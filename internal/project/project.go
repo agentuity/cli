@@ -25,7 +25,7 @@ type InitProjectResult struct {
 
 // InitProject will open a browser and wait for the user to finish initializing the project.
 // It will return the API key and project ID if the project is initialized successfully.
-func InitProject(logger logger.Logger, baseUrl string, provider string) (*InitProjectResult, error) {
+func InitProject(logger logger.Logger, baseUrl string, provider string, name string, description string) (*InitProjectResult, error) {
 	var result InitProjectResult
 	callback := func(query url.Values) error {
 		apikey := query.Get("apikey")
@@ -46,8 +46,12 @@ func InitProject(logger logger.Logger, baseUrl string, provider string) (*InitPr
 		return nil
 	}
 	var query map[string]string
-	if provider != "" {
-		query = map[string]string{"provider": provider}
+	query = map[string]string{"provider": provider}
+	if name != "" {
+		query["name"] = name
+	}
+	if description != "" {
+		query["description"] = description
 	}
 	if err := util.BrowserFlow(util.BrowserFlowOptions{
 		Logger:      logger,

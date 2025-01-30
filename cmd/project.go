@@ -6,7 +6,7 @@ import (
 
 	"github.com/agentuity/cli/internal/env"
 	"github.com/agentuity/cli/internal/project"
-	"github.com/agentuity/cli/internal/project/autodetect"
+	"github.com/agentuity/cli/internal/provider"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -45,12 +45,11 @@ var projectInitCmd = &cobra.Command{
 		}
 		appUrl := viper.GetString("overrides.app_url")
 		initScreenWithLogo()
-		projectType, err := autodetect.Detect(logger, dir)
+		detection, err := provider.Detect(logger, dir)
 		if err != nil {
 			logger.Fatal("failed to detect project type: %s", err)
 		}
-		logger.Debug("Detected project type: %s", projectType)
-		result, err := project.InitProject(logger, appUrl, projectType)
+		result, err := project.InitProject(logger, appUrl, detection.Provider, detection.Name, detection.Description)
 		if err != nil {
 			logger.Fatal("failed to initialize project: %s", err)
 		}

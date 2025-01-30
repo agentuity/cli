@@ -3,8 +3,8 @@ package cmd
 import (
 	"os"
 
-	"github.com/agentuity/cli/internal/dev"
 	"github.com/agentuity/cli/internal/project"
+	"github.com/agentuity/cli/internal/provider"
 	csys "github.com/shopmonkeyus/go-common/sys"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -36,7 +36,7 @@ var devRunCmd = &cobra.Command{
 			logger.Fatal("no agentuity.yaml file found in the current directory")
 		}
 		apiUrl := viper.GetString("overrides.api_url")
-		provider, err := dev.NewProvider(logger, dir, args, apiUrl)
+		provider, err := provider.RunDev(logger, dir, apiUrl, args)
 		if err != nil {
 			logger.Fatal("failed to run development server: %s", err)
 		}

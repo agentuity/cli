@@ -3,6 +3,7 @@ module github.com/agentuity/cli
 go 1.23.4
 
 require (
+	github.com/BurntSushi/toml v1.4.0
 	github.com/fatih/color v1.18.0
 	github.com/inancgumus/screen v0.0.0-20190314163918-06e984b86ed3
 	github.com/leaanthony/spinner v0.5.4
