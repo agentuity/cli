@@ -2,12 +2,14 @@ package util
 
 import "golang.org/x/exp/rand"
 
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const alphaNumChars = "abcdefghjklmnpqrstuvwxyz23456789"
 
+// RandStringBytes will generate a random string of length n using the alphaNumChars string.
 func RandStringBytes(n int) string {
 	b := make([]byte, n)
+	l := len(alphaNumChars)
 	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+		b[i] = alphaNumChars[rand.Intn(l)]
 	}
 	return string(b)
 }

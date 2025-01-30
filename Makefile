@@ -1,4 +1,7 @@
-.PHONY: build
+.PHONY: build fmt
 
-build:
+build: fmt
 	@go build -o agentuity
+
+fmt:
+	@go fmt ./...

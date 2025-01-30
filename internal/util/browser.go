@@ -29,6 +29,9 @@ type BrowserFlowOptions struct {
 	Callback    browserCallback
 }
 
+// BrowserFlow will open a browser and wait for the user to finish the flow.
+// It will return an error if the flow times out with an ErrTimeout error.
+// It will return an error if the callback fails or any other error occurs.
 func BrowserFlow(opts BrowserFlowOptions) error {
 
 	logger := opts.Logger

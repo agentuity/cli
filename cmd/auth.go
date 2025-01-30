@@ -8,7 +8,7 @@ import (
 
 var authCmd = &cobra.Command{
 	Use:   "auth",
-	Short: "Authentication and authorization commands",
+	Short: "Authentication and authorization related commands",
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
