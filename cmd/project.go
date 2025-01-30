@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"os"
+	"path/filepath"
 
+	"github.com/agentuity/cli/internal/env"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/project/autodetect"
 	"github.com/spf13/cobra"
@@ -51,6 +53,30 @@ var projectInitCmd = &cobra.Command{
 		result, err := project.InitProject(logger, appUrl, projectType)
 		if err != nil {
 			logger.Fatal("failed to initialize project: %s", err)
+		}
+		project := project.NewProject()
+		project.ProjectId = result.ProjectId
+		project.Provider = result.Provider
+		if err := project.Save(dir); err != nil {
+			logger.Fatal("failed to save project: %s", err)
+		}
+		filename := filepath.Join(dir, ".env")
+		envLines, err := env.ParseEnvFile(filename)
+		if err != nil {
+			logger.Fatal("failed to parse .env file: %s", err)
+		}
+		var found bool
+		for _, envLine := range envLines {
+			if envLine.Key == "AGENTUITY_API_KEY" {
+				envLine.Val = result.APIKey
+				found = true
+			}
+		}
+		if !found {
+			envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_API_KEY", Val: result.APIKey})
+		}
+		if err := env.WriteEnvFile(filename, envLines); err != nil {
+			logger.Fatal("failed to write .env file: %s", err)
 		}
 		logger.Info("Project initialized successfully: %s", result.APIKey)
 	},

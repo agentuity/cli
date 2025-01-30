@@ -85,6 +85,10 @@ func init() {
 	authCmd.PersistentFlags().MarkHidden("app-url")
 	viper.BindPFlag("overrides.app_url", authCmd.PersistentFlags().Lookup("app-url"))
 
+	authCmd.PersistentFlags().String("api-url", "https://api.agentuity.com", "The base url of the Agentuity API")
+	authCmd.PersistentFlags().MarkHidden("api-url")
+	viper.BindPFlag("overrides.api_url", authCmd.PersistentFlags().Lookup("api-url"))
+
 	rootCmd.AddCommand(authCmd)
 	authCmd.AddCommand(authLoginCmd)
 	authCmd.AddCommand(authLogoutCmd)
