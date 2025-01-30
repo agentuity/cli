@@ -32,9 +32,18 @@ type Runner interface {
 
 // Provider is the interface that is implemented by the provider to perform implementation specific logic.
 type Provider interface {
+	// Name will return the name of the provider in a format that is easy to use in a CLI.
+	Name() string
+
+	// Identifier will return the identifier of the provider in a format that is easy to use in a CLI.
+	Identifier() string
+
 	// Detect will detect the provider for the given directory.
 	// It will return the detection if it is found, otherwise it will return nil.
 	Detect(logger logger.Logger, dir string, state map[string]any) (*Detection, error)
+
+	// NewProject will create a new project for the given provider.
+	NewProject(logger logger.Logger, dir string, name string) error
 
 	// RunDev will run the development mode for the given provider.
 	// It will return the runner if it is found, otherwise it will return nil.
@@ -45,6 +54,11 @@ var providers = map[string]Provider{}
 
 func register(name string, provider Provider) {
 	providers[name] = provider
+}
+
+// GetProviders will return the registered providers.
+func GetProviders() map[string]Provider {
+	return providers
 }
 
 // Detect will detect the provider for the given directory.

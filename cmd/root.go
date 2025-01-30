@@ -150,3 +150,24 @@ func initScreenWithLogo() {
 	fmt.Println()
 
 }
+
+func resolveDir(logger logger.Logger, dir string, createIfNotExists bool) string {
+	if dir == "." {
+		cwd, err := os.Getwd()
+		if err != nil {
+			logger.Fatal("failed to get current directory: %s", err)
+		}
+		dir = cwd
+	}
+
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if createIfNotExists {
+			if err := os.MkdirAll(dir, 0700); err != nil {
+				logger.Fatal("failed to create directory: %s", err)
+			}
+		} else {
+			logger.Fatal("directory does not exist: %s", dir)
+		}
+	}
+	return dir
+}

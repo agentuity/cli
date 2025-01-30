@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -89,6 +90,19 @@ func getUVCommand(logger logger.Logger, uv string, dir string, args []string, en
 	return cmd
 }
 
+func runUVCommand(uv string, dir string, args []string) error {
+	cmd := exec.Command(uv, args...)
+	cmd.Dir = dir
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func runUVNewVirtualEnv(uv string, dir string) error {
+	return runUVCommand(uv, dir, []string{"venv", filepath.Join(dir, ".venv")})
+}
+
 // PythonRunner is the runner implementation for python projects.
 type PythonRunner struct {
 	logger  logger.Logger
@@ -152,4 +166,28 @@ func newPythonRunner(logger logger.Logger, dir string, env []string, args []stri
 		restart: make(chan struct{}),
 		done:    make(chan struct{}),
 	}
+}
+
+func patchImport(buf string, token string) (string, error) {
+	i := strings.Index(buf, "import ")
+	if i < 0 {
+		return buf, fmt.Errorf("couldn't find any imports in this file")
+	}
+
+	// add our import
+	before := buf[:i]
+	after := buf[i:]
+	buf = before + "import agentuity\n" + after
+
+	i = strings.Index(buf, token)
+	if i < 0 {
+		return buf, fmt.Errorf("couldn't find %s in this file", token)
+	}
+
+	// patch in our init function
+	before = buf[:i]
+	after = buf[i:]
+	buf = before + "agentuity.init()\n\n" + after
+
+	return buf, nil
 }
