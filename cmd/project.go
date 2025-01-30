@@ -39,9 +39,9 @@ func initProject(logger logger.Logger, appUrl string, dir string, provider strin
 		logger.Fatal("failed to parse .env file: %s", err)
 	}
 	var found bool
-	for _, envLine := range envLines {
+	for i, envLine := range envLines {
 		if envLine.Key == "AGENTUITY_API_KEY" {
-			envLine.Val = result.APIKey
+			envLines[i].Val = result.APIKey
 			found = true
 		}
 	}
