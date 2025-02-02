@@ -19,6 +19,7 @@ limitations under the License.
 // rename Ignore to .gitignore from .helmignore
 // support ** rules by using doublestar library
 // add more default rules
+// added ability to add additional rules programatically
 
 package ignore
 
@@ -66,6 +67,11 @@ func (r *Rules) AddDefaults() {
 	r.parseRule("LICENSE.md")
 	r.parseRule("LICENSE")
 	r.parseRule("Makefile")
+}
+
+// Add a rule to the ignore set.
+func (r *Rules) Add(rule string) error {
+	return r.parseRule(rule)
 }
 
 // ParseFile parses an ignore file and returns the *Rules.

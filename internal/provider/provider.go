@@ -48,6 +48,9 @@ type Provider interface {
 	// RunDev will run the development mode for the given provider.
 	// It will return the runner if it is found, otherwise it will return nil.
 	RunDev(logger logger.Logger, dir string, env []string, args []string) (Runner, error)
+
+	// ProjectIgnoreRules should return any additional project specific deployment ignore rules.
+	ProjectIgnoreRules() []string
 }
 
 var providers = map[string]Provider{}
@@ -59,6 +62,14 @@ func register(name string, provider Provider) {
 // GetProviders will return the registered providers.
 func GetProviders() map[string]Provider {
 	return providers
+}
+
+// GetProviderForName returns a provider registered as name or returns an error
+func GetProviderForName(name string) (Provider, error) {
+	if p, ok := providers[name]; ok {
+		return p, nil
+	}
+	return nil, fmt.Errorf("no provider registered: %s", name)
 }
 
 // Detect will detect the provider for the given directory.

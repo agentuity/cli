@@ -7,6 +7,7 @@ import (
 
 	"github.com/agentuity/cli/internal/ignore"
 	"github.com/agentuity/cli/internal/project"
+	"github.com/agentuity/cli/internal/provider"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/spf13/cobra"
 )
@@ -32,6 +33,11 @@ var cloudDeployCmd = &cobra.Command{
 			logger.Fatal("error loading project: %s", err)
 		}
 
+		p, err := provider.GetProviderForName(project.Provider)
+		if err != nil {
+			logger.Fatal("%s", err)
+		}
+
 		// TODO: request an upload token
 
 		// load up any gitignore files
@@ -46,8 +52,15 @@ var cloudDeployCmd = &cobra.Command{
 		}
 		rules.AddDefaults()
 
-		// create a temp file
-		tmpfile, err := os.CreateTemp("", "project-*.zip")
+		// add any provider specific ignore rules
+		for _, rule := range p.ProjectIgnoreRules() {
+			if err := rules.Add(rule); err != nil {
+				logger.Fatal("error adding rule: %s. %s", rule, err)
+			}
+		}
+
+		// create a temp file we're going to use for zip and upload
+		tmpfile, err := os.CreateTemp("", "agentuity-deploy-*.zip")
 		if err != nil {
 			logger.Fatal("error creating temp file: %s", err)
 		}

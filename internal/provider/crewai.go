@@ -73,6 +73,10 @@ func (p *CrewAIProvider) NewProject(logger logger.Logger, dir string, name strin
 	return nil
 }
 
+func (p *CrewAIProvider) ProjectIgnoreRules() []string {
+	return nil
+}
+
 func init() {
 	register("crewai", &CrewAIProvider{})
 }
