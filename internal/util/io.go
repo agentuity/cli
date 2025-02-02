@@ -1,10 +1,12 @@
 package util
 
 import (
+	"archive/zip"
 	"fmt"
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 )
 
 // Exists returns true if the filename or directory specified by fn exists.
@@ -73,4 +75,86 @@ func CopyDir(src string, dst string) error {
 		}
 	}
 	return nil
+}
+
+// ListDir will return an array of files recursively walking into sub directories
+func ListDir(dir string) ([]string, error) {
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	res := make([]string, 0)
+	for _, file := range files {
+		if file.IsDir() {
+			newres, err := ListDir(filepath.Join(dir, file.Name()))
+			if err != nil {
+				return nil, err
+			}
+			res = append(res, newres...)
+		} else {
+			if file.Name() == ".DS_Store" {
+				continue
+			}
+			res = append(res, filepath.Join(dir, file.Name()))
+		}
+	}
+	return res, nil
+}
+
+// ZipDirCallbackMatcher is a function that returns true if the file should be included in the zip
+type ZipDirCallbackMatcher func(fn string, fi os.FileInfo) bool
+
+// ZipDir will zip up a directory into the outfilename and return an error if it fails
+func ZipDir(dir string, outfilename string, opts ...ZipDirCallbackMatcher) error {
+	zf, err := os.Create(outfilename)
+	if err != nil {
+		return fmt.Errorf("error opening: %s. %w", outfilename, err)
+	}
+	defer zf.Close()
+	zw := zip.NewWriter(zf)
+	defer zw.Close()
+	files, err := ListDir(dir)
+	if err != nil {
+		return fmt.Errorf("error listing files: %w", err)
+	}
+	for _, file := range files {
+		fn, err := filepath.Rel(dir, file)
+		if err != nil {
+			return fmt.Errorf("error getting relative path: %s. %w", file, err)
+		}
+		rf, err := os.Open(file)
+		if err != nil {
+			return fmt.Errorf("error opening file: %s. %w", file, err)
+		}
+		defer rf.Close()
+		if len(opts) > 0 {
+			fi, err := rf.Stat()
+			if err != nil {
+				return fmt.Errorf("error getting file info: %s. %w", file, err)
+			}
+			var notok bool
+			for _, opt := range opts {
+				if !opt(fn, fi) {
+					rf.Close()
+					notok = true
+					break
+				}
+			}
+			if notok {
+				continue
+			}
+		}
+		w, err := zw.Create(fn)
+		if err != nil {
+			return fmt.Errorf("error creating file: %s. %w", fn, err)
+		}
+		_, err = io.Copy(w, rf)
+		if err != nil {
+			return fmt.Errorf("error copying file: %s. %w", file, err)
+		}
+		rf.Close()
+	}
+	zw.Flush()
+	zw.Close()
+	return zf.Close()
 }

@@ -3,7 +3,6 @@ package cmd
 import (
 	"os"
 
-	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/provider"
 	csys "github.com/shopmonkeyus/go-common/sys"
 	"github.com/spf13/cobra"
@@ -23,18 +22,7 @@ var devRunCmd = &cobra.Command{
 	Short: "Run the development server",
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := newLogger(cmd)
-		cwd, err := os.Getwd()
-		if err != nil {
-			logger.Fatal("failed to get current directory: %s", err)
-		}
-		dir := cwd
-		dirFlag, _ := cmd.Flags().GetString("dir")
-		if dirFlag != "" {
-			dir = dirFlag
-		}
-		if !project.ProjectExists(dir) {
-			logger.Fatal("no agentuity.yaml file found in the current directory")
-		}
+		dir := resolveProjectDir(logger, cmd)
 		apiUrl := viper.GetString("overrides.api_url")
 		provider, err := provider.RunDev(logger, dir, apiUrl, args)
 		if err != nil {

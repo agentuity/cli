@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/agentuity/cli/internal/project"
 	"github.com/fatih/color"
 	"github.com/inancgumus/screen"
 	"github.com/shopmonkeyus/go-common/logger"
@@ -168,6 +169,26 @@ func resolveDir(logger logger.Logger, dir string, createIfNotExists bool) string
 		} else {
 			logger.Fatal("directory does not exist: %s", dir)
 		}
+	}
+	return dir
+}
+
+func resolveProjectDir(logger logger.Logger, cmd *cobra.Command) string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		logger.Fatal("failed to get current directory: %s", err)
+	}
+	dir := cwd
+	dirFlag, _ := cmd.Flags().GetString("dir")
+	if dirFlag != "" {
+		dir = dirFlag
+	}
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		logger.Fatal("failed to get absolute path: %s", err)
+	}
+	if !project.ProjectExists(abs) {
+		logger.Fatal("no agentuity.yaml file found in the current directory")
 	}
 	return dir
 }

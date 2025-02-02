@@ -9,6 +9,7 @@ import (
 	"github.com/agentuity/cli/internal/util"
 	"github.com/shopmonkeyus/go-common/logger"
 	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
@@ -45,8 +46,7 @@ func InitProject(logger logger.Logger, baseUrl string, provider string, name str
 		result.Provider = provider
 		return nil
 	}
-	var query map[string]string
-	query = map[string]string{"provider": provider}
+	query := map[string]string{"provider": provider}
 	if name != "" {
 		query["name"] = name
 	}
@@ -77,9 +77,22 @@ func ProjectExists(dir string) bool {
 	return err == nil
 }
 
+type Resources struct {
+	Memory string `json:"memory,omitempty" yaml:"memory,omitempty"`
+	CPU    string `json:"cpu,omitempty" yaml:"cpu,omitempty"`
+
+	CPUQuantity    resource.Quantity `json:"-" yaml:"-"`
+	MemoryQuantity resource.Quantity `json:"-" yaml:"-"`
+}
+
+type Deployment struct {
+	Resources *Resources `json:"resources,omitempty" yaml:"resources,omitempty"`
+}
+
 type Project struct {
-	ProjectId string `json:"project_id" yaml:"project_id"`
-	Provider  string `json:"provider" yaml:"provider"`
+	ProjectId  string      `json:"project_id" yaml:"project_id"`
+	Provider   string      `json:"provider" yaml:"provider"`
+	Deployment *Deployment `json:"deploy,omitempty" yaml:"deploy,omitempty"`
 }
 
 // Load will load the project from a file in the given directory.
@@ -93,7 +106,30 @@ func (p *Project) Load(dir string) error {
 		return err
 	}
 	defer of.Close()
-	return yaml.NewDecoder(of).Decode(p)
+	if err := yaml.NewDecoder(of).Decode(p); err != nil {
+		return err
+	}
+	if p.ProjectId == "" {
+		return fmt.Errorf("missing project_id value")
+	}
+	if p.Provider == "" {
+		return fmt.Errorf("missing provider value")
+	}
+	if p.Deployment != nil {
+		if p.Deployment.Resources != nil {
+			val, err := resource.ParseQuantity(p.Deployment.Resources.CPU)
+			if err != nil {
+				return fmt.Errorf("error validating deploy cpu value '%s'. %w", p.Deployment.Resources.CPU, err)
+			}
+			p.Deployment.Resources.CPUQuantity = val
+			val, err = resource.ParseQuantity(p.Deployment.Resources.Memory)
+			if err != nil {
+				return fmt.Errorf("error validating deploy memory value '%s'. %w", p.Deployment.Resources.Memory, err)
+			}
+			p.Deployment.Resources.MemoryQuantity = val
+		}
+	}
+	return nil
 }
 
 // Save will save the project to a file in the given directory.
