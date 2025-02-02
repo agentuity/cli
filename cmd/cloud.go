@@ -13,6 +13,7 @@ import (
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/provider"
 	"github.com/agentuity/cli/internal/util"
+	"github.com/agentuity/go-common/env"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -38,7 +39,7 @@ var cloudDeployCmd = &cobra.Command{
 	Use:   "deploy",
 	Short: "Deploy project to the cloud",
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := newLogger(cmd)
+		logger := env.NewLogger(cmd)
 		dir := resolveProjectDir(logger, cmd)
 
 		// validate our project

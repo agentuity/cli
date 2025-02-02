@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/agentuity/cli/internal/env"
 	"github.com/agentuity/cli/internal/project"
-	"github.com/shopmonkeyus/go-common/logger"
+	"github.com/agentuity/go-common/env"
+	"github.com/agentuity/go-common/logger"
 )
 
 // Detection is the structure that is returned by the Detect function.

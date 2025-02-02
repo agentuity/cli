@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/agentuity/cli/internal/project"
+	"github.com/agentuity/go-common/logger"
 	"github.com/fatih/color"
 	"github.com/inancgumus/screen"
-	"github.com/shopmonkeyus/go-common/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -101,43 +101,10 @@ func initConfig() {
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err != nil {
-		fmt.Println(err)
-	}
+	viper.ReadInConfig()
 
 	viper.SetDefault("overrides.app_url", "https://app.agentuity.com")
 	viper.SetDefault("overrides.api_url", "https://api.agentuity.com")
-}
-
-func flagOrEnv(cmd *cobra.Command, flagName string, envName string, defaultValue string) string {
-	flagValue, _ := cmd.Flags().GetString(flagName)
-	if flagValue != "" {
-		return flagValue
-	}
-	if val, ok := os.LookupEnv(envName); ok {
-		return val
-	}
-	return defaultValue
-}
-
-func newLogger(cmd *cobra.Command) logger.Logger {
-	log.SetFlags(0)
-	level := flagOrEnv(cmd, "log-level", "AGENTUITY_LOG_LEVEL", "info")
-	switch level {
-	case "debug", "DEBUG":
-		return logger.NewConsoleLogger(logger.LevelDebug)
-	case "warn", "WARN":
-		return logger.NewConsoleLogger(logger.LevelWarn)
-	case "error", "ERROR":
-		return logger.NewConsoleLogger(logger.LevelError)
-	case "trace", "TRACE":
-		return logger.NewConsoleLogger(logger.LevelTrace)
-	case "info", "INFO":
-	default:
-	}
-	return logger.NewConsoleLogger(logger.LevelInfo)
 }
 
 func printSuccess(msg string) {

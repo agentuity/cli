@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/agentuity/cli/internal/util"
-	"github.com/shopmonkeyus/go-common/logger"
+	"github.com/agentuity/go-common/logger"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/api/resource"
 )

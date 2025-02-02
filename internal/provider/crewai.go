@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/agentuity/cli/internal/util"
-	"github.com/shopmonkeyus/go-common/logger"
+	"github.com/agentuity/go-common/logger"
 )
 
 // CrewAIProvider is the provider implementation for the [CrewAI] framework.

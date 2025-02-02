@@ -4,7 +4,8 @@ import (
 	"os"
 
 	"github.com/agentuity/cli/internal/provider"
-	csys "github.com/shopmonkeyus/go-common/sys"
+	"github.com/agentuity/go-common/env"
+	csys "github.com/agentuity/go-common/sys"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -21,7 +22,7 @@ var devRunCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run the development server",
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := newLogger(cmd)
+		logger := env.NewLogger(cmd)
 		dir := resolveProjectDir(logger, cmd)
 		apiUrl := viper.GetString("overrides.api_url")
 		provider, err := provider.RunDev(logger, dir, apiUrl, args)

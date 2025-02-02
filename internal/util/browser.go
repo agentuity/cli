@@ -9,9 +9,9 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/agentuity/go-common/logger"
 	"github.com/leaanthony/spinner"
 	"github.com/pkg/browser"
-	"github.com/shopmonkeyus/go-common/logger"
 )
 
 var ErrTimeout = errors.New("timeout")

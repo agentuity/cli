@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/agentuity/cli/internal/auth"
+	"github.com/agentuity/go-common/env"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -18,7 +19,7 @@ var authLoginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "Login to the Agentuity Cloud Platform",
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := newLogger(cmd)
+		logger := env.NewLogger(cmd)
 		appUrl := viper.GetString("overrides.app_url")
 		initScreenWithLogo()
 		authResult, err := auth.Login(logger, appUrl)
@@ -39,7 +40,7 @@ var authLogoutCmd = &cobra.Command{
 	Use:   "logout",
 	Short: "Logout of the Agentuity Cloud Platform",
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := newLogger(cmd)
+		logger := env.NewLogger(cmd)
 		appUrl := viper.GetString("overrides.app_url")
 		token := viper.GetString("auth.token")
 		if token == "" {
@@ -63,7 +64,7 @@ var authWhoamiCmd = &cobra.Command{
 	Use:   "whoami",
 	Short: "Print the current logged in user details",
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := newLogger(cmd)
+		logger := env.NewLogger(cmd)
 		token := viper.GetString("auth.token")
 		if token == "" {
 			logger.Fatal("you are not logged in")

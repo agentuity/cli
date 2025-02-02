@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	"github.com/BurntSushi/toml"
-	"github.com/shopmonkeyus/go-common/logger"
+	"github.com/agentuity/go-common/logger"
 )
 
 // PyProject is the structure that is used to parse the pyproject.toml file.
