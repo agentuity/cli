@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -154,11 +155,11 @@ var cloudDeployCmd = &cobra.Command{
 		if err != nil {
 			logger.Fatal("error uploading deployment: %s", err)
 		}
-		resp.Body.Close()
-
 		if resp.StatusCode != http.StatusOK {
-			logger.Fatal("error uploading deployment (%s)", resp.Status)
+			buf, _ := io.ReadAll(resp.Body)
+			logger.Fatal("error uploading deployment (%s) %s", resp.Status, string(buf))
 		}
+		resp.Body.Close()
 		logger.Debug("deployment uploaded %d bytes in %v", fi.Size(), time.Since(started))
 
 		// tell the api that we've completed the upload for the deployment
