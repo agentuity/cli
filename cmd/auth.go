@@ -62,14 +62,9 @@ var authWhoamiCmd = &cobra.Command{
 	Use:   "whoami",
 	Short: "Print the current logged in user details",
 	Run: func(cmd *cobra.Command, args []string) {
-<<<<<<< HEAD
 		logger := env.NewLogger(cmd)
-		token := viper.GetString("auth.token")
-=======
-		logger := newLogger(cmd)
-		token := viper.GetString("auth.api_key")
->>>>>>> main
-		if token == "" {
+		apikey := viper.GetString("auth.api_key")
+		if apikey == "" {
 			logger.Fatal("you are not logged in")
 		}
 		userId := viper.GetString("auth.user_id")
