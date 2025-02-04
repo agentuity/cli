@@ -90,17 +90,28 @@ func getUVCommand(logger logger.Logger, uv string, dir string, args []string, en
 	return cmd
 }
 
-func runUVCommand(uv string, dir string, args []string) error {
+func runUVCommand(logger logger.Logger, uv string, dir string, args []string, env []string) error {
 	cmd := exec.Command(uv, args...)
 	cmd.Dir = dir
+	cmd.Env = append(env, os.Environ()...)
+	logger.Debug("running %s with env: %s in directory: %s and args: %s", uv, strings.Join(cmd.Env, " "), dir, strings.Join(args, " "))
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
-func runUVNewVirtualEnv(uv string, dir string) error {
-	return runUVCommand(uv, dir, []string{"venv", filepath.Join(dir, ".venv")})
+func createUVNewVirtualEnv(logger logger.Logger, uv string, dir string, version string) ([]string, error) {
+	venv := filepath.Join(dir, ".venv")
+	if err := runUVCommand(logger, uv, dir, []string{"venv", venv, "--python", version}, nil); err != nil {
+		return nil, fmt.Errorf("failed to create virtual environment: %w", err)
+	}
+	bin := filepath.Join(venv, "bin")
+	env := []string{
+		"VIRTUAL_ENV=" + venv,
+		"PATH=" + bin + string(os.PathListSeparator) + os.Getenv("PATH"),
+	}
+	return env, nil
 }
 
 // PythonRunner is the runner implementation for python projects.

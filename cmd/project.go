@@ -61,8 +61,8 @@ var projectNewCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		token := viper.GetString("auth.token")
-		if token == "" {
+		apikey := viper.GetString("auth.api_key")
+		if apikey == "" {
 			logger.Fatal("you are not logged in")
 		}
 
@@ -158,7 +158,7 @@ var projectInitCmd = &cobra.Command{
 		logger := env.NewLogger(cmd)
 		dir := resolveDir(logger, args[0], false)
 
-		token := viper.GetString("auth.token")
+		token := viper.GetString("auth.api_key")
 		if token == "" {
 			logger.Fatal("you are not logged in")
 		}
