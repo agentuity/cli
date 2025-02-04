@@ -41,7 +41,7 @@ func (p *CrewAIProvider) NewProject(logger logger.Logger, dir string, name strin
 		return err
 	}
 	if ok {
-		env, err := createUVNewVirtualEnv(logger, uv, dir)
+		env, err := createUVNewVirtualEnv(logger, uv, dir, ">=3.10")
 		if err != nil {
 			return err
 		}

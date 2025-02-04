@@ -94,16 +94,16 @@ func runUVCommand(logger logger.Logger, uv string, dir string, args []string, en
 	cmd := exec.Command(uv, args...)
 	cmd.Dir = dir
 	cmd.Env = append(env, os.Environ()...)
-	logger.Debug("running %s with env: %s in directory: %s", uv, strings.Join(cmd.Env, " "), dir)
+	logger.Debug("running %s with env: %s in directory: %s and args: %s", uv, strings.Join(cmd.Env, " "), dir, strings.Join(args, " "))
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
-func createUVNewVirtualEnv(logger logger.Logger, uv string, dir string) ([]string, error) {
+func createUVNewVirtualEnv(logger logger.Logger, uv string, dir string, version string) ([]string, error) {
 	venv := filepath.Join(dir, ".venv")
-	if err := runUVCommand(logger, uv, dir, []string{"venv", venv}, nil); err != nil {
+	if err := runUVCommand(logger, uv, dir, []string{"venv", venv, "--python", version}, nil); err != nil {
 		return nil, fmt.Errorf("failed to create virtual environment: %w", err)
 	}
 	bin := filepath.Join(venv, "bin")
