@@ -7,9 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/agentuity/cli/internal/project"
+	"github.com/agentuity/go-common/logger"
 	"github.com/fatih/color"
 	"github.com/inancgumus/screen"
-	"github.com/shopmonkeyus/go-common/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -100,42 +101,10 @@ func initConfig() {
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		return
-	}
+	viper.ReadInConfig()
 
 	viper.SetDefault("overrides.app_url", "https://app.agentuity.com")
-}
-
-func flagOrEnv(cmd *cobra.Command, flagName string, envName string, defaultValue string) string {
-	flagValue, _ := cmd.Flags().GetString(flagName)
-	if flagValue != "" {
-		return flagValue
-	}
-	if val, ok := os.LookupEnv(envName); ok {
-		return val
-	}
-	return defaultValue
-}
-
-func newLogger(cmd *cobra.Command) logger.Logger {
-	log.SetFlags(0)
-	level := flagOrEnv(cmd, "log-level", "AGENTUITY_LOG_LEVEL", "info")
-	switch level {
-	case "debug", "DEBUG":
-		return logger.NewConsoleLogger(logger.LevelDebug)
-	case "warn", "WARN":
-		return logger.NewConsoleLogger(logger.LevelWarn)
-	case "error", "ERROR":
-		return logger.NewConsoleLogger(logger.LevelError)
-	case "trace", "TRACE":
-		return logger.NewConsoleLogger(logger.LevelTrace)
-	case "info", "INFO":
-	default:
-	}
-	return logger.NewConsoleLogger(logger.LevelInfo)
+	viper.SetDefault("overrides.api_url", "https://api.agentuity.com")
 }
 
 func printSuccess(msg string) {
@@ -170,4 +139,34 @@ func resolveDir(logger logger.Logger, dir string, createIfNotExists bool) string
 		}
 	}
 	return dir
+}
+
+func resolveProjectDir(logger logger.Logger, cmd *cobra.Command) string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		logger.Fatal("failed to get current directory: %s", err)
+	}
+	dir := cwd
+	dirFlag, _ := cmd.Flags().GetString("dir")
+	if dirFlag != "" {
+		dir = dirFlag
+	}
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		logger.Fatal("failed to get absolute path: %s", err)
+	}
+	if !project.ProjectExists(abs) {
+		logger.Fatal("no agentuity.yaml file found in the current directory")
+	}
+	return dir
+}
+
+func addURLFlags(cmd *cobra.Command) {
+	cmd.PersistentFlags().String("app-url", "https://app.agentuity.com", "The base url of the Agentuity Console app")
+	cmd.PersistentFlags().MarkHidden("app-url")
+	viper.BindPFlag("overrides.app_url", cmd.PersistentFlags().Lookup("app-url"))
+
+	cmd.PersistentFlags().String("api-url", "https://api.agentuity.com", "The base url of the Agentuity API")
+	cmd.PersistentFlags().MarkHidden("api-url")
+	viper.BindPFlag("overrides.api_url", cmd.PersistentFlags().Lookup("api-url"))
 }

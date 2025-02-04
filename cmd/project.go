@@ -4,12 +4,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/agentuity/cli/internal/env"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/provider"
 	"github.com/agentuity/cli/internal/util"
+	"github.com/agentuity/go-common/env"
+	"github.com/agentuity/go-common/logger"
 	"github.com/charmbracelet/huh"
-	"github.com/shopmonkeyus/go-common/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -60,9 +60,9 @@ var projectNewCmd = &cobra.Command{
 	Aliases: []string{"create"},
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := newLogger(cmd)
-		token := viper.GetString("auth.api_key")
-		if token == "" {
+		logger := env.NewLogger(cmd)
+		apikey := viper.GetString("auth.api_key")
+		if apikey == "" {
 			logger.Fatal("you are not logged in")
 		}
 
@@ -155,7 +155,7 @@ var projectInitCmd = &cobra.Command{
 	Short: "Initialize a new project",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := newLogger(cmd)
+		logger := env.NewLogger(cmd)
 		dir := resolveDir(logger, args[0], false)
 
 		token := viper.GetString("auth.api_key")

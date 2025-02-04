@@ -2,7 +2,7 @@ package auth
 
 import (
 	"github.com/agentuity/cli/internal/util"
-	"github.com/shopmonkeyus/go-common/logger"
+	"github.com/agentuity/go-common/logger"
 )
 
 const (

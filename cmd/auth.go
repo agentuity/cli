@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/agentuity/cli/internal/auth"
+	"github.com/agentuity/go-common/env"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -18,7 +19,7 @@ var authLoginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "Login to the Agentuity Cloud Platform",
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := newLogger(cmd)
+		logger := env.NewLogger(cmd)
 		appUrl := viper.GetString("overrides.app_url")
 		initScreenWithLogo()
 		authResult, err := auth.Login(logger, appUrl)
@@ -38,7 +39,7 @@ var authLogoutCmd = &cobra.Command{
 	Use:   "logout",
 	Short: "Logout of the Agentuity Cloud Platform",
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := newLogger(cmd)
+		logger := env.NewLogger(cmd)
 		appUrl := viper.GetString("overrides.app_url")
 		token := viper.GetString("auth.api_key")
 		if token == "" {
@@ -61,9 +62,9 @@ var authWhoamiCmd = &cobra.Command{
 	Use:   "whoami",
 	Short: "Print the current logged in user details",
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := newLogger(cmd)
-		token := viper.GetString("auth.api_key")
-		if token == "" {
+		logger := env.NewLogger(cmd)
+		apikey := viper.GetString("auth.api_key")
+		if apikey == "" {
 			logger.Fatal("you are not logged in")
 		}
 		userId := viper.GetString("auth.user_id")
@@ -75,16 +76,9 @@ var authWhoamiCmd = &cobra.Command{
 }
 
 func init() {
-	authCmd.PersistentFlags().String("app-url", "https://app.agentuity.com", "The base url of the Agentuity Console app")
-	authCmd.PersistentFlags().MarkHidden("app-url")
-	viper.BindPFlag("overrides.app_url", authCmd.PersistentFlags().Lookup("app-url"))
-
-	authCmd.PersistentFlags().String("api-url", "https://api.agentuity.com", "The base url of the Agentuity API")
-	authCmd.PersistentFlags().MarkHidden("api-url")
-	viper.BindPFlag("overrides.api_url", authCmd.PersistentFlags().Lookup("api-url"))
-
 	rootCmd.AddCommand(authCmd)
 	authCmd.AddCommand(authLoginCmd)
 	authCmd.AddCommand(authLogoutCmd)
 	authCmd.AddCommand(authWhoamiCmd)
+	addURLFlags(authCmd)
 }

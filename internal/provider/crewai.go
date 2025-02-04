@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/agentuity/cli/internal/util"
-	"github.com/shopmonkeyus/go-common/logger"
+	"github.com/agentuity/go-common/logger"
 )
 
 // CrewAIProvider is the provider implementation for the [CrewAI] framework.
@@ -75,6 +75,10 @@ func (p *CrewAIProvider) NewProject(logger logger.Logger, dir string, name strin
 			return fmt.Errorf("failed to write main file: %w", err)
 		}
 	}
+	return nil
+}
+
+func (p *CrewAIProvider) ProjectIgnoreRules() []string {
 	return nil
 }
 
