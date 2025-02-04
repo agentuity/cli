@@ -1,68 +1,72 @@
 package project
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
-	"net/url"
+	"net/http"
 	"os"
 	"path/filepath"
 
-	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
-	initPath        = "/project/init"
-	initWaitMessage = "Waiting for init to complete in the browser..."
+	initPath = "/cli/project"
 )
 
-type InitProjectResult struct {
-	APIKey    string
-	ProjectId string
-	Provider  string
+type initProjectResult struct {
+	Success bool        `json:"success"`
+	Data    ProjectData `json:"data"`
+	Message string      `json:"message"`
 }
 
-// InitProject will open a browser and wait for the user to finish initializing the project.
+type ProjectData struct {
+	APIKey    string `json:"api_key"`
+	ProjectId string `json:"id"`
+}
+
+// InitProject will create a new project in the organization.
 // It will return the API key and project ID if the project is initialized successfully.
-func InitProject(logger logger.Logger, baseUrl string, provider string, name string, description string) (*InitProjectResult, error) {
-	var result InitProjectResult
-	callback := func(query url.Values) error {
-		apikey := query.Get("apikey")
-		projectId := query.Get("project_id")
-		provider := query.Get("provider")
-		if apikey == "" {
-			return fmt.Errorf("no apikey found")
-		}
-		if projectId == "" {
-			return fmt.Errorf("no project_id found")
-		}
-		if provider == "" {
-			return fmt.Errorf("no provider found")
-		}
-		result.APIKey = apikey
-		result.ProjectId = projectId
-		result.Provider = provider
-		return nil
+func InitProject(logger logger.Logger, baseUrl string, token string, orgId string, provider string, name string, description string) (*ProjectData, error) {
+
+	payload := map[string]string{
+		"organization_id": orgId,
+		"provider":        provider,
+		"name":            name,
+		"description":     description,
 	}
-	query := map[string]string{"provider": provider}
-	if name != "" {
-		query["name"] = name
-	}
-	if description != "" {
-		query["description"] = description
-	}
-	if err := util.BrowserFlow(util.BrowserFlowOptions{
-		Logger:      logger,
-		BaseUrl:     baseUrl,
-		StartPath:   initPath,
-		WaitMessage: initWaitMessage,
-		Callback:    callback,
-		Query:       query,
-	}); err != nil {
+
+	body, err := json.Marshal(payload)
+	if err != nil {
 		return nil, err
 	}
-	return &result, nil
+
+	req, err := http.NewRequest("POST", baseUrl+initPath, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to initialize project: %s", resp.Status)
+	}
+
+	var result initProjectResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result.Data, nil
 }
 
 func getFilename(dir string) string {

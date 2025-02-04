@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/agentuity/cli/internal/organization"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/provider"
 	"github.com/agentuity/cli/internal/util"
@@ -22,14 +23,14 @@ var projectCmd = &cobra.Command{
 	},
 }
 
-func initProject(logger logger.Logger, appUrl string, dir string, provider string, name string, description string) *project.InitProjectResult {
-	result, err := project.InitProject(logger, appUrl, provider, name, description)
+func initProject(logger logger.Logger, appUrl string, dir string, token string, orgId string, provider string, name string, description string) *project.ProjectData {
+	result, err := project.InitProject(logger, appUrl, token, orgId, provider, name, description)
 	if err != nil {
 		logger.Fatal("failed to initialize project: %s", err)
 	}
 	project := project.NewProject()
 	project.ProjectId = result.ProjectId
-	project.Provider = result.Provider
+	project.Provider = provider
 	if err := project.Save(dir); err != nil {
 		logger.Fatal("failed to save project: %s", err)
 	}
@@ -54,6 +55,32 @@ func initProject(logger logger.Logger, appUrl string, dir string, provider strin
 	return result
 }
 
+func promptForOrganization(logger logger.Logger, theme *huh.Theme, apiUrl string, token string) (string, error) {
+	orgs, err := organization.ListOrganizations(logger, apiUrl, token)
+	if err != nil {
+		logger.Fatal("failed to list organizations: %s", err)
+	}
+	if len(orgs) == 0 {
+		logger.Fatal("you are not a member of any organizations")
+	}
+	var orgId string
+	if len(orgs) == 1 {
+		orgId = orgs[0].OrgId
+	} else {
+		var opts []huh.Option[string]
+		for _, org := range orgs {
+			opts = append(opts, huh.NewOption(org.Name, org.OrgId))
+		}
+		if huh.NewSelect[string]().
+			Title("What organization should we create the project in?").
+			Options(opts...).
+			Value(&orgId).WithTheme(theme).Run() != nil {
+			logger.Fatal("failed to get organization")
+		}
+	}
+	return orgId, nil
+}
+
 var projectNewCmd = &cobra.Command{
 	Use:     "new",
 	Short:   "Create a new project",
@@ -66,7 +93,7 @@ var projectNewCmd = &cobra.Command{
 			logger.Fatal("you are not logged in")
 		}
 
-		appUrl := viper.GetString("overrides.app_url")
+		apiUrl := viper.GetString("overrides.api_url")
 		initScreenWithLogo()
 
 		cwd, err := os.Getwd()
@@ -75,6 +102,11 @@ var projectNewCmd = &cobra.Command{
 		}
 
 		theme := huh.ThemeCatppuccin()
+
+		orgId, err := promptForOrganization(logger, theme, apiUrl, apikey)
+		if err != nil {
+			logger.Fatal("failed to get organization: %s", err)
+		}
 
 		var name string
 
@@ -144,7 +176,7 @@ var projectNewCmd = &cobra.Command{
 			logger.Fatal("failed to create project: %s", err)
 		}
 
-		initProject(logger, appUrl, projectDir, providerName, name, "")
+		initProject(logger, apiUrl, projectDir, apikey, orgId, providerName, name, "")
 
 		printSuccess("Project created successfully")
 	},
@@ -162,14 +194,20 @@ var projectInitCmd = &cobra.Command{
 		if token == "" {
 			logger.Fatal("you are not logged in")
 		}
-		appUrl := viper.GetString("overrides.app_url")
+		apiUrl := viper.GetString("overrides.api_url")
 		initScreenWithLogo()
 		detection, err := provider.Detect(logger, dir)
 		if err != nil {
 			logger.Fatal("failed to detect project type: %s", err)
 		}
 
-		initProject(logger, appUrl, dir, detection.Provider, detection.Name, detection.Description)
+		theme := huh.ThemeCatppuccin()
+		orgId, err := promptForOrganization(logger, theme, apiUrl, token)
+		if err != nil {
+			logger.Fatal("failed to get organization: %s", err)
+		}
+
+		initProject(logger, apiUrl, dir, token, orgId, detection.Provider, detection.Name, detection.Description)
 
 		logger.Info("Project initialized successfully")
 	},
