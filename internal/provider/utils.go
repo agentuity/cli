@@ -90,9 +90,10 @@ func getUVCommand(logger logger.Logger, uv string, dir string, args []string, en
 	return cmd
 }
 
-func runUVCommand(uv string, dir string, args []string) error {
+func runUVCommand(uv string, dir string, args []string, env []string) error {
 	cmd := exec.Command(uv, args...)
 	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), env...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -100,7 +101,7 @@ func runUVCommand(uv string, dir string, args []string) error {
 }
 
 func runUVNewVirtualEnv(uv string, dir string) error {
-	return runUVCommand(uv, dir, []string{"venv", filepath.Join(dir, ".venv")})
+	return runUVCommand(uv, dir, []string{"venv", filepath.Join(dir, ".venv")}, nil)
 }
 
 // PythonRunner is the runner implementation for python projects.

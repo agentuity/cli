@@ -41,10 +41,14 @@ func (p *CrewAIProvider) NewProject(logger logger.Logger, dir string, name strin
 		if err := runUVNewVirtualEnv(uv, dir); err != nil {
 			return err
 		}
-		if err := runUVCommand(uv, dir, []string{"pip", "install", "crewai"}); err != nil {
+		env := []string{
+			"VIRTUAL_ENV=" + filepath.Join(dir, ".venv"),
+			"PATH=" + filepath.Join(dir, ".venv", "bin") + string(os.PathListSeparator) + os.Getenv("PATH"),
+		}
+		if err := runUVCommand(uv, dir, []string{"pip", "install", "crewai"}, env); err != nil {
 			return err
 		}
-		if err := runUVCommand(uv, dir, []string{"run", "crewai", "create", "crew", name}); err != nil {
+		if err := runUVCommand(uv, dir, []string{"run", "crewai", "create", "crew", name}, env); err != nil {
 			return err
 		}
 		srcDir := filepath.Join(dir, name) // because create nests directories we need to unnest
@@ -54,7 +58,7 @@ func (p *CrewAIProvider) NewProject(logger logger.Logger, dir string, name strin
 		if err := os.RemoveAll(srcDir); err != nil {
 			return err
 		}
-		if err := runUVCommand(uv, dir, []string{"add", "agentuity"}); err != nil {
+		if err := runUVCommand(uv, dir, []string{"add", "agentuity"}, env); err != nil {
 			return err
 		}
 		mainFile := filepath.Join(dir, "src", name, "main.py")
