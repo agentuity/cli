@@ -22,7 +22,6 @@ type BrowserFlowOptions struct {
 	Logger      logger.Logger
 	BaseUrl     string
 	StartPath   string
-	SuccessPath string
 	WaitMessage string
 	AuthToken   string
 	Query       map[string]string
@@ -87,10 +86,21 @@ func BrowserFlow(opts BrowserFlowOptions) error {
 				return
 			}
 		}
-		u.Path = opts.SuccessPath
-		u.RawQuery = ""
-		w.Header().Set("Location", u.String())
-		w.WriteHeader(302)
+		callback := query.Get("callback")
+		if callback != "" {
+			cu, err := url.Parse(callback)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+			}
+			q := cu.Query()
+			q.Set("success", "true")
+			cu.RawQuery = q.Encode()
+			logger.Trace("redirecting to %s", cu.String())
+			w.Header().Set("Location", cu.String())
+			w.WriteHeader(302)
+			return
+		}
+		w.WriteHeader(200)
 	})
 
 	server := &http.Server{Handler: srv}
@@ -101,13 +111,14 @@ func BrowserFlow(opts BrowserFlowOptions) error {
 		if err != nil && err != http.ErrServerClosed {
 			errors <- fmt.Errorf("failed to serve: %w", err)
 		}
+		logger.Trace("server closed")
 	}()
 
 	logger.Trace("opening browser to %s", u.String())
 	if err := browser.OpenURL(u.String()); err != nil {
 		return fmt.Errorf("failed to open browser: %w", err)
 	}
-	logger.Trace("waiting for callback to http://127.0.0.1:%d/callback?state=%s&token=", port, state)
+	logger.Trace("waiting for callback to http://127.0.0.1:%d", port)
 
 	defer server.Shutdown(context.Background())
 

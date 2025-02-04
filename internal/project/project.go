@@ -13,7 +13,6 @@ import (
 
 const (
 	initPath        = "/project/init"
-	successInitPath = "/project/init/success"
 	initWaitMessage = "Waiting for init to complete in the browser..."
 )
 
@@ -45,8 +44,7 @@ func InitProject(logger logger.Logger, baseUrl string, provider string, name str
 		result.Provider = provider
 		return nil
 	}
-	var query map[string]string
-	query = map[string]string{"provider": provider}
+	query := map[string]string{"provider": provider}
 	if name != "" {
 		query["name"] = name
 	}
@@ -57,7 +55,6 @@ func InitProject(logger logger.Logger, baseUrl string, provider string, name str
 		Logger:      logger,
 		BaseUrl:     baseUrl,
 		StartPath:   initPath,
-		SuccessPath: successInitPath,
 		WaitMessage: initWaitMessage,
 		Callback:    callback,
 		Query:       query,

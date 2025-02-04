@@ -9,14 +9,12 @@ import (
 )
 
 const (
-	loginPath        = "/auth/login"
-	successLoginPath = "/auth/login/success"
+	loginPath        = "/auth/cli"
 	loginWaitMessage = "Waiting for login to complete in the browser..."
 )
 
 type LoginResult struct {
-	Token  string
-	OrgId  string
+	APIKey string
 	UserId string
 }
 
@@ -26,20 +24,15 @@ type LoginResult struct {
 func Login(logger logger.Logger, baseUrl string) (*LoginResult, error) {
 	var result LoginResult
 	callback := func(query url.Values) error {
-		token := query.Get("token")
-		orgId := query.Get("org_id")
+		apiKey := query.Get("api_key")
 		userId := query.Get("user_id")
-		if token == "" {
+		if apiKey == "" {
 			return fmt.Errorf("no token found")
-		}
-		if orgId == "" {
-			return fmt.Errorf("no org_id found")
 		}
 		if userId == "" {
 			return fmt.Errorf("no user_id found")
 		}
-		result.Token = token
-		result.OrgId = orgId
+		result.APIKey = apiKey
 		result.UserId = userId
 		return nil
 	}
@@ -47,7 +40,6 @@ func Login(logger logger.Logger, baseUrl string) (*LoginResult, error) {
 		Logger:      logger,
 		BaseUrl:     baseUrl,
 		StartPath:   loginPath,
-		SuccessPath: successLoginPath,
 		WaitMessage: loginWaitMessage,
 		Callback:    callback,
 	}); err != nil {

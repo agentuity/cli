@@ -25,8 +25,7 @@ var authLoginCmd = &cobra.Command{
 		if err != nil {
 			logger.Fatal("failed to login: %s", err)
 		}
-		viper.Set("auth.token", authResult.Token)
-		viper.Set("auth.org_id", authResult.OrgId)
+		viper.Set("auth.api_key", authResult.APIKey)
 		viper.Set("auth.user_id", authResult.UserId)
 		if err := viper.WriteConfig(); err != nil {
 			logger.Fatal("failed to write config: %s", err)
@@ -41,12 +40,11 @@ var authLogoutCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := newLogger(cmd)
 		appUrl := viper.GetString("overrides.app_url")
-		token := viper.GetString("auth.token")
+		token := viper.GetString("auth.api_key")
 		if token == "" {
 			logger.Fatal("you are not logged in")
 		}
-		viper.Set("auth.token", "")
-		viper.Set("auth.org_id", "")
+		viper.Set("auth.api_key", "")
 		viper.Set("auth.user_id", "")
 		if err := viper.WriteConfig(); err != nil {
 			logger.Fatal("failed to write config: %s", err)
@@ -64,7 +62,7 @@ var authWhoamiCmd = &cobra.Command{
 	Short: "Print the current logged in user details",
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := newLogger(cmd)
-		token := viper.GetString("auth.token")
+		token := viper.GetString("auth.api_key")
 		if token == "" {
 			logger.Fatal("you are not logged in")
 		}
@@ -72,11 +70,7 @@ var authWhoamiCmd = &cobra.Command{
 		if userId == "" {
 			logger.Fatal("you are not logged in")
 		}
-		orgId := viper.GetString("auth.org_id")
-		if orgId == "" {
-			logger.Fatal("you are not logged in")
-		}
-		logger.Info("You are logged in as user_id: %s and org_id: %s", userId, orgId)
+		logger.Info("You are logged in with user id: %s", userId)
 	},
 }
 

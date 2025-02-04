@@ -7,7 +7,6 @@ import (
 
 const (
 	logoutPath        = "/auth/logout"
-	successLogoutPath = "/auth/logout/success"
 	logoutWaitMessage = "Waiting for logout to complete in the browser..."
 )
 
@@ -17,7 +16,6 @@ func Logout(logger logger.Logger, baseUrl string, authToken string) error {
 		Logger:      logger,
 		BaseUrl:     baseUrl,
 		StartPath:   logoutPath,
-		SuccessPath: successLogoutPath,
 		WaitMessage: logoutWaitMessage,
 	})
 }
