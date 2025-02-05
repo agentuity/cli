@@ -188,47 +188,61 @@ var cloudDeployCmd = &cobra.Command{
 
 		resp, err = http.DefaultClient.Do(req)
 		if err != nil {
+			if err := updateDeploymentStatus(apiUrl, token, startResponse.Data.DeploymentId, "failed"); err != nil {
+				logger.Fatal("%s", err)
+			}
 			logger.Fatal("error uploading deployment: %s", err)
+
 		}
 		if resp.StatusCode != http.StatusOK {
 			buf, _ := io.ReadAll(resp.Body)
+			if err := updateDeploymentStatus(apiUrl, token, startResponse.Data.DeploymentId, "failed"); err != nil {
+				logger.Fatal("%s", err)
+			}
 			logger.Fatal("error uploading deployment (%s) %s", resp.Status, string(buf))
 		}
 		resp.Body.Close()
 		logger.Debug("deployment uploaded %d bytes in %v", fi.Size(), time.Since(started))
 
 		// tell the api that we've completed the upload for the deployment
-		u.Path = fmt.Sprintf("/cli/deploy/upload/%s", startResponse.Data.DeploymentId)
-
-		payload := map[string]string{
-			"state": "completed",
+		if err := updateDeploymentStatus(apiUrl, token, startResponse.Data.DeploymentId, "completed"); err != nil {
+			logger.Fatal("%s", err)
 		}
-		
-		body, err := json.Marshal(payload)
-		if err != nil {
-			logger.Fatal("error marshalling payload: %s", err)
-		}
-
-
-		req, err = http.NewRequest("PUT", u.String(), bytes.NewBuffer(body))
-		if err != nil {
-			logger.Fatal("error creating upload deployment success request: %s", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+token)
-
-		resp, err = http.DefaultClient.Do(req)
-		if err != nil {
-			logger.Fatal("error sending upload deployment success request: %s", err)
-		}
-
-		if resp.StatusCode != http.StatusAccepted {
-			logger.Fatal("error sending deployment success (%s)", resp.Status)
-		}
-		resp.Body.Close()
 
 		logger.Info("Your deployment is available at %s/deployment/%s", appUrl, startResponse.Data.DeploymentId)
 	},
+}
+
+func updateDeploymentStatus(apiUrl, token, deploymentId, status string) error {
+	u, err := url.Parse(apiUrl)
+	if err != nil {
+		return fmt.Errorf("error parsing api url: %s", err)
+	}
+	u.Path = fmt.Sprintf("/cli/deploy/upload/%s", deploymentId)
+
+	payload := map[string]string{"state": status}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("error marshalling payload: %s", err)
+	}
+
+	req, err := http.NewRequest("PUT", u.String(), bytes.NewBuffer(body))
+	if err != nil {
+		return fmt.Errorf("error creating status update request: %s", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("error sending status update request: %s", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusAccepted {
+		return fmt.Errorf("error updating deployment status (%s)", resp.Status)
+	}
+	return nil
 }
 
 func init() {
