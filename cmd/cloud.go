@@ -21,6 +21,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+
+
 var cloudCmd = &cobra.Command{
 	Use:   "cloud",
 	Short: "Cloud related commands",
@@ -71,6 +73,13 @@ var cloudDeployCmd = &cobra.Command{
 		token := viper.GetString("auth.api_key")
 
 		u, err := url.Parse(apiUrl)
+
+		client := util.NewAPIClient(apiUrl, token)
+
+		var projectResponse projectResponse
+
+
+		client.do("GET", fmt.Sprintf("/cli/project/%s", project.ProjectId, ), projectResponse)
 		
 		
 		if err != nil {
@@ -196,6 +205,8 @@ var cloudDeployCmd = &cobra.Command{
 		}
 		if resp.StatusCode != http.StatusOK {
 			buf, _ := io.ReadAll(resp.Body)
+
+
 			if err := updateDeploymentStatus(apiUrl, token, startResponse.Data.DeploymentId, "failed"); err != nil {
 				logger.Fatal("%s", err)
 			}
