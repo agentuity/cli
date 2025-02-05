@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -56,13 +58,14 @@ var cloudDeployCmd = &cobra.Command{
 
 		apiUrl := viper.GetString("overrides.api_url")
 		appUrl := viper.GetString("overrides.app_url")
-		token := viper.GetString("auth.token")
+		token := viper.GetString("auth.api_key")
+		orgId := "org_2sax8PpsO3uh8hbFYCaB7p1mZ3Z"
 
 		u, err := url.Parse(apiUrl)
 		if err != nil {
 			logger.Fatal("error parsing api url: %s. %s", apiUrl, err)
 		}
-		u.Path = "/cli/deploy/start"
+		u.Path = fmt.Sprintf("/cli/deploy/start/%s/%s", orgId, project.ProjectId)
 
 		// start the deployment request to get a one-time upload url
 		req, err := http.NewRequest("PUT", u.String(), nil)
@@ -163,11 +166,23 @@ var cloudDeployCmd = &cobra.Command{
 		logger.Debug("deployment uploaded %d bytes in %v", fi.Size(), time.Since(started))
 
 		// tell the api that we've completed the upload for the deployment
-		u.Path = "/cli/deploy/upload/" + startResponse.Data.DeploymentId
-		req, err = http.NewRequest("PUT", u.String(), nil)
+		u.Path = fmt.Sprintf("/cli/deploy/upload/%s", startResponse.Data.DeploymentId)
+
+		payload := map[string]string{
+			"state": "completed",
+		}
+		
+		body, err := json.Marshal(payload)
+		if err != nil {
+			logger.Fatal("error marshalling payload: %s", err)
+		}
+
+
+		req, err = http.NewRequest("PUT", u.String(), bytes.NewBuffer(body))
 		if err != nil {
 			logger.Fatal("error creating upload deployment success request: %s", err)
 		}
+		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err = http.DefaultClient.Do(req)
