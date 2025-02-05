@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -36,6 +38,16 @@ type startResponse struct {
 	Message *string `json:"message,omitempty"`
 }
 
+type projectResponse struct {
+	Success bool `json:"success"`
+	Data    struct {
+		Id string `json:"id"`
+		OrgId     string `json:"orgId"`
+		Name      string `json:"name"`
+	}
+	Message *string `json:"message,omitempty"`
+}
+
 var cloudDeployCmd = &cobra.Command{
 	Use:   "deploy",
 	Short: "Deploy project to the cloud",
@@ -56,21 +68,44 @@ var cloudDeployCmd = &cobra.Command{
 
 		apiUrl := viper.GetString("overrides.api_url")
 		appUrl := viper.GetString("overrides.app_url")
-		token := viper.GetString("auth.token")
+		token := viper.GetString("auth.api_key")
 
 		u, err := url.Parse(apiUrl)
+		
+		
 		if err != nil {
 			logger.Fatal("error parsing api url: %s. %s", apiUrl, err)
 		}
-		u.Path = "/cli/deploy/start"
+		u.Path = fmt.Sprintf("/cli/project/%s", project.ProjectId)
+		req, err := http.NewRequest("GET", u.String(), nil)
+		if err != nil {
+			logger.Fatal("error creating project request: %s", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			logger.Fatal("error requesting project: %s", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			logger.Fatal("unexpected error requesting project (%s)", resp.Status)
+		}
+		enc := json.NewDecoder(resp.Body)
+		var projectResponse projectResponse
+		if err := enc.Decode(&projectResponse); err != nil {
+			logger.Fatal("error decoding project response json: %s", err)
+		}
+		orgId := projectResponse.Data.OrgId
+
 
 		// start the deployment request to get a one-time upload url
-		req, err := http.NewRequest("PUT", u.String(), nil)
+		u.Path = fmt.Sprintf("/cli/deploy/start/%s/%s", orgId, project.ProjectId)
+		req, err = http.NewRequest("PUT", u.String(), nil)
 		if err != nil {
 			logger.Fatal("error creating url route: %s", err)
 		}
 		req.Header.Set("Authorization", "Bearer "+token)
-		resp, err := http.DefaultClient.Do(req)
+		resp, err = http.DefaultClient.Do(req)
 		if err != nil {
 			logger.Fatal("error creating start request for upload: %s", err)
 		}
@@ -78,7 +113,7 @@ var cloudDeployCmd = &cobra.Command{
 		if resp.StatusCode != http.StatusAccepted {
 			logger.Fatal("unexpected error uploading (%s)", resp.Status)
 		}
-		enc := json.NewDecoder(resp.Body)
+		enc = json.NewDecoder(resp.Body)
 		var startResponse startResponse
 		if err := enc.Decode(&startResponse); err != nil {
 			logger.Fatal("error decoding start response json: %s", err)
@@ -163,11 +198,23 @@ var cloudDeployCmd = &cobra.Command{
 		logger.Debug("deployment uploaded %d bytes in %v", fi.Size(), time.Since(started))
 
 		// tell the api that we've completed the upload for the deployment
-		u.Path = "/cli/deploy/upload/" + startResponse.Data.DeploymentId
-		req, err = http.NewRequest("PUT", u.String(), nil)
+		u.Path = fmt.Sprintf("/cli/deploy/upload/%s", startResponse.Data.DeploymentId)
+
+		payload := map[string]string{
+			"state": "completed",
+		}
+		
+		body, err := json.Marshal(payload)
+		if err != nil {
+			logger.Fatal("error marshalling payload: %s", err)
+		}
+
+
+		req, err = http.NewRequest("PUT", u.String(), bytes.NewBuffer(body))
 		if err != nil {
 			logger.Fatal("error creating upload deployment success request: %s", err)
 		}
+		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err = http.DefaultClient.Do(req)
