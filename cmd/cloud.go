@@ -41,9 +41,9 @@ type startResponse struct {
 type projectResponse struct {
 	Success bool `json:"success"`
 	Data    struct {
-		Id string `json:"id"`
-		OrgId     string `json:"orgId"`
-		Name      string `json:"name"`
+		Id    string `json:"id"`
+		OrgId string `json:"orgId"`
+		Name  string `json:"name"`
 	}
 	Message *string `json:"message,omitempty"`
 }
@@ -55,15 +55,27 @@ var cloudDeployCmd = &cobra.Command{
 		logger := env.NewLogger(cmd)
 		dir := resolveProjectDir(logger, cmd)
 
+		deploymentConfig := project.NewDeploymentConfig()
+
 		// validate our project
 		project := project.NewProject()
 		if err := project.Load(dir); err != nil {
 			logger.Fatal("error loading project: %s", err)
 		}
 
+		deploymentConfig.Provider = project.Provider
+
 		p, err := provider.GetProviderForName(project.Provider)
 		if err != nil {
 			logger.Fatal("%s", err)
+		}
+
+		if err := p.ConfigureDeploymentConfig(deploymentConfig); err != nil {
+			logger.Fatal("error configuring deployment config: %s", err)
+		}
+
+		if err := deploymentConfig.Write(dir); err != nil {
+			logger.Fatal("error writing deployment config: %s", err)
 		}
 
 		apiUrl := viper.GetString("overrides.api_url")
@@ -71,8 +83,6 @@ var cloudDeployCmd = &cobra.Command{
 		token := viper.GetString("auth.api_key")
 
 		u, err := url.Parse(apiUrl)
-		
-		
 		if err != nil {
 			logger.Fatal("error parsing api url: %s. %s", apiUrl, err)
 		}
@@ -84,11 +94,12 @@ var cloudDeployCmd = &cobra.Command{
 		req.Header.Set("Authorization", "Bearer "+token)
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			logger.Fatal("error requesting project: %s", err)
+			logger.Fatal("error requesting project: %s (%s)", err, u.String())
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			logger.Fatal("unexpected error requesting project (%s)", resp.Status)
+			buf, _ := io.ReadAll(resp.Body)
+			logger.Fatal("unexpected error requesting project (%s) %s", resp.Status, string(buf))
 		}
 		enc := json.NewDecoder(resp.Body)
 		var projectResponse projectResponse
@@ -96,7 +107,6 @@ var cloudDeployCmd = &cobra.Command{
 			logger.Fatal("error decoding project response json: %s", err)
 		}
 		orgId := projectResponse.Data.OrgId
-
 
 		// start the deployment request to get a one-time upload url
 		u.Path = fmt.Sprintf("/cli/deploy/start/%s/%s", orgId, project.ProjectId)

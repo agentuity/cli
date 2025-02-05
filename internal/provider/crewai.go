@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
 )
@@ -79,6 +80,13 @@ func (p *CrewAIProvider) NewProject(logger logger.Logger, dir string, name strin
 }
 
 func (p *CrewAIProvider) ProjectIgnoreRules() []string {
+	return nil
+}
+
+func (p *CrewAIProvider) ConfigureDeploymentConfig(config *project.DeploymentConfig) error {
+	config.Language = "python"
+	config.MinVersion = ">=3.10,<3.13"
+	config.Command = []string{"run_crew"}
 	return nil
 }
 

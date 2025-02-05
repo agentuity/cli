@@ -151,3 +151,28 @@ func (p *Project) Save(dir string) error {
 func NewProject() *Project {
 	return &Project{}
 }
+
+type DeploymentConfig struct {
+	Provider   string   `yaml:"provider"`
+	Language   string   `yaml:"language"`
+	MinVersion string   `yaml:"min_version,omitempty"`
+	WorkingDir string   `yaml:"working_dir,omitempty"`
+	Command    []string `yaml:"command,omitempty"`
+	Env        []string `yaml:"env,omitempty"`
+}
+
+func NewDeploymentConfig() *DeploymentConfig {
+	return &DeploymentConfig{}
+}
+
+func (c *DeploymentConfig) Write(dir string) error {
+	fn := filepath.Join(dir, "agentuity-deployment.yaml")
+	of, err := os.Create(fn)
+	if err != nil {
+		return err
+	}
+	defer of.Close()
+	enc := yaml.NewEncoder(of)
+	enc.SetIndent(2)
+	return enc.Encode(c)
+}

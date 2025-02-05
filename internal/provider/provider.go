@@ -51,6 +51,9 @@ type Provider interface {
 
 	// ProjectIgnoreRules should return any additional project specific deployment ignore rules.
 	ProjectIgnoreRules() []string
+
+	// ConfigureDeploymentConfig will configure the deployment config for the given provider.
+	ConfigureDeploymentConfig(config *project.DeploymentConfig) error
 }
 
 var providers = map[string]Provider{}
