@@ -50,11 +50,9 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 	}
 	defer resp.Body.Close()
 
-	if method == "GET" && resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
 		return fmt.Errorf("request failed with status (%s)", resp.Status)
-	} else if method != "GET" && resp.StatusCode != http.StatusAccepted {
-		return fmt.Errorf("request failed with status (%s)", resp.Status)
-	}
+	} 
 
 	if response != nil {
 		if err := json.NewDecoder(resp.Body).Decode(response); err != nil {
