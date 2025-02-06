@@ -26,10 +26,10 @@ type initProjectResult struct {
 }
 
 type ProjectData struct {
-	APIKey    string `json:"api_key"`
-	ProjectId string `json:"id"`
-	Env     map[string]interface{} `json:"env"`
-	Secrets map[string]interface{} `json:"secrets"`
+	APIKey    string                 `json:"api_key"`
+	ProjectId string                 `json:"id"`
+	Env       map[string]interface{} `json:"env"`
+	Secrets   map[string]interface{} `json:"secrets"`
 }
 
 // InitProject will create a new project in the organization.
@@ -157,8 +157,8 @@ func NewProject() *Project {
 }
 
 type ProjectResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
+	Success bool        `json:"success"`
+	Message string      `json:"message"`
 	Data    ProjectData `json:"data"`
 }
 
@@ -172,7 +172,7 @@ func (p *Project) ListProjectEnv(logger logger.Logger, baseUrl string, token str
 	return &projectResponse.Data, nil
 }
 
-func (p *Project) SetProjectEnv (logger logger.Logger, baseUrl string, token string, env map[string]interface{}) (*ProjectData, error) {
+func (p *Project) SetProjectEnv(logger logger.Logger, baseUrl string, token string, env map[string]interface{}) (*ProjectData, error) {
 	client := util.NewAPIClient(baseUrl, token)
 	var projectResponse ProjectResponse
 	if err := client.Do("PUT", fmt.Sprintf("/cli/project/%s", p.ProjectId), map[string]interface{}{
@@ -182,6 +182,7 @@ func (p *Project) SetProjectEnv (logger logger.Logger, baseUrl string, token str
 	}
 	return &projectResponse.Data, nil
 }
+
 type DeploymentConfig struct {
 	Provider   string   `yaml:"provider"`
 	Language   string   `yaml:"language"`

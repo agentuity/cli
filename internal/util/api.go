@@ -52,7 +52,7 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
 		return fmt.Errorf("request failed with status (%s)", resp.Status)
-	} 
+	}
 
 	if response != nil {
 		if err := json.NewDecoder(resp.Body).Decode(response); err != nil {

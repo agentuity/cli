@@ -17,7 +17,6 @@ var envCmd = &cobra.Command{
 	},
 }
 
-
 var envSetCmd = &cobra.Command{
 	Use:   "set [key] [value]",
 	Short: "Set environment variables",
@@ -34,21 +33,16 @@ var envSetCmd = &cobra.Command{
 		if err := project.Load(dir); err != nil {
 			logger.Fatal("failed to load project: %s", err)
 		}
-		projectData, err := project.SetProjectEnv(logger, apiUrl, apiKey, map[string]interface{}{args[0]: args[1]})
+		_, err := project.SetProjectEnv(logger, apiUrl, apiKey, map[string]interface{}{args[0]: args[1]})
 		if err != nil {
 			logger.Fatal("failed to set project env: %s", err)
 		}
-		for key, value := range projectData.Env {
-			if key == args[0] {
-				fmt.Printf("%s=%s\n", key, value)
-			}
-		}
+		printSuccess(fmt.Sprintf("Environment variable %s set successfully", args[0]))
 	},
 }
 
-
 var envGetCmd = &cobra.Command{
-	Use:   "get",
+	Use:   "get [key]",
 	Short: "Get environment variables",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -100,10 +94,9 @@ var envListCmd = &cobra.Command{
 	},
 }
 
-
 func init() {
 	rootCmd.AddCommand(envCmd)
 	envCmd.AddCommand(envSetCmd)
-	envCmd.AddCommand(envListCmd )
+	envCmd.AddCommand(envListCmd)
 	envCmd.AddCommand(envGetCmd)
 }
