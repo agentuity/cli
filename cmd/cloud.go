@@ -71,14 +71,14 @@ var cloudDeployCmd = &cobra.Command{
 
 		// Get project details
 		var projectResponse projectResponse
-		if err := client.DoWithResponse("GET", fmt.Sprintf("/cli/project/%s", project.ProjectId), nil, &projectResponse); err != nil {
+		if err := client.Do("GET", fmt.Sprintf("/cli/project/%s", project.ProjectId), nil, &projectResponse); err != nil {
 			logger.Fatal("error requesting project: %s", err)
 		}
 		orgId := projectResponse.Data.OrgId
 
 		// Start deployment
 		var startResponse startResponse
-		if err := client.DoWithResponse("PUT", fmt.Sprintf("/cli/deploy/start/%s/%s", orgId, project.ProjectId), nil, &startResponse); err != nil {
+		if err := client.Do("PUT", fmt.Sprintf("/cli/deploy/start/%s/%s", orgId, project.ProjectId), nil, &startResponse); err != nil {
 			logger.Fatal("error starting deployment: %s", err)
 		}
 
@@ -172,7 +172,7 @@ var cloudDeployCmd = &cobra.Command{
 func updateDeploymentStatus(apiUrl, token, deploymentId, status string) error {
 	client := util.NewAPIClient(apiUrl, token)
 	payload := map[string]string{"state": status}
-	return client.DoWithResponse("PUT", fmt.Sprintf("/cli/deploy/upload/%s", deploymentId), payload, nil)
+	return client.Do("PUT", fmt.Sprintf("/cli/deploy/upload/%s", deploymentId), payload, nil)
 }
 
 func init() {

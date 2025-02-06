@@ -22,7 +22,7 @@ func NewAPIClient(baseURL, token string) *APIClient {
 	}
 }
 
-func (c *APIClient) DoWithResponse(method, path string, payload interface{}, response interface{}) error {
+func (c *APIClient) Do(method, path string, payload interface{}, response interface{}) error {
 	u, err := url.Parse(c.baseURL)
 	if err != nil {
 		return fmt.Errorf("error parsing base url: %w", err)
