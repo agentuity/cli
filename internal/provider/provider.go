@@ -91,9 +91,9 @@ func Detect(logger logger.Logger, dir string) (*Detection, error) {
 	return nil, nil
 }
 
-// RunDev will run the development mode for the given provider.
+// NewRunner will create a new runner for the given provider.
 // It will return the runner if it is found, otherwise it will return nil.
-func RunDev(logger logger.Logger, dir string, apiUrl string, args []string) (Runner, error) {
+func NewRunner(logger logger.Logger, dir string, apiUrl string, eventLogFile string, args []string) (Runner, error) {
 	project := project.NewProject()
 	if err := project.Load(dir); err != nil {
 		return nil, err
@@ -120,5 +120,10 @@ func RunDev(logger logger.Logger, dir string, apiUrl string, args []string) (Run
 	if !apiFound {
 		envs = append(envs, env.EncodeOSEnv("AGENTUITY_URL", apiUrl))
 	}
+	if eventLogFile != "" {
+		envs = append(envs, env.EncodeOSEnv("AGENTUITY_TRACE_LOG", eventLogFile))
+	}
+	envs = append(envs, env.EncodeOSEnv("AGENTUITY_LOG_LEVEL", "error"))
+
 	return provider.RunDev(logger, dir, envs, args)
 }

@@ -2,6 +2,7 @@ package provider
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -75,18 +76,29 @@ func uvExists() (string, bool, error) {
 	return fn, true, nil
 }
 
+type writerLogger struct {
+	logger logger.Logger
+}
+
+func (w *writerLogger) Write(p []byte) (int, error) {
+	w.logger.Info(string(p))
+	return len(p), nil
+}
+
+func newWriterLogger(logger logger.Logger) io.Writer {
+	return &writerLogger{logger: logger}
+}
+
 // getUVCommand will get the uv command for the given directory.
 // It will return the command if it is found, otherwise it will return nil.
 func getUVCommand(logger logger.Logger, uv string, dir string, args []string, env []string) *exec.Cmd {
-	_ = logger
 	cmdargs := []string{"run"}
 	cmdargs = append(cmdargs, args...)
 	cmd := exec.Command(uv, cmdargs...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), env...)
-	// TODO: use logger
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = newWriterLogger(logger.With(map[string]interface{}{"source": "uv.stdout"}))
+	cmd.Stderr = newWriterLogger(logger.With(map[string]interface{}{"source": "uv.stderr"}))
 	return cmd
 }
 
