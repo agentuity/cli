@@ -212,6 +212,7 @@ var projectInitCmd = &cobra.Command{
 		logger.Info("Project initialized successfully")
 	},
 }
+
 func init() {
 	rootCmd.AddCommand(projectCmd)
 	projectCmd.AddCommand(projectInitCmd)
