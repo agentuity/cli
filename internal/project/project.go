@@ -8,7 +8,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
+
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -24,8 +26,10 @@ type initProjectResult struct {
 }
 
 type ProjectData struct {
-	APIKey    string `json:"api_key"`
-	ProjectId string `json:"id"`
+	APIKey    string                 `json:"api_key"`
+	ProjectId string                 `json:"id"`
+	Env       map[string]interface{} `json:"env"`
+	Secrets   map[string]interface{} `json:"secrets"`
 }
 
 // InitProject will create a new project in the organization.
@@ -150,6 +154,33 @@ func (p *Project) Save(dir string) error {
 // NewProject will create a new project that is empty.
 func NewProject() *Project {
 	return &Project{}
+}
+
+type ProjectResponse struct {
+	Success bool        `json:"success"`
+	Message string      `json:"message"`
+	Data    ProjectData `json:"data"`
+}
+
+func (p *Project) ListProjectEnv(logger logger.Logger, baseUrl string, token string) (*ProjectData, error) {
+	client := util.NewAPIClient(baseUrl, token)
+
+	var projectResponse ProjectResponse
+	if err := client.Do("GET", fmt.Sprintf("/cli/project/%s", p.ProjectId), nil, &projectResponse); err != nil {
+		logger.Fatal("error getting project env: %s", err)
+	}
+	return &projectResponse.Data, nil
+}
+
+func (p *Project) SetProjectEnv(logger logger.Logger, baseUrl string, token string, env map[string]interface{}) (*ProjectData, error) {
+	client := util.NewAPIClient(baseUrl, token)
+	var projectResponse ProjectResponse
+	if err := client.Do("PUT", fmt.Sprintf("/cli/project/%s/env", p.ProjectId), map[string]interface{}{
+		"env": env,
+	}, &projectResponse); err != nil {
+		logger.Fatal("error setting project env: %s", err)
+	}
+	return &projectResponse.Data, nil
 }
 
 type DeploymentConfig struct {
