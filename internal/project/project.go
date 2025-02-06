@@ -175,7 +175,7 @@ func (p *Project) ListProjectEnv(logger logger.Logger, baseUrl string, token str
 func (p *Project) SetProjectEnv(logger logger.Logger, baseUrl string, token string, env map[string]interface{}) (*ProjectData, error) {
 	client := util.NewAPIClient(baseUrl, token)
 	var projectResponse ProjectResponse
-	if err := client.Do("PUT", fmt.Sprintf("/cli/project/%s", p.ProjectId), map[string]interface{}{
+	if err := client.Do("PUT", fmt.Sprintf("/cli/project/%s/env", p.ProjectId), map[string]interface{}{
 		"env": env,
 	}, &projectResponse); err != nil {
 		logger.Fatal("error setting project env: %s", err)
