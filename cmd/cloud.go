@@ -1,12 +1,9 @@
 package cmd
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -20,8 +17,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
-
-
 
 var cloudCmd = &cobra.Command{
 	Use:   "cloud",
@@ -72,67 +67,20 @@ var cloudDeployCmd = &cobra.Command{
 		appUrl := viper.GetString("overrides.app_url")
 		token := viper.GetString("auth.api_key")
 
-		u, err := url.Parse(apiUrl)
-
 		client := util.NewAPIClient(apiUrl, token)
 
+		// Get project details
 		var projectResponse projectResponse
-
-
-		client.do("GET", fmt.Sprintf("/cli/project/%s", project.ProjectId, ), projectResponse)
-		
-		
-		if err != nil {
-			logger.Fatal("error parsing api url: %s. %s", apiUrl, err)
-		}
-		u.Path = fmt.Sprintf("/cli/project/%s", project.ProjectId)
-		req, err := http.NewRequest("GET", u.String(), nil)
-		if err != nil {
-			logger.Fatal("error creating project request: %s", err)
-		}
-		req.Header.Set("Authorization", "Bearer "+token)
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
+		if err := client.DoWithResponse("GET", fmt.Sprintf("/cli/project/%s", project.ProjectId), nil, &projectResponse); err != nil {
 			logger.Fatal("error requesting project: %s", err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			logger.Fatal("unexpected error requesting project (%s)", resp.Status)
-		}
-		enc := json.NewDecoder(resp.Body)
-		var projectResponse projectResponse
-		if err := enc.Decode(&projectResponse); err != nil {
-			logger.Fatal("error decoding project response json: %s", err)
 		}
 		orgId := projectResponse.Data.OrgId
 
-
-		// start the deployment request to get a one-time upload url
-		u.Path = fmt.Sprintf("/cli/deploy/start/%s/%s", orgId, project.ProjectId)
-		req, err = http.NewRequest("PUT", u.String(), nil)
-		if err != nil {
-			logger.Fatal("error creating url route: %s", err)
-		}
-		req.Header.Set("Authorization", "Bearer "+token)
-		resp, err = http.DefaultClient.Do(req)
-		if err != nil {
-			logger.Fatal("error creating start request for upload: %s", err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusAccepted {
-			logger.Fatal("unexpected error uploading (%s)", resp.Status)
-		}
-		enc = json.NewDecoder(resp.Body)
+		// Start deployment
 		var startResponse startResponse
-		if err := enc.Decode(&startResponse); err != nil {
-			logger.Fatal("error decoding start response json: %s", err)
+		if err := client.DoWithResponse("PUT", fmt.Sprintf("/cli/deploy/start/%s/%s", orgId, project.ProjectId), nil, &startResponse); err != nil {
+			logger.Fatal("error starting deployment: %s", err)
 		}
-		resp.Body.Close()
-		if !startResponse.Success {
-			logger.Fatal("error generating start authentication: %s", startResponse.Message)
-		}
-		logger.Debug("upload api is %s", startResponse.Data.Url)
-		logger.Debug("deployment id is %s", startResponse.Data.DeploymentId)
 
 		// load up any gitignore files
 		gitignore := filepath.Join(dir, ignore.Ignore)
@@ -187,7 +135,7 @@ var cloudDeployCmd = &cobra.Command{
 		started = time.Now()
 
 		// send the zip file to the upload endpoint provided
-		req, err = http.NewRequest("PUT", startResponse.Data.Url, of)
+		req, err := http.NewRequest("PUT", startResponse.Data.Url, of)
 		if err != nil {
 			logger.Fatal("error creating PUT request", err)
 		}
@@ -195,18 +143,15 @@ var cloudDeployCmd = &cobra.Command{
 		req.Header.Set("Content-Type", "application/zip")
 		req.Header.Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
 
-		resp, err = http.DefaultClient.Do(req)
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			if err := updateDeploymentStatus(apiUrl, token, startResponse.Data.DeploymentId, "failed"); err != nil {
 				logger.Fatal("%s", err)
 			}
 			logger.Fatal("error uploading deployment: %s", err)
-
 		}
 		if resp.StatusCode != http.StatusOK {
 			buf, _ := io.ReadAll(resp.Body)
-
-
 			if err := updateDeploymentStatus(apiUrl, token, startResponse.Data.DeploymentId, "failed"); err != nil {
 				logger.Fatal("%s", err)
 			}
@@ -225,35 +170,9 @@ var cloudDeployCmd = &cobra.Command{
 }
 
 func updateDeploymentStatus(apiUrl, token, deploymentId, status string) error {
-	u, err := url.Parse(apiUrl)
-	if err != nil {
-		return fmt.Errorf("error parsing api url: %s", err)
-	}
-	u.Path = fmt.Sprintf("/cli/deploy/upload/%s", deploymentId)
-
+	client := util.NewAPIClient(apiUrl, token)
 	payload := map[string]string{"state": status}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("error marshalling payload: %s", err)
-	}
-
-	req, err := http.NewRequest("PUT", u.String(), bytes.NewBuffer(body))
-	if err != nil {
-		return fmt.Errorf("error creating status update request: %s", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error sending status update request: %s", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusAccepted {
-		return fmt.Errorf("error updating deployment status (%s)", resp.Status)
-	}
-	return nil
+	return client.DoWithResponse("PUT", fmt.Sprintf("/cli/deploy/upload/%s", deploymentId), payload, nil)
 }
 
 func init() {

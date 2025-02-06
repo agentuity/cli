@@ -22,7 +22,7 @@ func NewAPIClient(baseURL, token string) *APIClient {
 	}
 }
 
-func (c *APIClient) do(method, path string, payload interface{}) error {
+func (c *APIClient) DoWithResponse(method, path string, payload interface{}, response interface{}) error {
 	u, err := url.Parse(c.baseURL)
 	if err != nil {
 		return fmt.Errorf("error parsing base url: %w", err)
@@ -50,8 +50,16 @@ func (c *APIClient) do(method, path string, payload interface{}) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusAccepted {
+	if method == "GET" && resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("request failed with status (%s)", resp.Status)
+	} else if method != "GET" && resp.StatusCode != http.StatusAccepted {
+		return fmt.Errorf("request failed with status (%s)", resp.Status)
+	}
+
+	if response != nil {
+		if err := json.NewDecoder(resp.Body).Decode(response); err != nil {
+			return fmt.Errorf("error decoding response: %w", err)
+		}
 	}
 	return nil
 }
