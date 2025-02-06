@@ -162,7 +162,7 @@ type ProjectResponse struct {
 	Data    ProjectData `json:"data"`
 }
 
-func (p *Project) GetProjectEnv(logger logger.Logger, baseUrl string, token string) (*ProjectData, error) {
+func (p *Project) ListProjectEnv(logger logger.Logger, baseUrl string, token string) (*ProjectData, error) {
 	client := util.NewAPIClient(baseUrl, token)
 
 	var projectResponse ProjectResponse
@@ -172,11 +172,11 @@ func (p *Project) GetProjectEnv(logger logger.Logger, baseUrl string, token stri
 	return &projectResponse.Data, nil
 }
 
-func (p *Project) SetProjectSecrets(logger logger.Logger, baseUrl string, token string, secrets map[string]interface{}) (*ProjectData, error) {
+func (p *Project) SetProjectEnv (logger logger.Logger, baseUrl string, token string, env map[string]interface{}) (*ProjectData, error) {
 	client := util.NewAPIClient(baseUrl, token)
 	var projectResponse ProjectResponse
 	if err := client.Do("PUT", fmt.Sprintf("/cli/project/%s", p.ProjectId), map[string]interface{}{
-		"secrets": secrets,
+		"env": env,
 	}, &projectResponse); err != nil {
 		logger.Fatal("error setting project env: %s", err)
 	}

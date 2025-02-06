@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -213,101 +212,8 @@ var projectInitCmd = &cobra.Command{
 		logger.Info("Project initialized successfully")
 	},
 }
-
-var projectEnvSetCmd = &cobra.Command{
-	Use:   "env:set [directory]",
-	Short: "Set environment variables for a project",
-	Args:  cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		logger := env.NewLogger(cmd)
-		dir := "."
-		if len(args) > 0 {
-			dir = args[0]
-		}
-		dir = resolveDir(logger, dir, false)
-		envFile := filepath.Join(dir, ".env")
-
-		envLines, err := env.ParseEnvFile(envFile)
-		if err != nil {
-			logger.Fatal("failed to parse .env file: %s", err)
-		}
-
-		// Print local env vars to stdout
-		for _, envLine := range envLines {
-			fmt.Printf("%s=%s\n", envLine.Key, envLine.Val)
-		}
-	
-		apiUrl := viper.GetString("overrides.api_url")
-		apiKey := viper.GetString("auth.api_key")
-		if apiKey == "" {
-			logger.Fatal("you are not logged in")
-		}
-
-		project := project.NewProject()
-		if err := project.Load(dir); err != nil {
-			logger.Fatal("failed to load project: %s", err)
-		}
-
-		secretMap := make(map[string]interface{})
-		for _, envLine := range envLines {
-			secretMap[envLine.Key] = envLine.Val
-		}
-		
-		project.SetProjectSecrets(logger, apiUrl, apiKey, secretMap)
-
-		if err != nil {
-			logger.Fatal("failed to set project env: %s", err)
-		}
-
-		printSuccess("Project environment variables set successfully")
-
-	},
-}
-
-var projectEnvCmd = &cobra.Command{
-	Use:   "env [directory]",
-	Short: "Get environment variables for a project",
-	Args:  cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		logger := env.NewLogger(cmd)
-
-		dir := "."
-		if len(args) > 0 {
-			dir = args[0]
-		}
-		dir = resolveDir(logger, dir, false)
-		
-		apiUrl := viper.GetString("overrides.api_url")
-		apiKey := viper.GetString("auth.api_key")
-		if apiKey == "" {
-			logger.Fatal("you are not logged in")
-		}
-
-		project := project.NewProject()
-		if err := project.Load(dir); err != nil {
-			logger.Fatal("failed to load project: %s", err)
-		}
-		logger.Info("Getting environment variables for project %s", project.ProjectId)
-
-		projectData, err := project.GetProjectEnv(logger, apiUrl, apiKey)
-		if err != nil {
-			logger.Fatal("failed to get project env: %s", err)
-		}
-		// Print remote env vars and secrets to stdout
-		for key, value := range projectData.Env {
-			fmt.Printf("%s=%s\n", key, value)
-		}
-		for key, value := range projectData.Secrets {
-			fmt.Printf("%s=%s\n", key, value)
-		}
-
-	},
-}
-
 func init() {
 	rootCmd.AddCommand(projectCmd)
 	projectCmd.AddCommand(projectInitCmd)
 	projectCmd.AddCommand(projectNewCmd)
-	projectCmd.AddCommand(projectEnvCmd)
-	projectCmd.AddCommand(projectEnvSetCmd)
 }
