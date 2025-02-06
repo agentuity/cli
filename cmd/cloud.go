@@ -38,9 +38,9 @@ type startResponse struct {
 type projectResponse struct {
 	Success bool `json:"success"`
 	Data    struct {
-		Id string `json:"id"`
-		OrgId     string `json:"orgId"`
-		Name      string `json:"name"`
+		Id    string `json:"id"`
+		OrgId string `json:"orgId"`
+		Name  string `json:"name"`
 	}
 	Message *string `json:"message,omitempty"`
 }
@@ -52,15 +52,27 @@ var cloudDeployCmd = &cobra.Command{
 		logger := env.NewLogger(cmd)
 		dir := resolveProjectDir(logger, cmd)
 
+		deploymentConfig := project.NewDeploymentConfig()
+
 		// validate our project
 		project := project.NewProject()
 		if err := project.Load(dir); err != nil {
 			logger.Fatal("error loading project: %s", err)
 		}
 
+		deploymentConfig.Provider = project.Provider
+
 		p, err := provider.GetProviderForName(project.Provider)
 		if err != nil {
 			logger.Fatal("%s", err)
+		}
+
+		if err := p.ConfigureDeploymentConfig(deploymentConfig); err != nil {
+			logger.Fatal("error configuring deployment config: %s", err)
+		}
+
+		if err := deploymentConfig.Write(dir); err != nil {
+			logger.Fatal("error writing deployment config: %s", err)
 		}
 
 		apiUrl := viper.GetString("overrides.api_url")

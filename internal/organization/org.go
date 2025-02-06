@@ -39,6 +39,13 @@ func ListOrganizations(logger logger.Logger, apiUrl string, token string) ([]Org
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusUnauthorized {
+			return nil, fmt.Errorf("unauthorized")
+		}
+		return nil, fmt.Errorf("http error: %s", resp.Status)
+	}
+
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
