@@ -169,4 +169,8 @@ func addURLFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().String("api-url", "https://api.agentuity.com", "The base url of the Agentuity API")
 	cmd.PersistentFlags().MarkHidden("api-url")
 	viper.BindPFlag("overrides.api_url", cmd.PersistentFlags().Lookup("api-url"))
+
+	cmd.PersistentFlags().String("websocket-url", "wss://app.agentuity.com", "The base url of the Agentuity WebSocket API")
+	cmd.PersistentFlags().MarkHidden("websocket-url")
+	viper.BindPFlag("overrides.websocket_url", cmd.PersistentFlags().Lookup("websocket-url"))
 }
