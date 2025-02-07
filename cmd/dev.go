@@ -73,6 +73,11 @@ func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketI
 	}
 	u.RawQuery = url.Values{"id": {websocketId}, "type": {"LIVE_DEV"}}.Encode()
 	u.Path = "/websocket"
+	if u.Scheme == "http" {
+		u.Scheme = "ws"
+	} else if u.Scheme == "https" {
+		u.Scheme = "wss"
+	}
 
 	urlString := u.String()
 
