@@ -12,6 +12,7 @@ import (
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
 	csys "github.com/agentuity/go-common/sys"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/nxadm/tail"
 	"github.com/spf13/cobra"
@@ -81,7 +82,7 @@ func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketI
 
 	urlString := u.String()
 
-	logger.Debug("dialing %s", urlString)
+	logger.Trace("dialing %s", urlString)
 	self.conn, _, err = websocket.DefaultDialer.Dial(urlString, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial: %s", err)
@@ -133,7 +134,7 @@ func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketI
 				logger.Trace("read:", err)
 				return
 			}
-			logger.Info("recv: %s", message)
+			logger.Debug("recv: %s", message)
 		}
 	}()
 
@@ -175,6 +176,10 @@ func (c *LiveDevConnection) Close() error {
 	return c.sdkEventsTail.Stop()
 }
 
+func (c *LiveDevConnection) WebURL(appUrl string) string {
+	return fmt.Sprintf("%s/developer/live/%s", appUrl, c.websocketId)
+}
+
 var devRunCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run the development server",
@@ -183,14 +188,21 @@ var devRunCmd = &cobra.Command{
 		sdkEventsFile := "events.log"
 		dir := resolveProjectDir(log, cmd)
 		apiUrl := viper.GetString("overrides.api_url")
+		appUrl := viper.GetString("overrides.app_url")
 		websocketUrl := viper.GetString("overrides.websocket_url")
 		websocketId, _ := cmd.Flags().GetString("websocket-id")
 
+		// get 6 random characters
+		if websocketId == "" {
+			websocketId = uuid.New().String()[:6]
+		}
 		liveDevConnection, err := NewLiveDevConnection(log, sdkEventsFile, websocketId, websocketUrl)
 		if err != nil {
 			log.Fatal("failed to create live dev connection: %s", err)
 		}
 		defer liveDevConnection.Close()
+		log.Info("development agent url: %s", liveDevConnection.WebURL(appUrl))
+		time.Sleep(2 * time.Second)
 		logger := logger.NewMultiLogger(log, logger.NewJSONLoggerWithSink(liveDevConnection, logger.LevelInfo))
 		logger.Info("starting development agent 🤖")
 		runner, err := provider.NewRunner(logger, dir, apiUrl, sdkEventsFile, args)
