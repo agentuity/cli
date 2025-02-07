@@ -55,7 +55,7 @@ func decodeEvent(event string) ([]map[string]any, error) {
 	return nil, fmt.Errorf("event does not look like a JSON object or array")
 }
 
-func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketId string) (*LiveDevConnection, error) {
+func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketId string, websocketUrl string) (*LiveDevConnection, error) {
 	t, err := tail.TailFile(sdkEventsFile, tail.Config{Follow: true, ReOpen: true, Logger: tail.DiscardingLogger})
 	if err != nil {
 		return nil, err
@@ -67,13 +67,12 @@ func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketI
 		sdkEventsTail: t,
 		logQueue:      make(chan []byte, 100),
 	}
-	// ws://localhost:8787/websocket?type=LIVE_DEV&id=oooweee
-	// TODO: make this configurable
-	u, err := url.Parse("wss://8b06-12-144-206-134.ngrok-free.app/websocket")
+	u, err := url.Parse(websocketUrl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse url: %s", err)
 	}
 	u.RawQuery = url.Values{"id": {websocketId}, "type": {"LIVE_DEV"}}.Encode()
+	u.Path = "/websocket"
 
 	urlString := u.String()
 
@@ -179,9 +178,10 @@ var devRunCmd = &cobra.Command{
 		sdkEventsFile := "events.log"
 		dir := resolveProjectDir(log, cmd)
 		apiUrl := viper.GetString("overrides.api_url")
+		websocketUrl := viper.GetString("overrides.websocket_url")
 		websocketId, _ := cmd.Flags().GetString("websocket-id")
 
-		liveDevConnection, err := NewLiveDevConnection(log, sdkEventsFile, websocketId)
+		liveDevConnection, err := NewLiveDevConnection(log, sdkEventsFile, websocketId, websocketUrl)
 		if err != nil {
 			log.Fatal("failed to create live dev connection: %s", err)
 		}
@@ -224,4 +224,5 @@ func init() {
 	devCmd.AddCommand(devRunCmd)
 	devRunCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
 	devRunCmd.Flags().String("websocket-id", "", "aaan")
+	addURLFlags(devRunCmd)
 }
