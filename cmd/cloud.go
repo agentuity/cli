@@ -177,7 +177,7 @@ var cloudDeployCmd = &cobra.Command{
 			logger.Fatal("%s", err)
 		}
 
-		logger.Info("Your deployment is available at %s/deployment/%s", appUrl, startResponse.Data.DeploymentId)
+		logger.Info("Your deployment is available at %s/projects/%s?deploymentId=%s", appUrl, project.ProjectId, startResponse.Data.DeploymentId)
 	},
 }
 
