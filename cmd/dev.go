@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/nxadm/tail"
+	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -201,8 +202,11 @@ var devRunCmd = &cobra.Command{
 			log.Fatal("failed to create live dev connection: %s", err)
 		}
 		defer liveDevConnection.Close()
-		log.Info("development agent url: %s", liveDevConnection.WebURL(appUrl))
-		time.Sleep(2 * time.Second)
+		devUrl := liveDevConnection.WebURL(appUrl)
+		log.Info("development agent url: %s", devUrl)
+		if err := browser.OpenURL(devUrl); err != nil {
+			log.Fatal("failed to open browser: %s", err)
+		}
 		logger := logger.NewMultiLogger(log, logger.NewJSONLoggerWithSink(liveDevConnection, logger.LevelInfo))
 		logger.Info("starting development agent 🤖")
 		runner, err := provider.NewRunner(logger, dir, apiUrl, sdkEventsFile, args)
