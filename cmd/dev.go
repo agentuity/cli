@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/url"
 	"os"
 	"regexp"
@@ -84,6 +83,7 @@ func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketI
 		return nil, fmt.Errorf("failed to dial: %s", err)
 	}
 
+	// writer
 	go func() {
 		for {
 			select {
@@ -116,14 +116,20 @@ func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketI
 						}
 					}
 				}
-			default:
-				_, message, err := self.conn.ReadMessage()
-				if err != nil {
-					log.Println("read:", err)
-					return
-				}
-				log.Printf("recv: %s", message)
+
 			}
+		}
+	}()
+
+	// reader
+	go func() {
+		for {
+			_, message, err := self.conn.ReadMessage()
+			if err != nil {
+				logger.Trace("read:", err)
+				return
+			}
+			logger.Info("recv: %s", message)
 		}
 	}()
 
@@ -169,9 +175,7 @@ var devRunCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run the development server",
 	Run: func(cmd *cobra.Command, args []string) {
-
 		log := env.NewLogger(cmd)
-
 		sdkEventsFile := "events.log"
 		dir := resolveProjectDir(log, cmd)
 		apiUrl := viper.GetString("overrides.api_url")
