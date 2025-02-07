@@ -228,6 +228,6 @@ func init() {
 	rootCmd.AddCommand(devCmd)
 	devCmd.AddCommand(devRunCmd)
 	devRunCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
-	devRunCmd.Flags().String("websocket-id", "", "aaan")
+	devRunCmd.Flags().String("websocket-id", "", "The websocket room id to use for the development agent")
 	addURLFlags(devRunCmd)
 }
