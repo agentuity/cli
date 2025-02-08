@@ -50,8 +50,9 @@ func loadEnvFile(le []env.EnvLine, forceSecret bool) (map[string]string, map[str
 }
 
 var envSetCmd = &cobra.Command{
-	Use:   "set [key] [value]",
-	Short: "Set environment variables",
+	Use:     "set [key] [value]",
+	Aliases: []string{"add", "put"},
+	Short:   "Set environment variables",
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		dir := resolveProjectDir(logger, cmd)
@@ -243,8 +244,8 @@ var envSetCmd = &cobra.Command{
 
 var envGetCmd = &cobra.Command{
 	Use:   "get [key]",
-	Short: "Get environment variables",
-	Args:  cobra.MinimumNArgs(1),
+	Short: "Get an environment or secret value",
+	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		dir := resolveProjectDir(logger, cmd)
@@ -261,17 +262,42 @@ var envGetCmd = &cobra.Command{
 		if err != nil {
 			logger.Fatal("failed to list project env: %s", err)
 		}
+		var found bool
 		for key, value := range projectData.Env {
 			if key == args[0] {
-				fmt.Printf("%s=%s\n", key, value)
+				if !hasTTY {
+					fmt.Println(value)
+				} else {
+					fmt.Println(color.CyanString(value))
+				}
+				found = true
+				break
 			}
+		}
+		if !found {
+			for key, value := range projectData.Secrets {
+				if key == args[0] {
+					if !hasTTY {
+						fmt.Println(value)
+					} else {
+						fmt.Println(color.BlackString(value))
+					}
+					found = true
+					break
+				}
+			}
+		}
+		if !found {
+			printWarning("No environment variables or secrets set for this project named %s", args[0])
 		}
 	},
 }
 
 var envListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all environment variables",
+	Use:     "list",
+	Aliases: []string{"ls", "show", "print"},
+	Args:    cobra.NoArgs,
+	Short:   "List all environment variables and secrets",
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		dir := resolveProjectDir(logger, cmd)
@@ -312,8 +338,9 @@ var envListCmd = &cobra.Command{
 }
 
 var envDeleteCmd = &cobra.Command{
-	Use:   "delete [key...]",
-	Short: "Delete one or more environment variables and secrets",
+	Use:     "delete [key...]",
+	Aliases: []string{"rm", "del"},
+	Short:   "Delete one or more environment variables and secrets",
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		dir := resolveProjectDir(logger, cmd)
