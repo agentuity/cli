@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/agentuity/cli/internal/ignore"
@@ -14,6 +15,7 @@ import (
 	"github.com/agentuity/cli/internal/provider"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -51,46 +53,121 @@ var cloudDeployCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		dir := resolveProjectDir(logger, cmd)
+		apiUrl := viper.GetString("overrides.api_url")
+		appUrl := viper.GetString("overrides.app_url")
+		token := viper.GetString("auth.api_key")
 
 		deploymentConfig := project.NewDeploymentConfig()
 
 		// validate our project
-		project := project.NewProject()
-		if err := project.Load(dir); err != nil {
+		theproject := project.NewProject()
+		if err := theproject.Load(dir); err != nil {
 			logger.Fatal("error loading project: %s", err)
 		}
-
-		deploymentConfig.Provider = project.Provider
-
-		p, err := provider.GetProviderForName(project.Provider)
+		deploymentConfig.Provider = theproject.Provider
+		p, err := provider.GetProviderForName(theproject.Provider)
 		if err != nil {
 			logger.Fatal("%s", err)
 		}
+
+		// check to see if we have any env vars that are not in the project
+		envfile := filepath.Join(dir, ".env")
+		if util.Exists(envfile) {
+			var projectData *project.ProjectData
+			var le []env.EnvLine
+
+			action := func() {
+				var err error
+				projectData, err = theproject.ListProjectEnv(logger, apiUrl, token)
+				if err != nil {
+					logger.Fatal("error listing project env: %s", err)
+				}
+				le, err = env.ParseEnvFile(envfile)
+				if err != nil {
+					logger.Fatal("error parsing env file: %s. %s", envfile, err)
+				}
+			}
+			showSpinner(logger, "", action)
+
+			var foundkeys []string
+			for _, ev := range le {
+				if isAgentuityEnv.MatchString(ev.Key) {
+					continue
+				}
+				if projectData.Env != nil && projectData.Env[ev.Key] == ev.Val {
+					continue
+				}
+				if projectData.Secrets != nil && projectData.Secrets[ev.Key] == ev.Val {
+					continue
+				}
+				foundkeys = append(foundkeys, ev.Key)
+			}
+			if len(foundkeys) > 0 {
+				var confirm bool
+				var title string
+				switch {
+				case len(foundkeys) < 3 && len(foundkeys) > 1:
+					title = fmt.Sprintf("The environment variables %s from .env are not in the project. Would you like to add it?", strings.Join(foundkeys, ", "))
+				case len(foundkeys) == 1:
+					title = fmt.Sprintf("The environment variable %s from .env is not in the project. Would you like to add it?", foundkeys[0])
+				default:
+					title = fmt.Sprintf("There are %d environment variables from .envthat are not in the project. Would you like to add them?", len(foundkeys))
+				}
+				if huh.NewConfirm().
+					Title(title).
+					Affirmative("Yes!").
+					Negative("No").
+					Value(&confirm).WithTheme(theme).Run() != nil {
+					logger.Fatal("failed to confirm environment variable addition")
+				}
+				if !confirm {
+					printWarning("cancelled")
+					return
+				}
+				envs, secrets := loadEnvFile(le, false)
+				_, err := theproject.SetProjectEnv(logger, apiUrl, token, envs, secrets)
+				if err != nil {
+					logger.Fatal("failed to set project env: %s", err)
+				}
+				switch {
+				case len(envs) > 0 && len(secrets) > 0:
+					printSuccess("Environment variables and secrets added")
+				case len(envs) == 1:
+					printSuccess("Environment variable added")
+				case len(envs) > 1:
+					printSuccess("Environment variables added")
+				case len(secrets) == 1:
+					printSuccess("Secret added")
+				case len(secrets) > 1:
+					printSuccess("Secrets added")
+				}
+			}
+		}
+
+		client := util.NewAPIClient(apiUrl, token)
+
+		deploymentConfig.Deployment = theproject.Deployment
 
 		if err := p.ConfigureDeploymentConfig(deploymentConfig); err != nil {
 			logger.Fatal("error configuring deployment config: %s", err)
 		}
 
-		if err := deploymentConfig.Write(dir); err != nil {
+		cleanup, err := deploymentConfig.Write(dir)
+		if err != nil {
 			logger.Fatal("error writing deployment config: %s", err)
 		}
-
-		apiUrl := viper.GetString("overrides.api_url")
-		appUrl := viper.GetString("overrides.app_url")
-		token := viper.GetString("auth.api_key")
-
-		client := util.NewAPIClient(apiUrl, token)
+		defer cleanup()
 
 		// Get project details
 		var projectResponse projectResponse
-		if err := client.Do("GET", fmt.Sprintf("/cli/project/%s", project.ProjectId), nil, &projectResponse); err != nil {
+		if err := client.Do("GET", fmt.Sprintf("/cli/project/%s", theproject.ProjectId), nil, &projectResponse); err != nil {
 			logger.Fatal("error requesting project: %s", err)
 		}
 		orgId := projectResponse.Data.OrgId
 
 		// Start deployment
 		var startResponse startResponse
-		if err := client.Do("PUT", fmt.Sprintf("/cli/deploy/start/%s/%s", orgId, project.ProjectId), nil, &startResponse); err != nil {
+		if err := client.Do("PUT", fmt.Sprintf("/cli/deploy/start/%s/%s", orgId, theproject.ProjectId), nil, &startResponse); err != nil {
 			logger.Fatal("error starting deployment: %s", err)
 		}
 
@@ -121,21 +198,25 @@ var cloudDeployCmd = &cobra.Command{
 		defer os.Remove(tmpfile.Name())
 		tmpfile.Close()
 
-		// zip up our directory
-		started := time.Now()
-		logger.Debug("creating a zip file of %s into %s", dir, tmpfile.Name())
-		if err := util.ZipDir(dir, tmpfile.Name(), func(fn string, fi os.FileInfo) bool {
-			notok := rules.Ignore(fn, fi)
-			if notok {
-				logger.Trace("❌ %s", fn)
-			} else {
-				logger.Trace("❎ %s", fn)
+		zipaction := func() {
+			// zip up our directory
+			started := time.Now()
+			logger.Debug("creating a zip file of %s into %s", dir, tmpfile.Name())
+			if err := util.ZipDir(dir, tmpfile.Name(), func(fn string, fi os.FileInfo) bool {
+				notok := rules.Ignore(fn, fi)
+				if notok {
+					logger.Trace("❌ %s", fn)
+				} else {
+					logger.Trace("❎ %s", fn)
+				}
+				return !notok
+			}); err != nil {
+				logger.Fatal("error zipping project: %s", err)
 			}
-			return !notok
-		}); err != nil {
-			logger.Fatal("error zipping project: %s", err)
+			logger.Debug("zip file created in %v", time.Since(started))
 		}
-		logger.Debug("zip file created in %v", time.Since(started))
+
+		showSpinner(logger, "Packaging ...", zipaction)
 
 		of, err := os.Open(tmpfile.Name())
 		if err != nil {
@@ -144,40 +225,44 @@ var cloudDeployCmd = &cobra.Command{
 		defer of.Close()
 
 		fi, _ := os.Stat(tmpfile.Name())
-		started = time.Now()
+		started := time.Now()
 
-		// send the zip file to the upload endpoint provided
-		req, err := http.NewRequest("PUT", startResponse.Data.Url, of)
-		if err != nil {
-			logger.Fatal("error creating PUT request", err)
-		}
-		req.ContentLength = fi.Size()
-		req.Header.Set("Content-Type", "application/zip")
-		req.Header.Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
+		action := func() {
+			// send the zip file to the upload endpoint provided
+			req, err := http.NewRequest("PUT", startResponse.Data.Url, of)
+			if err != nil {
+				logger.Fatal("error creating PUT request", err)
+			}
+			req.ContentLength = fi.Size()
+			req.Header.Set("Content-Type", "application/zip")
+			req.Header.Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
 
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			if err := updateDeploymentStatus(apiUrl, token, startResponse.Data.DeploymentId, "failed"); err != nil {
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				if err := updateDeploymentStatus(apiUrl, token, startResponse.Data.DeploymentId, "failed"); err != nil {
+					logger.Fatal("%s", err)
+				}
+				logger.Fatal("error uploading deployment: %s", err)
+			}
+			if resp.StatusCode != http.StatusOK {
+				buf, _ := io.ReadAll(resp.Body)
+				if err := updateDeploymentStatus(apiUrl, token, startResponse.Data.DeploymentId, "failed"); err != nil {
+					logger.Fatal("%s", err)
+				}
+				logger.Fatal("error uploading deployment (%s) %s", resp.Status, string(buf))
+			}
+			resp.Body.Close()
+			logger.Debug("deployment uploaded %d bytes in %v", fi.Size(), time.Since(started))
+
+			// tell the api that we've completed the upload for the deployment
+			if err := updateDeploymentStatus(apiUrl, token, startResponse.Data.DeploymentId, "completed"); err != nil {
 				logger.Fatal("%s", err)
 			}
-			logger.Fatal("error uploading deployment: %s", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			buf, _ := io.ReadAll(resp.Body)
-			if err := updateDeploymentStatus(apiUrl, token, startResponse.Data.DeploymentId, "failed"); err != nil {
-				logger.Fatal("%s", err)
-			}
-			logger.Fatal("error uploading deployment (%s) %s", resp.Status, string(buf))
-		}
-		resp.Body.Close()
-		logger.Debug("deployment uploaded %d bytes in %v", fi.Size(), time.Since(started))
-
-		// tell the api that we've completed the upload for the deployment
-		if err := updateDeploymentStatus(apiUrl, token, startResponse.Data.DeploymentId, "completed"); err != nil {
-			logger.Fatal("%s", err)
 		}
 
-		logger.Info("Your deployment is available at %s/projects/%s?deploymentId=%s", appUrl, project.ProjectId, startResponse.Data.DeploymentId)
+		showSpinner(logger, "Deploying ...", action)
+
+		printSuccess("Your project was deployed successfully. It is available at %s", link("%s/projects/%s?deploymentId=%s", appUrl, theproject.ProjectId, startResponse.Data.DeploymentId))
 	},
 }
 

@@ -50,7 +50,7 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted && response == nil {
 		return fmt.Errorf("request failed with status (%s)", resp.Status)
 	}
 

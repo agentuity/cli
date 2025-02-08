@@ -9,6 +9,8 @@ import (
 
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/go-common/logger"
+	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/huh/spinner"
 	"github.com/fatih/color"
 	"github.com/inancgumus/screen"
 	"github.com/spf13/cobra"
@@ -107,8 +109,59 @@ func initConfig() {
 	viper.SetDefault("overrides.api_url", "https://api.agentuity.com")
 }
 
-func printSuccess(msg string) {
-	color.Green("✓ %s", msg)
+func printSuccess(msg string, args ...any) {
+	fmt.Printf("%s %s", color.GreenString("✓"), fmt.Sprintf(msg, args...))
+	fmt.Println()
+}
+
+func printWarning(msg string, args ...any) {
+	fmt.Printf("%s %s", color.RedString("✕"), fmt.Sprintf(msg, args...))
+	fmt.Println()
+}
+
+func printCommand(cmd string, args ...string) string {
+	cmdline := "agentuity " + strings.Join(append([]string{cmd}, args...), " ")
+	return color.HiCyanString(cmdline)
+}
+
+func link(url string, args ...any) string {
+	return color.HiWhiteString(fmt.Sprintf(url, args...))
+}
+
+func maxString(val string, max int) string {
+	if len(val) > max {
+		return val[:max] + "..."
+	}
+	return val
+}
+
+func showSpinner(logger logger.Logger, title string, action func()) {
+	if err := spinner.New().Title(title).Action(action).Run(); err != nil {
+		logger.Fatal("%s", err)
+	}
+}
+
+var theme = huh.ThemeCatppuccin()
+
+func getInput(logger logger.Logger, title string, description string, prompt string, mask bool) string {
+	var value string
+	if prompt == "" {
+		prompt = "> "
+	}
+	echoMode := huh.EchoModeNormal
+	if mask {
+		echoMode = huh.EchoModePassword
+	}
+	if huh.NewInput().
+		Title(title).
+		Description(description).
+		Prompt(prompt).
+		Value(&value).
+		EchoMode(echoMode).
+		WithHeight(100).WithTheme(theme).Run() != nil {
+		logger.Fatal("failed to get input value")
+	}
+	return value
 }
 
 func initScreenWithLogo() {

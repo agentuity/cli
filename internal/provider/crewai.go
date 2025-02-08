@@ -50,10 +50,11 @@ func (p *CrewAIProvider) NewProject(logger logger.Logger, dir string, name strin
 		if err := runUVCommand(logger, uv, dir, []string{"pip", "install", "crewai"}, env); err != nil {
 			return fmt.Errorf("failed to install crewai: %w", err)
 		}
-		if err := runUVCommand(logger, uv, dir, []string{"run", "crewai", "create", "crew", name}, env); err != nil {
+		dirname := filepath.Base(dir)
+		if err := runUVCommand(logger, uv, dir, []string{"run", "crewai", "create", "crew", dirname}, env); err != nil {
 			return fmt.Errorf("failed to create crew: %w", err)
 		}
-		srcDir := filepath.Join(dir, name) // because create nests directories we need to unnest
+		srcDir := filepath.Join(dir, dirname) // because create nests directories we need to unnest
 		if err := util.CopyDir(srcDir, dir); err != nil {
 			return fmt.Errorf("failed to copy crew from %s to %s: %w", srcDir, dir, err)
 		}
@@ -63,7 +64,7 @@ func (p *CrewAIProvider) NewProject(logger logger.Logger, dir string, name strin
 		if err := runUVCommand(logger, uv, dir, []string{"add", "agentuity"}, env); err != nil {
 			return fmt.Errorf("failed to add agentuity: %w", err)
 		}
-		mainFile := filepath.Join(dir, "src", name, "main.py")
+		mainFile := filepath.Join(dir, "src", dirname, "main.py")
 		buf, err := os.ReadFile(mainFile)
 		if err != nil {
 			return fmt.Errorf("failed to read main file: %w", err)

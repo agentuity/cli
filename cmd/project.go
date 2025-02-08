@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/agentuity/cli/internal/organization"
 	"github.com/agentuity/cli/internal/project"
@@ -11,6 +13,7 @@ import (
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
 	"github.com/charmbracelet/huh"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -81,6 +84,13 @@ func promptForOrganization(logger logger.Logger, theme *huh.Theme, apiUrl string
 	return orgId, nil
 }
 
+var projectNameTransformer = regexp.MustCompile(`[^a-zA-Z0-9_-]`)
+var invalidProjectNames = []any{
+	"test",
+	"agent",
+	"agentuity",
+}
+
 var projectNewCmd = &cobra.Command{
 	Use:     "new",
 	Short:   "Create a new project",
@@ -94,6 +104,7 @@ var projectNewCmd = &cobra.Command{
 		}
 
 		apiUrl := viper.GetString("overrides.api_url")
+		appUrl := viper.GetString("overrides.app_url")
 		initScreenWithLogo()
 
 		cwd, err := os.Getwd()
@@ -113,12 +124,25 @@ var projectNewCmd = &cobra.Command{
 		if huh.NewInput().
 			Title("What should we name the project?").
 			Prompt("> ").
-			CharLimit(255).
-			Value(&name).WithTheme(theme).Run() != nil {
+			CharLimit(255).Validate(func(name string) error {
+			for _, invalid := range invalidProjectNames {
+				if s, ok := invalid.(string); ok {
+					if name == s {
+						return fmt.Errorf("%s is not a valid project name", name)
+					}
+				}
+				if r, ok := invalid.(regexp.Regexp); ok {
+					if r.MatchString(name) {
+						return fmt.Errorf("%s is not a valid project name", name)
+					}
+				}
+			}
+			return nil
+		}).Value(&name).WithTheme(theme).Run() != nil {
 			logger.Fatal("failed to get project name")
 		}
 
-		projectDir := filepath.Join(cwd, name)
+		projectDir := filepath.Join(cwd, projectNameTransformer.ReplaceAllString(name, "_"))
 		if huh.NewInput().
 			Title("What directory should the project be created in?").
 			Prompt("> ").
@@ -176,9 +200,19 @@ var projectNewCmd = &cobra.Command{
 			logger.Fatal("failed to create project: %s", err)
 		}
 
-		initProject(logger, apiUrl, projectDir, apikey, orgId, providerName, name, "")
+		projectData := initProject(logger, apiUrl, projectDir, apikey, orgId, providerName, name, "")
 
 		printSuccess("Project created successfully")
+
+		fmt.Println()
+		fmt.Println("Next steps:")
+		fmt.Println()
+		fmt.Printf("1. Switch into the project	directory at %s\n", color.GreenString(projectDir))
+		fmt.Printf("2. Run %s to run the project locally\n", printCommand("dev", "run"))
+		fmt.Printf("3. Run %s to deploy the project\n", printCommand("deploy", "cloud"))
+		fmt.Println()
+		fmt.Printf("Access your project at %s", link("%s/projects/%s", appUrl, projectData.ProjectId))
+		fmt.Println()
 	},
 }
 
