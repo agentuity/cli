@@ -27,21 +27,35 @@ type initProjectResult struct {
 }
 
 type ProjectData struct {
-	APIKey    string            `json:"api_key"`
-	ProjectId string            `json:"id"`
-	Env       map[string]string `json:"env"`
-	Secrets   map[string]string `json:"secrets"`
+	APIKey      string            `json:"api_key"`
+	ProjectId   string            `json:"id"`
+	Env         map[string]string `json:"env"`
+	Secrets     map[string]string `json:"secrets"`
+	IOId        string            `json:"ioId"`
+	IOAuthToken string            `json:"ioAuthToken,omitempty"`
+}
+
+type InitProjectArgs struct {
+	BaseURL           string
+	Dir               string
+	Token             string
+	OrgId             string
+	Provider          string
+	Name              string
+	Description       string
+	EnableWebhookAuth bool
 }
 
 // InitProject will create a new project in the organization.
 // It will return the API key and project ID if the project is initialized successfully.
-func InitProject(logger logger.Logger, baseUrl string, token string, orgId string, provider string, name string, description string) (*ProjectData, error) {
+func InitProject(logger logger.Logger, args InitProjectArgs) (*ProjectData, error) {
 
-	payload := map[string]string{
-		"organization_id": orgId,
-		"provider":        provider,
-		"name":            name,
-		"description":     description,
+	payload := map[string]any{
+		"organization_id":   args.OrgId,
+		"provider":          args.Provider,
+		"name":              args.Name,
+		"description":       args.Description,
+		"enableWebhookAuth": args.EnableWebhookAuth,
 	}
 
 	body, err := json.Marshal(payload)
@@ -49,13 +63,13 @@ func InitProject(logger logger.Logger, baseUrl string, token string, orgId strin
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", baseUrl+initPath, bytes.NewReader(body))
+	req, err := http.NewRequest("POST", args.BaseURL+initPath, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", "Bearer "+args.Token)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -99,9 +113,10 @@ type Deployment struct {
 }
 
 type IO struct {
-	Type   string         `json:"type" yaml:"type"`
-	ID     string         `json:"id,omitempty" yaml:"id,omitempty"`
-	Config map[string]any `json:"config,omitempty" yaml:"config,omitempty"`
+	Type      string         `json:"type" yaml:"type"`
+	ID        string         `json:"id,omitempty" yaml:"id,omitempty"`
+	Direction string         `json:"direction" yaml:"-"`
+	Config    map[string]any `json:"config,omitempty" yaml:"config,omitempty"`
 }
 
 type Project struct {
@@ -184,11 +199,13 @@ func NewProject() *Project {
 	}
 }
 
-type ProjectResponse struct {
-	Success bool        `json:"success"`
-	Message string      `json:"message"`
-	Data    ProjectData `json:"data"`
+type Response[T any] struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Data    T      `json:"data"`
 }
+
+type ProjectResponse = Response[ProjectData]
 
 func (p *Project) ListProjectEnv(logger logger.Logger, baseUrl string, token string) (*ProjectData, error) {
 	client := util.NewAPIClient(baseUrl, token)
@@ -229,6 +246,44 @@ func (p *Project) DeleteProjectEnv(logger logger.Logger, baseUrl string, token s
 	}
 	if !projectResponse.Success {
 		return errors.New(projectResponse.Message)
+	}
+	return nil
+}
+
+type IOResponse = Response[IO]
+
+func (p *Project) CreateIO(logger logger.Logger, baseUrl string, token string, direction string, io IO) (*IO, error) {
+	client := util.NewAPIClient(baseUrl, token)
+	var ioResponse IOResponse
+	if err := client.Do("POST", fmt.Sprintf("/cli/project/%s/io", p.ProjectId), io, &ioResponse); err != nil {
+		logger.Fatal("error creating io: %s", err)
+	}
+	if !ioResponse.Success {
+		return nil, errors.New(ioResponse.Message)
+	}
+	return &ioResponse.Data, nil
+}
+
+func (p *Project) ListIO(logger logger.Logger, baseUrl string, token string, direction string) ([]IO, error) {
+	client := util.NewAPIClient(baseUrl, token)
+	var response Response[[]IO]
+	if err := client.Do("GET", fmt.Sprintf("/cli/project/%s/io/%s", p.ProjectId, direction), nil, &response); err != nil {
+		logger.Fatal("error creating io: %s", err)
+	}
+	if !response.Success {
+		return nil, errors.New(response.Message)
+	}
+	return response.Data, nil
+}
+
+func (p *Project) DeleteIO(logger logger.Logger, baseUrl string, token string, id string) error {
+	client := util.NewAPIClient(baseUrl, token)
+	var response Response[any]
+	if err := client.Do("DELETE", fmt.Sprintf("/cli/project/%s/io/%s", p.ProjectId, id), nil, &response); err != nil {
+		logger.Fatal("error creating io: %s", err)
+	}
+	if !response.Success {
+		return errors.New(response.Message)
 	}
 	return nil
 }

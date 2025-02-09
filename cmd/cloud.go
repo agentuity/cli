@@ -15,7 +15,7 @@ import (
 	"github.com/agentuity/cli/internal/provider"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
-	"github.com/charmbracelet/huh"
+	"github.com/agentuity/go-common/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -47,24 +47,53 @@ type projectResponse struct {
 	Message *string `json:"message,omitempty"`
 }
 
+type projectContext struct {
+	Logger  logger.Logger
+	Project *project.Project
+	Dir     string
+	APIURL  string
+	APPURL  string
+	Token   string
+}
+
+func ensureProject(cmd *cobra.Command) projectContext {
+	logger := env.NewLogger(cmd)
+	dir := resolveProjectDir(logger, cmd)
+	apiUrl := viper.GetString("overrides.api_url")
+	appUrl := viper.GetString("overrides.app_url")
+	token := viper.GetString("auth.api_key")
+
+	// validate our project
+	theproject := project.NewProject()
+	if err := theproject.Load(dir); err != nil {
+		logger.Fatal("error loading project: %s", err)
+	}
+
+	return projectContext{
+		Logger:  logger,
+		Project: theproject,
+		Dir:     dir,
+		APIURL:  apiUrl,
+		APPURL:  appUrl,
+		Token:   token,
+	}
+}
+
 var cloudDeployCmd = &cobra.Command{
 	Use:   "deploy",
 	Short: "Deploy project to the cloud",
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := env.NewLogger(cmd)
-		dir := resolveProjectDir(logger, cmd)
-		apiUrl := viper.GetString("overrides.api_url")
-		appUrl := viper.GetString("overrides.app_url")
-		token := viper.GetString("auth.api_key")
+		context := ensureProject(cmd)
+		logger := context.Logger
+		theproject := context.Project
+		dir := context.Dir
+		apiUrl := context.APIURL
+		appUrl := context.APPURL
+		token := context.Token
 
 		deploymentConfig := project.NewDeploymentConfig()
-
-		// validate our project
-		theproject := project.NewProject()
-		if err := theproject.Load(dir); err != nil {
-			logger.Fatal("error loading project: %s", err)
-		}
 		deploymentConfig.Provider = theproject.Provider
+
 		p, err := provider.GetProviderForName(theproject.Provider)
 		if err != nil {
 			logger.Fatal("%s", err)
@@ -103,7 +132,6 @@ var cloudDeployCmd = &cobra.Command{
 				foundkeys = append(foundkeys, ev.Key)
 			}
 			if len(foundkeys) > 0 {
-				var confirm bool
 				var title string
 				switch {
 				case len(foundkeys) < 3 && len(foundkeys) > 1:
@@ -113,14 +141,7 @@ var cloudDeployCmd = &cobra.Command{
 				default:
 					title = fmt.Sprintf("There are %d environment variables from .envthat are not in the project. Would you like to add them?", len(foundkeys))
 				}
-				if huh.NewConfirm().
-					Title(title).
-					Affirmative("Yes!").
-					Negative("No").
-					Value(&confirm).WithTheme(theme).Run() != nil {
-					logger.Fatal("failed to confirm environment variable addition")
-				}
-				if !confirm {
+				if !ask(logger, title, true) {
 					printWarning("cancelled")
 					return
 				}
@@ -254,8 +275,24 @@ var cloudDeployCmd = &cobra.Command{
 			resp.Body.Close()
 			logger.Debug("deployment uploaded %d bytes in %v", fi.Size(), time.Since(started))
 
+			sources := []string{}
+			destinations := []string{}
+			var hasWebhook bool
+			for _, io := range theproject.Inputs {
+				if io.Type == "webhook" && hasWebhook {
+					printWarning("Multiple source webhooks found. Only the first one will be used.")
+					continue
+				}
+				sources = append(sources, io.ID)
+				if io.Type == "webhook" {
+					hasWebhook = true
+				}
+			}
+			for _, io := range theproject.Outputs {
+				destinations = append(destinations, io.ID)
+			}
 			// tell the api that we've completed the upload for the deployment
-			if err := updateDeploymentStatus(apiUrl, token, startResponse.Data.DeploymentId, "completed"); err != nil {
+			if err := updateDeploymentStatusCompleted(apiUrl, token, startResponse.Data.DeploymentId, sources, destinations); err != nil {
 				logger.Fatal("%s", err)
 			}
 		}
@@ -269,6 +306,12 @@ var cloudDeployCmd = &cobra.Command{
 func updateDeploymentStatus(apiUrl, token, deploymentId, status string) error {
 	client := util.NewAPIClient(apiUrl, token)
 	payload := map[string]string{"state": status}
+	return client.Do("PUT", fmt.Sprintf("/cli/deploy/upload/%s", deploymentId), payload, nil)
+}
+
+func updateDeploymentStatusCompleted(apiUrl, token, deploymentId string, sources []string, destinations []string) error {
+	client := util.NewAPIClient(apiUrl, token)
+	payload := map[string]any{"state": "completed", "sources": sources, "destinations": destinations}
 	return client.Do("PUT", fmt.Sprintf("/cli/deploy/upload/%s", deploymentId), payload, nil)
 }
 
