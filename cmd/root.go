@@ -114,6 +114,11 @@ func printSuccess(msg string, args ...any) {
 	fmt.Println()
 }
 
+func printLock(msg string, args ...any) {
+	fmt.Printf("🔒 %s", fmt.Sprintf(msg, args...))
+	fmt.Println()
+}
+
 func printWarning(msg string, args ...any) {
 	fmt.Printf("%s %s", color.RedString("✕"), fmt.Sprintf(msg, args...))
 	fmt.Println()
@@ -143,7 +148,7 @@ func showSpinner(logger logger.Logger, title string, action func()) {
 
 var theme = huh.ThemeCatppuccin()
 
-func getInput(logger logger.Logger, title string, description string, prompt string, mask bool) string {
+func getInput(logger logger.Logger, title string, description string, prompt string, mask bool, validate func(string) error) string {
 	var value string
 	if prompt == "" {
 		prompt = "> "
@@ -152,16 +157,37 @@ func getInput(logger logger.Logger, title string, description string, prompt str
 	if mask {
 		echoMode = huh.EchoModePassword
 	}
+	if validate == nil {
+		validate = func(string) error {
+			return nil
+		}
+	}
 	if huh.NewInput().
 		Title(title).
 		Description(description).
 		Prompt(prompt).
 		Value(&value).
 		EchoMode(echoMode).
+		Validate(validate).
 		WithHeight(100).WithTheme(theme).Run() != nil {
 		logger.Fatal("failed to get input value")
 	}
 	return value
+}
+
+func ask(logger logger.Logger, title string, defaultValue bool) bool {
+	confirm := defaultValue
+	if huh.NewConfirm().
+		Title(title).
+		Affirmative("Yes!").
+		Negative("No").
+		Value(&confirm).
+		Inline(true).
+		WithTheme(theme).
+		Run() != nil {
+		logger.Fatal("failed to confirm")
+	}
+	return confirm
 }
 
 func initScreenWithLogo() {

@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/go-common/env"
 	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/sys"
@@ -16,7 +15,6 @@ import (
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"golang.org/x/term"
 )
 
@@ -54,17 +52,13 @@ var envSetCmd = &cobra.Command{
 	Aliases: []string{"add", "put"},
 	Short:   "Set environment variables",
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := env.NewLogger(cmd)
-		dir := resolveProjectDir(logger, cmd)
-		apiUrl := viper.GetString("overrides.api_url")
-		apiKey := viper.GetString("auth.api_key")
-		if apiKey == "" {
-			logger.Fatal("you are not logged in")
-		}
-		project := project.NewProject()
-		if err := project.Load(dir); err != nil {
-			logger.Fatal("failed to load project: %s", err)
-		}
+		context := ensureProject(cmd)
+		logger := context.Logger
+		dir := context.Dir
+		apiUrl := context.APIURL
+		apiKey := context.Token
+		theproject := context.Project
+
 		forceSecret, _ := cmd.Flags().GetBool("secret")
 		noConfirm, _ := cmd.Flags().GetBool("force")
 
@@ -83,12 +77,15 @@ var envSetCmd = &cobra.Command{
 			if sys.Exists(setFromFile) {
 				le, _ := env.ParseEnvFile(setFromFile)
 				envs, secrets = loadEnvFile(le, forceSecret)
-				hasSetFromFile = true
-				setFromEnv = true
+				if len(envs) > 0 || len(secrets) > 0 {
+					hasSetFromFile = true
+					setFromEnv = true
+				}
 			} else {
 				logger.Fatal("file does not exist: %s", setFromFile)
 			}
-		} else {
+		}
+		if !hasSetFromFile {
 			// load any environment variables from the environment
 			for _, line := range os.Environ() {
 				parts := strings.SplitN(line, "=", 2)
@@ -101,10 +98,14 @@ var envSetCmd = &cobra.Command{
 			envfile := filepath.Join(dir, ".env")
 			if sys.Exists(envfile) {
 				le, _ := env.ParseEnvFile(envfile)
+				var added bool
 				for _, ev := range le {
-					localenv[ev.Key] = ev.Val
+					if !isAgentuityEnv.MatchString(ev.Key) {
+						localenv[ev.Key] = ev.Val
+						added = true
+					}
 				}
-				hasEnvFile = true
+				hasEnvFile = added
 			}
 		}
 
@@ -154,7 +155,7 @@ var envSetCmd = &cobra.Command{
 			if len(envs) > 0 || len(secrets) > 0 {
 				help = "Press enter to save..."
 			}
-			key = getInput(logger, "Enter your environment variable name", help, "", false)
+			key = getInput(logger, "Enter your environment variable name", help, "", false, nil)
 			if key == "" {
 				askMore = false
 			}
@@ -186,7 +187,7 @@ var envSetCmd = &cobra.Command{
 						help = "Your input will be masked"
 					}
 				}
-				value = getInput(logger, prompt, help, "", isSecret)
+				value = getInput(logger, prompt, help, "", isSecret, nil)
 				if value == "" && defaultValue != "" {
 					value = defaultValue
 				} else if value == "" {
@@ -217,7 +218,7 @@ var envSetCmd = &cobra.Command{
 			for k := range envs {
 				delete(secrets, k)
 			}
-			_, err := project.SetProjectEnv(logger, apiUrl, apiKey, envs, secrets)
+			_, err := theproject.SetProjectEnv(logger, apiUrl, apiKey, envs, secrets)
 			if err != nil {
 				logger.Fatal("failed to set project env: %s", err)
 			}
@@ -247,18 +248,13 @@ var envGetCmd = &cobra.Command{
 	Short: "Get an environment or secret value",
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := env.NewLogger(cmd)
-		dir := resolveProjectDir(logger, cmd)
-		apiUrl := viper.GetString("overrides.api_url")
-		apiKey := viper.GetString("auth.api_key")
-		if apiKey == "" {
-			logger.Fatal("you are not logged in")
-		}
-		project := project.NewProject()
-		if err := project.Load(dir); err != nil {
-			logger.Fatal("failed to load project: %s", err)
-		}
-		projectData, err := project.ListProjectEnv(logger, apiUrl, apiKey)
+		context := ensureProject(cmd)
+		logger := context.Logger
+		theproject := context.Project
+		apiUrl := context.APIURL
+		apiKey := context.Token
+
+		projectData, err := theproject.ListProjectEnv(logger, apiUrl, apiKey)
 		if err != nil {
 			logger.Fatal("failed to list project env: %s", err)
 		}
@@ -299,18 +295,13 @@ var envListCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	Short:   "List all environment variables and secrets",
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := env.NewLogger(cmd)
-		dir := resolveProjectDir(logger, cmd)
-		apiUrl := viper.GetString("overrides.api_url")
-		apiKey := viper.GetString("auth.api_key")
-		if apiKey == "" {
-			logger.Fatal("you are not logged in")
-		}
-		project := project.NewProject()
-		if err := project.Load(dir); err != nil {
-			logger.Fatal("failed to load project: %s", err)
-		}
-		projectData, err := project.ListProjectEnv(logger, apiUrl, apiKey)
+		context := ensureProject(cmd)
+		logger := context.Logger
+		theproject := context.Project
+		apiUrl := context.APIURL
+		apiKey := context.Token
+
+		projectData, err := theproject.ListProjectEnv(logger, apiUrl, apiKey)
 		if err != nil {
 			logger.Fatal("failed to list project env: %s", err)
 		}
@@ -342,18 +333,13 @@ var envDeleteCmd = &cobra.Command{
 	Aliases: []string{"rm", "del"},
 	Short:   "Delete one or more environment variables and secrets",
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := env.NewLogger(cmd)
-		dir := resolveProjectDir(logger, cmd)
-		apiUrl := viper.GetString("overrides.api_url")
-		apiKey := viper.GetString("auth.api_key")
-		if apiKey == "" {
-			logger.Fatal("you are not logged in")
-		}
-		project := project.NewProject()
-		if err := project.Load(dir); err != nil {
-			logger.Fatal("failed to load project: %s", err)
-		}
-		projectData, err := project.ListProjectEnv(logger, apiUrl, apiKey)
+		context := ensureProject(cmd)
+		logger := context.Logger
+		theproject := context.Project
+		apiUrl := context.APIURL
+		apiKey := context.Token
+
+		projectData, err := theproject.ListProjectEnv(logger, apiUrl, apiKey)
 		if err != nil {
 			logger.Fatal("failed to list project env: %s", err)
 		}
@@ -417,7 +403,6 @@ var envDeleteCmd = &cobra.Command{
 		}
 		if len(secretsToDelete) > 0 || len(envsToDelete) > 0 {
 			if !force {
-				var confirm bool
 				var title string
 				switch {
 				case len(secretsToDelete) > 0 && len(envsToDelete) > 0:
@@ -431,17 +416,12 @@ var envDeleteCmd = &cobra.Command{
 				case len(envsToDelete) == 1:
 					title = "Are you sure you want to delete this environment variable?"
 				}
-				if huh.NewConfirm().
-					Title(title).
-					Value(&confirm).Run() != nil {
-					logger.Fatal("error getting confirmation")
-				}
-				if !confirm {
+				if !ask(logger, title, false) {
 					printWarning("cancelled")
 					return
 				}
 			}
-			err := project.DeleteProjectEnv(logger, apiUrl, apiKey, envsToDelete, secretsToDelete)
+			err := theproject.DeleteProjectEnv(logger, apiUrl, apiKey, envsToDelete, secretsToDelete)
 			if err != nil {
 				logger.Fatal("failed to delete project env: %s", err)
 			}
@@ -473,4 +453,7 @@ func init() {
 	envCmd.AddCommand(envGetCmd)
 	envCmd.AddCommand(envDeleteCmd)
 	envDeleteCmd.Flags().Bool("force", !hasTTY, "Don't prompt for confirmation")
+	for _, cmd := range []*cobra.Command{envSetCmd, envListCmd, envGetCmd, envDeleteCmd} {
+		cmd.Flags().StringP("dir", "d", ".", "The directory to the project to deploy")
+	}
 }

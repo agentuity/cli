@@ -26,18 +26,47 @@ var projectCmd = &cobra.Command{
 	},
 }
 
-func initProject(logger logger.Logger, appUrl string, dir string, token string, orgId string, provider string, name string, description string) *project.ProjectData {
-	result, err := project.InitProject(logger, appUrl, token, orgId, provider, name, description)
+type InitProjectArgs struct {
+	BaseURL           string
+	Dir               string
+	Token             string
+	OrgId             string
+	Provider          string
+	Name              string
+	Description       string
+	EnableWebhookAuth bool
+}
+
+func initProject(logger logger.Logger, args InitProjectArgs) *project.ProjectData {
+
+	result, err := project.InitProject(logger, project.InitProjectArgs{
+		BaseURL:           args.BaseURL,
+		Token:             args.Token,
+		OrgId:             args.OrgId,
+		Provider:          args.Provider,
+		Name:              args.Name,
+		Description:       args.Description,
+		EnableWebhookAuth: args.EnableWebhookAuth,
+		Dir:               args.Dir,
+	})
 	if err != nil {
 		logger.Fatal("failed to initialize project: %s", err)
 	}
-	project := project.NewProject()
-	project.ProjectId = result.ProjectId
-	project.Provider = provider
-	if err := project.Save(dir); err != nil {
+	proj := project.NewProject()
+	proj.ProjectId = result.ProjectId
+	proj.Provider = args.Provider
+
+	proj.Inputs = []project.IO{
+		{
+			Type: "webhook",
+			ID:   result.IOId,
+		},
+	}
+
+	if err := proj.Save(args.Dir); err != nil {
 		logger.Fatal("failed to save project: %s", err)
 	}
-	filename := filepath.Join(dir, ".env")
+	filename := filepath.Join(args.Dir, ".env")
 	envLines, err := env.ParseEnvFile(filename)
 	if err != nil {
 		logger.Fatal("failed to parse .env file: %s", err)
@@ -58,7 +87,11 @@ func initProject(logger logger.Logger, appUrl string, dir string, token string, 
 	return result
 }
 
-func promptForOrganization(logger logger.Logger, theme *huh.Theme, apiUrl string, token string) (string, error) {
+func promptForWebhookAuth(logger logger.Logger) bool {
+	return ask(logger, "Do you want to secure the agent webhook with a Bearer Token?", true)
+}
+
+func promptForOrganization(logger logger.Logger, apiUrl string, token string) (string, error) {
 	orgs, err := organization.ListOrganizations(logger, apiUrl, token)
 	if err != nil {
 		logger.Fatal("failed to list organizations: %s", err)
@@ -114,7 +147,7 @@ var projectNewCmd = &cobra.Command{
 
 		theme := huh.ThemeCatppuccin()
 
-		orgId, err := promptForOrganization(logger, theme, apiUrl, apikey)
+		orgId, err := promptForOrganization(logger, apiUrl, apikey)
 		if err != nil {
 			logger.Fatal("failed to get organization: %s", err)
 		}
@@ -166,27 +199,14 @@ var projectNewCmd = &cobra.Command{
 			logger.Fatal("failed to get project framework")
 		}
 
-		var confirm bool
-		if huh.NewConfirm().
-			Title("Create new project in "+projectDir+"?").
-			Affirmative("Yes!").
-			Negative("Cancel").
-			Value(&confirm).WithTheme(theme).Run() != nil {
-			logger.Fatal("failed to confirm project creation")
-		}
-		if !confirm {
+		enableWebhookAuth := promptForWebhookAuth(logger)
+
+		if !ask(logger, "Create new project in "+projectDir+"?", true) {
 			return
 		}
 
 		if util.Exists(projectDir) {
-			if huh.NewConfirm().
-				Title("The directory "+projectDir+" already exists.\nAre you sure you want to overwrite files here?").
-				Affirmative("Yes!").
-				Negative("Cancel").
-				Value(&confirm).WithTheme(theme).Run() != nil {
-				logger.Fatal("failed to confirm directory")
-			}
-			if !confirm {
+			if !ask(logger, "The directory "+projectDir+" already exists.\nAre you sure you want to overwrite files here?", true) {
 				return
 			}
 		} else {
@@ -200,19 +220,35 @@ var projectNewCmd = &cobra.Command{
 			logger.Fatal("failed to create project: %s", err)
 		}
 
-		projectData := initProject(logger, apiUrl, projectDir, apikey, orgId, providerName, name, "")
+		projectData := initProject(logger, InitProjectArgs{
+			BaseURL:           apiUrl,
+			Dir:               projectDir,
+			Token:             apikey,
+			OrgId:             orgId,
+			Provider:          providerName,
+			Name:              name,
+			EnableWebhookAuth: enableWebhookAuth,
+		})
 
+		fmt.Println()
 		printSuccess("Project created successfully")
 
 		fmt.Println()
 		fmt.Println("Next steps:")
 		fmt.Println()
-		fmt.Printf("1. Switch into the project	directory at %s\n", color.GreenString(projectDir))
+		fmt.Printf("1. Switch into the project directory at %s\n", color.GreenString(projectDir))
 		fmt.Printf("2. Run %s to run the project locally\n", printCommand("dev", "run"))
 		fmt.Printf("3. Run %s to deploy the project\n", printCommand("deploy", "cloud"))
 		fmt.Println()
 		fmt.Printf("Access your project at %s", link("%s/projects/%s", appUrl, projectData.ProjectId))
 		fmt.Println()
+
+		if projectData.IOAuthToken != "" {
+			fmt.Println()
+			printLock("Your agent webhook is secured with a Bearer Token: %s", color.BlackString(projectData.IOAuthToken))
+			fmt.Println()
+		}
+
 	},
 }
 
@@ -235,15 +271,29 @@ var projectInitCmd = &cobra.Command{
 			logger.Fatal("failed to detect project type: %s", err)
 		}
 
-		theme := huh.ThemeCatppuccin()
-		orgId, err := promptForOrganization(logger, theme, apiUrl, token)
+		orgId, err := promptForOrganization(logger, apiUrl, token)
 		if err != nil {
 			logger.Fatal("failed to get organization: %s", err)
 		}
 
-		initProject(logger, apiUrl, dir, token, orgId, detection.Provider, detection.Name, detection.Description)
+		enableWebhookAuth := promptForWebhookAuth(logger)
 
-		logger.Info("Project initialized successfully")
+		p := initProject(logger, InitProjectArgs{
+			BaseURL:           apiUrl,
+			Dir:               dir,
+			Token:             token,
+			OrgId:             orgId,
+			Provider:          detection.Provider,
+			Name:              detection.Name,
+			Description:       detection.Description,
+			EnableWebhookAuth: enableWebhookAuth,
+		})
+
+		if p.IOAuthToken != "" {
+			printLock("Your agent webhook is secured with a Bearer Token: %s", color.BlackString(p.IOAuthToken))
+		}
+
+		printSuccess("Project initialized successfully")
 	},
 }
 
