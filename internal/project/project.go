@@ -3,6 +3,7 @@ package project
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -26,10 +27,10 @@ type initProjectResult struct {
 }
 
 type ProjectData struct {
-	APIKey    string                 `json:"api_key"`
-	ProjectId string                 `json:"id"`
-	Env       map[string]interface{} `json:"env"`
-	Secrets   map[string]interface{} `json:"secrets"`
+	APIKey    string            `json:"api_key"`
+	ProjectId string            `json:"id"`
+	Env       map[string]string `json:"env"`
+	Secrets   map[string]string `json:"secrets"`
 }
 
 // InitProject will create a new project in the organization.
@@ -86,19 +87,29 @@ func ProjectExists(dir string) bool {
 type Resources struct {
 	Memory string `json:"memory,omitempty" yaml:"memory,omitempty"`
 	CPU    string `json:"cpu,omitempty" yaml:"cpu,omitempty"`
+	Disk   string `json:"disk,omitempty" yaml:"disk,omitempty"`
 
 	CPUQuantity    resource.Quantity `json:"-" yaml:"-"`
 	MemoryQuantity resource.Quantity `json:"-" yaml:"-"`
+	DiskQuantity   resource.Quantity `json:"-" yaml:"-"`
 }
 
 type Deployment struct {
 	Resources *Resources `json:"resources,omitempty" yaml:"resources,omitempty"`
 }
 
+type IO struct {
+	Type   string         `json:"type" yaml:"type"`
+	ID     string         `json:"id,omitempty" yaml:"id,omitempty"`
+	Config map[string]any `json:"config,omitempty" yaml:"config,omitempty"`
+}
+
 type Project struct {
 	ProjectId  string      `json:"project_id" yaml:"project_id"`
 	Provider   string      `json:"provider" yaml:"provider"`
-	Deployment *Deployment `json:"deploy,omitempty" yaml:"deploy,omitempty"`
+	Deployment *Deployment `json:"deployment,omitempty" yaml:"deployment,omitempty"`
+	Inputs     []IO        `json:"inputs,omitempty" yaml:"inputs,omitempty"`
+	Outputs    []IO        `json:"outputs,omitempty" yaml:"outputs,omitempty"`
 }
 
 // Load will load the project from a file in the given directory.
@@ -151,9 +162,26 @@ func (p *Project) Save(dir string) error {
 	return enc.Encode(p)
 }
 
+const (
+	defaultMemory = "1Gi"
+	defaultCPU    = "1000M"
+)
+
 // NewProject will create a new project that is empty.
 func NewProject() *Project {
-	return &Project{}
+	return &Project{
+		Inputs: []IO{
+			{
+				Type: "webhook",
+			},
+		},
+		Deployment: &Deployment{
+			Resources: &Resources{
+				Memory: defaultMemory,
+				CPU:    defaultCPU,
+			},
+		},
+	}
 }
 
 type ProjectResponse struct {
@@ -169,41 +197,73 @@ func (p *Project) ListProjectEnv(logger logger.Logger, baseUrl string, token str
 	if err := client.Do("GET", fmt.Sprintf("/cli/project/%s", p.ProjectId), nil, &projectResponse); err != nil {
 		logger.Fatal("error getting project env: %s", err)
 	}
-	return &projectResponse.Data, nil
-}
-
-func (p *Project) SetProjectEnv(logger logger.Logger, baseUrl string, token string, env map[string]interface{}) (*ProjectData, error) {
-	client := util.NewAPIClient(baseUrl, token)
-	var projectResponse ProjectResponse
-	if err := client.Do("PUT", fmt.Sprintf("/cli/project/%s/env", p.ProjectId), map[string]interface{}{
-		"env": env,
-	}, &projectResponse); err != nil {
-		logger.Fatal("error setting project env: %s", err)
+	if !projectResponse.Success {
+		return nil, errors.New(projectResponse.Message)
 	}
 	return &projectResponse.Data, nil
 }
 
+func (p *Project) SetProjectEnv(logger logger.Logger, baseUrl string, token string, env map[string]string, secrets map[string]string) (*ProjectData, error) {
+	client := util.NewAPIClient(baseUrl, token)
+	var projectResponse ProjectResponse
+	if err := client.Do("PUT", fmt.Sprintf("/cli/project/%s/env", p.ProjectId), map[string]any{
+		"env":     env,
+		"secrets": secrets,
+	}, &projectResponse); err != nil {
+		logger.Fatal("error setting project env: %s", err)
+	}
+	if !projectResponse.Success {
+		return nil, errors.New(projectResponse.Message)
+	}
+	return &projectResponse.Data, nil
+}
+
+func (p *Project) DeleteProjectEnv(logger logger.Logger, baseUrl string, token string, env []string, secrets []string) error {
+	client := util.NewAPIClient(baseUrl, token)
+	var projectResponse ProjectResponse
+	if err := client.Do("DELETE", fmt.Sprintf("/cli/project/%s/env", p.ProjectId), map[string]any{
+		"env":     env,
+		"secrets": secrets,
+	}, &projectResponse); err != nil {
+		logger.Fatal("error deleting project env: %s", err)
+	}
+	if !projectResponse.Success {
+		return errors.New(projectResponse.Message)
+	}
+	return nil
+}
+
 type DeploymentConfig struct {
-	Provider   string   `yaml:"provider"`
-	Language   string   `yaml:"language"`
-	MinVersion string   `yaml:"min_version,omitempty"`
-	WorkingDir string   `yaml:"working_dir,omitempty"`
-	Command    []string `yaml:"command,omitempty"`
-	Env        []string `yaml:"env,omitempty"`
+	Provider   string      `yaml:"provider"`
+	Language   string      `yaml:"language"`
+	MinVersion string      `yaml:"min_version,omitempty"`
+	WorkingDir string      `yaml:"working_dir,omitempty"`
+	Command    []string    `yaml:"command,omitempty"`
+	Env        []string    `yaml:"env,omitempty"`
+	Deployment *Deployment `yaml:"deployment,omitempty"`
 }
 
 func NewDeploymentConfig() *DeploymentConfig {
 	return &DeploymentConfig{}
 }
 
-func (c *DeploymentConfig) Write(dir string) error {
+type CleanupFunc func()
+
+func (c *DeploymentConfig) Write(dir string) (CleanupFunc, error) {
 	fn := filepath.Join(dir, "agentuity-deployment.yaml")
+	cleanup := func() {
+		os.Remove(fn)
+	}
 	of, err := os.Create(fn)
 	if err != nil {
-		return err
+		return cleanup, err
 	}
 	defer of.Close()
 	enc := yaml.NewEncoder(of)
 	enc.SetIndent(2)
-	return enc.Encode(c)
+	err = enc.Encode(c)
+	if err != nil {
+		return cleanup, err
+	}
+	return cleanup, nil
 }
