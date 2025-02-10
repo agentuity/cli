@@ -190,40 +190,6 @@ func (c *LiveDevConnection) WebURL(appUrl string) string {
 	return fmt.Sprintf("%s/developer/live/%s", appUrl, c.websocketId)
 }
 
-var devDebugCmd = &cobra.Command{
-	Use:   "debug",
-	Short: "Debug the development websocket",
-	Run: func(cmd *cobra.Command, args []string) {
-		log := env.NewLogger(cmd)
-		sdkEventsFile := "events.log"
-		appUrl := viper.GetString("overrides.app_url")
-		websocketUrl := viper.GetString("overrides.websocket_url")
-		websocketId, _ := cmd.Flags().GetString("websocket-id")
-		apiKey := viper.GetString("auth.api_key")
-
-		// get 6 random characters
-		if websocketId == "" {
-			websocketId = uuid.New().String()[:6]
-		}
-		liveDevConnection, err := NewLiveDevConnection(log, sdkEventsFile, websocketId, websocketUrl, apiKey)
-		if err != nil {
-			log.Fatal("failed to create live dev connection: %s", err)
-		}
-		defer liveDevConnection.Close()
-		devUrl := liveDevConnection.WebURL(appUrl)
-		log.Info("development agent url: %s", devUrl)
-		if err := browser.OpenURL(devUrl); err != nil {
-			log.Fatal("failed to open browser: %s", err)
-		}
-		logger := logger.NewMultiLogger(log, logger.NewJSONLoggerWithSink(liveDevConnection, logger.LevelInfo))
-		logger.Info("starting development agent 🤖")
-		for {
-			time.Sleep(1 * time.Second)
-			logger.Info("ping")
-		}
-	},
-}
-
 var devRunCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run the development server",
