@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"regexp"
@@ -57,7 +58,7 @@ func decodeEvent(event string) ([]map[string]any, error) {
 	return nil, fmt.Errorf("event does not look like a JSON object or array")
 }
 
-func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketId string, websocketUrl string) (*LiveDevConnection, error) {
+func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketId string, websocketUrl string, apiKey string) (*LiveDevConnection, error) {
 	t, err := tail.TailFile(sdkEventsFile, tail.Config{Follow: true, ReOpen: true, Logger: tail.DiscardingLogger})
 	if err != nil {
 		return nil, err
@@ -84,8 +85,16 @@ func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketI
 	urlString := u.String()
 
 	logger.Trace("dialing %s", urlString)
-	self.conn, _, err = websocket.DefaultDialer.Dial(urlString, nil)
+	headers := http.Header{}
+	headers.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
+	var httpResponse *http.Response
+	self.conn, httpResponse, err = websocket.DefaultDialer.Dial(urlString, headers)
 	if err != nil {
+		if httpResponse != nil {
+			if httpResponse.StatusCode == 401 {
+				logger.Error("invalid api key")
+			}
+		}
 		return nil, fmt.Errorf("failed to dial: %s", err)
 	}
 
@@ -192,12 +201,13 @@ var devRunCmd = &cobra.Command{
 		appUrl := viper.GetString("overrides.app_url")
 		websocketUrl := viper.GetString("overrides.websocket_url")
 		websocketId, _ := cmd.Flags().GetString("websocket-id")
+		apiKey := viper.GetString("auth.api_key")
 
 		// get 6 random characters
 		if websocketId == "" {
 			websocketId = uuid.New().String()[:6]
 		}
-		liveDevConnection, err := NewLiveDevConnection(log, sdkEventsFile, websocketId, websocketUrl)
+		liveDevConnection, err := NewLiveDevConnection(log, sdkEventsFile, websocketId, websocketUrl, apiKey)
 		if err != nil {
 			log.Fatal("failed to create live dev connection: %s", err)
 		}
