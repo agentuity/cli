@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 
 	"github.com/agentuity/cli/internal/provider"
@@ -202,6 +204,72 @@ func (c *LiveDevConnection) WebURL(appUrl string) string {
 	return fmt.Sprintf("%s/developer/live/%s", appUrl, c.websocketId)
 }
 
+type TriggerMessage struct {
+	ID      string `json:"id"`
+	Type    string `json:"type"`
+	From    string `json:"from"`
+	Payload struct {
+		Trigger     string `json:"trigger"`
+		ContentType string `json:"contentType"`
+		Payload     string `json:"payload"`
+	} `json:"payload"`
+}
+
+func isTriggerMessage(message []byte) (*TriggerMessage, error) {
+	var tm TriggerMessage
+	if err := json.Unmarshal(message, &tm); err != nil {
+		return nil, err
+	}
+	return &tm, nil
+}
+
+func SaveInput(message []byte) error {
+	triggerMessage, err := isTriggerMessage(message)
+	if err != nil {
+		return err
+	}
+	if triggerMessage == nil {
+		return fmt.Errorf("message is not a trigger message")
+	}
+
+	payload := triggerMessage.Payload
+
+	id := uuid.New().String()[:8]
+
+	// Ensure directory exists
+	if err := os.MkdirAll("/tmp/agentuity", 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	// Create input file with state
+	inputPath := filepath.Join("/tmp/agentuity", id, "input")
+	if err := os.MkdirAll(filepath.Dir(inputPath), 0755); err != nil {
+		return fmt.Errorf("failed to create input directory: %w", err)
+	}
+
+	// Marshal payload struct to JSON bytes
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	if err := os.WriteFile(inputPath, payloadBytes, 0644); err != nil {
+		return fmt.Errorf("failed to write input file: %w", err)
+	}
+
+	// Create empty output file
+	outputPath := filepath.Join("/tmp/agentuity", id, "output")
+	if err := os.WriteFile(outputPath, []byte{}, 0644); err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+
+	// Export environment variables
+	os.Setenv("AGENTUITY_SDK_INPUT_FILE", inputPath)
+	os.Setenv("AGENTUITY_SDK_OUTPUT_FILE", outputPath)
+
+	return nil
+}
+
 var devRunCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run the development server",
@@ -240,6 +308,9 @@ var devRunCmd = &cobra.Command{
 
 		liveDevConnection.SetOnMessage(func(message []byte) error {
 			logger.Trace("recv: %s", message)
+			if err := SaveInput(message); err != nil {
+				logger.Error("failed to save input: %s", err)
+			}
 			go func() {
 				if err := runner.Start(); err != nil {
 					logger.Fatal("failed to start development agent: %s", err)
