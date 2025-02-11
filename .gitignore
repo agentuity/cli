@@ -2,3 +2,4 @@
 /myagent
 cli
 dist/
+**/.DS_Store
