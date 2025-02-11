@@ -284,6 +284,12 @@ var devRunCmd = &cobra.Command{
 		websocketId, _ := cmd.Flags().GetString("websocket-id")
 		apiKey := viper.GetString("auth.api_key")
 
+		if _, err := os.Stat(sdkEventsFile); err == nil {
+			if err := os.Remove(sdkEventsFile); err != nil {
+				log.Trace("failed to delete sdkEventsFile: %s", err)
+			}
+		}
+
 		// get 6 random characters
 		if websocketId == "" {
 			websocketId = uuid.New().String()[:6]
