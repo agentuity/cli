@@ -100,3 +100,17 @@ notarize:
         # Not recommended, as it could take a really long time.
         wait: false
         # timeout: 20m
+brews:
+  - name: agentuity
+    repository:
+      owner: agentuity
+      name: homebrew-tap
+      branch: main
+    conflicts:
+      - the_silver_searcher
+    homepage: "https://agentuity.com"
+    description: "Agentuity CLI"
+    license: "Apache-2.0"
+    install: |
+      bin.install "agentuity"
+
