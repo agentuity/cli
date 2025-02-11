@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/agentuity/go-common/env"
+	"github.com/agentuity/go-common/logger"
 	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/sys"
 	"github.com/charmbracelet/huh"
@@ -18,8 +19,6 @@ import (
 	"golang.org/x/term"
 )
 
-var hasTTY = term.IsTerminal(int(os.Stdout.Fd()))
-
 var envCmd = &cobra.Command{
 	Use:   "env",
 	Short: "Environment related commands",
@@ -28,8 +27,11 @@ var envCmd = &cobra.Command{
 	},
 }
 
-var looksLikeSecret = regexp.MustCompile(`(?i)KEY|SECRET|TOKEN|PASSWORD|sk_`)
-var isAgentuityEnv = regexp.MustCompile(`(?i)AGENTUITY_`)
+var (
+	hasTTY          = term.IsTerminal(int(os.Stdout.Fd()))
+	looksLikeSecret = regexp.MustCompile(`(?i)KEY|SECRET|TOKEN|PASSWORD|sk_`)
+	isAgentuityEnv  = regexp.MustCompile(`(?i)AGENTUITY_`)
+)
 
 func loadEnvFile(le []env.EnvLine, forceSecret bool) (map[string]string, map[string]string) {
 	envs := make(map[string]string)
@@ -45,6 +47,40 @@ func loadEnvFile(le []env.EnvLine, forceSecret bool) (map[string]string, map[str
 		}
 	}
 	return envs, secrets
+}
+
+func promptForEnv(logger logger.Logger, key string, isSecret bool, localenv map[string]string, osenv map[string]string) string {
+	prompt := "Enter your environment variable value for " + key
+	var help string
+	var defaultValue string
+	if isSecret {
+		prompt = "Enter your secret value for " + key
+		if val, ok := localenv[key]; ok {
+			help = "Press enter to set as " + maxString(cstr.Mask(val), 30) + " from your .env file"
+			defaultValue = val
+		} else if val, ok := osenv[key]; ok {
+			help = "Press enter to set as " + maxString(cstr.Mask(val), 30) + " from your environment"
+			defaultValue = val
+		} else {
+			help = "Your input will be masked"
+		}
+	}
+	value := getInput(logger, prompt, help, "", isSecret, nil)
+	if value == "" && defaultValue != "" {
+		value = defaultValue
+	}
+	return value
+}
+
+func loadOSEnv() map[string]string {
+	osenv := make(map[string]string)
+	for _, line := range os.Environ() {
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 && !isAgentuityEnv.MatchString(parts[0]) {
+			osenv[parts[0]] = parts[1]
+		}
+	}
+	return osenv
 }
 
 var envSetCmd = &cobra.Command{
@@ -87,12 +123,7 @@ var envSetCmd = &cobra.Command{
 		}
 		if !hasSetFromFile {
 			// load any environment variables from the environment
-			for _, line := range os.Environ() {
-				parts := strings.SplitN(line, "=", 2)
-				if len(parts) == 2 && !isAgentuityEnv.MatchString(parts[0]) {
-					osenv[parts[0]] = parts[1]
-				}
-			}
+			osenv = loadOSEnv()
 
 			// load any environment variables from the .env file
 			envfile := filepath.Join(dir, ".env")
@@ -172,27 +203,7 @@ var envSetCmd = &cobra.Command{
 				}
 			}
 			if value == "" {
-				prompt := "Enter your environment variable value for " + key
-				var help string
-				var defaultValue string
-				if isSecret {
-					prompt = "Enter your secret value for " + key
-					if val, ok := localenv[key]; ok {
-						help = "Press enter to set as " + maxString(cstr.Mask(val), 30) + " from your .env file"
-						defaultValue = val
-					} else if val, ok := osenv[key]; ok {
-						help = "Press enter to set as " + maxString(cstr.Mask(val), 30) + " from your environment"
-						defaultValue = val
-					} else {
-						help = "Your input will be masked"
-					}
-				}
-				value = getInput(logger, prompt, help, "", isSecret, nil)
-				if value == "" && defaultValue != "" {
-					value = defaultValue
-				} else if value == "" {
-					return
-				}
+				value = promptForEnv(logger, key, isSecret, localenv, osenv)
 			}
 		}
 		if key != "" && value != "" {
@@ -322,7 +333,7 @@ var envListCmd = &cobra.Command{
 		if len(projectData.Env) == 0 && len(projectData.Secrets) == 0 {
 			printWarning("No environment variables or secrets set for this project")
 			fmt.Println()
-			fmt.Printf("You can set environment variables with %s", printCommand("env", "set", "<key>", "<value>"))
+			fmt.Printf("You can set environment variables with %s", command("env", "set", "<key>", "<value>"))
 			fmt.Println()
 		}
 	},

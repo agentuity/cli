@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -224,4 +225,79 @@ func patchImport(buf string, token string) (string, error) {
 	buf = before + "agentuity.init()\n\n" + after
 
 	return buf, nil
+}
+
+type modelMatcher struct {
+	SecretName string
+	Matcher    *regexp.Regexp
+}
+
+var modelMatcherRules = []modelMatcher{
+	{"OPENROUTER_API_KEY", regexp.MustCompile(`openrouter`)},
+	{"GITHUB_API_KEY", regexp.MustCompile(`github`)},
+	{"LM_STUDIO_API_KEY", regexp.MustCompile(`lm_studio`)},
+	{"AZURE_API_KEY", regexp.MustCompile(`azure\/`)},
+	{"DATABRICKS_API_KEY", regexp.MustCompile(`databricks`)},
+	{"COHERE_API_KEY", regexp.MustCompile(`command-`)},
+	{"OPENAI_API_KEY", regexp.MustCompile(`^(gpt|o\d+)-`)},
+	{"GEMINI_API_KEY", regexp.MustCompile(`gemini`)},
+	{"ANTHROPIC_API_KEY", regexp.MustCompile(`claude`)},
+	{"AZURE_AI_API_KEY", regexp.MustCompile(`azure_ai`)},
+	{"PERPLEXITYAI_API_KEY", regexp.MustCompile(`perplexity`)},
+	{"MISTRAL_API_KEY", regexp.MustCompile(`mistral`)},
+	{"HUGGINGFACE_API_KEY", regexp.MustCompile(`huggingface`)},
+	{"WATSONX_APIKEY", regexp.MustCompile(`watsonx`)},
+	{"NVIDIA_NIM_API_KEY", regexp.MustCompile(`nvidia_nim`)},
+	{"XAI_API_KEY", regexp.MustCompile(`xai|grok`)},
+	{"GROQ_API_KEY", regexp.MustCompile(`groq`)},
+	{"CLOUDFLARE_API_KEY", regexp.MustCompile(`cloudflare`)},
+	{"DEEPSEEK_API_KEY", regexp.MustCompile(`deepseek`)},
+	{"FIREWORKS_AI_API_KEY", regexp.MustCompile(`fireworks_ai`)},
+	{"REPLICATE_API_KEY", regexp.MustCompile(`replicate`)},
+	{"TOGETHERAI_API_KEY", regexp.MustCompile(`together_ai`)},
+	{"VOYAGE_API_KEY", regexp.MustCompile(`voyage`)},
+	{"SAMBANOVA_API_KEY", regexp.MustCompile(`sambanova`)},
+	{"BASETEN_API_KEY", regexp.MustCompile(`baseten`)},
+	{"ALEPHALPHA_API_KEY", regexp.MustCompile(`luminous`)},
+	{"JINA_AI_API_KEY", regexp.MustCompile(`jina_ai`)},
+}
+
+func validateModelSecretSet(logger logger.Logger, data DeployPreflightCheckData, modelName string) error {
+	for _, m := range modelMatcherRules {
+		if m.Matcher.MatchString(modelName) {
+			if val, found := data.ProjectData.Secrets[m.SecretName]; !found || val == "" {
+				if err := promptToSetSecret(logger, data, m.SecretName, "You are using the model "+modelName+" but you haven't set the "+m.SecretName+" secret to your project. Would you like to set it?"); err != nil {
+					return err
+				}
+			}
+			break
+		}
+	}
+	return nil
+}
+
+func promptToSetSecret(logger logger.Logger, data DeployPreflightCheckData, secretName string, prompt string) error {
+	if _, found := data.ProjectData.Secrets[secretName]; !found {
+		var warn bool
+		// we haven't set the openai key but we've selected an openai model
+		if !data.PromptHelpers.Ask(logger, prompt, true) {
+			warn = true
+		} else {
+			secret := data.PromptHelpers.PromptForEnv(logger, secretName, true, nil, data.OSEnvironment)
+			if secret == "" {
+				warn = true
+			} else {
+				pd, err := data.Project.SetProjectEnv(logger, data.APIURL, data.APIKey, nil, map[string]string{secretName: secret})
+				if err != nil {
+					return err
+				}
+				data.ProjectData = pd
+			}
+		}
+		if warn {
+			data.PromptHelpers.PrintWarning("Your project will likely not run since the %s will not be set in your deployment", secretName)
+			return nil
+		}
+	}
+	return nil
 }

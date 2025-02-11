@@ -91,6 +91,16 @@ func (p *CrewAIProvider) ConfigureDeploymentConfig(config *project.DeploymentCon
 	return nil
 }
 
+func (p *CrewAIProvider) DeployPreflightCheck(logger logger.Logger, data DeployPreflightCheckData) error {
+	if data.Envfile != nil {
+		// detect if we have a MODEL set but the model's API Key hasn't been set
+		if val, ok := data.Envfile.Lookup("MODEL"); ok && val != "" {
+			return validateModelSecretSet(logger, data, val)
+		}
+	}
+	return nil
+}
+
 func init() {
 	register("crewai", &CrewAIProvider{})
 }

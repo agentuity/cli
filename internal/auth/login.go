@@ -27,10 +27,10 @@ func Login(logger logger.Logger, baseUrl string) (*LoginResult, error) {
 		apiKey := query.Get("api_key")
 		userId := query.Get("user_id")
 		if apiKey == "" {
-			return fmt.Errorf("no token found")
+			return fmt.Errorf("no api_key found from the callback result")
 		}
 		if userId == "" {
-			return fmt.Errorf("no user_id found")
+			return fmt.Errorf("no user_id found found from the callback result")
 		}
 		result.APIKey = apiKey
 		result.UserId = userId

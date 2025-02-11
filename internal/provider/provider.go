@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/agentuity/cli/internal/project"
+	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
 )
@@ -30,6 +31,62 @@ type Runner interface {
 	Done() chan struct{}
 }
 
+type EnvFile struct {
+	Filepath string
+	Env      []env.EnvLine
+}
+
+func (e *EnvFile) Lookup(key string) (string, bool) {
+	for _, line := range e.Env {
+		if line.Key == key {
+			return line.Val, true
+		}
+	}
+	return "", false
+}
+
+type PromptHelpers struct {
+	// ShowSpinner will show a spinner with the title while the action is running
+	ShowSpinner func(logger logger.Logger, title string, action func())
+	// PrintSuccess will print a check mark and the message provided with optional formatting arguments
+	PrintSuccess func(msg string, args ...any)
+	// PrintLock will print a lock and the message provided with optional formatting arguments
+	PrintLock func(msg string, args ...any)
+	// PrintLock will print an X mark and the message provided with optional formatting arguments
+	PrintWarning func(msg string, args ...any)
+	// CommandString will format a CLI command
+	CommandString func(cmd string, args ...string) string
+	// LinkString will return a formatted URL string
+	LinkString func(cmd string, args ...any) string
+	// Ask will ask the user for input and return true (confirm) or false (no!)
+	Ask func(logger logger.Logger, title string, defaultValue bool) bool
+	// PromptForEnv is a helper for prompting the user to get a environment (or secret) value. You must do something with the result such as save it.
+	PromptForEnv func(logger logger.Logger, key string, isSecret bool, localenv map[string]string, osenv map[string]string) string
+}
+
+type DeployPreflightCheckData struct {
+	// Dir returns the full path to the project folder
+	Dir string
+	// APIClient is for communicating with the backend
+	APIClient *util.APIClient
+	// APIURL is the base url to the API
+	APIURL string
+	// APIKey is the projects api key
+	APIKey string
+	// Envfile if the project has a .env file and the parsed contents of that file
+	Envfile *EnvFile
+	// Project is the project data
+	Project *project.Project
+	// ProjectData is the project data loaded from the backend
+	ProjectData *project.ProjectData
+	// Config is the deployment configuration
+	Config *project.DeploymentConfig
+	// PromptHelpers are a set of funcs to assist in prompting the user on the command line
+	PromptHelpers PromptHelpers
+	// OS Environment as a map
+	OSEnvironment map[string]string
+}
+
 // Provider is the interface that is implemented by the provider to perform implementation specific logic.
 type Provider interface {
 	// Name will return the name of the provider in a format that is easy to use in a CLI.
@@ -51,6 +108,9 @@ type Provider interface {
 
 	// ProjectIgnoreRules should return any additional project specific deployment ignore rules.
 	ProjectIgnoreRules() []string
+
+	// DeployPreflightCheck is called before cloud deployment to allow the provider to perform any preflight checks.
+	DeployPreflightCheck(logger logger.Logger, data DeployPreflightCheckData) error
 
 	// ConfigureDeploymentConfig will configure the deployment config for the given provider.
 	ConfigureDeploymentConfig(config *project.DeploymentConfig) error
