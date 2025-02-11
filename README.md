@@ -16,7 +16,7 @@ The CLI for the Agentuity Agent Cloud Platform.
 If you are on a Mac, you can install the CLI using Homebrew:
 
 ```bash
-brew install agentuity
+ brew tap agentuity/tap && brew install agentuity
 ```
 
 For other platforms, please download the binary from the [Releases](https://github.com/agentuity/cli/releases) page.
