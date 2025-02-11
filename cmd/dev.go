@@ -236,13 +236,14 @@ func SaveInput(message []byte) error {
 
 	id := uuid.New().String()[:8]
 
+	dir := filepath.Join(os.TempDir(), "agentuity")
 	// Ensure directory exists
-	if err := os.MkdirAll("/tmp/agentuity", 0755); err != nil {
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	// Create input file with state
-	inputPath := filepath.Join("/tmp/agentuity", id, "input")
+	inputPath := filepath.Join(dir, id, "input")
 	if err := os.MkdirAll(filepath.Dir(inputPath), 0755); err != nil {
 		return fmt.Errorf("failed to create input directory: %w", err)
 	}
@@ -258,7 +259,7 @@ func SaveInput(message []byte) error {
 	}
 
 	// Create empty output file
-	outputPath := filepath.Join("/tmp/agentuity", id, "output")
+	outputPath := filepath.Join(dir, id, "output")
 	if err := os.WriteFile(outputPath, []byte{}, 0644); err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)
 	}
@@ -293,8 +294,8 @@ var devRunCmd = &cobra.Command{
 		}
 		defer liveDevConnection.Close()
 		devUrl := liveDevConnection.WebURL(appUrl)
-		log.Info("development agent url: %s", devUrl)
-		log.Info("Kicking off development agent my using the run button in the web browser 🤖")
+		log.Info("development server at url: %s", devUrl)
+
 		if err := browser.OpenURL(devUrl); err != nil {
 			log.Fatal("failed to open browser: %s", err)
 
@@ -315,8 +316,6 @@ var devRunCmd = &cobra.Command{
 				logger.Fatal("failed to start development agent: %s", err)
 			}
 			<-runner.Done()
-			fmt.Println("runner done")
-
 			return nil
 		})
 
