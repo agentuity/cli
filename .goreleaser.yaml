@@ -109,8 +109,10 @@ brews:
     conflicts:
       - the_silver_searcher
     homepage: "https://agentuity.com"
-    description: "Agentuity CLI"
+    description: "The Agentuity Agent Cloud Platform CLI"
     license: "Apache-2.0"
     install: |
       bin.install "agentuity"
+    alternative_names:
+      - "agentuity@{{ .Major }}.{{ .Minor }}"
 
