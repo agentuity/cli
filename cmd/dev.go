@@ -294,7 +294,7 @@ var devRunCmd = &cobra.Command{
 		defer liveDevConnection.Close()
 		devUrl := liveDevConnection.WebURL(appUrl)
 		log.Info("development agent url: %s", devUrl)
-		log.Info("Kicking off development agent my using the run button  in the web browser 🤖")
+		log.Info("Kicking off development agent my using the run button in the web browser 🤖")
 		if err := browser.OpenURL(devUrl); err != nil {
 			log.Fatal("failed to open browser: %s", err)
 
