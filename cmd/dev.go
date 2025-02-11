@@ -303,8 +303,6 @@ var devRunCmd = &cobra.Command{
 
 		liveDevConnection.SetOnMessage(func(message []byte) error {
 			runner, err := provider.NewRunner(logger, dir, apiUrl, sdkEventsFile, args)
-			fmt.Println("runner", runner, err)
-
 			go func() {
 				if err != nil {
 					logger.Fatal("failed to run development agent: %s", err)
