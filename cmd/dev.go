@@ -6,12 +6,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
-	"time"
 
 	"github.com/agentuity/cli/internal/provider"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+
 	csys "github.com/agentuity/go-common/sys"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -35,6 +36,7 @@ type LiveDevConnection struct {
 	sdkEventsTail *tail.Tail
 	conn          *websocket.Conn
 	logQueue      chan []byte
+	onMessage     func(message []byte) error
 }
 
 var looksLikeJson = regexp.MustCompile(`^\{.*\}$`)
@@ -56,6 +58,10 @@ func decodeEvent(event string) ([]map[string]any, error) {
 		return payload, nil
 	}
 	return nil, fmt.Errorf("event does not look like a JSON object or array")
+}
+
+func (c *LiveDevConnection) SetOnMessage(onMessage func(message []byte) error) {
+	c.onMessage = onMessage
 }
 
 func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketId string, websocketUrl string, apiKey string) (*LiveDevConnection, error) {
@@ -141,10 +147,18 @@ func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketI
 		for {
 			_, message, err := self.conn.ReadMessage()
 			if err != nil {
-				logger.Trace("read:", err)
+				logger.Fatal("failed to read message: %s", err)
 				return
 			}
 			logger.Debug("recv: %s", message)
+			if self.onMessage == nil {
+				logger.Trace("no onMessage handler set, skipping message")
+				continue
+			}
+
+			if err := self.onMessage(message); err != nil {
+				logger.Trace("failed to handle message: %s", err)
+			}
 		}
 	}()
 
@@ -190,6 +204,73 @@ func (c *LiveDevConnection) WebURL(appUrl string) string {
 	return fmt.Sprintf("%s/developer/live/%s", appUrl, c.websocketId)
 }
 
+type TriggerMessage struct {
+	ID      string `json:"id"`
+	Type    string `json:"type"`
+	From    string `json:"from"`
+	Payload struct {
+		Trigger     string `json:"trigger"`
+		ContentType string `json:"contentType"`
+		Payload     string `json:"payload"`
+	} `json:"payload"`
+}
+
+func isTriggerMessage(message []byte) (*TriggerMessage, error) {
+	var tm TriggerMessage
+	if err := json.Unmarshal(message, &tm); err != nil {
+		return nil, err
+	}
+	return &tm, nil
+}
+
+func SaveInput(message []byte) error {
+	triggerMessage, err := isTriggerMessage(message)
+	if err != nil {
+		return err
+	}
+	if triggerMessage == nil {
+		return fmt.Errorf("message is not a trigger message")
+	}
+
+	payload := triggerMessage.Payload
+
+	id := uuid.New().String()[:8]
+
+	dir := filepath.Join(os.TempDir(), "agentuity")
+	// Ensure directory exists
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	// Create input file with state
+	inputPath := filepath.Join(dir, id, "input")
+	if err := os.MkdirAll(filepath.Dir(inputPath), 0755); err != nil {
+		return fmt.Errorf("failed to create input directory: %w", err)
+	}
+
+	// Marshal payload struct to JSON bytes
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	if err := os.WriteFile(inputPath, payloadBytes, 0644); err != nil {
+		return fmt.Errorf("failed to write input file: %w", err)
+	}
+
+	// Create empty output file
+	outputPath := filepath.Join(dir, id, "output")
+	if err := os.WriteFile(outputPath, []byte{}, 0644); err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+
+	// Export environment variables
+	os.Setenv("AGENTUITY_SDK_INPUT_FILE", inputPath)
+	os.Setenv("AGENTUITY_SDK_OUTPUT_FILE", outputPath)
+
+	return nil
+}
+
 var devRunCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run the development server",
@@ -213,40 +294,32 @@ var devRunCmd = &cobra.Command{
 		}
 		defer liveDevConnection.Close()
 		devUrl := liveDevConnection.WebURL(appUrl)
-		log.Info("development agent url: %s", devUrl)
+		log.Info("development server at url: %s", devUrl)
+
 		if err := browser.OpenURL(devUrl); err != nil {
 			log.Fatal("failed to open browser: %s", err)
+
 		}
 		logger := logger.NewMultiLogger(log, logger.NewJSONLoggerWithSink(liveDevConnection, logger.LevelInfo))
-		logger.Info("starting development agent 🤖")
-		runner, err := provider.NewRunner(logger, dir, apiUrl, sdkEventsFile, args)
-		if err != nil {
-			logger.Fatal("failed to run development agent: %s", err)
-		}
-		if err := runner.Start(); err != nil {
-			logger.Fatal("failed to start development agent: %s", err)
-		}
-		// TODO: hook up watch
-		for {
-			select {
-			case <-runner.Done():
-				logger.Info("development agent stopped")
-				time.Sleep(1 * time.Second)
-				os.Exit(0)
-			case <-runner.Restart():
-				if err := runner.Stop(); err != nil {
-					logger.Warn("failed to stop development agent: %s", err)
-				}
-				if err := runner.Start(); err != nil {
-					logger.Fatal("failed to restart development agent: %s", err)
-				}
-			case <-csys.CreateShutdownChannel():
-				if err := runner.Stop(); err != nil {
-					logger.Warn("failed to stop development agent: %s", err)
-				}
-				return
+
+		liveDevConnection.SetOnMessage(func(message []byte) error {
+			logger.Trace("recv: %s", message)
+			runner, err := provider.NewRunner(logger, dir, apiUrl, sdkEventsFile, args)
+			if err != nil {
+				logger.Fatal("failed to run development agent: %s", err)
 			}
-		}
+			if err := SaveInput(message); err != nil {
+				logger.Error("failed to save input: %s", err)
+			}
+
+			if err := runner.Start(); err != nil {
+				logger.Fatal("failed to start development agent: %s", err)
+			}
+			<-runner.Done()
+			return nil
+		})
+
+		<-csys.CreateShutdownChannel()
 	},
 }
 
