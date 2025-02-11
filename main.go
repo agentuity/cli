@@ -21,8 +21,20 @@ THE SOFTWARE.
 */
 package main
 
-import "github.com/agentuity/cli/cmd"
+import (
+	"os"
+
+	"github.com/agentuity/cli/cmd"
+)
+
+var version = "dev"
 
 func main() {
+	if version == "dev" {
+		if v, ok := os.LookupEnv("GIT_SHA"); ok && v != "" {
+			version = v
+		}
+	}
+	cmd.Version = version
 	cmd.Execute()
 }
