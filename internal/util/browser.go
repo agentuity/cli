@@ -7,10 +7,12 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/agentuity/go-common/logger"
-	"github.com/leaanthony/spinner"
+	"github.com/charmbracelet/huh/spinner"
+	"github.com/fatih/color"
 	"github.com/pkg/browser"
 )
 
@@ -43,7 +45,7 @@ func BrowserFlow(opts BrowserFlowOptions) error {
 	timer := time.NewTimer(time.Minute)
 	defer timer.Stop()
 
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := net.Listen("tcp", "127.0.0.1:0") // MUST listen only on 127.0.0.1 so we don't open a unintended port to the public
 	if err != nil {
 		return fmt.Errorf("failed to listen on port: %w", err)
 	}
@@ -91,6 +93,7 @@ func BrowserFlow(opts BrowserFlowOptions) error {
 			cu, err := url.Parse(callback)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
 			}
 			q := cu.Query()
 			q.Set("success", "true")
@@ -114,37 +117,44 @@ func BrowserFlow(opts BrowserFlowOptions) error {
 		logger.Trace("server closed")
 	}()
 
-	logger.Trace("opening browser to %s", u.String())
-	if err := browser.OpenURL(u.String()); err != nil {
-		return fmt.Errorf("failed to open browser: %w", err)
-	}
-	logger.Trace("waiting for callback to http://127.0.0.1:%d", port)
+	defer func() {
+		time.Sleep(time.Second)
+		server.Shutdown(context.Background())
+	}()
 
-	defer server.Shutdown(context.Background())
+	color.Magenta("Your browser has been opened to visit the URL:")
+	fmt.Println()
+	color.Black(u.String())
+	fmt.Println()
 
-	var s *spinner.Spinner
-	if opts.WaitMessage != "" {
-		s = spinner.New(opts.WaitMessage)
-		s.Start()
-	}
+	var returnErr error
+	var wg sync.WaitGroup
 
-	select {
-	case err := <-errors:
-		if s != nil {
-			s.Error(err.Error())
+	action := func() {
+		defer wg.Done()
+		if berr := browser.OpenURL(u.String()); berr != nil {
+			returnErr = fmt.Errorf("failed to open browser: %w", err)
+			return
 		}
+		logger.Trace("waiting for callback to http://127.0.0.1:%d", port)
+		select {
+		case e := <-errors:
+			returnErr = e
+			return
+		case <-timer.C:
+			returnErr = ErrTimeout
+			return
+		case <-ctx.Done():
+		}
+	}
+
+	wg.Add(1)
+
+	if err := spinner.New().Title("Waiting for response...").Action(action).Run(); err != nil {
 		return err
-	case <-timer.C:
-		if s != nil {
-			s.Error(ErrTimeout.Error())
-		}
-		return ErrTimeout
-	case <-ctx.Done():
 	}
 
-	if s != nil {
-		s.Success()
-	}
+	wg.Wait()
 
-	return nil
+	return returnErr
 }

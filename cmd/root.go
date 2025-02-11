@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/agentuity/cli/internal/project"
+	"github.com/agentuity/cli/internal/provider"
 	"github.com/agentuity/go-common/logger"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
@@ -41,6 +42,7 @@ const logoHeader = `
                 ######                                     #####               
               .###################################################              
              #######################################################            
+
 `
 
 func center(s string, width int) string {
@@ -55,6 +57,7 @@ func center(s string, width int) string {
 
 func printLogo() {
 	color.RGB(0, 255, 255).Print(logoHeader)
+	fmt.Println(color.RGB(0, 255, 255).Sprint(center("Agentuity Agent Cloud", 81)))
 	fmt.Println()
 }
 
@@ -62,7 +65,6 @@ func printLogo() {
 var rootCmd = &cobra.Command{
 	Use:     "agentuity",
 	Aliases: []string{"ag"},
-	Short:   color.RGB(0, 255, 255).Sprint(center("Agentuity Cloud Platform Tooling", 81)),
 	Run: func(cmd *cobra.Command, args []string) {
 		printLogo()
 		cmd.Help()
@@ -126,7 +128,7 @@ func printWarning(msg string, args ...any) {
 	fmt.Println()
 }
 
-func printCommand(cmd string, args ...string) string {
+func command(cmd string, args ...string) string {
 	cmdline := "agentuity " + strings.Join(append([]string{cmd}, args...), " ")
 	return color.HiCyanString(cmdline)
 }
@@ -198,7 +200,19 @@ func initScreenWithLogo() {
 	printLogo()
 	fmt.Println()
 	fmt.Println()
+}
 
+func createPromptHelper() provider.PromptHelpers {
+	return provider.PromptHelpers{
+		ShowSpinner:   showSpinner,
+		PrintSuccess:  printSuccess,
+		CommandString: command,
+		LinkString:    link,
+		PrintLock:     printLock,
+		PrintWarning:  printWarning,
+		Ask:           ask,
+		PromptForEnv:  promptForEnv,
+	}
 }
 
 func resolveDir(logger logger.Logger, dir string, createIfNotExists bool) string {

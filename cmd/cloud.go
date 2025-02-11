@@ -99,24 +99,29 @@ var cloudDeployCmd = &cobra.Command{
 			logger.Fatal("%s", err)
 		}
 
-		// check to see if we have any env vars that are not in the project
-		envfile := filepath.Join(dir, ".env")
-		if util.Exists(envfile) {
-			var projectData *project.ProjectData
-			var le []env.EnvLine
+		client := util.NewAPIClient(apiUrl, token)
+		var le []env.EnvLine
+		var envFile *provider.EnvFile
+		var projectData *project.ProjectData
 
-			action := func() {
-				var err error
-				projectData, err = theproject.ListProjectEnv(logger, apiUrl, token)
-				if err != nil {
-					logger.Fatal("error listing project env: %s", err)
-				}
-				le, err = env.ParseEnvFile(envfile)
-				if err != nil {
-					logger.Fatal("error parsing env file: %s. %s", envfile, err)
-				}
+		action := func() {
+			var err error
+			projectData, err = theproject.ListProjectEnv(logger, apiUrl, token)
+			if err != nil {
+				logger.Fatal("error listing project env: %s", err)
 			}
-			showSpinner(logger, "", action)
+		}
+		showSpinner(logger, "", action)
+
+		// check to see if we have any env vars that are not in the project
+		envfilename := filepath.Join(dir, ".env")
+		if util.Exists(envfilename) {
+
+			le, err = env.ParseEnvFile(envfilename)
+			if err != nil {
+				logger.Fatal("error parsing env file: %s. %s", envfilename, err)
+			}
+			envFile = &provider.EnvFile{Filepath: envfilename, Env: le}
 
 			var foundkeys []string
 			for _, ev := range le {
@@ -146,10 +151,11 @@ var cloudDeployCmd = &cobra.Command{
 					return
 				}
 				envs, secrets := loadEnvFile(le, false)
-				_, err := theproject.SetProjectEnv(logger, apiUrl, token, envs, secrets)
+				pd, err := theproject.SetProjectEnv(logger, apiUrl, token, envs, secrets)
 				if err != nil {
 					logger.Fatal("failed to set project env: %s", err)
 				}
+				projectData = pd // overwrite with the new version
 				switch {
 				case len(envs) > 0 && len(secrets) > 0:
 					printSuccess("Environment variables and secrets added")
@@ -165,10 +171,25 @@ var cloudDeployCmd = &cobra.Command{
 			}
 		}
 
-		client := util.NewAPIClient(apiUrl, token)
-
 		deploymentConfig.Deployment = theproject.Deployment
 
+		// allow the provider to perform any preflight checks
+		if err := p.DeployPreflightCheck(logger, provider.DeployPreflightCheckData{
+			Dir:           dir,
+			APIClient:     client,
+			APIURL:        apiUrl,
+			APIKey:        token,
+			Envfile:       envFile,
+			Project:       theproject,
+			ProjectData:   projectData,
+			Config:        deploymentConfig,
+			OSEnvironment: loadOSEnv(),
+			PromptHelpers: createPromptHelper(),
+		}); err != nil {
+			logger.Fatal("error performing pre-flight check: %s", err)
+		}
+
+		// have the provider set any specific deployment configuration
 		if err := p.ConfigureDeploymentConfig(deploymentConfig); err != nil {
 			logger.Fatal("error configuring deployment config: %s", err)
 		}
@@ -207,7 +228,7 @@ var cloudDeployCmd = &cobra.Command{
 		// add any provider specific ignore rules
 		for _, rule := range p.ProjectIgnoreRules() {
 			if err := rules.Add(rule); err != nil {
-				logger.Fatal("error adding rule: %s. %s", rule, err)
+				logger.Fatal("error adding project ignore rule: %s. %s", rule, err)
 			}
 		}
 
@@ -248,7 +269,7 @@ var cloudDeployCmd = &cobra.Command{
 		fi, _ := os.Stat(tmpfile.Name())
 		started := time.Now()
 
-		action := func() {
+		action = func() {
 			// send the zip file to the upload endpoint provided
 			req, err := http.NewRequest("PUT", startResponse.Data.Url, of)
 			if err != nil {
