@@ -301,22 +301,23 @@ var devRunCmd = &cobra.Command{
 		}
 		logger := logger.NewMultiLogger(log, logger.NewJSONLoggerWithSink(liveDevConnection, logger.LevelInfo))
 
-		runner, err := provider.NewRunner(logger, dir, apiUrl, sdkEventsFile, args)
-		if err != nil {
-			logger.Fatal("failed to run development agent: %s", err)
-		}
-
 		liveDevConnection.SetOnMessage(func(message []byte) error {
-			logger.Trace("recv: %s", message)
-			if err := SaveInput(message); err != nil {
-				logger.Error("failed to save input: %s", err)
-			}
+			runner, err := provider.NewRunner(logger, dir, apiUrl, sdkEventsFile, args)
+			fmt.Println("runner", runner, err)
+
 			go func() {
+				if err != nil {
+					logger.Fatal("failed to run development agent: %s", err)
+				}
+				logger.Trace("recv: %s", message)
+				if err := SaveInput(message); err != nil {
+					logger.Error("failed to save input: %s", err)
+				}
+
 				if err := runner.Start(); err != nil {
 					logger.Fatal("failed to start development agent: %s", err)
 				}
 			}()
-			<-runner.Done()
 
 			return nil
 		})
