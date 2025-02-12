@@ -109,7 +109,7 @@ brews:
     conflicts:
       - the_silver_searcher
     homepage: "https://agentuity.com"
-    description: "The Agentuity Agent Cloud Platform CLI"
+    description: "Tooling for the Agentuity Agent Cloud Platform"
     license: "Apache-2.0"
     install: |
       bin.install "agentuity"
