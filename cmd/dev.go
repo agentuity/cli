@@ -215,6 +215,19 @@ type TriggerMessage struct {
 	} `json:"payload"`
 }
 
+type OutputPayload struct {
+	ContentType string `json:"contentType"`
+	Payload     string `json:"payload"`
+}
+
+func isOutputPayload(message []byte) (*OutputPayload, error) {
+	var op OutputPayload
+	if err := json.Unmarshal(message, &op); err != nil {
+		return nil, err
+	}
+	return &op, nil
+}
+
 func isTriggerMessage(message []byte) (*TriggerMessage, error) {
 	var tm TriggerMessage
 	if err := json.Unmarshal(message, &tm); err != nil {
@@ -223,7 +236,33 @@ func isTriggerMessage(message []byte) (*TriggerMessage, error) {
 	return &tm, nil
 }
 
-func SaveInput(message []byte) error {
+func ReadOutput(roomId string, id string) (map[string]any, error) {
+	outputPath := filepath.Join(os.TempDir(), "agentuity", roomId, id, "output")
+
+	//read this file
+	content, err := os.ReadFile(outputPath)
+	if err != nil {
+		return nil, err
+	}
+
+	op, err := isOutputPayload(content)
+
+	if err != nil {
+		return nil, err
+	}
+	if op == nil {
+		return nil, fmt.Errorf("output is not a valid output payload")
+	}
+
+	message := map[string]any{
+		"contentType": op.ContentType,
+		"payload":     op.Payload,
+	}
+
+	return message, nil
+}
+
+func SaveInput(id string, message []byte) error {
 	triggerMessage, err := isTriggerMessage(message)
 	if err != nil {
 		return err
@@ -233,8 +272,6 @@ func SaveInput(message []byte) error {
 	}
 
 	payload := triggerMessage.Payload
-
-	id := uuid.New().String()[:8]
 
 	dir := filepath.Join(os.TempDir(), "agentuity")
 	// Ensure directory exists
@@ -309,12 +346,13 @@ var devRunCmd = &cobra.Command{
 		logger := logger.NewMultiLogger(log, logger.NewJSONLoggerWithSink(liveDevConnection, logger.LevelInfo))
 
 		liveDevConnection.SetOnMessage(func(message []byte) error {
+			id := uuid.New().String()[:8]
 			logger.Trace("recv: %s", message)
 			runner, err := provider.NewRunner(logger, dir, apiUrl, sdkEventsFile, args)
 			if err != nil {
 				logger.Fatal("failed to run development agent: %s", err)
 			}
-			if err := SaveInput(message); err != nil {
+			if err := SaveInput(id, message); err != nil {
 				logger.Error("failed to save input: %s", err)
 			}
 
@@ -322,6 +360,25 @@ var devRunCmd = &cobra.Command{
 				logger.Fatal("failed to start development agent: %s", err)
 			}
 			<-runner.Done()
+			output, err := ReadOutput(websocketId, id)
+			if err != nil {
+				logger.Error("failed to read output: %s", err)
+				return nil
+			}
+			if output == nil {
+				logger.Error("failed to read output: %s", err)
+				return nil
+			}
+
+			liveDevConnection.SendMessage(map[string]any{
+				"id":   liveDevConnection.websocketId,
+				"type": "output",
+				"payload": map[string]any{
+					"contentType": "text/plain",
+					"payload":     output,
+				},
+			}, "output")
+
 			return nil
 		})
 
