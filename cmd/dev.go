@@ -204,11 +204,12 @@ func (c *LiveDevConnection) WebURL(appUrl string) string {
 	return fmt.Sprintf("%s/developer/live/%s", appUrl, c.websocketId)
 }
 
-type TriggerMessage struct {
+type InputMessage struct {
 	ID      string `json:"id"`
 	Type    string `json:"type"`
 	From    string `json:"from"`
 	Payload struct {
+		SessionID   string `json:"sessionId"`
 		Trigger     string `json:"trigger"`
 		ContentType string `json:"contentType"`
 		Payload     string `json:"payload"`
@@ -228,16 +229,15 @@ func isOutputPayload(message []byte) (*OutputPayload, error) {
 	return &op, nil
 }
 
-func isTriggerMessage(message []byte) (*TriggerMessage, error) {
-	var tm TriggerMessage
+func isInputMessage(message []byte) (*InputMessage, error) {
+	var tm InputMessage
 	if err := json.Unmarshal(message, &tm); err != nil {
 		return nil, err
 	}
 	return &tm, nil
 }
 
-func ReadOutput(roomId string, id string) (map[string]any, error) {
-	outputPath := filepath.Join(os.TempDir(), "agentuity", roomId, id, "output")
+func ReadOutput(logger logger.Logger, outputPath string) (map[string]any, error) {
 
 	//read this file
 	content, err := os.ReadFile(outputPath)
@@ -258,54 +258,59 @@ func ReadOutput(roomId string, id string) (map[string]any, error) {
 		"contentType": op.ContentType,
 		"payload":     op.Payload,
 	}
-
 	return message, nil
 }
 
-func SaveInput(id string, message []byte) error {
-	triggerMessage, err := isTriggerMessage(message)
+func SaveInput(logger logger.Logger, id string, message []byte) (string, error) {
+	inputMessage, err := isInputMessage(message)
 	if err != nil {
-		return err
+		return "", err
 	}
-	if triggerMessage == nil {
-		return fmt.Errorf("message is not a trigger message")
+	if inputMessage == nil {
+		return "", fmt.Errorf("message is not a input message")
 	}
 
-	payload := triggerMessage.Payload
+	payload := inputMessage.Payload
+	sessionId := inputMessage.Payload.SessionID
 
 	dir := filepath.Join(os.TempDir(), "agentuity")
+
 	// Ensure directory exists
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
+		return "", fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	// Create input file with state
 	inputPath := filepath.Join(dir, id, "input")
 	if err := os.MkdirAll(filepath.Dir(inputPath), 0755); err != nil {
-		return fmt.Errorf("failed to create input directory: %w", err)
+		return "", fmt.Errorf("failed to create input directory: %w", err)
 	}
+	logger.Trace("inputPath: %s", inputPath)
 
 	// Marshal payload struct to JSON bytes
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("failed to marshal payload: %w", err)
+		return "", fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
 	if err := os.WriteFile(inputPath, payloadBytes, 0644); err != nil {
-		return fmt.Errorf("failed to write input file: %w", err)
+		return "", fmt.Errorf("failed to write input file: %w", err)
 	}
 
 	// Create empty output file
 	outputPath := filepath.Join(dir, id, "output")
 	if err := os.WriteFile(outputPath, []byte{}, 0644); err != nil {
-		return fmt.Errorf("failed to create output file: %w", err)
+		return "", fmt.Errorf("failed to create output file: %w", err)
 	}
+
+	logger.Trace("outputPath: %s", outputPath)
 
 	// Export environment variables
 	os.Setenv("AGENTUITY_SDK_INPUT_FILE", inputPath)
 	os.Setenv("AGENTUITY_SDK_OUTPUT_FILE", outputPath)
+	os.Setenv("AGENTUITY_SDK_SESSION_ID", sessionId)
 
-	return nil
+	return outputPath, nil
 }
 
 var devRunCmd = &cobra.Command{
@@ -352,7 +357,8 @@ var devRunCmd = &cobra.Command{
 			if err != nil {
 				logger.Fatal("failed to run development agent: %s", err)
 			}
-			if err := SaveInput(id, message); err != nil {
+			outputPath, err := SaveInput(logger, id, message)
+			if err != nil {
 				logger.Error("failed to save input: %s", err)
 			}
 
@@ -360,7 +366,8 @@ var devRunCmd = &cobra.Command{
 				logger.Fatal("failed to start development agent: %s", err)
 			}
 			<-runner.Done()
-			output, err := ReadOutput(websocketId, id)
+
+			output, err := ReadOutput(logger, outputPath)
 			if err != nil {
 				logger.Error("failed to read output: %s", err)
 				return nil
@@ -370,14 +377,7 @@ var devRunCmd = &cobra.Command{
 				return nil
 			}
 
-			liveDevConnection.SendMessage(map[string]any{
-				"id":   liveDevConnection.websocketId,
-				"type": "output",
-				"payload": map[string]any{
-					"contentType": "text/plain",
-					"payload":     output,
-				},
-			}, "output")
+			liveDevConnection.SendMessage(output, "output")
 
 			return nil
 		})
