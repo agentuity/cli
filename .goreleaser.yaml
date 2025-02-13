@@ -114,5 +114,4 @@ brews:
     install: |
       bin.install "agentuity"
     alternative_names:
-      - "agentuity@{{ .Major }}.{{ .Minor }}"
-
+      - "agentuity@{{ .Version }}"
