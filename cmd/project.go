@@ -243,7 +243,7 @@ var projectNewCmd = &cobra.Command{
 		fmt.Println()
 		fmt.Printf("1. Switch into the project directory at %s\n", color.GreenString(projectDir))
 		fmt.Printf("2. Run %s to run the project locally\n", command("dev", "run"))
-		fmt.Printf("3. Run %s to deploy the project\n", command("deploy", "cloud"))
+		fmt.Printf("3. Run %s to deploy the project\n", command("cloud", "deploy"))
 		fmt.Println()
 		fmt.Printf("Access your project at %s", link("%s/projects/%s", appUrl, projectData.ProjectId))
 		fmt.Println()
