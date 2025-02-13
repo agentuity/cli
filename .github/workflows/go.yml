@@ -20,5 +20,10 @@ jobs:
     - name: Build
       run: go build -v .
 
+    - name: Go Vulnerability Scan
+      run: |
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        govulncheck ./...
+
     - name: Test
       run: go test -v ./... 
