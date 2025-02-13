@@ -204,71 +204,114 @@ func (c *LiveDevConnection) WebURL(appUrl string) string {
 	return fmt.Sprintf("%s/developer/live/%s", appUrl, c.websocketId)
 }
 
-type TriggerMessage struct {
+type InputMessage struct {
 	ID      string `json:"id"`
 	Type    string `json:"type"`
 	From    string `json:"from"`
 	Payload struct {
+		SessionID   string `json:"sessionId"`
 		Trigger     string `json:"trigger"`
 		ContentType string `json:"contentType"`
 		Payload     string `json:"payload"`
 	} `json:"payload"`
 }
 
-func isTriggerMessage(message []byte) (*TriggerMessage, error) {
-	var tm TriggerMessage
+type OutputPayload struct {
+	ContentType string `json:"contentType"`
+	Payload     string `json:"payload"`
+}
+
+func isOutputPayload(message []byte) (*OutputPayload, error) {
+	var op OutputPayload
+	if err := json.Unmarshal(message, &op); err != nil {
+		return nil, err
+	}
+	return &op, nil
+}
+
+func isInputMessage(message []byte) (*InputMessage, error) {
+	var tm InputMessage
 	if err := json.Unmarshal(message, &tm); err != nil {
 		return nil, err
 	}
 	return &tm, nil
 }
 
-func SaveInput(message []byte) error {
-	triggerMessage, err := isTriggerMessage(message)
+func ReadOutput(logger logger.Logger, outputPath string, sessionId string) (map[string]any, error) {
+
+	//read this file
+	content, err := os.ReadFile(outputPath)
 	if err != nil {
-		return err
-	}
-	if triggerMessage == nil {
-		return fmt.Errorf("message is not a trigger message")
+		return nil, err
 	}
 
-	payload := triggerMessage.Payload
+	op, err := isOutputPayload(content)
 
-	id := uuid.New().String()[:8]
+	if err != nil {
+		return nil, err
+	}
+	if op == nil {
+		return nil, fmt.Errorf("output is not a valid output payload")
+	}
+
+	message := map[string]any{
+		"sessionId":   sessionId,
+		"contentType": op.ContentType,
+		"payload":     op.Payload,
+	}
+	return message, nil
+}
+
+func SaveInput(logger logger.Logger, message []byte) (string, string, error) {
+	inputMessage, err := isInputMessage(message)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to parse input message: %w", err)
+	}
+	if inputMessage == nil {
+		return "", "", fmt.Errorf("message is not a input message")
+	}
+
+	payload := inputMessage.Payload
+	sessionId := inputMessage.Payload.SessionID
 
 	dir := filepath.Join(os.TempDir(), "agentuity")
+
 	// Ensure directory exists
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
+		return "", "", fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	// Create input file with state
-	inputPath := filepath.Join(dir, id, "input")
+	inputPath := filepath.Join(dir, sessionId, "input")
 	if err := os.MkdirAll(filepath.Dir(inputPath), 0755); err != nil {
-		return fmt.Errorf("failed to create input directory: %w", err)
+		return "", "", fmt.Errorf("failed to create input directory: %w", err)
 	}
+	logger.Trace("inputPath: %s", inputPath)
 
 	// Marshal payload struct to JSON bytes
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("failed to marshal payload: %w", err)
+		return "", "", fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
 	if err := os.WriteFile(inputPath, payloadBytes, 0644); err != nil {
-		return fmt.Errorf("failed to write input file: %w", err)
+		return "", "", fmt.Errorf("failed to write input file: %w", err)
 	}
 
 	// Create empty output file
-	outputPath := filepath.Join(dir, id, "output")
+	outputPath := filepath.Join(dir, sessionId, "output")
 	if err := os.WriteFile(outputPath, []byte{}, 0644); err != nil {
-		return fmt.Errorf("failed to create output file: %w", err)
+		return "", "", fmt.Errorf("failed to create output file: %w", err)
 	}
+
+	logger.Trace("outputPath: %s", outputPath)
 
 	// Export environment variables
 	os.Setenv("AGENTUITY_SDK_INPUT_FILE", inputPath)
 	os.Setenv("AGENTUITY_SDK_OUTPUT_FILE", outputPath)
+	os.Setenv("AGENTUITY_SDK_SESSION_ID", sessionId)
 
-	return nil
+	return outputPath, sessionId, nil
 }
 
 var devRunCmd = &cobra.Command{
@@ -314,7 +357,8 @@ var devRunCmd = &cobra.Command{
 			if err != nil {
 				logger.Fatal("failed to run development agent: %s", err)
 			}
-			if err := SaveInput(message); err != nil {
+			outputPath, sessionId, err := SaveInput(logger, message)
+			if err != nil {
 				logger.Error("failed to save input: %s", err)
 			}
 
@@ -322,6 +366,19 @@ var devRunCmd = &cobra.Command{
 				logger.Fatal("failed to start development agent: %s", err)
 			}
 			<-runner.Done()
+
+			output, err := ReadOutput(logger, outputPath, sessionId)
+			if err != nil {
+				logger.Error("failed to read output: %s", err)
+				return nil
+			}
+			if output == nil {
+				logger.Error("failed to read output: %s", err)
+				return nil
+			}
+
+			liveDevConnection.SendMessage(output, "output")
+
 			return nil
 		})
 
