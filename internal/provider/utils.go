@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -300,4 +301,40 @@ func promptToSetSecret(logger logger.Logger, data DeployPreflightCheckData, secr
 		}
 	}
 	return nil
+}
+
+type packageJSONFile map[string]any
+
+func (p packageJSONFile) AddScript(name string, command string) {
+	kv, found := p["scripts"].(map[string]any)
+	if !found {
+		kv = make(map[string]any)
+		p["scripts"] = kv
+	}
+	kv[name] = command
+}
+
+func (p packageJSONFile) Write(dir string) error {
+	fn := filepath.Join(dir, "package.json")
+	content, err := json.MarshalIndent(p, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(fn, content, 0644)
+}
+
+func loadPackageJSON(dir string) (packageJSONFile, error) {
+	fn := filepath.Join(dir, "package.json")
+	if _, err := os.Stat(fn); os.IsNotExist(err) {
+		return nil, nil
+	}
+	content, err := os.ReadFile(fn)
+	if err != nil {
+		return nil, err
+	}
+	var pkg packageJSONFile
+	if err := json.Unmarshal(content, &pkg); err != nil {
+		return nil, err
+	}
+	return pkg, nil
 }

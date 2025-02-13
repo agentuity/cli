@@ -86,6 +86,7 @@ func (p *CrewAIProvider) ProjectIgnoreRules() []string {
 
 func (p *CrewAIProvider) ConfigureDeploymentConfig(config *project.DeploymentConfig) error {
 	config.Language = "python"
+	config.Runtime = "uv"
 	config.MinVersion = ">=3.10,<3.13"
 	config.Command = []string{"run_crew"}
 	return nil

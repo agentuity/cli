@@ -289,13 +289,14 @@ func (p *Project) DeleteIO(logger logger.Logger, baseUrl string, token string, i
 }
 
 type DeploymentConfig struct {
-	Provider   string      `yaml:"provider"`
-	Language   string      `yaml:"language"`
-	MinVersion string      `yaml:"min_version,omitempty"`
-	WorkingDir string      `yaml:"working_dir,omitempty"`
-	Command    []string    `yaml:"command,omitempty"`
-	Env        []string    `yaml:"env,omitempty"`
-	Deployment *Deployment `yaml:"deployment,omitempty"`
+	Provider   string      `yaml:"provider" json:"provider"`
+	Language   string      `yaml:"language" json:"language"`
+	Runtime    string      `yaml:"runtime,omitempty" json:"runtime,omitempty"`
+	MinVersion string      `yaml:"min_version,omitempty" json:"min_version,omitempty"`
+	WorkingDir string      `yaml:"working_dir,omitempty" json:"working_dir,omitempty"`
+	Command    []string    `yaml:"command,omitempty" json:"command,omitempty"`
+	Env        []string    `yaml:"env,omitempty" json:"env,omitempty"`
+	Deployment *Deployment `yaml:"deployment,omitempty" json:"deployment,omitempty"`
 }
 
 func NewDeploymentConfig() *DeploymentConfig {
