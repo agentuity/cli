@@ -16,6 +16,7 @@ import (
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -268,6 +269,7 @@ var cloudDeployCmd = &cobra.Command{
 
 		fi, _ := os.Stat(tmpfile.Name())
 		started := time.Now()
+		var webhookToken string
 
 		action = func() {
 			// send the zip file to the upload endpoint provided
@@ -316,11 +318,41 @@ var cloudDeployCmd = &cobra.Command{
 			if err := updateDeploymentStatusCompleted(apiUrl, token, startResponse.Data.DeploymentId, sources, destinations); err != nil {
 				logger.Fatal("%s", err)
 			}
+			res, err := theproject.ListIO(logger, apiUrl, token, "source")
+			if err != nil {
+				logger.Fatal("error listing sources: %s", err)
+			}
+			for _, io := range res {
+				if io.Type == "webhook" && io.Config != nil {
+					if auth, ok := io.Config["authorization"].(map[string]any); ok {
+						if val, ok := auth["token"].(string); ok {
+							webhookToken = val
+						}
+					}
+				}
+			}
 		}
 
 		showSpinner(logger, "Deploying ...", action)
 
 		printSuccess("Your project was deployed successfully. It is available at %s", link("%s/projects/%s?deploymentId=%s", appUrl, theproject.ProjectId, startResponse.Data.DeploymentId))
+
+		if len(theproject.Inputs) > 0 {
+			var found bool
+			for _, io := range theproject.Inputs {
+				if io.Type == "webhook" {
+					found = true
+					break
+				}
+			}
+			if found {
+				if webhookToken != "" {
+					printSuccess("You can send a POST to %s with the following Bearer token: %s", link("%s/project/%s/run", apiUrl, theproject.ProjectId), color.BlackString(webhookToken))
+				} else {
+					printSuccess("You can send a POST to %s", link("%s/project/%s/run", apiUrl, theproject.ProjectId))
+				}
+			}
+		}
 	},
 }
 
