@@ -237,7 +237,7 @@ func isInputMessage(message []byte) (*InputMessage, error) {
 	return &tm, nil
 }
 
-func ReadOutput(logger logger.Logger, outputPath string) (map[string]any, error) {
+func ReadOutput(logger logger.Logger, outputPath string, sessionId string) (map[string]any, error) {
 
 	//read this file
 	content, err := os.ReadFile(outputPath)
@@ -255,19 +255,20 @@ func ReadOutput(logger logger.Logger, outputPath string) (map[string]any, error)
 	}
 
 	message := map[string]any{
+		"sessionId":   sessionId,
 		"contentType": op.ContentType,
 		"payload":     op.Payload,
 	}
 	return message, nil
 }
 
-func SaveInput(logger logger.Logger, id string, message []byte) (string, error) {
+func SaveInput(logger logger.Logger, message []byte) (string, string, error) {
 	inputMessage, err := isInputMessage(message)
 	if err != nil {
-		return "", err
+		return "", "", fmt.Errorf("failed to parse input message: %w", err)
 	}
 	if inputMessage == nil {
-		return "", fmt.Errorf("message is not a input message")
+		return "", "", fmt.Errorf("message is not a input message")
 	}
 
 	payload := inputMessage.Payload
@@ -277,30 +278,30 @@ func SaveInput(logger logger.Logger, id string, message []byte) (string, error) 
 
 	// Ensure directory exists
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create directory: %w", err)
+		return "", "", fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	// Create input file with state
-	inputPath := filepath.Join(dir, id, "input")
+	inputPath := filepath.Join(dir, sessionId, "input")
 	if err := os.MkdirAll(filepath.Dir(inputPath), 0755); err != nil {
-		return "", fmt.Errorf("failed to create input directory: %w", err)
+		return "", "", fmt.Errorf("failed to create input directory: %w", err)
 	}
 	logger.Trace("inputPath: %s", inputPath)
 
 	// Marshal payload struct to JSON bytes
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal payload: %w", err)
+		return "", "", fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
 	if err := os.WriteFile(inputPath, payloadBytes, 0644); err != nil {
-		return "", fmt.Errorf("failed to write input file: %w", err)
+		return "", "", fmt.Errorf("failed to write input file: %w", err)
 	}
 
 	// Create empty output file
-	outputPath := filepath.Join(dir, id, "output")
+	outputPath := filepath.Join(dir, sessionId, "output")
 	if err := os.WriteFile(outputPath, []byte{}, 0644); err != nil {
-		return "", fmt.Errorf("failed to create output file: %w", err)
+		return "", "", fmt.Errorf("failed to create output file: %w", err)
 	}
 
 	logger.Trace("outputPath: %s", outputPath)
@@ -310,7 +311,7 @@ func SaveInput(logger logger.Logger, id string, message []byte) (string, error) 
 	os.Setenv("AGENTUITY_SDK_OUTPUT_FILE", outputPath)
 	os.Setenv("AGENTUITY_SDK_SESSION_ID", sessionId)
 
-	return outputPath, nil
+	return outputPath, sessionId, nil
 }
 
 var devRunCmd = &cobra.Command{
@@ -351,13 +352,12 @@ var devRunCmd = &cobra.Command{
 		logger := logger.NewMultiLogger(log, logger.NewJSONLoggerWithSink(liveDevConnection, logger.LevelInfo))
 
 		liveDevConnection.SetOnMessage(func(message []byte) error {
-			id := uuid.New().String()[:8]
 			logger.Trace("recv: %s", message)
 			runner, err := provider.NewRunner(logger, dir, apiUrl, sdkEventsFile, args)
 			if err != nil {
 				logger.Fatal("failed to run development agent: %s", err)
 			}
-			outputPath, err := SaveInput(logger, id, message)
+			outputPath, sessionId, err := SaveInput(logger, message)
 			if err != nil {
 				logger.Error("failed to save input: %s", err)
 			}
@@ -367,7 +367,7 @@ var devRunCmd = &cobra.Command{
 			}
 			<-runner.Done()
 
-			output, err := ReadOutput(logger, outputPath)
+			output, err := ReadOutput(logger, outputPath, sessionId)
 			if err != nil {
 				logger.Error("failed to read output: %s", err)
 				return nil
