@@ -14,6 +14,8 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/agentuity/go-common/logger"
+	"github.com/agentuity/go-common/sys"
+	"github.com/evanw/esbuild/pkg/api"
 )
 
 // PyProject is the structure that is used to parse the pyproject.toml file.
@@ -104,22 +106,11 @@ func getUVCommand(logger logger.Logger, uv string, dir string, args []string, en
 	return cmd
 }
 
-func runUVCommand(logger logger.Logger, uv string, dir string, args []string, env []string) error {
-	cmd := exec.Command(uv, args...)
+func runCommand(logger logger.Logger, bin string, dir string, args []string, env []string) error {
+	cmd := exec.Command(bin, args...)
 	cmd.Dir = dir
 	cmd.Env = append(env, os.Environ()...)
-	logger.Debug("running %s with env: %s in directory: %s and args: %s", uv, strings.Join(cmd.Env, " "), dir, strings.Join(args, " "))
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-func runBunCommand(logger logger.Logger, bunjs string, dir string, args []string, env []string) error {
-	cmd := exec.Command(bunjs, args...)
-	cmd.Dir = dir
-	cmd.Env = append(env, os.Environ()...)
-	logger.Debug("running %s with env: %s in directory: %s and args: %s", bunjs, strings.Join(cmd.Env, " "), dir, strings.Join(args, " "))
+	logger.Debug("running %s with env: %s in directory: %s and args: %s", bin, strings.Join(cmd.Env, " "), dir, strings.Join(args, " "))
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -128,7 +119,7 @@ func runBunCommand(logger logger.Logger, bunjs string, dir string, args []string
 
 func createUVNewVirtualEnv(logger logger.Logger, uv string, dir string, version string) ([]string, error) {
 	venv := filepath.Join(dir, ".venv")
-	if err := runUVCommand(logger, uv, dir, []string{"venv", venv, "--python", version}, nil); err != nil {
+	if err := runCommand(logger, uv, dir, []string{"venv", venv, "--python", version}, nil); err != nil {
 		return nil, fmt.Errorf("failed to create virtual environment: %w", err)
 	}
 	bin := filepath.Join(venv, "bin")
@@ -314,6 +305,40 @@ func (p packageJSONFile) AddScript(name string, command string) {
 	kv[name] = command
 }
 
+func (p packageJSONFile) RemoveScript(name string) {
+	if kv, found := p["scripts"].(map[string]any); found {
+		delete(kv, name)
+	}
+}
+
+func (p packageJSONFile) SetMain(main string) {
+	p["main"] = main
+}
+
+func (p packageJSONFile) SetType(typ string) {
+	p["type"] = typ
+}
+
+func (p packageJSONFile) SetDependencies(dependencies []string) {
+	p["dependencies"] = dependencies
+}
+
+func (p packageJSONFile) SetName(name string) {
+	p["name"] = name
+}
+
+func (p packageJSONFile) SetVersion(version string) {
+	p["version"] = version
+}
+
+func (p packageJSONFile) SetDescription(description string) {
+	p["description"] = description
+}
+
+func (p packageJSONFile) SetKeywords(keywords []string) {
+	p["keywords"] = keywords
+}
+
 func (p packageJSONFile) Write(dir string) error {
 	fn := filepath.Join(dir, "package.json")
 	content, err := json.MarshalIndent(p, "", "  ")
@@ -325,16 +350,88 @@ func (p packageJSONFile) Write(dir string) error {
 
 func loadPackageJSON(dir string) (packageJSONFile, error) {
 	fn := filepath.Join(dir, "package.json")
+	pkg := make(packageJSONFile)
 	if _, err := os.Stat(fn); os.IsNotExist(err) {
-		return nil, nil
+		return pkg, nil
 	}
 	content, err := os.ReadFile(fn)
 	if err != nil {
 		return nil, err
 	}
-	var pkg packageJSONFile
 	if err := json.Unmarshal(content, &pkg); err != nil {
 		return nil, err
 	}
 	return pkg, nil
+}
+
+func BundleJS(logger logger.Logger, dir string, runtime string, production bool) error {
+	outdir := filepath.Join(dir, ".agentuity")
+	if sys.Exists(outdir) {
+		if err := os.RemoveAll(outdir); err != nil {
+			return fmt.Errorf("failed to remove .agentuity directory: %w", err)
+		}
+	}
+	if err := os.MkdirAll(outdir, 0755); err != nil {
+		return fmt.Errorf("failed to create .agentuity directory: %w", err)
+	}
+	result := api.Build(api.BuildOptions{
+		EntryPoints:   []string{"index.ts"},
+		Bundle:        true,
+		Outdir:        outdir,
+		Write:         true,
+		Format:        api.FormatESModule,
+		AbsWorkingDir: dir,
+	})
+	if len(result.Errors) > 0 {
+		for _, err := range result.Errors {
+			if err.Location != nil {
+				logger.Error("failed to bundle %s (line %d): %s", err.Location.File, err.Location.Line, err.Text)
+				continue
+			}
+			logger.Error("failed to bundle: %s", err.Text)
+		}
+		return fmt.Errorf("failed to bundle JS")
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		return fmt.Errorf("node not found in PATH")
+	}
+	if production {
+		pkg, err := loadPackageJSON(dir)
+		if err != nil {
+			return fmt.Errorf("failed to load package.json: %w", err)
+		}
+		pkg.RemoveScript("build")
+		pkg.RemoveScript("prestart")
+		var bin string
+		var script string
+		if runtime == "bunjs" {
+			bin = "bun"
+			script = `#!/bin/bash
+			set -e
+			cd .agentuity
+			bun install && bun start
+			`
+		} else {
+			bin = "node"
+			script = `#!/bin/bash
+			set -e
+			cd .agentuity
+			npm install && node index.js
+			`
+		}
+		pkg.AddScript("start", bin+" index.js")
+		pkg.Write(outdir)
+		if err := os.WriteFile(filepath.Join(outdir, "run.sh"), []byte(script), 0644); err != nil {
+			return fmt.Errorf("failed to write run.sh: %w", err)
+		}
+		if err := os.Chmod(filepath.Join(outdir, "run.sh"), 0755); err != nil {
+			return fmt.Errorf("failed to chmod+x run.sh: %w", err)
+		}
+	}
+	script := filepath.Join(dir, "node_modules", "@agentuity", "sdk", "dist", "instrumentation", "bundler.js")
+	if err := runCommand(logger, node, outdir, []string{script}, nil); err != nil {
+		return fmt.Errorf("failed to run agentuity-builder: %w", err)
+	}
+	return nil
 }

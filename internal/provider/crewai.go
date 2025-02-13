@@ -47,11 +47,11 @@ func (p *CrewAIProvider) NewProject(logger logger.Logger, dir string, name strin
 			return err
 		}
 		logger.Debug("adding crewai to virtual environment using: %s", strings.Join(env, " "))
-		if err := runUVCommand(logger, uv, dir, []string{"pip", "install", "crewai"}, env); err != nil {
+		if err := runCommand(logger, uv, dir, []string{"pip", "install", "crewai"}, env); err != nil {
 			return fmt.Errorf("failed to install crewai: %w", err)
 		}
 		dirname := filepath.Base(dir)
-		if err := runUVCommand(logger, uv, dir, []string{"run", "crewai", "create", "crew", dirname}, env); err != nil {
+		if err := runCommand(logger, uv, dir, []string{"run", "crewai", "create", "crew", dirname}, env); err != nil {
 			return fmt.Errorf("failed to create crew: %w", err)
 		}
 		srcDir := filepath.Join(dir, dirname) // because create nests directories we need to unnest
@@ -61,7 +61,7 @@ func (p *CrewAIProvider) NewProject(logger logger.Logger, dir string, name strin
 		if err := os.RemoveAll(srcDir); err != nil {
 			return fmt.Errorf("failed to remove crew folder: %w", err)
 		}
-		if err := runUVCommand(logger, uv, dir, []string{"add", "agentuity"}, env); err != nil {
+		if err := runCommand(logger, uv, dir, []string{"add", "agentuity"}, env); err != nil {
 			return fmt.Errorf("failed to add agentuity: %w", err)
 		}
 		mainFile := filepath.Join(dir, "src", dirname, "main.py")
