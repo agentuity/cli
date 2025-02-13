@@ -19,7 +19,7 @@ type BunProvider struct {
 var _ Provider = (*BunProvider)(nil)
 
 func (p *BunProvider) Name() string {
-	return "Bun"
+	return "Bun with Vercel AI SDK"
 }
 
 func (p *BunProvider) Identifier() string {
@@ -34,7 +34,7 @@ func (p *BunProvider) RunDev(logger logger.Logger, dir string, env []string, arg
 	return nil, fmt.Errorf("not implemented")
 }
 
-const template = `import { generateText } from "ai";
+const buntemplate = `import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
 
 const res = await generateText({
@@ -52,18 +52,24 @@ func (p *BunProvider) NewProject(logger logger.Logger, dir string, name string) 
 	if err != nil {
 		return fmt.Errorf("bun not found in PATH")
 	}
-	if err := runBunCommand(logger, bunjs, dir, []string{"init", "--yes"}, nil); err != nil {
+	if err := runCommand(logger, bunjs, dir, []string{"init", "--yes"}, nil); err != nil {
 		return fmt.Errorf("failed to run bun init: %w", err)
 	}
-	toml := `preload = ["@agentuity/sdk"]`
-	if err := os.WriteFile(filepath.Join(dir, "bunfig.toml"), []byte(toml+"\n"), 0644); err != nil {
-		return fmt.Errorf("failed to write bun.toml: %w", err)
-	}
-	if err := runBunCommand(logger, bunjs, dir, []string{"add", "@agentuity/sdk", "ai", "@ai-sdk/openai"}, nil); err != nil {
+	if err := runCommand(logger, bunjs, dir, []string{"add", "@agentuity/sdk", "ai", "@ai-sdk/openai"}, nil); err != nil {
 		return fmt.Errorf("failed to add npm modules: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "index.ts"), []byte(template), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "index.ts"), []byte(buntemplate), 0644); err != nil {
 		return fmt.Errorf("failed to write index.ts: %w", err)
+	}
+	projectJSON, err := loadPackageJSON(dir)
+	if err != nil {
+		return fmt.Errorf("failed to load package.json from %s. %w", dir, err)
+	}
+	projectJSON.AddScript("build", "agentuity bundle -r bunjs")
+	projectJSON.AddScript("prestart", "agentuity bundle -r bunjs")
+	projectJSON.AddScript("start", "bun run .agentuity/index.js")
+	if err := projectJSON.Write(dir); err != nil {
+		return fmt.Errorf("failed to write package.json: %w", err)
 	}
 	return nil
 }
@@ -74,11 +80,29 @@ func (p *BunProvider) ProjectIgnoreRules() []string {
 
 func (p *BunProvider) ConfigureDeploymentConfig(config *project.DeploymentConfig) error {
 	config.Language = "javascript"
-	config.Command = []string{"bun", "run", "index.ts"}
+	config.Runtime = "bunjs"
+	config.Command = []string{"sh", "/app/.agentuity/run.sh"}
 	return nil
 }
 
 func (p *BunProvider) DeployPreflightCheck(logger logger.Logger, data DeployPreflightCheckData) error {
+	buf, _ := os.ReadFile(filepath.Join(data.Dir, "index.ts"))
+	str := string(buf)
+	if openAICheck.MatchString(str) {
+		tok := openAICheck.FindStringSubmatch(str)
+		if len(tok) != 2 {
+			return fmt.Errorf("failed to find openai token in index.ts")
+		}
+		model := tok[1]
+		if err := validateModelSecretSet(logger, data, model); err != nil {
+			return fmt.Errorf("failed to validate model secret: %w", err)
+		}
+	}
+
+	if err := BundleJS(logger, data.Dir, "bun", true); err != nil {
+		return fmt.Errorf("failed to bundle JS: %w", err)
+	}
+
 	return nil
 }
 

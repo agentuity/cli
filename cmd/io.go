@@ -80,7 +80,6 @@ func configurationWebhook(logger logger.Logger, needsURL bool) map[string]any {
 			huh.NewOption("None", "none"),
 			huh.NewOption("Bearer Token", "bearer"),
 			huh.NewOption("HTTP Basic Auth", "basic"),
-			huh.NewOption("HTTP Digest Auth", "digest"),
 			huh.NewOption("HTTP Header", "header"),
 		).
 		Value(&authType).Run() != nil {

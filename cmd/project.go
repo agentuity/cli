@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 
 	"github.com/agentuity/cli/internal/organization"
 	"github.com/agentuity/cli/internal/project"
@@ -190,6 +191,10 @@ var projectNewCmd = &cobra.Command{
 		for key, provider := range providers {
 			opts = append(opts, huh.NewOption(provider.Name(), key))
 		}
+
+		sort.Slice(opts, func(i, j int) bool {
+			return opts[i].Value < opts[j].Value
+		})
 
 		var providerName string
 		if huh.NewSelect[string]().

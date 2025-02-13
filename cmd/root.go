@@ -251,7 +251,7 @@ func resolveProjectDir(logger logger.Logger, cmd *cobra.Command) string {
 	if !project.ProjectExists(abs) {
 		logger.Fatal("no agentuity.yaml file found in the current directory")
 	}
-	return dir
+	return abs
 }
 
 func addURLFlags(cmd *cobra.Command) {
