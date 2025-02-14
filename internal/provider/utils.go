@@ -380,6 +380,8 @@ func BundleJS(logger logger.Logger, dir string, runtime string, production bool)
 		Outdir:        outdir,
 		Write:         true,
 		Format:        api.FormatESModule,
+		Platform:      api.PlatformNode,
+		External:      []string{"@agentuity/sdk"},
 		AbsWorkingDir: dir,
 	})
 	if len(result.Errors) > 0 {
@@ -435,3 +437,19 @@ func BundleJS(logger logger.Logger, dir string, runtime string, production bool)
 	}
 	return nil
 }
+
+const jstemplate = `import { getInput, setOutput } from "@agentuity/sdk";
+import { generateText } from "ai";
+import { openai } from "@ai-sdk/openai";
+
+const input = await getInput();
+
+const res = await generateText({
+	model: openai("gpt-4o"),
+	system: "You are a friendly assistant!",
+	prompt: input?.payload ?? "Why is the sky blue?",
+});
+
+console.log(res.text);
+await setOutput(res.text, "text/plain");
+`

@@ -23,5 +23,5 @@ func init() {
 	rootCmd.AddCommand(bundleCmd)
 	bundleCmd.Flags().StringP("dir", "d", ".", "The directory to the project")
 	bundleCmd.Flags().BoolP("production", "p", false, "Whether to bundle for production")
-	bundleCmd.Flags().StringP("runtime", "r", "node", "The runtime to use for the bundle (either bunjs or nodejs)")
+	bundleCmd.Flags().StringP("runtime", "r", "nodejs", "The runtime to use for the bundle (either bunjs or nodejs)")
 }

@@ -34,18 +34,6 @@ func (p *BunProvider) RunDev(logger logger.Logger, dir string, env []string, arg
 	return nil, fmt.Errorf("not implemented")
 }
 
-const buntemplate = `import { generateText } from "ai";
-import { openai } from "@ai-sdk/openai";
-
-const res = await generateText({
-	model: openai("gpt-4o"),
-	system: "You are a friendly assistant!",
-	prompt: "Why is the sky blue?",
-});
-
-console.log(res.text);
-`
-
 func (p *BunProvider) NewProject(logger logger.Logger, dir string, name string) error {
 	logger = logger.WithPrefix("[bunjs]")
 	bunjs, err := exec.LookPath("bun")
@@ -58,7 +46,7 @@ func (p *BunProvider) NewProject(logger logger.Logger, dir string, name string) 
 	if err := runCommand(logger, bunjs, dir, []string{"add", "@agentuity/sdk", "ai", "@ai-sdk/openai"}, nil); err != nil {
 		return fmt.Errorf("failed to add npm modules: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "index.ts"), []byte(buntemplate), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "index.ts"), []byte(jstemplate), 0644); err != nil {
 		return fmt.Errorf("failed to write index.ts: %w", err)
 	}
 	projectJSON, err := loadPackageJSON(dir)

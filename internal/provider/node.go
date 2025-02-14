@@ -35,18 +35,6 @@ func (p *NodeJS) RunDev(logger logger.Logger, dir string, env []string, args []s
 	return nil, fmt.Errorf("not implemented")
 }
 
-const nodetemplate = `import { generateText } from "ai";
-import { openai } from "@ai-sdk/openai";
-
-const res = await generateText({
-	model: openai("gpt-4o"),
-	system: "You are a friendly assistant!",
-	prompt: "Why is the sky blue?",
-});
-
-console.log(res.text);
-`
-
 func (p *NodeJS) NewProject(logger logger.Logger, dir string, name string) error {
 	logger = logger.WithPrefix("[nodejs]")
 	npm, err := exec.LookPath("npm")
@@ -72,7 +60,7 @@ func (p *NodeJS) NewProject(logger logger.Logger, dir string, name string) error
 	if err := runCommand(logger, npm, dir, []string{"install", "@agentuity/sdk", "ai", "@ai-sdk/openai"}, nil); err != nil {
 		return fmt.Errorf("failed to add npm modules: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "index.ts"), []byte(nodetemplate), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "index.ts"), []byte(jstemplate), 0644); err != nil {
 		return fmt.Errorf("failed to write index.ts: %w", err)
 	}
 	return nil
