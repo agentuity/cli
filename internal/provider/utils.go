@@ -460,13 +460,13 @@ __agentuityGlobals__.makeResponsePayload = function makeResponsePayload(response
 	return null;
 }
 
-if (!process.env.AGENTUITY_SDK_SESSION_ID) {
+if (!process.env.AGENTUITY_SDK_AUTORUN) {
 	__agentuityGlobals__.startAgentCallback = function startAgentCallback(payload) {
 		const { request, context } = payload;
 		const sessionid = context.sessionId;
 		__agentuityGlobals__.createBridge(sessionid).then((bridge) => {
 			__agentuityGlobals__.localStorage.run({ bridge, sessionid }, () => {
-				__agentuityGlobals__.runFn.run(new __agentuityGlobals__.AgentRequest(request), new __agentuityGlobals__.AgentResponse(), context).then((r) => {
+				__agentuityGlobals__.runFn(new __agentuityGlobals__.AgentRequest(request), new __agentuityGlobals__.AgentResponse(), context).then((r) => {
 					r.payload = __agentuityGlobals__.makeResponsePayload(r);
 					bridge.shutdown(r);
 				}).catch((err) => {
@@ -483,7 +483,7 @@ if (!process.env.AGENTUITY_SDK_SESSION_ID) {
 var jsFooter = `
 %[3]s.runFn = %[2]s;
 %[3]s.loadAgentuity(%[1]s, %[3]s.startAgentCallback);
-if (process.env.AGENTUITY_SDK_SESSION_ID) {
+if (!!process.env.AGENTUITY_SDK_AUTORUN) {
 	%[3]s.createAutorunSession().then((res) => {
 		if (res.error) {
 			console.error(res.error);
@@ -494,7 +494,7 @@ if (process.env.AGENTUITY_SDK_SESSION_ID) {
 		const sessionid = context.sessionId;
 		%[3]s.createBridge(sessionid).then((bridge) => {
 			%[3]s.localStorage.run({ bridge, sessionid }, () => {
-				%[3]s.runFn.run(new %[3]s.AgentRequest(request), new %[3]s.AgentResponse(), context).then((r) => {
+				%[3]s.runFn(new %[3]s.AgentRequest(request), new %[3]s.AgentResponse(), context).then((r) => {
 					r.payload = %[3]s.makeResponsePayload(r);
 					bridge.shutdown(r).then(() => process.exit(0));
 				}).catch((err) => {
@@ -605,8 +605,19 @@ func createPlugin(logger logger.Logger, bundle bundleResult) api.Plugin {
 						}
 						js = strings.ReplaceAll(js, "__agentuityGlobals__.", gvarName[0]+".")
 						var m = regexp.MustCompile(`\s(.*?) as default\s}`)
-						tok := m.FindStringSubmatch(js)
-						varName := strings.TrimSpace(tok[1])
+						var varName string
+						if m.MatchString(js) {
+							tok := m.FindStringSubmatch(js)
+							varName = strings.TrimSpace(tok[1]) + ".run"
+						} else {
+							m = regexp.MustCompile(`export\s{\s+(run)\s+};`)
+							if m.MatchString(js) {
+								tok := m.FindStringSubmatch(js)
+								varName = strings.TrimSpace(tok[1])
+							} else {
+								return api.OnEndResult{}, fmt.Errorf("failed to find run function")
+							}
+						}
 						contents := js + fmt.Sprintf(jsFooter, cstr.JSONStringify(modules), varName, gvarName[0])
 						of, err := os.Create(r.Path)
 						if err != nil {
