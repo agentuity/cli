@@ -95,6 +95,9 @@ type Provider interface {
 	// Identifier will return the identifier of the provider in a format that is easy to use in a CLI.
 	Identifier() string
 
+	// Aliases will return any aliases for the provider for identifier alternatives.
+	Aliases() []string
+
 	// Detect will detect the provider for the given directory.
 	// It will return the detection if it is found, otherwise it will return nil.
 	Detect(logger logger.Logger, dir string, state map[string]any) (*Detection, error)

@@ -126,10 +126,10 @@ var invalidProjectNames = []any{
 }
 
 var projectNewCmd = &cobra.Command{
-	Use:     "new",
+	Use:     "new [name]",
 	Short:   "Create a new project",
 	Aliases: []string{"create"},
-	Args:    cobra.NoArgs,
+	Args:    cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		apikey := viper.GetString("auth.api_key")
@@ -155,53 +155,90 @@ var projectNewCmd = &cobra.Command{
 
 		var name string
 
-		if huh.NewInput().
-			Title("What should we name the project?").
-			Prompt("> ").
-			CharLimit(255).Validate(func(name string) error {
-			for _, invalid := range invalidProjectNames {
-				if s, ok := invalid.(string); ok {
-					if name == s {
-						return fmt.Errorf("%s is not a valid project name", name)
+		if len(args) > 0 {
+			name = args[0]
+		} else {
+			if huh.NewInput().
+				Title("What should we name the project?").
+				Prompt("> ").
+				CharLimit(255).Validate(func(name string) error {
+				for _, invalid := range invalidProjectNames {
+					if s, ok := invalid.(string); ok {
+						if name == s {
+							return fmt.Errorf("%s is not a valid project name", name)
+						}
+					}
+					if r, ok := invalid.(regexp.Regexp); ok {
+						if r.MatchString(name) {
+							return fmt.Errorf("%s is not a valid project name", name)
+						}
 					}
 				}
-				if r, ok := invalid.(regexp.Regexp); ok {
-					if r.MatchString(name) {
-						return fmt.Errorf("%s is not a valid project name", name)
-					}
-				}
+				return nil
+			}).Value(&name).WithTheme(theme).Run() != nil {
+				logger.Fatal("failed to get project name")
 			}
-			return nil
-		}).Value(&name).WithTheme(theme).Run() != nil {
-			logger.Fatal("failed to get project name")
 		}
 
 		projectDir := filepath.Join(cwd, projectNameTransformer.ReplaceAllString(name, "_"))
-		if huh.NewInput().
-			Title("What directory should the project be created in?").
-			Prompt("> ").
-			Placeholder(projectDir).
-			Value(&projectDir).WithTheme(theme).Run() != nil {
-			logger.Fatal("failed to get project directory")
+		dir, _ := cmd.Flags().GetString("dir")
+		if dir != "" {
+			projectDir = dir
+		} else {
+			if huh.NewInput().
+				Title("What directory should the project be created in?").
+				Prompt("> ").
+				Placeholder(projectDir).
+				Value(&projectDir).WithTheme(theme).Run() != nil {
+				logger.Fatal("failed to get project directory")
+			}
 		}
-
-		providers := provider.GetProviders()
-		var opts []huh.Option[string]
-
-		for key, provider := range providers {
-			opts = append(opts, huh.NewOption(provider.Name(), key))
-		}
-
-		sort.Slice(opts, func(i, j int) bool {
-			return opts[i].Value < opts[j].Value
-		})
 
 		var providerName string
-		if huh.NewSelect[string]().
-			Title("What framework should we use?").
-			Options(opts...).
-			Value(&providerName).WithTheme(theme).Run() != nil {
-			logger.Fatal("failed to get project framework")
+		providers := provider.GetProviders()
+		providerArg, _ := cmd.Flags().GetString("provider")
+
+		if providerArg != "" {
+			providerName = providerArg
+			var found bool
+			for _, provider := range providers {
+				if provider.Identifier() == providerName {
+					found = true
+					break
+				}
+				for _, alias := range provider.Aliases() {
+					if alias == providerName {
+						found = true
+						break
+					}
+				}
+				if found {
+					break
+				}
+			}
+			if !found {
+				providerName = ""
+			}
+		}
+
+		if providerName == "" {
+
+			var opts []huh.Option[string]
+
+			for key, provider := range providers {
+				opts = append(opts, huh.NewOption(provider.Name(), key))
+			}
+
+			sort.Slice(opts, func(i, j int) bool {
+				return opts[i].Value < opts[j].Value
+			})
+
+			if huh.NewSelect[string]().
+				Title("What framework should we use?").
+				Options(opts...).
+				Value(&providerName).WithTheme(theme).Run() != nil {
+				logger.Fatal("failed to get project framework")
+			}
 		}
 
 		enableWebhookAuth := promptForWebhookAuth(logger)
@@ -306,4 +343,6 @@ func init() {
 	rootCmd.AddCommand(projectCmd)
 	projectCmd.AddCommand(projectInitCmd)
 	projectCmd.AddCommand(projectNewCmd)
+	projectNewCmd.Flags().StringP("dir", "d", "", "The directory to create the project in")
+	projectNewCmd.Flags().StringP("provider", "p", "", "The provider to use for the project")
 }

@@ -40,10 +40,10 @@ func (p *BunProvider) NewProject(logger logger.Logger, dir string, name string) 
 	if err != nil {
 		return fmt.Errorf("bun not found in PATH")
 	}
-	if err := runCommand(logger, bunjs, dir, []string{"init", "--yes"}, nil); err != nil {
+	if err := runCommandSilent(logger, bunjs, dir, []string{"init", "--yes"}, nil); err != nil {
 		return fmt.Errorf("failed to run bun init: %w", err)
 	}
-	if err := runCommand(logger, bunjs, dir, []string{"add", "@agentuity/sdk", "ai", "@ai-sdk/openai"}, nil); err != nil {
+	if err := runCommandSilent(logger, bunjs, dir, []string{"add", "@agentuity/sdk", "ai", "@ai-sdk/openai"}, nil); err != nil {
 		return fmt.Errorf("failed to add npm modules: %w", err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "index.ts"), []byte(jstemplate), 0644); err != nil {
@@ -58,6 +58,15 @@ func (p *BunProvider) NewProject(logger logger.Logger, dir string, name string) 
 	projectJSON.AddScript("start", "bun run .agentuity/index.js")
 	if err := projectJSON.Write(dir); err != nil {
 		return fmt.Errorf("failed to write package.json: %w", err)
+	}
+	ts, err := loadTSConfig(dir)
+	if err != nil {
+		return fmt.Errorf("failed to load tsconfig.json: %w", err)
+	}
+	ts.AddTypes("bun", "@agentuity/sdk")
+	ts.AddCompilerOption("esModuleInterop", true)
+	if err := ts.Write(dir); err != nil {
+		return fmt.Errorf("failed to write tsconfig.json: %w", err)
 	}
 	return nil
 }
@@ -92,6 +101,10 @@ func (p *BunProvider) DeployPreflightCheck(logger logger.Logger, data DeployPref
 	}
 
 	return nil
+}
+
+func (p *BunProvider) Aliases() []string {
+	return []string{"bun"}
 }
 
 func init() {
