@@ -95,19 +95,9 @@ func (p *NodeJSProvider) ConfigureDeploymentConfig(config *project.DeploymentCon
 var openAICheck = regexp.MustCompile(`openai\("([\w-]+)"\)`) // TODO: need to expand this
 
 func (p *NodeJSProvider) DeployPreflightCheck(logger logger.Logger, data DeployPreflightCheckData) error {
-	buf, _ := os.ReadFile(filepath.Join(data.Dir, "index.ts"))
-	str := string(buf)
-	if openAICheck.MatchString(str) {
-		tok := openAICheck.FindStringSubmatch(str)
-		if len(tok) != 2 {
-			return fmt.Errorf("failed to find openai token in index.ts")
-		}
-		model := tok[1]
-		if err := validateModelSecretSet(logger, data, model); err != nil {
-			return fmt.Errorf("failed to validate model secret: %w", err)
-		}
+	if err := detectModelTokens(logger, data, data.Dir); err != nil {
+		return fmt.Errorf("failed to detect model tokens: %w", err)
 	}
-
 	if err := BundleJS(logger, data.Dir, "node", true); err != nil {
 		return fmt.Errorf("failed to bundle JS: %w", err)
 	}

@@ -749,6 +749,38 @@ func BundleJS(logger logger.Logger, dir string, runtime string, production bool)
 	return nil
 }
 
+func detectModelTokens(logger logger.Logger, data DeployPreflightCheckData, baseDir string) error {
+	files, err := sys.ListDir(filepath.Join(baseDir, "src"))
+	if err != nil {
+		return fmt.Errorf("failed to list src directory: %w", err)
+	}
+	if len(files) > 0 {
+		var validated bool
+		for _, file := range files {
+			if filepath.Ext(file) == ".ts" {
+				buf, _ := os.ReadFile(file)
+				str := string(buf)
+				// TODO: expand this to all models
+				if openAICheck.MatchString(str) {
+					tok := openAICheck.FindStringSubmatch(str)
+					if len(tok) != 2 {
+						return fmt.Errorf("failed to find model token in %s", file)
+					}
+					model := tok[1]
+					if err := validateModelSecretSet(logger, data, model); err != nil {
+						return fmt.Errorf("failed to validate model secret: %w", err)
+					}
+					validated = true
+				}
+			}
+			if validated {
+				break
+			}
+		}
+	}
+	return nil
+}
+
 const jstemplate = `import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
 
