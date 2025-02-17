@@ -14,8 +14,10 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/agentuity/go-common/logger"
+	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/sys"
 	"github.com/evanw/esbuild/pkg/api"
+	"github.com/marcozac/go-jsonc"
 )
 
 // PyProject is the structure that is used to parse the pyproject.toml file.
@@ -113,6 +115,15 @@ func runCommand(logger logger.Logger, bin string, dir string, args []string, env
 	logger.Debug("running %s with env: %s in directory: %s and args: %s", bin, strings.Join(cmd.Env, " "), dir, strings.Join(args, " "))
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func runCommandSilent(logger logger.Logger, bin string, dir string, args []string, env []string) error {
+	cmd := exec.Command(bin, args...)
+	cmd.Dir = dir
+	cmd.Env = append(env, os.Environ()...)
+	logger.Debug("running %s with env: %s in directory: %s and args: %s", bin, strings.Join(cmd.Env, " "), dir, strings.Join(args, " "))
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
@@ -364,6 +375,297 @@ func loadPackageJSON(dir string) (packageJSONFile, error) {
 	return pkg, nil
 }
 
+type tsconfig map[string]any
+
+func (t tsconfig) AddCompilerOption(key string, val any) {
+	if co, ok := t["compilerOptions"].(map[string]any); ok {
+		co[key] = val
+	} else {
+		co = make(map[string]any)
+		co[key] = val
+		t["compilerOptions"] = co
+	}
+}
+
+func (t tsconfig) AddTypes(vals ...string) {
+	if co, ok := t["compilerOptions"].(map[string]any); ok {
+		if types, ok := co["types"].([]string); ok {
+			co["types"] = append(types, vals...)
+		} else {
+			co["types"] = vals
+		}
+	} else {
+		co = make(map[string]any)
+		co["types"] = vals
+		t["compilerOptions"] = co
+	}
+}
+
+func (t tsconfig) Write(dir string) error {
+	fn := filepath.Join(dir, "tsconfig.json")
+	content, err := json.MarshalIndent(t, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(fn, content, 0644)
+}
+
+func loadTSConfig(dir string) (tsconfig, error) {
+	fn := filepath.Join(dir, "tsconfig.json")
+	content, err := os.ReadFile(fn)
+	if err != nil {
+		return nil, err
+	}
+	ts := make(tsconfig)
+	if err := jsonc.Unmarshal(content, &ts); err != nil {
+		return nil, err
+	}
+	return ts, nil
+}
+
+var jsPreamble = `import { AsyncLocalStorage } from 'node:async_hooks';
+import {
+	createBridge as __createBridge,
+	createAutorunSession as __createAutorunSession,
+	DefinedAgentResponse as __AgentResponse,
+	DefinedAgentRequest as __AgentRequest,
+	loadAgentuity as __loadAgentuity,
+	instrumentations as __agentuityInstrumentations
+} from '@agentuity/sdk';
+
+const __agentuityGlobals__ = {
+	instrumentations: __agentuityInstrumentations,
+	createBridge: __createBridge,
+	createAutorunSession: __createAutorunSession,
+	AgentResponse: __AgentResponse,
+	AgentRequest: __AgentRequest,
+	loadAgentuity: __loadAgentuity,
+	localStorage: new AsyncLocalStorage(),
+};
+
+__agentuityGlobals__.makeResponsePayload = function makeResponsePayload(response) {
+	if (response.payload) {
+		if (typeof response.payload === 'string') {
+			return btoa(response.payload);
+		}
+		if (typeof response.payload === 'object') {
+			return btoa(JSON.stringify(response.payload));
+		}
+		if (response.payload instanceof ArrayBuffer) {
+			const array = Array.from(new Uint8Array(response.payload));
+			const str = array.map((byte) => String.fromCharCode(byte)).join('');
+			return btoa(str);
+		}
+	}
+	return null;
+}
+
+if (!process.env.AGENTUITY_SDK_AUTORUN && process.env.AGENTUITY_SDK_SOCKET_PATH) {
+	__agentuityGlobals__.startAgentCallback = function startAgentCallback(session, done) {
+		const { request, context } = session;
+		const sessionid = context.sessionId;
+		__agentuityGlobals__.createBridge(sessionid).then((bridge) => {
+			__agentuityGlobals__.localStorage.run({ bridge, sessionid }, () => {
+				__agentuityGlobals__.runFn(new __agentuityGlobals__.AgentRequest(request), new __agentuityGlobals__.AgentResponse(), context).then((r) => {
+					r.payload = __agentuityGlobals__.makeResponsePayload(r);
+					done();
+				}).catch((err) => {
+					done(err);
+				});
+			});
+		});
+	}
+}
+
+`
+
+var jsFooter = `
+%[3]s.runFn = %[2]s;
+%[3]s.loadAgentuity(%[1]s, %[3]s.startAgentCallback);
+if (!!process.env.AGENTUITY_SDK_AUTORUN) {
+	%[3]s.createAutorunSession().then((res) => {
+		if (res.error) {
+			console.error(res.error);
+			process.exit(1);
+		}
+		const session = res.result;
+		const { request, context } = session;
+		const sessionid = context.sessionId;
+		%[3]s.createBridge(sessionid).then((bridge) => {
+			%[3]s.localStorage.run({ bridge, sessionid }, () => {
+				%[3]s.runFn(new %[3]s.AgentRequest(request), new %[3]s.AgentResponse(), context).then((r) => {
+					r.payload = %[3]s.makeResponsePayload(r);
+					bridge.shutdown(r).then(() => process.exit(0));
+				}).catch((err) => {
+					console.error(err);
+					process.exit(1);
+				});
+			});
+		});
+	});
+} else if (!process.env.AGENTUITY_SDK_SOCKET_PATH) {
+	const sessionid = Math.random().toString(36).substring(2, 15);
+	const request = { trigger: 'manual', contentType: 'text/plain' };
+	const context = { sessionId: sessionid };
+	%[3]s.createBridge(sessionid).then((bridge) => {
+		%[3]s.localStorage.run({ bridge, sessionid }, () => {
+			%[3]s.runFn(new %[3]s.AgentRequest(request), new %[3]s.AgentResponse(), context).then((r) => {
+				r.payload = %[3]s.makeResponsePayload(r);
+				bridge.shutdown(r).then(() => {
+					console.log(r.payload ? atob(r.payload) : '');
+					process.exit(0);
+				});
+			}).catch((err) => {
+				console.error(err);
+				process.exit(1);
+			});
+		});
+	});
+}
+`
+
+type bundleModule struct {
+	Module    string                  `json:"module"`
+	Functions map[string]bundleAction `json:"functions"`
+}
+type bundleAction struct {
+	Before bool `json:"before"`
+	After  bool `json:"after"`
+}
+
+type bundleResult map[string]*bundleModule
+
+func createPlugin(logger logger.Logger, bundle bundleResult) api.Plugin {
+	var varCounter int
+	modules := make([]string, 0, len(bundle))
+	for k := range bundle {
+		modules = append(modules, k)
+	}
+	return api.Plugin{
+		Name: "inject-agentuity",
+		Setup: func(build api.PluginBuild) {
+			cwd, _ := os.Getwd()
+			fp := filepath.Join(cwd, "src", "index.ts")
+			for name, mod := range bundle {
+				build.OnLoad(api.OnLoadOptions{Filter: "node_modules/" + mod.Module + "/.*", Namespace: "file"}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
+					logger.Debug("re-writing %s for %s", args.Path, name)
+					buf, err := os.ReadFile(args.Path)
+					if err != nil {
+						return api.OnLoadResult{}, err
+					}
+					contents := string(buf)
+					var suffix strings.Builder
+					for fn, mod := range mod.Functions {
+						fnname := "async function " + fn
+						index := strings.Index(contents, fnname)
+						if index == -1 {
+							continue
+						}
+						newname := "__agentuity_" + fn
+						newfnname := "async function " + newname
+						contents = strings.Replace(contents, fnname, newfnname, 1)
+						varCounter++
+						varName := fmt.Sprintf("__var%d", varCounter)
+						suffix.WriteString(fnname + "(...args) {\n")
+						suffix.WriteString(fmt.Sprintf("const %s = __agentuityGlobals__.instrumentations['%s'].functions.find((fn) => fn.name === '%s');\n", varName, name, fn))
+						if mod.Before {
+							suffix.WriteString("\tlet _args = args;\n")
+							suffix.WriteString("\tconst bridge = __agentuityGlobals__.localStorage.getStore()?.bridge;\n")
+							suffix.WriteString("\tconst _ctx = { bridge };\n")
+							suffix.WriteString(fmt.Sprintf("\tawait %s.before(_ctx, _args);\n", varName))
+						}
+						suffix.WriteString("\tlet result = " + newname + "(...args);\n")
+						suffix.WriteString("\tif (result instanceof Promise) {\n")
+						suffix.WriteString("\t\tresult = await result;\n")
+						suffix.WriteString("\t}\n")
+						if mod.After {
+							suffix.WriteString(fmt.Sprintf("\tlet _result = await %s.after(_ctx, _args, result);\n", varName))
+							suffix.WriteString("\tif (_result !== undefined) {\n")
+							suffix.WriteString("\t\tresult = _result;\n")
+							suffix.WriteString("\t}\n")
+						}
+						suffix.WriteString("\treturn result;\n")
+						suffix.WriteString("}\n")
+					}
+					contents = contents + "\n" + suffix.String()
+					loader := api.LoaderJS
+					if strings.HasSuffix(args.Path, ".ts") {
+						loader = api.LoaderTS
+					}
+					return api.OnLoadResult{
+						Contents: &contents,
+						Loader:   loader,
+					}, nil
+				})
+			}
+			build.OnLoad(api.OnLoadOptions{Filter: fp, Namespace: "file"}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
+				logger.Debug("injecting agentuity into %s", args.Path)
+				buf, err := os.ReadFile(args.Path)
+				if err != nil {
+					return api.OnLoadResult{}, err
+				}
+				js := string(buf)
+				contents := jsPreamble + js
+				return api.OnLoadResult{
+					Contents: &contents,
+					Loader:   api.LoaderTS,
+				}, nil
+			})
+			build.OnEnd(func(result *api.BuildResult) (api.OnEndResult, error) {
+				for _, r := range result.OutputFiles {
+					if strings.HasSuffix(r.Path, "index.js") {
+						js := string(r.Contents)
+						var gm = regexp.MustCompile(`__agentuityGlobals__(\d+)`) // need to get the mangled name
+						gvarName := gm.FindStringSubmatch(js)
+						if len(gvarName) == 0 {
+							return api.OnEndResult{}, fmt.Errorf("failed to find __agentuityGlobals__")
+						}
+						js = strings.ReplaceAll(js, "__agentuityGlobals__.", gvarName[0]+".")
+						var m = regexp.MustCompile(`\s(.*?) as default\s}`)
+						var varName string
+						if m.MatchString(js) {
+							tok := m.FindStringSubmatch(js)
+							varName = strings.TrimSpace(tok[1]) + ".run"
+						} else {
+							m = regexp.MustCompile(`export\s{\s+(run)\s+};`)
+							if m.MatchString(js) {
+								tok := m.FindStringSubmatch(js)
+								varName = strings.TrimSpace(tok[1])
+							} else {
+								return api.OnEndResult{}, fmt.Errorf("failed to find run function")
+							}
+						}
+						contents := js + fmt.Sprintf(jsFooter, cstr.JSONStringify(modules), varName, gvarName[0])
+						of, err := os.Create(r.Path)
+						if err != nil {
+							return api.OnEndResult{}, err
+						}
+						defer of.Close()
+						of.WriteString(contents)
+						of.Close()
+					}
+				}
+				return api.OnEndResult{}, nil
+			})
+		},
+	}
+}
+
+func addAgentuityBuildToGitignore(dir string) error {
+	fn := filepath.Join(dir, ".gitignore")
+	var contents string
+	if sys.Exists(fn) {
+		buf, err := os.ReadFile(fn)
+		if err != nil {
+			return fmt.Errorf("failed to read .gitignore: %w", err)
+		}
+		contents = string(buf)
+	}
+	contents += "\n# don't commit the agentuity build folder\n"
+	contents += ".agentuity\n"
+	return os.WriteFile(fn, []byte(contents), 0644)
+}
+
 func BundleJS(logger logger.Logger, dir string, runtime string, production bool) error {
 	outdir := filepath.Join(dir, ".agentuity")
 	if sys.Exists(outdir) {
@@ -374,8 +676,23 @@ func BundleJS(logger logger.Logger, dir string, runtime string, production bool)
 	if err := os.MkdirAll(outdir, 0755); err != nil {
 		return fmt.Errorf("failed to create .agentuity directory: %w", err)
 	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		return fmt.Errorf("node not found in PATH")
+	}
+	script := filepath.Join(dir, "node_modules", "@agentuity", "sdk", "dist", "instrumentation", "bundler.js")
+	c := exec.Command(node, script, dir)
+	c.Dir = outdir
+	modulesOut, err := c.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to run agentuity-builder: %w", err)
+	}
+	bresult := make(bundleResult)
+	if err := json.Unmarshal(modulesOut, &bresult); err != nil {
+		return fmt.Errorf("failed to unmarshal agentuity-builder output: %w", err)
+	}
 	result := api.Build(api.BuildOptions{
-		EntryPoints:   []string{"index.ts"},
+		EntryPoints:   []string{"src/index.ts"},
 		Bundle:        true,
 		Outdir:        outdir,
 		Write:         true,
@@ -383,6 +700,8 @@ func BundleJS(logger logger.Logger, dir string, runtime string, production bool)
 		Platform:      api.PlatformNode,
 		External:      []string{"@agentuity/sdk"},
 		AbsWorkingDir: dir,
+		TreeShaking:   api.TreeShakingFalse,
+		Plugins:       []api.Plugin{createPlugin(logger, bresult)},
 	})
 	if len(result.Errors) > 0 {
 		for _, err := range result.Errors {
@@ -393,10 +712,6 @@ func BundleJS(logger logger.Logger, dir string, runtime string, production bool)
 			logger.Error("failed to bundle: %s", err.Text)
 		}
 		return fmt.Errorf("failed to bundle JS")
-	}
-	node, err := exec.LookPath("node")
-	if err != nil {
-		return fmt.Errorf("node not found in PATH")
 	}
 	if production {
 		pkg, err := loadPackageJSON(dir)
@@ -431,25 +746,52 @@ func BundleJS(logger logger.Logger, dir string, runtime string, production bool)
 			return fmt.Errorf("failed to chmod+x run.sh: %w", err)
 		}
 	}
-	script := filepath.Join(dir, "node_modules", "@agentuity", "sdk", "dist", "instrumentation", "bundler.js")
-	if err := runCommand(logger, node, outdir, []string{script}, nil); err != nil {
-		return fmt.Errorf("failed to run agentuity-builder: %w", err)
+	return nil
+}
+
+func detectModelTokens(logger logger.Logger, data DeployPreflightCheckData, baseDir string) error {
+	files, err := sys.ListDir(filepath.Join(baseDir, "src"))
+	if err != nil {
+		return fmt.Errorf("failed to list src directory: %w", err)
+	}
+	if len(files) > 0 {
+		var validated bool
+		for _, file := range files {
+			if filepath.Ext(file) == ".ts" {
+				buf, _ := os.ReadFile(file)
+				str := string(buf)
+				// TODO: expand this to all models
+				if openAICheck.MatchString(str) {
+					tok := openAICheck.FindStringSubmatch(str)
+					if len(tok) != 2 {
+						return fmt.Errorf("failed to find model token in %s", file)
+					}
+					model := tok[1]
+					if err := validateModelSecretSet(logger, data, model); err != nil {
+						return fmt.Errorf("failed to validate model secret: %w", err)
+					}
+					validated = true
+				}
+			}
+			if validated {
+				break
+			}
+		}
 	}
 	return nil
 }
 
-const jstemplate = `import { getInput, setOutput } from "@agentuity/sdk";
-import { generateText } from "ai";
+const jstemplate = `import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
 
-const input = await getInput();
-
-const res = await generateText({
-	model: openai("gpt-4o"),
-	system: "You are a friendly assistant!",
-	prompt: input?.payload ?? "Why is the sky blue?",
-});
-
-console.log(res.text);
-await setOutput(res.text, "text/plain");
+export default {
+	run: async (req, resp, ctx) => {
+		const res = await generateText({
+			model: openai("gpt-4o"),
+			system: "You are a friendly assistant!",
+			prompt: req.text() ?? "Why is the sky blue?",
+		});
+		return resp.text(res.text);
+	},
+} satisfies AgentHandler;
 `
