@@ -171,9 +171,20 @@ var ioDestinationCreateCmd = &cobra.Command{
 		if err != nil {
 			logger.Fatal("failed to create destination: %s", err)
 		}
-		theproject.Outputs = append(theproject.Outputs, *io)
-		if err := theproject.Save(context.Dir); err != nil {
-			logger.Fatal("failed to save project: %s", err)
+		// if we are re-activating an IO, we will get back the same object
+		// so we need to check if it already exists in the project
+		var found bool
+		for _, input := range theproject.Outputs {
+			if input.ID == io.ID && input.Type == io.Type {
+				found = true
+				break
+			}
+		}
+		if !found {
+			theproject.Outputs = append(theproject.Outputs, *io)
+			if err := theproject.Save(context.Dir); err != nil {
+				logger.Fatal("failed to save project: %s", err)
+			}
 		}
 		printSuccess("%s destination created: %s", destinationType, io.ID)
 	},
@@ -215,9 +226,20 @@ var ioSourceCreateCmd = &cobra.Command{
 		if err != nil {
 			logger.Fatal("failed to create source: %s", err)
 		}
-		theproject.Inputs = append(theproject.Inputs, *io)
-		if err := theproject.Save(context.Dir); err != nil {
-			logger.Fatal("failed to save project: %s", err)
+		// if we are re-activating an IO, we will get back the same object
+		// so we need to check if it already exists in the project
+		var found bool
+		for _, input := range theproject.Inputs {
+			if input.ID == io.ID && input.Type == io.Type {
+				found = true
+				break
+			}
+		}
+		if !found {
+			theproject.Inputs = append(theproject.Inputs, *io)
+			if err := theproject.Save(context.Dir); err != nil {
+				logger.Fatal("failed to save project: %s", err)
+			}
 		}
 		printSuccess("%s source created: %s", destinationType, io.ID)
 	},
