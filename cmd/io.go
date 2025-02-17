@@ -247,7 +247,6 @@ var ioDestinationCreateCmd = &cobra.Command{
 		apiKey := context.Token
 		var destinationType string
 		config := map[string]any{}
-		fmt.Println(typeOptions)
 		if huh.NewSelect[string]().
 			Title("Select a destination type").
 			Options(typeOptions...).
@@ -263,6 +262,7 @@ var ioDestinationCreateCmd = &cobra.Command{
 		case "webhook":
 			config = configurationWebhook(logger, true)
 		default:
+			logger.Fatal("invalid source type")
 		}
 		io, err := theproject.CreateIO(logger, apiUrl, apiKey, "destination", project.IO{
 			Direction: "destination",
