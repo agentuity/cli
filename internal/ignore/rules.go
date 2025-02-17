@@ -166,6 +166,11 @@ func (r *Rules) parseRule(rule string) error {
 		return nil
 	}
 
+	// Special case for agentuity build folder
+	if rule == ".agentuity" || rule == ".agentuity/**" {
+		return nil
+	}
+
 	// Fail any patterns that can't compile. A non-empty string must be
 	// given to Match() to avoid optimization that skips rule evaluation.
 	if _, err := filepath.Match(rule, "abc"); err != nil {

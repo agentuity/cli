@@ -102,6 +102,10 @@ func (p *CrewAIProvider) DeployPreflightCheck(logger logger.Logger, data DeployP
 	return nil
 }
 
+func (p *CrewAIProvider) Aliases() []string {
+	return []string{"crew"}
+}
+
 func init() {
 	register("crewai", &CrewAIProvider{})
 }

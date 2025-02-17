@@ -310,6 +310,8 @@ func SaveInput(logger logger.Logger, message []byte) (string, string, error) {
 	os.Setenv("AGENTUITY_SDK_INPUT_FILE", inputPath)
 	os.Setenv("AGENTUITY_SDK_OUTPUT_FILE", outputPath)
 	os.Setenv("AGENTUITY_SDK_SESSION_ID", sessionId)
+	os.Setenv("AGENTUITY_SDK_DEV_MODE", "true")
+	os.Setenv("AGENTUITY_SDK_AUTORUN", "true")
 
 	return outputPath, sessionId, nil
 }
