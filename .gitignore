@@ -1,5 +1,5 @@
 /agentuity
-/myagent
+/myagent*
 cli
 dist/
 **/.DS_Store

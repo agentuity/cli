@@ -60,6 +60,19 @@ func validateURL(urlstr string) error {
 	return nil
 }
 
+func validatePhoneNumber(phoneNumber string) error {
+	if phoneNumber == "" {
+		return fmt.Errorf("phone number is required")
+	}
+	if !strings.HasPrefix(phoneNumber, "+1") {
+		return fmt.Errorf("phone number must start with +1")
+	}
+	if len(phoneNumber) != 10 {
+		return fmt.Errorf("phone number must be 10 digits")
+	}
+	return nil
+}
+
 func minLength(min int) func(string) error {
 	return func(s string) error {
 		if len(s) < min {
@@ -72,7 +85,8 @@ func minLength(min int) func(string) error {
 type ExistingPhoneResponse struct {
 	Success bool `json:"success"`
 	Data    []struct {
-		PhoneNumber string `json:"phoneNumber"`
+		PhoneNumber   string `json:"phoneNumber"`
+		PhoneNumberId string `json:"phoneNumberId"`
 	} `json:"data"`
 }
 
@@ -90,8 +104,8 @@ type PhoneBuyResponse struct {
 	} `json:"data"`
 }
 
-func configurationSMS(logger logger.Logger, apiClient *util.APIClient, projectId string) map[string]any {
-	var phoneNumber string
+func configurationSMS(logger logger.Logger, apiClient *util.APIClient, projectId string, requireTo bool) map[string]any {
+	var phoneNumberId string
 	var existingPhoneResponse ExistingPhoneResponse
 	err := apiClient.Do("GET", "/phone", nil, &existingPhoneResponse)
 	if err != nil {
@@ -112,12 +126,12 @@ func configurationSMS(logger logger.Logger, apiClient *util.APIClient, projectId
 		if useExistingPhone {
 			phoneOptions := make([]huh.Option[string], len(existingPhoneResponse.Data))
 			for i, p := range existingPhoneResponse.Data {
-				phoneOptions[i] = huh.NewOption(p.PhoneNumber, p.PhoneNumber)
+				phoneOptions[i] = huh.NewOption(p.PhoneNumber, p.PhoneNumberId)
 			}
 			if huh.NewSelect[string]().
 				Title("Select a phone number").
 				Options(phoneOptions...).
-				Value(&phoneNumber).Run() != nil {
+				Value(&phoneNumberId).Run() != nil {
 				logger.Fatal("failed to select phone number")
 			}
 		}
@@ -136,34 +150,40 @@ func configurationSMS(logger logger.Logger, apiClient *util.APIClient, projectId
 		phoneOptions[i] = huh.NewOption(p.PhoneNumber, p.PhoneNumber)
 	}
 
-	if phoneNumber == "" {
+	if phoneNumberId == "" {
+		var phoneNumber string
 		if huh.NewSelect[string]().
 			Title("Purchase a phone number").
 			Options(phoneOptions...).
 			Value(&phoneNumber).Run() != nil {
 			logger.Fatal("failed to select phone number")
 		}
+		var phoneBuyResponse PhoneBuyResponse
+		err = apiClient.Do("POST", "/phone/buy", map[string]string{
+			"phoneNumber": phoneNumber,
+			"projectId":   projectId,
+		}, &phoneBuyResponse)
+		if err != nil {
+			logger.Fatal("failed to buy phone number: %s", err)
+		}
+		if !phoneBuyResponse.Success {
+			logger.Fatal("failed to buy phone number")
+		}
+		logger.Info("phone number purchased: %s", phoneBuyResponse.Data.PhoneNumberId)
+		phoneNumberId = phoneBuyResponse.Data.PhoneNumberId
 	}
 
-	var phoneBuyResponse PhoneBuyResponse
-	err = apiClient.Do("POST", "/phone/buy", map[string]string{
-		"phoneNumber": phoneNumber,
-		"projectId":   projectId,
-	}, &phoneBuyResponse)
-
-	if err != nil {
-		logger.Fatal("failed to buy phone number: %s", err)
+	var toNumber string
+	if requireTo {
+		toNumber = getInput(logger, "Enter the phone number to send SMS to:", "", "", false, validatePhoneNumber)
 	}
 
-	if !phoneBuyResponse.Success {
-		logger.Fatal("failed to buy phone number")
+	config := map[string]any{
+		"to":            toNumber,
+		"phoneNumberId": phoneNumberId,
 	}
 
-	logger.Info("phone number purchased: %s", phoneBuyResponse.Data.PhoneNumberId)
-
-	return map[string]any{
-		"phoneNumberId": phoneBuyResponse.Data.PhoneNumberId,
-	}
+	return config
 }
 
 func configurationWebhook(logger logger.Logger, needsURL bool) map[string]any {
@@ -239,7 +259,7 @@ var ioDestinationCreateCmd = &cobra.Command{
 		switch destinationType {
 		case "sms":
 			apiClient := util.NewAPIClient(apiUrl, apiKey)
-			config = configurationSMS(logger, apiClient, theproject.ProjectId)
+			config = configurationSMS(logger, apiClient, theproject.ProjectId, true)
 		case "webhook":
 			config = configurationWebhook(logger, true)
 		default:
@@ -270,33 +290,38 @@ var ioSourceCreateCmd = &cobra.Command{
 		theproject := context.Project
 		apiUrl := context.APIURL
 		apiKey := context.Token
-		var destinationType string
+		apiClient := util.NewAPIClient(apiUrl, apiKey)
+		var sourceType string
 		if huh.NewSelect[string]().
 			Title("Select a source type").
 			Options(typeOptions...).
-			Value(&destinationType).
+			Value(&sourceType).
 			WithTheme(theme).
 			Run() != nil {
 			logger.Fatal("failed to select source type")
 		}
-		switch destinationType {
+		var config map[string]any
+		switch sourceType {
+		case "sms":
+			config = configurationSMS(logger, apiClient, theproject.ProjectId, false)
 		case "webhook":
-			config := configurationWebhook(logger, false)
-			io, err := theproject.CreateIO(logger, apiUrl, apiKey, "source", project.IO{
-				Direction: "source",
-				Config:    config,
-				Type:      destinationType,
-			})
-			if err != nil {
-				logger.Fatal("failed to create source: %s", err)
-			}
-			theproject.Inputs = append(theproject.Inputs, *io)
-			if err := theproject.Save(context.Dir); err != nil {
-				logger.Fatal("failed to save project: %s", err)
-			}
-			printSuccess("%s source created: %s", destinationType, io.ID)
+			config = configurationWebhook(logger, false)
 		default:
+			logger.Fatal("invalid source type")
 		}
+		io, err := theproject.CreateIO(logger, apiUrl, apiKey, "source", project.IO{
+			Direction: "source",
+			Config:    config,
+			Type:      sourceType,
+		})
+		if err != nil {
+			logger.Fatal("failed to create source: %s", err)
+		}
+		theproject.Inputs = append(theproject.Inputs, *io)
+		if err := theproject.Save(context.Dir); err != nil {
+			logger.Fatal("failed to save project: %s", err)
+		}
+		printSuccess("%s source created: %s", sourceType, io.ID)
 	},
 }
 
