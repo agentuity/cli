@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/agentuity/cli/internal/project"
+	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
 	cstr "github.com/agentuity/go-common/string"
 	"github.com/charmbracelet/huh"
@@ -65,6 +66,103 @@ func minLength(min int) func(string) error {
 			return fmt.Errorf("must be at least %d characters long", min)
 		}
 		return nil
+	}
+}
+
+type ExistingPhoneResponse struct {
+	Success bool `json:"success"`
+	Data    []struct {
+		PhoneNumber string `json:"phoneNumber"`
+	} `json:"data"`
+}
+
+type PhoneAvailableResponse struct {
+	Success bool `json:"success"`
+	Data    []struct {
+		PhoneNumber string `json:"phoneNumber"`
+	} `json:"data"`
+}
+
+type PhoneBuyResponse struct {
+	Success bool `json:"success"`
+	Data    struct {
+		PhoneNumberId string `json:"phoneNumberId"`
+	} `json:"data"`
+}
+
+func configurationSMS(logger logger.Logger, apiClient *util.APIClient, projectId string) map[string]any {
+	var phoneNumber string
+	var existingPhoneResponse ExistingPhoneResponse
+	err := apiClient.Do("GET", "/phone", nil, &existingPhoneResponse)
+	if err != nil {
+		logger.Fatal("failed to get existing phone numbers: %s", err)
+	}
+
+	if !existingPhoneResponse.Success {
+		logger.Fatal("failed to get existing phone numbers: %s", err)
+	}
+
+	if len(existingPhoneResponse.Data) > 0 {
+		var useExistingPhone bool
+		if huh.NewConfirm().
+			Title("Do you want to use an existing phone number?").
+			Value(&useExistingPhone).Run() != nil {
+			logger.Fatal("failed to confirm")
+		}
+		if useExistingPhone {
+			phoneOptions := make([]huh.Option[string], len(existingPhoneResponse.Data))
+			for i, p := range existingPhoneResponse.Data {
+				phoneOptions[i] = huh.NewOption(p.PhoneNumber, p.PhoneNumber)
+			}
+			if huh.NewSelect[string]().
+				Title("Select a phone number").
+				Options(phoneOptions...).
+				Value(&phoneNumber).Run() != nil {
+				logger.Fatal("failed to select phone number")
+			}
+		}
+	}
+
+	var phoneAvailableResponse PhoneAvailableResponse
+	if err := apiClient.Do("GET", "/phone/available", nil, &phoneAvailableResponse); err != nil {
+		logger.Fatal("failed to get available phone available: %s", err)
+	}
+	if !phoneAvailableResponse.Success {
+		logger.Fatal("failed to get phone available")
+	}
+
+	phoneOptions := make([]huh.Option[string], len(phoneAvailableResponse.Data))
+	for i, p := range phoneAvailableResponse.Data {
+		phoneOptions[i] = huh.NewOption(p.PhoneNumber, p.PhoneNumber)
+	}
+
+	if phoneNumber == "" {
+		if huh.NewSelect[string]().
+			Title("Purchase a phone number").
+			Options(phoneOptions...).
+			Value(&phoneNumber).Run() != nil {
+			logger.Fatal("failed to select phone number")
+		}
+	}
+
+	var phoneBuyResponse PhoneBuyResponse
+	err = apiClient.Do("POST", "/phone/buy", map[string]string{
+		"phoneNumber": phoneNumber,
+		"projectId":   projectId,
+	}, &phoneBuyResponse)
+
+	if err != nil {
+		logger.Fatal("failed to buy phone number: %s", err)
+	}
+
+	if !phoneBuyResponse.Success {
+		logger.Fatal("failed to buy phone number")
+	}
+
+	logger.Info("phone number purchased: %s", phoneBuyResponse.Data.PhoneNumberId)
+
+	return map[string]any{
+		"phoneNumberId": phoneBuyResponse.Data.PhoneNumberId,
 	}
 }
 
@@ -128,6 +226,8 @@ var ioDestinationCreateCmd = &cobra.Command{
 		apiUrl := context.APIURL
 		apiKey := context.Token
 		var destinationType string
+		config := map[string]any{}
+		fmt.Println(typeOptions)
 		if huh.NewSelect[string]().
 			Title("Select a destination type").
 			Options(typeOptions...).
@@ -137,23 +237,26 @@ var ioDestinationCreateCmd = &cobra.Command{
 			logger.Fatal("failed to select destination type")
 		}
 		switch destinationType {
+		case "sms":
+			apiClient := util.NewAPIClient(apiUrl, apiKey)
+			config = configurationSMS(logger, apiClient, theproject.ProjectId)
 		case "webhook":
-			config := configurationWebhook(logger, true)
-			io, err := theproject.CreateIO(logger, apiUrl, apiKey, "destination", project.IO{
-				Direction: "destination",
-				Config:    config,
-				Type:      destinationType,
-			})
-			if err != nil {
-				logger.Fatal("failed to create destination: %s", err)
-			}
-			theproject.Outputs = append(theproject.Outputs, *io)
-			if err := theproject.Save(context.Dir); err != nil {
-				logger.Fatal("failed to save project: %s", err)
-			}
-			printSuccess("%s destination created: %s", destinationType, io.ID)
+			config = configurationWebhook(logger, true)
 		default:
 		}
+		io, err := theproject.CreateIO(logger, apiUrl, apiKey, "destination", project.IO{
+			Direction: "destination",
+			Config:    config,
+			Type:      destinationType,
+		})
+		if err != nil {
+			logger.Fatal("failed to create destination: %s", err)
+		}
+		theproject.Outputs = append(theproject.Outputs, *io)
+		if err := theproject.Save(context.Dir); err != nil {
+			logger.Fatal("failed to save project: %s", err)
+		}
+		printSuccess("%s destination created: %s", destinationType, io.ID)
 	},
 }
 
