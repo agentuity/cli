@@ -95,19 +95,9 @@ func (p *BunProvider) ConfigureDeploymentConfig(config *project.DeploymentConfig
 }
 
 func (p *BunProvider) DeployPreflightCheck(logger logger.Logger, data DeployPreflightCheckData) error {
-	buf, _ := os.ReadFile(filepath.Join(data.Dir, "index.ts"))
-	str := string(buf)
-	if openAICheck.MatchString(str) {
-		tok := openAICheck.FindStringSubmatch(str)
-		if len(tok) != 2 {
-			return fmt.Errorf("failed to find openai token in index.ts")
-		}
-		model := tok[1]
-		if err := validateModelSecretSet(logger, data, model); err != nil {
-			return fmt.Errorf("failed to validate model secret: %w", err)
-		}
+	if err := detectModelTokens(logger, data, data.Dir); err != nil {
+		return fmt.Errorf("failed to detect model tokens: %w", err)
 	}
-
 	if err := BundleJS(logger, data.Dir, "bun", true); err != nil {
 		return fmt.Errorf("failed to bundle JS: %w", err)
 	}
