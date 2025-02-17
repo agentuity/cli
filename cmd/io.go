@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/adhocore/gronx"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/go-common/logger"
 	cstr "github.com/agentuity/go-common/string"
@@ -39,7 +40,14 @@ var ioDestinationCmd = &cobra.Command{
 	},
 }
 
-var typeOptions = []huh.Option[string]{
+var srcOptions = []huh.Option[string]{
+	huh.NewOption("Webhook", "webhook"),
+	huh.NewOption("Schedule", "cron"),
+	huh.NewOption("SMS", "sms"),
+	huh.NewOption("Email", "email"),
+}
+
+var destOptions = []huh.Option[string]{
 	huh.NewOption("Webhook", "webhook"),
 	huh.NewOption("SMS", "sms"),
 	huh.NewOption("Email", "email"),
@@ -68,10 +76,22 @@ func minLength(min int) func(string) error {
 	}
 }
 
+func configurationCron(logger logger.Logger) map[string]any {
+	gron := gronx.New()
+	validateCron := func(expr string) error {
+		if !gron.IsValid(expr) {
+			return fmt.Errorf("invalid cron schedule")
+		}
+		return nil
+	}
+	schedule := getInput(logger, "Enter the Schedule Expression (UTC timezone)", "The pattern should be in cron syntax (https://crontab.guru/ is a good resource)", "", false, "0 * * * 1-5", validateCron)
+	return map[string]any{"cronExpression": schedule}
+}
+
 func configurationWebhook(logger logger.Logger, needsURL bool) map[string]any {
 	var url string
 	if needsURL {
-		url = getInput(logger, "Enter the URL", "", "", false, validateURL)
+		url = getInput(logger, "Enter the URL", "", "", false, "", validateURL)
 	}
 	var authType string
 	if huh.NewSelect[string]().
@@ -92,22 +112,22 @@ func configurationWebhook(logger logger.Logger, needsURL bool) map[string]any {
 	switch authType {
 	case "none":
 	case "bearer":
-		token := getInput(logger, "Enter the Authorization Bearer Token", "The input will be masked", "", true, minLength(10))
+		token := getInput(logger, "Enter the Authorization Bearer Token", "The input will be masked", "", true, "", minLength(10))
 		config["authorization"] = map[string]string{
 			"type":  "bearer",
 			"token": token,
 		}
 	case "basic":
-		username := getInput(logger, "Enter the HTTP Basic Auth Username", "", "", false, minLength(1))
-		password := getInput(logger, "Enter the HTTP Basic Auth Password", "", "", true, minLength(1))
+		username := getInput(logger, "Enter the HTTP Basic Auth Username", "", "", false, "", minLength(1))
+		password := getInput(logger, "Enter the HTTP Basic Auth Password", "", "", true, "", minLength(1))
 		config["authorization"] = map[string]string{
 			"type":     "basic",
 			"username": username,
 			"password": password,
 		}
 	case "header":
-		headerName := getInput(logger, "Enter the HTTP Header Name", "", "", false, minLength(1))
-		headerValue := getInput(logger, "Enter the HTTP Header Value", "", "", false, minLength(1))
+		headerName := getInput(logger, "Enter the HTTP Header Name", "", "", false, "", minLength(1))
+		headerValue := getInput(logger, "Enter the HTTP Header Value", "", "", false, "", minLength(1))
 		config["authorization"] = map[string]string{
 			"type":  "header",
 			"name":  headerName,
@@ -130,30 +150,32 @@ var ioDestinationCreateCmd = &cobra.Command{
 		var destinationType string
 		if huh.NewSelect[string]().
 			Title("Select a destination type").
-			Options(typeOptions...).
+			Options(destOptions...).
 			Value(&destinationType).
 			WithTheme(theme).
 			Run() != nil {
 			logger.Fatal("failed to select destination type")
 		}
+		var config map[string]any
 		switch destinationType {
 		case "webhook":
-			config := configurationWebhook(logger, true)
-			io, err := theproject.CreateIO(logger, apiUrl, apiKey, "destination", project.IO{
-				Direction: "destination",
-				Config:    config,
-				Type:      destinationType,
-			})
-			if err != nil {
-				logger.Fatal("failed to create destination: %s", err)
-			}
-			theproject.Outputs = append(theproject.Outputs, *io)
-			if err := theproject.Save(context.Dir); err != nil {
-				logger.Fatal("failed to save project: %s", err)
-			}
-			printSuccess("%s destination created: %s", destinationType, io.ID)
+			config = configurationWebhook(logger, true)
 		default:
+			logger.Fatal("unsupported destination type: %s", destinationType)
 		}
+		io, err := theproject.CreateIO(logger, apiUrl, apiKey, "destination", project.IO{
+			Direction: "destination",
+			Config:    config,
+			Type:      destinationType,
+		})
+		if err != nil {
+			logger.Fatal("failed to create destination: %s", err)
+		}
+		theproject.Outputs = append(theproject.Outputs, *io)
+		if err := theproject.Save(context.Dir); err != nil {
+			logger.Fatal("failed to save project: %s", err)
+		}
+		printSuccess("%s destination created: %s", destinationType, io.ID)
 	},
 }
 
@@ -170,30 +192,34 @@ var ioSourceCreateCmd = &cobra.Command{
 		var destinationType string
 		if huh.NewSelect[string]().
 			Title("Select a source type").
-			Options(typeOptions...).
+			Options(srcOptions...).
 			Value(&destinationType).
 			WithTheme(theme).
 			Run() != nil {
 			logger.Fatal("failed to select source type")
 		}
+		var config map[string]any
 		switch destinationType {
+		case "cron":
+			config = configurationCron(logger)
 		case "webhook":
-			config := configurationWebhook(logger, false)
-			io, err := theproject.CreateIO(logger, apiUrl, apiKey, "source", project.IO{
-				Direction: "source",
-				Config:    config,
-				Type:      destinationType,
-			})
-			if err != nil {
-				logger.Fatal("failed to create source: %s", err)
-			}
-			theproject.Inputs = append(theproject.Inputs, *io)
-			if err := theproject.Save(context.Dir); err != nil {
-				logger.Fatal("failed to save project: %s", err)
-			}
-			printSuccess("%s source created: %s", destinationType, io.ID)
+			config = configurationWebhook(logger, false)
 		default:
+			logger.Fatal("unsupported source type: %s", destinationType)
 		}
+		io, err := theproject.CreateIO(logger, apiUrl, apiKey, "source", project.IO{
+			Direction: "source",
+			Config:    config,
+			Type:      destinationType,
+		})
+		if err != nil {
+			logger.Fatal("failed to create source: %s", err)
+		}
+		theproject.Inputs = append(theproject.Inputs, *io)
+		if err := theproject.Save(context.Dir); err != nil {
+			logger.Fatal("failed to save project: %s", err)
+		}
+		printSuccess("%s source created: %s", destinationType, io.ID)
 	},
 }
 

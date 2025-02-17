@@ -4,6 +4,7 @@ go 1.24
 
 require (
 	github.com/BurntSushi/toml v1.4.0
+	github.com/adhocore/gronx v1.19.5
 	github.com/agentuity/go-common v1.0.2
 	github.com/bmatcuk/doublestar/v4 v4.8.1
 	github.com/charmbracelet/huh v0.6.0
