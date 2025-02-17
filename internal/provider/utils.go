@@ -460,18 +460,17 @@ __agentuityGlobals__.makeResponsePayload = function makeResponsePayload(response
 	return null;
 }
 
-if (!process.env.AGENTUITY_SDK_AUTORUN) {
-	__agentuityGlobals__.startAgentCallback = function startAgentCallback(payload) {
-		const { request, context } = payload;
+if (!process.env.AGENTUITY_SDK_AUTORUN && process.env.AGENTUITY_SDK_SOCKET_PATH) {
+	__agentuityGlobals__.startAgentCallback = function startAgentCallback(session, done) {
+		const { request, context } = session;
 		const sessionid = context.sessionId;
 		__agentuityGlobals__.createBridge(sessionid).then((bridge) => {
 			__agentuityGlobals__.localStorage.run({ bridge, sessionid }, () => {
 				__agentuityGlobals__.runFn(new __agentuityGlobals__.AgentRequest(request), new __agentuityGlobals__.AgentResponse(), context).then((r) => {
 					r.payload = __agentuityGlobals__.makeResponsePayload(r);
-					bridge.shutdown(r);
+					done();
 				}).catch((err) => {
-					console.error(err); // TODO: handle error
-					process.exit(1);
+					done(err);
 				});
 			});
 		});
@@ -504,6 +503,24 @@ if (!!process.env.AGENTUITY_SDK_AUTORUN) {
 			});
 		});
 	});
+} else if (!process.env.AGENTUITY_SDK_SOCKET_PATH) {
+	const sessionid = Math.random().toString(36).substring(2, 15);
+	const request = { trigger: 'manual', contentType: 'text/plain' };
+	const context = { sessionId: sessionid };
+	%[3]s.createBridge(sessionid).then((bridge) => {
+		%[3]s.localStorage.run({ bridge, sessionid }, () => {
+			%[3]s.runFn(new %[3]s.AgentRequest(request), new %[3]s.AgentResponse(), context).then((r) => {
+				r.payload = %[3]s.makeResponsePayload(r);
+				bridge.shutdown(r).then(() => {
+					console.log(r.payload ? atob(r.payload) : '');
+					process.exit(0);
+				});
+			}).catch((err) => {
+				console.error(err);
+				process.exit(1);
+			});
+		});
+	});
 }
 `
 
@@ -528,7 +545,7 @@ func createPlugin(logger logger.Logger, bundle bundleResult) api.Plugin {
 		Name: "inject-agentuity",
 		Setup: func(build api.PluginBuild) {
 			cwd, _ := os.Getwd()
-			fp := filepath.Join(cwd, "index.ts")
+			fp := filepath.Join(cwd, "src", "index.ts")
 			for name, mod := range bundle {
 				build.OnLoad(api.OnLoadOptions{Filter: "node_modules/" + mod.Module + "/.*", Namespace: "file"}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
 					logger.Debug("re-writing %s for %s", args.Path, name)
@@ -634,6 +651,21 @@ func createPlugin(logger logger.Logger, bundle bundleResult) api.Plugin {
 	}
 }
 
+func addAgentuityBuildToGitignore(dir string) error {
+	fn := filepath.Join(dir, ".gitignore")
+	var contents string
+	if sys.Exists(fn) {
+		buf, err := os.ReadFile(fn)
+		if err != nil {
+			return fmt.Errorf("failed to read .gitignore: %w", err)
+		}
+		contents = string(buf)
+	}
+	contents += "\n# don't commit the agentuity build folder\n"
+	contents += ".agentuity\n"
+	return os.WriteFile(fn, []byte(contents), 0644)
+}
+
 func BundleJS(logger logger.Logger, dir string, runtime string, production bool) error {
 	outdir := filepath.Join(dir, ".agentuity")
 	if sys.Exists(outdir) {
@@ -660,7 +692,7 @@ func BundleJS(logger logger.Logger, dir string, runtime string, production bool)
 		return fmt.Errorf("failed to unmarshal agentuity-builder output: %w", err)
 	}
 	result := api.Build(api.BuildOptions{
-		EntryPoints:   []string{"index.ts"},
+		EntryPoints:   []string{"src/index.ts"},
 		Bundle:        true,
 		Outdir:        outdir,
 		Write:         true,

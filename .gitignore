@@ -3,4 +3,4 @@
 cli
 dist/
 **/.DS_Store
-/my*test
+/my*test*

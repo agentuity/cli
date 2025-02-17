@@ -46,7 +46,10 @@ func (p *BunProvider) NewProject(logger logger.Logger, dir string, name string) 
 	if err := runCommandSilent(logger, bunjs, dir, []string{"add", "@agentuity/sdk", "ai", "@ai-sdk/openai"}, nil); err != nil {
 		return fmt.Errorf("failed to add npm modules: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "index.ts"), []byte(jstemplate), 0644); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "src"), 0755); err != nil {
+		return fmt.Errorf("failed to create src directory: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "src", "index.ts"), []byte(jstemplate), 0644); err != nil {
 		return fmt.Errorf("failed to write index.ts: %w", err)
 	}
 	projectJSON, err := loadPackageJSON(dir)
@@ -56,6 +59,12 @@ func (p *BunProvider) NewProject(logger logger.Logger, dir string, name string) 
 	projectJSON.AddScript("build", "agentuity bundle -r bunjs")
 	projectJSON.AddScript("prestart", "agentuity bundle -r bunjs")
 	projectJSON.AddScript("start", "bun run .agentuity/index.js")
+	projectJSON.SetMain("index.js")
+	projectJSON.SetType("module")
+	projectJSON.SetName(name)
+	projectJSON.SetVersion("0.0.1")
+	projectJSON.SetDescription("A simple Agentuity Agent project with the Vercel AI SDK")
+	projectJSON.SetKeywords([]string{"agent", "agentuity", "ai", "vercel", "bun"})
 	if err := projectJSON.Write(dir); err != nil {
 		return fmt.Errorf("failed to write package.json: %w", err)
 	}
@@ -68,11 +77,14 @@ func (p *BunProvider) NewProject(logger logger.Logger, dir string, name string) 
 	if err := ts.Write(dir); err != nil {
 		return fmt.Errorf("failed to write tsconfig.json: %w", err)
 	}
+	if err := addAgentuityBuildToGitignore(dir); err != nil {
+		return fmt.Errorf("failed to add agentuity build to .gitignore: %w", err)
+	}
 	return nil
 }
 
 func (p *BunProvider) ProjectIgnoreRules() []string {
-	return []string{"node_modules/**", "dist/**"}
+	return []string{"node_modules/**", "dist/**", "src/**"}
 }
 
 func (p *BunProvider) ConfigureDeploymentConfig(config *project.DeploymentConfig) error {

@@ -48,7 +48,7 @@ func (p *NodeJSProvider) NewProject(logger logger.Logger, dir string, name strin
 	projectJSON.AddScript("build", "agentuity bundle -r node")
 	projectJSON.AddScript("prestart", "agentuity bundle -r node")
 	projectJSON.AddScript("start", "node .agentuity/index.js")
-	projectJSON.SetMain("index.js")
+	projectJSON.SetMain("src/index.js")
 	projectJSON.SetType("module")
 	projectJSON.SetName(name)
 	projectJSON.SetVersion("0.0.1")
@@ -60,7 +60,10 @@ func (p *NodeJSProvider) NewProject(logger logger.Logger, dir string, name strin
 	if err := runCommandSilent(logger, npm, dir, []string{"install", "@agentuity/sdk", "ai", "@ai-sdk/openai"}, nil); err != nil {
 		return fmt.Errorf("failed to add npm modules: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "index.ts"), []byte(jstemplate), 0644); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "src"), 0755); err != nil {
+		return fmt.Errorf("failed to create src directory: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "src", "index.ts"), []byte(jstemplate), 0644); err != nil {
 		return fmt.Errorf("failed to write index.ts: %w", err)
 	}
 	ts, err := loadTSConfig(dir)
@@ -72,11 +75,14 @@ func (p *NodeJSProvider) NewProject(logger logger.Logger, dir string, name strin
 	if err := ts.Write(dir); err != nil {
 		return fmt.Errorf("failed to write tsconfig.json: %w", err)
 	}
+	if err := addAgentuityBuildToGitignore(dir); err != nil {
+		return fmt.Errorf("failed to add agentuity build to .gitignore: %w", err)
+	}
 	return nil
 }
 
 func (p *NodeJSProvider) ProjectIgnoreRules() []string {
-	return []string{"node_modules/**", "dist/**"}
+	return []string{"node_modules/**", "dist/**", "src/**"}
 }
 
 func (p *NodeJSProvider) ConfigureDeploymentConfig(config *project.DeploymentConfig) error {
