@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
@@ -85,7 +87,29 @@ func configurationCron(logger logger.Logger) map[string]any {
 		return nil
 	}
 	schedule := getInput(logger, "Enter the Schedule Expression (UTC timezone)", "The pattern should be in cron syntax (https://crontab.guru/ is a good resource)", "", false, "0 * * * 1-5", validateCron)
-	return map[string]any{"cronExpression": schedule}
+	var data string
+	if huh.NewText().
+		Title("If you would like to send a specific payload when triggered, enter it here").
+		Value(&data).Run() != nil {
+		logger.Fatal("failed to enter payload")
+	}
+	contentType := "text/plain"
+	if data != "" && strings.HasPrefix(data, "{") && strings.HasSuffix(data, "}") {
+		contentType = "application/json"
+	}
+	contentType = getInput(logger, "Enter the Content Type", "The content type of the payload", "", false, contentType, nil)
+	if data != "" && contentType == "application/json" {
+	}
+	if contentType == "application/json" {
+		if data == "" {
+			contentType = "text/plain"
+		} else {
+			if !json.Valid([]byte(data)) {
+				logger.Fatal("You specified JSON content type but the input was invalid JSON")
+			}
+		}
+	}
+	return map[string]any{"cronExpression": schedule, "payload": base64.StdEncoding.EncodeToString([]byte(data)), "contentType": contentType}
 }
 
 func configurationWebhook(logger logger.Logger, needsURL bool) map[string]any {
