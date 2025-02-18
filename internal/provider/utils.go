@@ -430,6 +430,7 @@ import {
 	DefinedAgentResponse as __AgentResponse,
 	DefinedAgentRequest as __AgentRequest,
 	DefinedAgentKeyValueStorage as __AgentKeyValueStorage,
+	DefinedAgentVectorStorage as __AgentVectorStorage,
 	loadAgentuity as __loadAgentuity,
 	instrumentations as __agentuityInstrumentations
 } from '@agentuity/sdk';
@@ -441,6 +442,7 @@ const __agentuityGlobals__ = {
 	AgentResponse: __AgentResponse,
 	AgentRequest: __AgentRequest,
 	AgentKeyValueStorage: __AgentKeyValueStorage,
+	AgentVectorStorage: __AgentVectorStorage,
 	loadAgentuity: __loadAgentuity,
 	localStorage: new AsyncLocalStorage(),
 };
@@ -495,6 +497,7 @@ if (!!process.env.AGENTUITY_SDK_AUTORUN) {
 		const sessionid = context.sessionId;
 		__agentuityGlobals__.createBridge(sessionid).then((bridge) => {
 			context.kv = new __agentuityGlobals__.AgentKeyValueStorage(bridge);
+			context.vector = new __agentuityGlobals__.AgentVectorStorage(bridge);
 			__agentuityGlobals__.localStorage.run({ bridge, sessionid }, () => {
 				__agentuityGlobals__.runFn(new __agentuityGlobals__.AgentRequest(request), new __agentuityGlobals__.AgentResponse(), context).then((r) => {
 					r.payload = __agentuityGlobals__.makeResponsePayload(r);
@@ -512,6 +515,7 @@ if (!!process.env.AGENTUITY_SDK_AUTORUN) {
 	const context = { sessionId: sessionid };
 	__agentuityGlobals__.createBridge(sessionid).then((bridge) => {
 		context.kv = new __agentuityGlobals__.AgentKeyValueStorage(bridge);
+		context.vector = new __agentuityGlobals__.AgentVectorStorage(bridge);
 		__agentuityGlobals__.localStorage.run({ bridge, sessionid }, () => {
 			__agentuityGlobals__.runFn(new __agentuityGlobals__.AgentRequest(request), new __agentuityGlobals__.AgentResponse(), context).then((r) => {
 				r.payload = __agentuityGlobals__.makeResponsePayload(r);
