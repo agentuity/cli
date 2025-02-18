@@ -429,6 +429,7 @@ import {
 	createAutorunSession as __createAutorunSession,
 	DefinedAgentResponse as __AgentResponse,
 	DefinedAgentRequest as __AgentRequest,
+	DefinedAgentKeyValueStorage as __AgentKeyValueStorage,
 	loadAgentuity as __loadAgentuity,
 	instrumentations as __agentuityInstrumentations
 } from '@agentuity/sdk';
@@ -439,6 +440,7 @@ const __agentuityGlobals__ = {
 	createAutorunSession: __createAutorunSession,
 	AgentResponse: __AgentResponse,
 	AgentRequest: __AgentRequest,
+	AgentKeyValueStorage: __AgentKeyValueStorage,
 	loadAgentuity: __loadAgentuity,
 	localStorage: new AsyncLocalStorage(),
 };
@@ -492,6 +494,7 @@ if (!!process.env.AGENTUITY_SDK_AUTORUN) {
 		const { request, context } = session;
 		const sessionid = context.sessionId;
 		%[3]s.createBridge(sessionid).then((bridge) => {
+			context.kv = new %[3]s.AgentKeyValueStorage(bridge);
 			%[3]s.localStorage.run({ bridge, sessionid }, () => {
 				%[3]s.runFn(new %[3]s.AgentRequest(request), new %[3]s.AgentResponse(), context).then((r) => {
 					r.payload = %[3]s.makeResponsePayload(r);
@@ -508,6 +511,7 @@ if (!!process.env.AGENTUITY_SDK_AUTORUN) {
 	const request = { trigger: 'manual', contentType: 'text/plain' };
 	const context = { sessionId: sessionid };
 	%[3]s.createBridge(sessionid).then((bridge) => {
+		context.kv = new %[3]s.AgentKeyValueStorage(bridge);
 		%[3]s.localStorage.run({ bridge, sessionid }, () => {
 			%[3]s.runFn(new %[3]s.AgentRequest(request), new %[3]s.AgentResponse(), context).then((r) => {
 				r.payload = %[3]s.makeResponsePayload(r);
