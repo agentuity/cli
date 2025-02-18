@@ -482,10 +482,10 @@ if (!process.env.AGENTUITY_SDK_AUTORUN && process.env.AGENTUITY_SDK_SOCKET_PATH)
 `
 
 var jsFooter = `
-%[3]s.runFn = %[2]s;
-%[3]s.loadAgentuity(%[1]s, %[3]s.startAgentCallback);
+__agentuityGlobals__.runFn = %[2]s;
+__agentuityGlobals__.loadAgentuity(%[1]s, __agentuityGlobals__.startAgentCallback);
 if (!!process.env.AGENTUITY_SDK_AUTORUN) {
-	%[3]s.createAutorunSession().then((res) => {
+	__agentuityGlobals__.createAutorunSession().then((res) => {
 		if (res.error) {
 			console.error(res.error);
 			process.exit(1);
@@ -493,11 +493,11 @@ if (!!process.env.AGENTUITY_SDK_AUTORUN) {
 		const session = res.result;
 		const { request, context } = session;
 		const sessionid = context.sessionId;
-		%[3]s.createBridge(sessionid).then((bridge) => {
-			context.kv = new %[3]s.AgentKeyValueStorage(bridge);
-			%[3]s.localStorage.run({ bridge, sessionid }, () => {
-				%[3]s.runFn(new %[3]s.AgentRequest(request), new %[3]s.AgentResponse(), context).then((r) => {
-					r.payload = %[3]s.makeResponsePayload(r);
+		__agentuityGlobals__.createBridge(sessionid).then((bridge) => {
+			context.kv = new __agentuityGlobals__.AgentKeyValueStorage(bridge);
+			__agentuityGlobals__.localStorage.run({ bridge, sessionid }, () => {
+				__agentuityGlobals__.runFn(new __agentuityGlobals__.AgentRequest(request), new __agentuityGlobals__.AgentResponse(), context).then((r) => {
+					r.payload = __agentuityGlobals__.makeResponsePayload(r);
 					bridge.shutdown(r).then(() => process.exit(0));
 				}).catch((err) => {
 					console.error(err);
@@ -510,11 +510,11 @@ if (!!process.env.AGENTUITY_SDK_AUTORUN) {
 	const sessionid = Math.random().toString(36).substring(2, 15);
 	const request = { trigger: 'manual', contentType: 'text/plain' };
 	const context = { sessionId: sessionid };
-	%[3]s.createBridge(sessionid).then((bridge) => {
-		context.kv = new %[3]s.AgentKeyValueStorage(bridge);
-		%[3]s.localStorage.run({ bridge, sessionid }, () => {
-			%[3]s.runFn(new %[3]s.AgentRequest(request), new %[3]s.AgentResponse(), context).then((r) => {
-				r.payload = %[3]s.makeResponsePayload(r);
+	__agentuityGlobals__.createBridge(sessionid).then((bridge) => {
+		context.kv = new __agentuityGlobals__.AgentKeyValueStorage(bridge);
+		__agentuityGlobals__.localStorage.run({ bridge, sessionid }, () => {
+			__agentuityGlobals__.runFn(new __agentuityGlobals__.AgentRequest(request), new __agentuityGlobals__.AgentResponse(), context).then((r) => {
+				r.payload = __agentuityGlobals__.makeResponsePayload(r);
 				bridge.shutdown(r).then(() => {
 					console.log(r.payload ? atob(r.payload) : '');
 					process.exit(0);
@@ -527,6 +527,15 @@ if (!!process.env.AGENTUITY_SDK_AUTORUN) {
 	});
 }
 `
+
+func searchBackwards(contents string, offset int, val byte) int {
+	for i := offset; i >= 0; i-- {
+		if contents[i] == val {
+			return i
+		}
+	}
+	return -1
+}
 
 type bundleModule struct {
 	Module    string                  `json:"module"`
@@ -548,8 +557,6 @@ func createPlugin(logger logger.Logger, bundle bundleResult) api.Plugin {
 	return api.Plugin{
 		Name: "inject-agentuity",
 		Setup: func(build api.PluginBuild) {
-			cwd, _ := os.Getwd()
-			fp := filepath.Join(cwd, "src", "index.ts")
 			for name, mod := range bundle {
 				build.OnLoad(api.OnLoadOptions{Filter: "node_modules/" + mod.Module + "/.*", Namespace: "file"}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
 					logger.Debug("re-writing %s for %s", args.Path, name)
@@ -560,30 +567,53 @@ func createPlugin(logger logger.Logger, bundle bundleResult) api.Plugin {
 					contents := string(buf)
 					var suffix strings.Builder
 					for fn, mod := range mod.Functions {
-						fnname := "async function " + fn
+						fnname := "function " + fn
 						index := strings.Index(contents, fnname)
 						if index == -1 {
 							continue
 						}
+						eol := searchBackwards(contents, index, '\n')
+						if eol < 0 {
+							continue
+						}
+						prefix := strings.TrimSpace(contents[eol+1 : index])
+						isAsync := strings.Contains(prefix, "async")
 						newname := "__agentuity_" + fn
-						newfnname := "async function " + newname
+						newfnname := "function " + newname
+						var fnprefix string
+						if isAsync {
+							fnprefix = "async "
+						}
 						contents = strings.Replace(contents, fnname, newfnname, 1)
 						varCounter++
 						varName := fmt.Sprintf("__var%d", varCounter)
-						suffix.WriteString(fnname + "(...args) {\n")
-						suffix.WriteString(fmt.Sprintf("const %s = __agentuityGlobals__.instrumentations['%s'].functions.find((fn) => fn.name === '%s');\n", varName, name, fn))
+						suffix.WriteString(fnprefix + fnname + "(...args) {\n")
+						suffix.WriteString(fmt.Sprintf("\tconst %s = __agentuityGlobals__.instrumentations['%s'].functions.find((fn) => fn.name === '%s');\n", varName, name, fn))
+						suffix.WriteString("\tlet _args = args;\n")
 						if mod.Before {
-							suffix.WriteString("\tlet _args = args;\n")
 							suffix.WriteString("\tconst bridge = __agentuityGlobals__.localStorage.getStore()?.bridge;\n")
 							suffix.WriteString("\tconst _ctx = { bridge };\n")
-							suffix.WriteString(fmt.Sprintf("\tawait %s.before(_ctx, _args);\n", varName))
+							if isAsync {
+								suffix.WriteString(fmt.Sprintf("\tconst bargs = await %s.before(_ctx, _args);\n", varName))
+							} else {
+								suffix.WriteString(fmt.Sprintf("\tconst bargs = %s.before(_ctx, _args);\n", varName))
+							}
+							suffix.WriteString("\tif (bargs !== undefined && Array.isArray(bargs)) {\n")
+							suffix.WriteString("\t\t_args = bargs;\n")
+							suffix.WriteString("\t}\n")
 						}
-						suffix.WriteString("\tlet result = " + newname + "(...args);\n")
-						suffix.WriteString("\tif (result instanceof Promise) {\n")
-						suffix.WriteString("\t\tresult = await result;\n")
-						suffix.WriteString("\t}\n")
+						suffix.WriteString("\tlet result = " + newname + "(..._args);\n")
+						if isAsync {
+							suffix.WriteString("\tif (result instanceof Promise) {\n")
+							suffix.WriteString("\t\tresult = await result;\n")
+							suffix.WriteString("\t}\n")
+						}
 						if mod.After {
-							suffix.WriteString(fmt.Sprintf("\tlet _result = await %s.after(_ctx, _args, result);\n", varName))
+							if isAsync {
+								suffix.WriteString(fmt.Sprintf("\tlet _result = await %s.after(_ctx, _args, result);\n", varName))
+							} else {
+								suffix.WriteString(fmt.Sprintf("\tlet _result = %s.after(_ctx, _args, result);\n", varName))
+							}
 							suffix.WriteString("\tif (_result !== undefined) {\n")
 							suffix.WriteString("\t\tresult = _result;\n")
 							suffix.WriteString("\t}\n")
@@ -602,29 +632,10 @@ func createPlugin(logger logger.Logger, bundle bundleResult) api.Plugin {
 					}, nil
 				})
 			}
-			build.OnLoad(api.OnLoadOptions{Filter: fp, Namespace: "file"}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
-				logger.Debug("injecting agentuity into %s", args.Path)
-				buf, err := os.ReadFile(args.Path)
-				if err != nil {
-					return api.OnLoadResult{}, err
-				}
-				js := string(buf)
-				contents := jsPreamble + js
-				return api.OnLoadResult{
-					Contents: &contents,
-					Loader:   api.LoaderTS,
-				}, nil
-			})
 			build.OnEnd(func(result *api.BuildResult) (api.OnEndResult, error) {
 				for _, r := range result.OutputFiles {
 					if strings.HasSuffix(r.Path, "index.js") {
 						js := string(r.Contents)
-						var gm = regexp.MustCompile(`__agentuityGlobals__(\d+)`) // need to get the mangled name
-						gvarName := gm.FindStringSubmatch(js)
-						if len(gvarName) == 0 {
-							return api.OnEndResult{}, fmt.Errorf("failed to find __agentuityGlobals__")
-						}
-						js = strings.ReplaceAll(js, "__agentuityGlobals__.", gvarName[0]+".")
 						var m = regexp.MustCompile(`\s(.*?) as default\s}`)
 						var varName string
 						if m.MatchString(js) {
@@ -639,7 +650,7 @@ func createPlugin(logger logger.Logger, bundle bundleResult) api.Plugin {
 								return api.OnEndResult{}, fmt.Errorf("failed to find run function")
 							}
 						}
-						contents := js + fmt.Sprintf(jsFooter, cstr.JSONStringify(modules), varName, gvarName[0])
+						contents := jsPreamble + js + fmt.Sprintf(jsFooter, cstr.JSONStringify(modules), varName)
 						of, err := os.Create(r.Path)
 						if err != nil {
 							return api.OnEndResult{}, err
