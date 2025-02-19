@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/agentuity/cli/internal/project"
@@ -119,7 +120,7 @@ type SlackOAuthResponse struct {
 	} `json:"data"`
 }
 
-func configurationSlackSource(logger logger.Logger, apiClient *util.APIClient, projectId string) map[string]any {
+func configurationSlack(logger logger.Logger, apiClient *util.APIClient, projectId string, isSource bool) map[string]any {
 	var slackResponse SlackIntegrationResponse
 	err := apiClient.Do("GET", fmt.Sprintf("/cli/integration/%s/%s", "slack", projectId), nil, &slackResponse)
 	if err != nil {
@@ -142,10 +143,13 @@ func configurationSlackSource(logger logger.Logger, apiClient *util.APIClient, p
 		if err := browser.OpenURL(oauthResponse.Data.Url); err != nil {
 			log.Fatalf("failed to open browser: %s", err)
 		}
-		logger.Fatal("no Slack integrations found, please add a Slack integration first")
+		printSuccess("Slack OAuth URL opened in browser, complete the installation and try again")
+		os.Exit(0)
 	}
 
-	log.Fatal("unimplemented")
+	if isSource {
+		return map[string]any{}
+	}
 
 	return map[string]any{}
 }
@@ -353,7 +357,7 @@ var ioSourceCreateCmd = &cobra.Command{
 		case "webhook":
 			config = configurationWebhook(logger, false)
 		case "slack":
-			config = configurationSlackSource(logger, apiClient, theproject.ProjectId)
+			config = configurationSlack(logger, apiClient, theproject.ProjectId, true)
 		default:
 			logger.Fatal("invalid source type")
 		}
