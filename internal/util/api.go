@@ -7,16 +7,20 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+
+	"github.com/agentuity/go-common/logger"
 )
 
 type APIClient struct {
 	baseURL string
 	token   string
 	client  *http.Client
+	logger  logger.Logger
 }
 
-func NewAPIClient(baseURL, token string) *APIClient {
+func NewAPIClient(logger logger.Logger, baseURL, token string) *APIClient {
 	return &APIClient{
+		logger:  logger,
 		baseURL: baseURL,
 		token:   token,
 		client:  http.DefaultClient,
@@ -36,7 +40,6 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 		if err != nil {
 			return fmt.Errorf("error marshalling payload: %w", err)
 		}
-		fmt.Printf("Request payload: %s\n", string(body))
 	}
 
 	req, err := http.NewRequest(method, u.String(), bytes.NewBuffer(body))
@@ -61,8 +64,6 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 		if err != nil {
 			return fmt.Errorf("error reading response body: %w", err)
 		}
-		fmt.Printf("Response body: %s\n", string(respBody))
-
 		if err := json.NewDecoder(bytes.NewReader(respBody)).Decode(response); err != nil {
 			return fmt.Errorf("error decoding response: %w", err)
 		}

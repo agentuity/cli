@@ -109,8 +109,11 @@ type PhoneBuyResponse struct {
 }
 
 type SlackIntegrationResponse struct {
-	Success bool             `json:"success"`
-	Data    []map[string]any `json:"data"`
+	Success bool `json:"success"`
+	Data    []struct {
+		TeamId   string `json:"teamId"`
+		TeamName string `json:"teamName"`
+	} `json:"data"`
 }
 
 type SlackOAuthResponse struct {
@@ -146,12 +149,18 @@ func configurationSlack(logger logger.Logger, apiClient *util.APIClient, project
 		printSuccess("Slack OAuth URL opened in browser, complete the installation and try again")
 		os.Exit(0)
 	}
+	var teamId string = slackResponse.Data[0].TeamId
 
 	if isSource {
 		return map[string]any{}
 	}
 
-	return map[string]any{}
+	channelId := getInput(logger, "Enter the Slack Channel ID", "", "", false, nil)
+
+	return map[string]any{
+		"channelId": channelId,
+		"teamId":    teamId,
+	}
 }
 
 func configurationSMS(logger logger.Logger, apiClient *util.APIClient, projectId string, requireTo bool) map[string]any {
@@ -305,12 +314,14 @@ var ioDestinationCreateCmd = &cobra.Command{
 			Run() != nil {
 			logger.Fatal("failed to select destination type")
 		}
+		apiClient := util.NewAPIClient(logger, apiUrl, apiKey)
 		switch destinationType {
 		case "sms":
-			apiClient := util.NewAPIClient(apiUrl, apiKey)
 			config = configurationSMS(logger, apiClient, theproject.ProjectId, true)
 		case "webhook":
 			config = configurationWebhook(logger, true)
+		case "slack":
+			config = configurationSlack(logger, apiClient, theproject.ProjectId, false)
 		default:
 			logger.Fatal("invalid source type")
 		}
@@ -340,7 +351,7 @@ var ioSourceCreateCmd = &cobra.Command{
 		theproject := context.Project
 		apiUrl := context.APIURL
 		apiKey := context.Token
-		apiClient := util.NewAPIClient(apiUrl, apiKey)
+		apiClient := util.NewAPIClient(logger, apiUrl, apiKey)
 		var sourceType string
 		if huh.NewSelect[string]().
 			Title("Select a source type").
