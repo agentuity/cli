@@ -54,6 +54,8 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 		return fmt.Errorf("error sending request: %w", err)
 	}
 	defer resp.Body.Close()
+	c.logger.Trace("response: %s", resp.Status)
+	c.logger.Trace("response body: %s", resp.Body)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted && response == nil {
 		return fmt.Errorf("request failed with status (%s)", resp.Status)
