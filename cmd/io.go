@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/agentuity/cli/internal/project"
@@ -11,6 +13,7 @@ import (
 	cstr "github.com/agentuity/go-common/string"
 	"github.com/charmbracelet/huh"
 	"github.com/fatih/color"
+	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 )
 
@@ -44,6 +47,7 @@ var typeOptions = []huh.Option[string]{
 	huh.NewOption("Webhook", "webhook"),
 	huh.NewOption("SMS", "sms"),
 	huh.NewOption("Email", "email"),
+	huh.NewOption("Slack", "slack"),
 }
 
 func validateURL(urlstr string) error {
@@ -102,6 +106,52 @@ type PhoneBuyResponse struct {
 	Data    struct {
 		PhoneNumberId string `json:"phoneNumberId"`
 	} `json:"data"`
+}
+
+type SlackIntegrationResponse struct {
+	Success bool             `json:"success"`
+	Data    []map[string]any `json:"data"`
+}
+
+type SlackOAuthResponse struct {
+	Success bool `json:"success"`
+	Data    struct {
+		Url string `json:"url"`
+	} `json:"data"`
+}
+
+func configurationSlack(logger logger.Logger, apiClient *util.APIClient, projectId string, isSource bool) map[string]any {
+	var slackResponse SlackIntegrationResponse
+	err := apiClient.Do("GET", fmt.Sprintf("/cli/integration/%s/%s", "slack", projectId), nil, &slackResponse)
+	if err != nil {
+		logger.Fatal("failed to get Slack integration: %s", err)
+	}
+	if !slackResponse.Success {
+		logger.Fatal("failed to get Slack integration")
+	}
+
+	if len(slackResponse.Data) == 0 {
+		var oauthResponse SlackOAuthResponse
+		err = apiClient.Do("GET", fmt.Sprintf("/oauth/slack/link/%s", projectId), nil, &oauthResponse)
+		if err != nil {
+			logger.Fatal("failed to get Slack OAuth URL: %s", err)
+		}
+		if !oauthResponse.Success {
+			logger.Fatal("failed to get Slack OAuth URL")
+		}
+
+		if err := browser.OpenURL(oauthResponse.Data.Url); err != nil {
+			log.Fatalf("failed to open browser: %s", err)
+		}
+		printSuccess("Slack OAuth URL opened in browser, complete the installation and try again")
+		os.Exit(0)
+	}
+
+	if isSource {
+		return map[string]any{}
+	}
+
+	return map[string]any{}
 }
 
 func configurationSMS(logger logger.Logger, apiClient *util.APIClient, projectId string, requireTo bool) map[string]any {
@@ -306,6 +356,8 @@ var ioSourceCreateCmd = &cobra.Command{
 			config = configurationSMS(logger, apiClient, theproject.ProjectId, false)
 		case "webhook":
 			config = configurationWebhook(logger, false)
+		case "slack":
+			config = configurationSlack(logger, apiClient, theproject.ProjectId, true)
 		default:
 			logger.Fatal("invalid source type")
 		}

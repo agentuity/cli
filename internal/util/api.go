@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 )
@@ -35,6 +36,7 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 		if err != nil {
 			return fmt.Errorf("error marshalling payload: %w", err)
 		}
+		fmt.Printf("Request payload: %s\n", string(body))
 	}
 
 	req, err := http.NewRequest(method, u.String(), bytes.NewBuffer(body))
@@ -55,7 +57,13 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 	}
 
 	if response != nil {
-		if err := json.NewDecoder(resp.Body).Decode(response); err != nil {
+		respBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("error reading response body: %w", err)
+		}
+		fmt.Printf("Response body: %s\n", string(respBody))
+
+		if err := json.NewDecoder(bytes.NewReader(respBody)).Decode(response); err != nil {
 			return fmt.Errorf("error decoding response: %w", err)
 		}
 	}

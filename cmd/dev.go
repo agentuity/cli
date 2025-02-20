@@ -201,7 +201,7 @@ func (c *LiveDevConnection) Close() error {
 }
 
 func (c *LiveDevConnection) WebURL(appUrl string) string {
-	return fmt.Sprintf("%s/developer/live/%s", appUrl, c.websocketId)
+	return fmt.Sprintf("%s/live/%s", appUrl, c.websocketId)
 }
 
 type InputMessage struct {
