@@ -484,7 +484,7 @@ if (!process.env.AGENTUITY_SDK_AUTORUN && process.env.AGENTUITY_SDK_SOCKET_PATH)
 `
 
 var jsFooter = `
-__agentuityGlobals__.runFn = %[2]s;
+__agentuityGlobals__.runFn = %[2]s.run === 'function' ? %[2]s.run : %[2]s;
 __agentuityGlobals__.loadAgentuity(%[1]s, __agentuityGlobals__.startAgentCallback);
 if (!!process.env.AGENTUITY_SDK_AUTORUN) {
 	__agentuityGlobals__.createAutorunSession().then((res) => {
