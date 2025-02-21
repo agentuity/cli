@@ -1,12 +1,15 @@
 package cmd
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/url"
 	"os"
 	"strings"
 
+	"github.com/adhocore/gronx"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
@@ -43,7 +46,14 @@ var ioDestinationCmd = &cobra.Command{
 	},
 }
 
-var typeOptions = []huh.Option[string]{
+var sourceOptions = []huh.Option[string]{
+	huh.NewOption("Webhook", "webhook"),
+	huh.NewOption("Schedule", "cron"),
+	huh.NewOption("SMS", "sms"),
+	huh.NewOption("Email", "email"),
+}
+
+var destinationOptions = []huh.Option[string]{
 	huh.NewOption("Webhook", "webhook"),
 	huh.NewOption("SMS", "sms"),
 	huh.NewOption("Email", "email"),
@@ -86,6 +96,40 @@ func minLength(min int) func(string) error {
 	}
 }
 
+func configureCron(logger logger.Logger) map[string]any {
+	gron := gronx.New()
+	validateCron := func(expr string) error {
+		if !gron.IsValid(expr) {
+			return fmt.Errorf("invalid cron schedule")
+		}
+		return nil
+	}
+	schedule := getInput(logger, "Enter the Schedule Expression (UTC timezone)", "The pattern should be in cron syntax (https://crontab.guru/ is a good resource)", "", false, "0 * * * 1-5", validateCron)
+	var data string
+	if huh.NewText().
+		Title("If you would like to send a specific payload when triggered, enter it here").
+		Value(&data).Run() != nil {
+		logger.Fatal("failed to enter payload")
+	}
+	contentType := "text/plain"
+	if data != "" && strings.HasPrefix(data, "{") && strings.HasSuffix(data, "}") {
+		contentType = "application/json"
+	}
+	contentType = getInput(logger, "Enter the Content Type", "The content type of the payload", "", false, contentType, nil)
+	if data != "" && contentType == "application/json" {
+	}
+	if contentType == "application/json" {
+		if data == "" {
+			contentType = "text/plain"
+		} else {
+			if !json.Valid([]byte(data)) {
+				logger.Fatal("You specified JSON content type but the input was invalid JSON")
+			}
+		}
+	}
+	return map[string]any{"cronExpression": schedule, "payload": base64.StdEncoding.EncodeToString([]byte(data)), "contentType": contentType}
+}
+
 type ExistingPhoneResponse struct {
 	Success bool `json:"success"`
 	Data    []struct {
@@ -123,7 +167,7 @@ type SlackOAuthResponse struct {
 	} `json:"data"`
 }
 
-func configurationSlack(logger logger.Logger, apiClient *util.APIClient, projectId string, isSource bool) map[string]any {
+func configureSlack(logger logger.Logger, apiClient *util.APIClient, projectId string, isSource bool) map[string]any {
 	var slackResponse SlackIntegrationResponse
 	err := apiClient.Do("GET", fmt.Sprintf("/cli/integration/%s/%s", "slack", projectId), nil, &slackResponse)
 	if err != nil {
@@ -155,7 +199,7 @@ func configurationSlack(logger logger.Logger, apiClient *util.APIClient, project
 		return map[string]any{}
 	}
 
-	channelId := getInput(logger, "Enter the Slack Channel ID", "", "", false, nil)
+	channelId := getInput(logger, "Enter the Slack Channel ID", "", "", false, "", nil)
 
 	return map[string]any{
 		"channelId": channelId,
@@ -163,7 +207,7 @@ func configurationSlack(logger logger.Logger, apiClient *util.APIClient, project
 	}
 }
 
-func configurationSMS(logger logger.Logger, apiClient *util.APIClient, projectId string, requireTo bool) map[string]any {
+func configureSMS(logger logger.Logger, apiClient *util.APIClient, projectId string, requireTo bool) map[string]any {
 	var phoneNumberId string
 	var existingPhoneResponse ExistingPhoneResponse
 	err := apiClient.Do("GET", "/phone", nil, &existingPhoneResponse)
@@ -234,7 +278,7 @@ func configurationSMS(logger logger.Logger, apiClient *util.APIClient, projectId
 
 	var toNumber string
 	if requireTo {
-		toNumber = getInput(logger, "Enter the phone number to send SMS to:", "", "", false, validatePhoneNumber)
+		toNumber = getInput(logger, "Enter the phone number to send SMS to:", "", "", false, "", validatePhoneNumber)
 	}
 
 	config := map[string]any{
@@ -245,10 +289,10 @@ func configurationSMS(logger logger.Logger, apiClient *util.APIClient, projectId
 	return config
 }
 
-func configurationWebhook(logger logger.Logger, needsURL bool) map[string]any {
+func configureWebhook(logger logger.Logger, needsURL bool) map[string]any {
 	var url string
 	if needsURL {
-		url = getInput(logger, "Enter the URL", "", "", false, validateURL)
+		url = getInput(logger, "Enter the URL to the Webhook", "", "", false, "", validateURL)
 	}
 	var authType string
 	if huh.NewSelect[string]().
@@ -269,22 +313,22 @@ func configurationWebhook(logger logger.Logger, needsURL bool) map[string]any {
 	switch authType {
 	case "none":
 	case "bearer":
-		token := getInput(logger, "Enter the Authorization Bearer Token", "The input will be masked", "", true, minLength(10))
+		token := getInput(logger, "Enter the Authorization Bearer Token", "The input will be masked", "", true, "", minLength(10))
 		config["authorization"] = map[string]string{
 			"type":  "bearer",
 			"token": token,
 		}
 	case "basic":
-		username := getInput(logger, "Enter the HTTP Basic Auth Username", "", "", false, minLength(1))
-		password := getInput(logger, "Enter the HTTP Basic Auth Password", "", "", true, minLength(1))
+		username := getInput(logger, "Enter the HTTP Basic Auth Username", "", "", false, "", minLength(1))
+		password := getInput(logger, "Enter the HTTP Basic Auth Password", "", "", true, "", minLength(1))
 		config["authorization"] = map[string]string{
 			"type":     "basic",
 			"username": username,
 			"password": password,
 		}
 	case "header":
-		headerName := getInput(logger, "Enter the HTTP Header Name", "", "", false, minLength(1))
-		headerValue := getInput(logger, "Enter the HTTP Header Value", "", "", false, minLength(1))
+		headerName := getInput(logger, "Enter the HTTP Header Name", "", "", false, "", minLength(1))
+		headerValue := getInput(logger, "Enter the HTTP Header Value", "", "", false, "", minLength(1))
 		config["authorization"] = map[string]string{
 			"type":  "header",
 			"name":  headerName,
@@ -308,7 +352,7 @@ var ioDestinationCreateCmd = &cobra.Command{
 		config := map[string]any{}
 		if huh.NewSelect[string]().
 			Title("Select a destination type").
-			Options(typeOptions...).
+			Options(destinationOptions...).
 			Value(&destinationType).
 			WithTheme(theme).
 			Run() != nil {
@@ -317,13 +361,13 @@ var ioDestinationCreateCmd = &cobra.Command{
 		apiClient := util.NewAPIClient(logger, apiUrl, apiKey)
 		switch destinationType {
 		case "sms":
-			config = configurationSMS(logger, apiClient, theproject.ProjectId, true)
+			config = configureSMS(logger, apiClient, theproject.ProjectId, true)
 		case "webhook":
-			config = configurationWebhook(logger, true)
+			config = configureWebhook(logger, true)
 		case "slack":
-			config = configurationSlack(logger, apiClient, theproject.ProjectId, false)
+			config = configureSlack(logger, apiClient, theproject.ProjectId, false)
 		default:
-			logger.Fatal("invalid source type")
+			logger.Fatal("invalid destination type: %s. currently only sms, webhook, and slack are supported", destinationType)
 		}
 		io, err := theproject.CreateIO(logger, apiUrl, apiKey, "destination", project.IO{
 			Direction: "destination",
@@ -355,7 +399,7 @@ var ioSourceCreateCmd = &cobra.Command{
 		var sourceType string
 		if huh.NewSelect[string]().
 			Title("Select a source type").
-			Options(typeOptions...).
+			Options(sourceOptions...).
 			Value(&sourceType).
 			WithTheme(theme).
 			Run() != nil {
@@ -363,14 +407,16 @@ var ioSourceCreateCmd = &cobra.Command{
 		}
 		var config map[string]any
 		switch sourceType {
+		case "cron":
+			config = configureCron(logger)
 		case "sms":
-			config = configurationSMS(logger, apiClient, theproject.ProjectId, false)
+			config = configureSMS(logger, apiClient, theproject.ProjectId, false)
 		case "webhook":
-			config = configurationWebhook(logger, false)
+			config = configureWebhook(logger, false)
 		case "slack":
-			config = configurationSlack(logger, apiClient, theproject.ProjectId, true)
+			config = configureSlack(logger, apiClient, theproject.ProjectId, true)
 		default:
-			logger.Fatal("invalid source type")
+			logger.Fatal("invalid source type: %s. currently only cron, sms, webhook, and slack are supported", sourceType)
 		}
 		io, err := theproject.CreateIO(logger, apiUrl, apiKey, "source", project.IO{
 			Direction: "source",
@@ -502,6 +548,6 @@ func init() {
 		ioDestinationListCmd,
 		ioDestinationDeleteCmd,
 	} {
-		cmd.Flags().StringP("dir", "d", ".", "The directory to the project to deploy")
+		cmd.Flags().StringP("dir", "d", ".", "The root of the project directory")
 	}
 }

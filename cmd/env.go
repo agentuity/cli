@@ -65,7 +65,7 @@ func promptForEnv(logger logger.Logger, key string, isSecret bool, localenv map[
 			help = "Your input will be masked"
 		}
 	}
-	value := getInput(logger, prompt, help, "", isSecret, nil)
+	value := getInput(logger, prompt, help, "", isSecret, "", nil)
 	if value == "" && defaultValue != "" {
 		value = defaultValue
 	}
@@ -186,7 +186,7 @@ var envSetCmd = &cobra.Command{
 			if len(envs) > 0 || len(secrets) > 0 {
 				help = "Press enter to save..."
 			}
-			key = getInput(logger, "Enter your environment variable name", help, "", false, nil)
+			key = getInput(logger, "Enter your environment variable name", help, "", false, "", nil)
 			if key == "" {
 				askMore = false
 			}

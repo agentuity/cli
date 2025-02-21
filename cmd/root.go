@@ -149,8 +149,8 @@ func showSpinner(logger logger.Logger, title string, action func()) {
 
 var theme = huh.ThemeCatppuccin()
 
-func getInput(logger logger.Logger, title string, description string, prompt string, mask bool, validate func(string) error) string {
-	var value string
+func getInput(logger logger.Logger, title string, description string, prompt string, mask bool, defaultValue string, validate func(string) error) string {
+	value := defaultValue
 	if prompt == "" {
 		prompt = "> "
 	}
