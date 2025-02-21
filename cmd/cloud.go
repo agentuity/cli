@@ -370,6 +370,7 @@ func updateDeploymentStatusCompleted(logger logger.Logger, apiUrl, token, deploy
 
 func init() {
 	rootCmd.AddCommand(cloudCmd)
+	rootCmd.AddCommand(cloudDeployCmd)
 	cloudCmd.AddCommand(cloudDeployCmd)
 	cloudDeployCmd.Flags().StringP("dir", "d", ".", "The directory to the project to deploy")
 	addURLFlags(cloudCmd)

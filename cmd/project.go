@@ -341,6 +341,7 @@ var projectInitCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(projectCmd)
+	rootCmd.AddCommand(projectNewCmd)
 	projectCmd.AddCommand(projectInitCmd)
 	projectCmd.AddCommand(projectNewCmd)
 	projectNewCmd.Flags().StringP("dir", "d", "", "The directory to create the project in")
