@@ -243,10 +243,6 @@ var projectNewCmd = &cobra.Command{
 
 		enableWebhookAuth := promptForWebhookAuth(logger)
 
-		if !ask(logger, "Create new project in "+projectDir+"?", true) {
-			return
-		}
-
 		if util.Exists(projectDir) {
 			if !ask(logger, "The directory "+projectDir+" already exists.\nAre you sure you want to overwrite files here?", true) {
 				return
@@ -279,8 +275,8 @@ var projectNewCmd = &cobra.Command{
 		fmt.Println("Next steps:")
 		fmt.Println()
 		fmt.Printf("1. Switch into the project directory at %s\n", color.GreenString(projectDir))
-		fmt.Printf("2. Run %s to run the project locally\n", command("dev", "run"))
-		fmt.Printf("3. Run %s to deploy the project\n", command("cloud", "deploy"))
+		fmt.Printf("2. Run %s to run the project locally\n", command("run"))
+		fmt.Printf("3. Run %s to deploy the project\n", command("deploy"))
 		fmt.Println()
 		fmt.Printf("Access your project at %s", link("%s/projects/%s", appUrl, projectData.ProjectId))
 		fmt.Println()
