@@ -52,6 +52,7 @@ func (p *BunProvider) NewProject(logger logger.Logger, dir string, name string) 
 	if err := os.WriteFile(filepath.Join(dir, "src", "index.ts"), []byte(jstemplate), 0644); err != nil {
 		return fmt.Errorf("failed to write index.ts: %w", err)
 	}
+	os.Remove(filepath.Join(dir, "index.ts"))
 	projectJSON, err := loadPackageJSON(dir)
 	if err != nil {
 		return fmt.Errorf("failed to load package.json from %s. %w", dir, err)

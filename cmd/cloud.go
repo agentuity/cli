@@ -100,7 +100,7 @@ var cloudDeployCmd = &cobra.Command{
 			logger.Fatal("%s", err)
 		}
 
-		client := util.NewAPIClient(apiUrl, token)
+		client := util.NewAPIClient(logger, apiUrl, token)
 		var le []env.EnvLine
 		var envFile *provider.EnvFile
 		var projectData *project.ProjectData
@@ -283,14 +283,14 @@ var cloudDeployCmd = &cobra.Command{
 
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
-				if err := updateDeploymentStatus(apiUrl, token, startResponse.Data.DeploymentId, "failed"); err != nil {
+				if err := updateDeploymentStatus(logger, apiUrl, token, startResponse.Data.DeploymentId, "failed"); err != nil {
 					logger.Fatal("%s", err)
 				}
 				logger.Fatal("error uploading deployment: %s", err)
 			}
 			if resp.StatusCode != http.StatusOK {
 				buf, _ := io.ReadAll(resp.Body)
-				if err := updateDeploymentStatus(apiUrl, token, startResponse.Data.DeploymentId, "failed"); err != nil {
+				if err := updateDeploymentStatus(logger, apiUrl, token, startResponse.Data.DeploymentId, "failed"); err != nil {
 					logger.Fatal("%s", err)
 				}
 				logger.Fatal("error uploading deployment (%s) %s", resp.Status, string(buf))
@@ -315,7 +315,7 @@ var cloudDeployCmd = &cobra.Command{
 				destinations = append(destinations, io.ID)
 			}
 			// tell the api that we've completed the upload for the deployment
-			if err := updateDeploymentStatusCompleted(apiUrl, token, startResponse.Data.DeploymentId, sources, destinations); err != nil {
+			if err := updateDeploymentStatusCompleted(logger, apiUrl, token, startResponse.Data.DeploymentId, sources, destinations); err != nil {
 				logger.Fatal("%s", err)
 			}
 			res, err := theproject.ListIO(logger, apiUrl, token, "source")
@@ -356,14 +356,14 @@ var cloudDeployCmd = &cobra.Command{
 	},
 }
 
-func updateDeploymentStatus(apiUrl, token, deploymentId, status string) error {
-	client := util.NewAPIClient(apiUrl, token)
+func updateDeploymentStatus(logger logger.Logger, apiUrl, token, deploymentId, status string) error {
+	client := util.NewAPIClient(logger, apiUrl, token)
 	payload := map[string]string{"state": status}
 	return client.Do("PUT", fmt.Sprintf("/cli/deploy/upload/%s", deploymentId), payload, nil)
 }
 
-func updateDeploymentStatusCompleted(apiUrl, token, deploymentId string, sources []string, destinations []string) error {
-	client := util.NewAPIClient(apiUrl, token)
+func updateDeploymentStatusCompleted(logger logger.Logger, apiUrl, token, deploymentId string, sources []string, destinations []string) error {
+	client := util.NewAPIClient(logger, apiUrl, token)
 	payload := map[string]any{"state": "completed", "sources": sources, "destinations": destinations}
 	return client.Do("PUT", fmt.Sprintf("/cli/deploy/upload/%s", deploymentId), payload, nil)
 }

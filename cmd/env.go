@@ -342,6 +342,7 @@ var envListCmd = &cobra.Command{
 var envDeleteCmd = &cobra.Command{
 	Use:     "delete [key...]",
 	Aliases: []string{"rm", "del"},
+	Args:    cobra.MinimumNArgs(1),
 	Short:   "Delete one or more environment variables and secrets",
 	Run: func(cmd *cobra.Command, args []string) {
 		context := ensureProject(cmd)

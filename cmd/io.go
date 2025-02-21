@@ -4,15 +4,19 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/adhocore/gronx"
 	"github.com/agentuity/cli/internal/project"
+	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
 	cstr "github.com/agentuity/go-common/string"
 	"github.com/charmbracelet/huh"
 	"github.com/fatih/color"
+	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 )
 
@@ -42,17 +46,18 @@ var ioDestinationCmd = &cobra.Command{
 	},
 }
 
-var srcOptions = []huh.Option[string]{
+var sourceOptions = []huh.Option[string]{
 	huh.NewOption("Webhook", "webhook"),
 	huh.NewOption("Schedule", "cron"),
 	huh.NewOption("SMS", "sms"),
 	huh.NewOption("Email", "email"),
 }
 
-var destOptions = []huh.Option[string]{
+var destinationOptions = []huh.Option[string]{
 	huh.NewOption("Webhook", "webhook"),
 	huh.NewOption("SMS", "sms"),
 	huh.NewOption("Email", "email"),
+	huh.NewOption("Slack", "slack"),
 }
 
 func validateURL(urlstr string) error {
@@ -69,6 +74,19 @@ func validateURL(urlstr string) error {
 	return nil
 }
 
+func validatePhoneNumber(phoneNumber string) error {
+	if phoneNumber == "" {
+		return fmt.Errorf("phone number is required")
+	}
+	if !strings.HasPrefix(phoneNumber, "+1") {
+		return fmt.Errorf("phone number must start with +1")
+	}
+	if len(phoneNumber) != 10 {
+		return fmt.Errorf("phone number must be 10 digits")
+	}
+	return nil
+}
+
 func minLength(min int) func(string) error {
 	return func(s string) error {
 		if len(s) < min {
@@ -78,7 +96,7 @@ func minLength(min int) func(string) error {
 	}
 }
 
-func configurationCron(logger logger.Logger) map[string]any {
+func configureCron(logger logger.Logger) map[string]any {
 	gron := gronx.New()
 	validateCron := func(expr string) error {
 		if !gron.IsValid(expr) {
@@ -112,10 +130,169 @@ func configurationCron(logger logger.Logger) map[string]any {
 	return map[string]any{"cronExpression": schedule, "payload": base64.StdEncoding.EncodeToString([]byte(data)), "contentType": contentType}
 }
 
-func configurationWebhook(logger logger.Logger, needsURL bool) map[string]any {
+type ExistingPhoneResponse struct {
+	Success bool `json:"success"`
+	Data    []struct {
+		PhoneNumber   string `json:"phoneNumber"`
+		PhoneNumberId string `json:"phoneNumberId"`
+	} `json:"data"`
+}
+
+type PhoneAvailableResponse struct {
+	Success bool `json:"success"`
+	Data    []struct {
+		PhoneNumber string `json:"phoneNumber"`
+	} `json:"data"`
+}
+
+type PhoneBuyResponse struct {
+	Success bool `json:"success"`
+	Data    struct {
+		PhoneNumberId string `json:"phoneNumberId"`
+	} `json:"data"`
+}
+
+type SlackIntegrationResponse struct {
+	Success bool `json:"success"`
+	Data    []struct {
+		TeamId   string `json:"teamId"`
+		TeamName string `json:"teamName"`
+	} `json:"data"`
+}
+
+type SlackOAuthResponse struct {
+	Success bool `json:"success"`
+	Data    struct {
+		Url string `json:"url"`
+	} `json:"data"`
+}
+
+func configureSlack(logger logger.Logger, apiClient *util.APIClient, projectId string, isSource bool) map[string]any {
+	var slackResponse SlackIntegrationResponse
+	err := apiClient.Do("GET", fmt.Sprintf("/cli/integration/%s/%s", "slack", projectId), nil, &slackResponse)
+	if err != nil {
+		logger.Fatal("failed to get Slack integration: %s", err)
+	}
+	if !slackResponse.Success {
+		logger.Fatal("failed to get Slack integration")
+	}
+
+	if len(slackResponse.Data) == 0 {
+		var oauthResponse SlackOAuthResponse
+		err = apiClient.Do("GET", fmt.Sprintf("/oauth/slack/link/%s", projectId), nil, &oauthResponse)
+		if err != nil {
+			logger.Fatal("failed to get Slack OAuth URL: %s", err)
+		}
+		if !oauthResponse.Success {
+			logger.Fatal("failed to get Slack OAuth URL")
+		}
+
+		if err := browser.OpenURL(oauthResponse.Data.Url); err != nil {
+			log.Fatalf("failed to open browser: %s", err)
+		}
+		printSuccess("Slack OAuth URL opened in browser, complete the installation and try again")
+		os.Exit(0)
+	}
+	var teamId string = slackResponse.Data[0].TeamId
+
+	if isSource {
+		return map[string]any{}
+	}
+
+	channelId := getInput(logger, "Enter the Slack Channel ID", "", "", false, "", nil)
+
+	return map[string]any{
+		"channelId": channelId,
+		"teamId":    teamId,
+	}
+}
+
+func configureSMS(logger logger.Logger, apiClient *util.APIClient, projectId string, requireTo bool) map[string]any {
+	var phoneNumberId string
+	var existingPhoneResponse ExistingPhoneResponse
+	err := apiClient.Do("GET", "/phone", nil, &existingPhoneResponse)
+	if err != nil {
+		logger.Fatal("failed to get existing phone numbers: %s", err)
+	}
+
+	if !existingPhoneResponse.Success {
+		logger.Fatal("failed to get existing phone numbers: %s", err)
+	}
+
+	if len(existingPhoneResponse.Data) > 0 {
+		var useExistingPhone bool
+		if huh.NewConfirm().
+			Title("Do you want to use an existing phone number?").
+			Value(&useExistingPhone).Run() != nil {
+			logger.Fatal("failed to confirm")
+		}
+		if useExistingPhone {
+			phoneOptions := make([]huh.Option[string], len(existingPhoneResponse.Data))
+			for i, p := range existingPhoneResponse.Data {
+				phoneOptions[i] = huh.NewOption(p.PhoneNumber, p.PhoneNumberId)
+			}
+			if huh.NewSelect[string]().
+				Title("Select a phone number").
+				Options(phoneOptions...).
+				Value(&phoneNumberId).Run() != nil {
+				logger.Fatal("failed to select phone number")
+			}
+		}
+	}
+
+	var phoneAvailableResponse PhoneAvailableResponse
+	if err := apiClient.Do("GET", "/phone/available", nil, &phoneAvailableResponse); err != nil {
+		logger.Fatal("failed to get available phone available: %s", err)
+	}
+	if !phoneAvailableResponse.Success {
+		logger.Fatal("failed to get phone available")
+	}
+
+	phoneOptions := make([]huh.Option[string], len(phoneAvailableResponse.Data))
+	for i, p := range phoneAvailableResponse.Data {
+		phoneOptions[i] = huh.NewOption(p.PhoneNumber, p.PhoneNumber)
+	}
+
+	if phoneNumberId == "" {
+		var phoneNumber string
+		if huh.NewSelect[string]().
+			Title("Purchase a phone number").
+			Options(phoneOptions...).
+			Value(&phoneNumber).Run() != nil {
+			logger.Fatal("failed to select phone number")
+		}
+		var phoneBuyResponse PhoneBuyResponse
+		err = apiClient.Do("POST", "/phone/buy", map[string]string{
+			"phoneNumber": phoneNumber,
+			"projectId":   projectId,
+		}, &phoneBuyResponse)
+		if err != nil {
+			logger.Fatal("failed to buy phone number: %s", err)
+		}
+		if !phoneBuyResponse.Success {
+			logger.Fatal("failed to buy phone number")
+		}
+		logger.Info("phone number purchased: %s", phoneBuyResponse.Data.PhoneNumberId)
+		phoneNumberId = phoneBuyResponse.Data.PhoneNumberId
+	}
+
+	var toNumber string
+	if requireTo {
+		toNumber = getInput(logger, "Enter the phone number to send SMS to:", "", "", false, "", validatePhoneNumber)
+	}
+
+	config := map[string]any{
+		"to":            toNumber,
+		"phoneNumberId": phoneNumberId,
+	}
+
+	return config
+}
+
+func configureWebhook(logger logger.Logger, needsURL bool) map[string]any {
 	var url string
 	if needsURL {
-		url = getInput(logger, "Enter the URL", "", "", false, "", validateURL)
+		url = getInput(logger, "Enter the URL to the Webhook", "", "", false, "", validateURL)
 	}
 	var authType string
 	if huh.NewSelect[string]().
@@ -172,20 +349,25 @@ var ioDestinationCreateCmd = &cobra.Command{
 		apiUrl := context.APIURL
 		apiKey := context.Token
 		var destinationType string
+		config := map[string]any{}
 		if huh.NewSelect[string]().
 			Title("Select a destination type").
-			Options(destOptions...).
+			Options(destinationOptions...).
 			Value(&destinationType).
 			WithTheme(theme).
 			Run() != nil {
 			logger.Fatal("failed to select destination type")
 		}
-		var config map[string]any
+		apiClient := util.NewAPIClient(logger, apiUrl, apiKey)
 		switch destinationType {
+		case "sms":
+			config = configureSMS(logger, apiClient, theproject.ProjectId, true)
 		case "webhook":
-			config = configurationWebhook(logger, true)
+			config = configureWebhook(logger, true)
+		case "slack":
+			config = configureSlack(logger, apiClient, theproject.ProjectId, false)
 		default:
-			logger.Fatal("unsupported destination type: %s", destinationType)
+			logger.Fatal("invalid destination type: %s. currently only sms, webhook, and slack are supported", destinationType)
 		}
 		io, err := theproject.CreateIO(logger, apiUrl, apiKey, "destination", project.IO{
 			Direction: "destination",
@@ -195,20 +377,9 @@ var ioDestinationCreateCmd = &cobra.Command{
 		if err != nil {
 			logger.Fatal("failed to create destination: %s", err)
 		}
-		// if we are re-activating an IO, we will get back the same object
-		// so we need to check if it already exists in the project
-		var found bool
-		for _, input := range theproject.Outputs {
-			if input.ID == io.ID && input.Type == io.Type {
-				found = true
-				break
-			}
-		}
-		if !found {
-			theproject.Outputs = append(theproject.Outputs, *io)
-			if err := theproject.Save(context.Dir); err != nil {
-				logger.Fatal("failed to save project: %s", err)
-			}
+		theproject.Outputs = append(theproject.Outputs, *io)
+		if err := theproject.Save(context.Dir); err != nil {
+			logger.Fatal("failed to save project: %s", err)
 		}
 		printSuccess("%s destination created: %s", destinationType, io.ID)
 	},
@@ -224,48 +395,42 @@ var ioSourceCreateCmd = &cobra.Command{
 		theproject := context.Project
 		apiUrl := context.APIURL
 		apiKey := context.Token
-		var destinationType string
+		apiClient := util.NewAPIClient(logger, apiUrl, apiKey)
+		var sourceType string
 		if huh.NewSelect[string]().
 			Title("Select a source type").
-			Options(srcOptions...).
-			Value(&destinationType).
+			Options(sourceOptions...).
+			Value(&sourceType).
 			WithTheme(theme).
 			Run() != nil {
 			logger.Fatal("failed to select source type")
 		}
 		var config map[string]any
-		switch destinationType {
+		switch sourceType {
 		case "cron":
-			config = configurationCron(logger)
+			config = configureCron(logger)
+		case "sms":
+			config = configureSMS(logger, apiClient, theproject.ProjectId, false)
 		case "webhook":
-			config = configurationWebhook(logger, false)
+			config = configureWebhook(logger, false)
+		case "slack":
+			config = configureSlack(logger, apiClient, theproject.ProjectId, true)
 		default:
-			logger.Fatal("unsupported source type: %s", destinationType)
+			logger.Fatal("invalid source type: %s. currently only cron, sms, webhook, and slack are supported", sourceType)
 		}
 		io, err := theproject.CreateIO(logger, apiUrl, apiKey, "source", project.IO{
 			Direction: "source",
 			Config:    config,
-			Type:      destinationType,
+			Type:      sourceType,
 		})
 		if err != nil {
 			logger.Fatal("failed to create source: %s", err)
 		}
-		// if we are re-activating an IO, we will get back the same object
-		// so we need to check if it already exists in the project
-		var found bool
-		for _, input := range theproject.Inputs {
-			if input.ID == io.ID && input.Type == io.Type {
-				found = true
-				break
-			}
+		theproject.Inputs = append(theproject.Inputs, *io)
+		if err := theproject.Save(context.Dir); err != nil {
+			logger.Fatal("failed to save project: %s", err)
 		}
-		if !found {
-			theproject.Inputs = append(theproject.Inputs, *io)
-			if err := theproject.Save(context.Dir); err != nil {
-				logger.Fatal("failed to save project: %s", err)
-			}
-		}
-		printSuccess("%s source created: %s", destinationType, io.ID)
+		printSuccess("%s source created: %s", sourceType, io.ID)
 	},
 }
 
@@ -383,6 +548,6 @@ func init() {
 		ioDestinationListCmd,
 		ioDestinationDeleteCmd,
 	} {
-		cmd.Flags().StringP("dir", "d", ".", "The directory to the project to deploy")
+		cmd.Flags().StringP("dir", "d", ".", "The root of the project directory")
 	}
 }

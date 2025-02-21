@@ -208,7 +208,7 @@ type Response[T any] struct {
 type ProjectResponse = Response[ProjectData]
 
 func (p *Project) ListProjectEnv(logger logger.Logger, baseUrl string, token string) (*ProjectData, error) {
-	client := util.NewAPIClient(baseUrl, token)
+	client := util.NewAPIClient(logger, baseUrl, token)
 
 	var projectResponse ProjectResponse
 	if err := client.Do("GET", fmt.Sprintf("/cli/project/%s", p.ProjectId), nil, &projectResponse); err != nil {
@@ -221,7 +221,7 @@ func (p *Project) ListProjectEnv(logger logger.Logger, baseUrl string, token str
 }
 
 func (p *Project) SetProjectEnv(logger logger.Logger, baseUrl string, token string, env map[string]string, secrets map[string]string) (*ProjectData, error) {
-	client := util.NewAPIClient(baseUrl, token)
+	client := util.NewAPIClient(logger, baseUrl, token)
 	var projectResponse ProjectResponse
 	if err := client.Do("PUT", fmt.Sprintf("/cli/project/%s/env", p.ProjectId), map[string]any{
 		"env":     env,
@@ -236,7 +236,7 @@ func (p *Project) SetProjectEnv(logger logger.Logger, baseUrl string, token stri
 }
 
 func (p *Project) DeleteProjectEnv(logger logger.Logger, baseUrl string, token string, env []string, secrets []string) error {
-	client := util.NewAPIClient(baseUrl, token)
+	client := util.NewAPIClient(logger, baseUrl, token)
 	var projectResponse ProjectResponse
 	if err := client.Do("DELETE", fmt.Sprintf("/cli/project/%s/env", p.ProjectId), map[string]any{
 		"env":     env,
@@ -253,7 +253,7 @@ func (p *Project) DeleteProjectEnv(logger logger.Logger, baseUrl string, token s
 type IOResponse = Response[IO]
 
 func (p *Project) CreateIO(logger logger.Logger, baseUrl string, token string, direction string, io IO) (*IO, error) {
-	client := util.NewAPIClient(baseUrl, token)
+	client := util.NewAPIClient(logger, baseUrl, token)
 	var ioResponse IOResponse
 	if err := client.Do("POST", fmt.Sprintf("/cli/project/%s/io", p.ProjectId), io, &ioResponse); err != nil {
 		logger.Fatal("error creating io: %s", err)
@@ -265,7 +265,7 @@ func (p *Project) CreateIO(logger logger.Logger, baseUrl string, token string, d
 }
 
 func (p *Project) ListIO(logger logger.Logger, baseUrl string, token string, direction string) ([]IO, error) {
-	client := util.NewAPIClient(baseUrl, token)
+	client := util.NewAPIClient(logger, baseUrl, token)
 	var response Response[[]IO]
 	if err := client.Do("GET", fmt.Sprintf("/cli/project/%s/io/%s", p.ProjectId, direction), nil, &response); err != nil {
 		logger.Fatal("error creating io: %s", err)
@@ -277,7 +277,7 @@ func (p *Project) ListIO(logger logger.Logger, baseUrl string, token string, dir
 }
 
 func (p *Project) DeleteIO(logger logger.Logger, baseUrl string, token string, id string) error {
-	client := util.NewAPIClient(baseUrl, token)
+	client := util.NewAPIClient(logger, baseUrl, token)
 	var response Response[any]
 	if err := client.Do("DELETE", fmt.Sprintf("/cli/project/%s/io/%s", p.ProjectId, id), nil, &response); err != nil {
 		logger.Fatal("error creating io: %s", err)
