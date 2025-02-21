@@ -390,6 +390,7 @@ var devRunCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(devCmd)
+	rootCmd.AddCommand(devRunCmd)
 	devCmd.AddCommand(devRunCmd)
 	devRunCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
 	devRunCmd.Flags().String("websocket-id", "", "The websocket room id to use for the development agent")

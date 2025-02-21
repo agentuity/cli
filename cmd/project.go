@@ -126,9 +126,9 @@ var invalidProjectNames = []any{
 }
 
 var projectNewCmd = &cobra.Command{
-	Use:     "new [name]",
+	Use:     "create [name]",
 	Short:   "Create a new project",
-	Aliases: []string{"create"},
+	Aliases: []string{"new"},
 	Args:    cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
