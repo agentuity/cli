@@ -93,9 +93,16 @@ var cloudDeployCmd = &cobra.Command{
 		token := context.Token
 
 		deploymentConfig := project.NewDeploymentConfig()
-		deploymentConfig.Provider = theproject.Provider
 
-		p, err := provider.GetProviderForName(theproject.Provider)
+		name := theproject.Bundler.Framework
+		if name == "" {
+			name = theproject.Bundler.Runtime
+		}
+		if name == "" {
+			name = theproject.Bundler.Language
+		}
+
+		p, err := provider.GetProviderForName(name)
 		if err != nil {
 			logger.Fatal("%s", err)
 		}

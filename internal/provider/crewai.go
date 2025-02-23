@@ -106,6 +106,22 @@ func (p *CrewAIProvider) Aliases() []string {
 	return []string{"crew"}
 }
 
+func (p *CrewAIProvider) Language() string {
+	return "python"
+}
+
+func (p *CrewAIProvider) Framework() string {
+	return "crewai"
+}
+
+func (p *CrewAIProvider) Runtime() string {
+	return "uv"
+}
+
+func (p *CrewAIProvider) DefaultSrcDir() string {
+	return "src"
+}
+
 func init() {
 	register("crewai", &CrewAIProvider{})
 }

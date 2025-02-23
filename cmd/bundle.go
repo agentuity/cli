@@ -12,8 +12,7 @@ var bundleCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		projectContext := ensureProject(cmd)
 		production, _ := cmd.Flags().GetBool("production")
-		runtime, _ := cmd.Flags().GetString("runtime")
-		if err := provider.BundleJS(projectContext.Logger, projectContext.Dir, runtime, production); err != nil {
+		if err := provider.BundleJS(projectContext.Logger, projectContext.Project, projectContext.Dir, production); err != nil {
 			projectContext.Logger.Fatal("failed to bundle JS: %s", err)
 		}
 	},
@@ -23,5 +22,4 @@ func init() {
 	rootCmd.AddCommand(bundleCmd)
 	bundleCmd.Flags().StringP("dir", "d", ".", "The directory to the project")
 	bundleCmd.Flags().BoolP("production", "p", false, "Whether to bundle for production")
-	bundleCmd.Flags().StringP("runtime", "r", "nodejs", "The runtime to use for the bundle (either bunjs or nodejs)")
 }

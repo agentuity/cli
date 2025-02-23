@@ -32,10 +32,10 @@ type InitProjectArgs struct {
 	Dir               string
 	Token             string
 	OrgId             string
-	Provider          string
 	Name              string
 	Description       string
 	EnableWebhookAuth bool
+	Provider          provider.Provider
 }
 
 func initProject(logger logger.Logger, args InitProjectArgs) *project.ProjectData {
@@ -44,23 +44,31 @@ func initProject(logger logger.Logger, args InitProjectArgs) *project.ProjectDat
 		BaseURL:           args.BaseURL,
 		Token:             args.Token,
 		OrgId:             args.OrgId,
-		Provider:          args.Provider,
 		Name:              args.Name,
 		Description:       args.Description,
 		EnableWebhookAuth: args.EnableWebhookAuth,
 		Dir:               args.Dir,
+		Provider:          args.Provider.Name(),
 	})
 	if err != nil {
 		logger.Fatal("failed to initialize project: %s", err)
 	}
 	proj := project.NewProject()
 	proj.ProjectId = result.ProjectId
-	proj.Provider = args.Provider
 
 	proj.Inputs = []project.IO{
 		{
 			Type: "webhook",
 			ID:   result.IOId,
+		},
+	}
+
+	proj.Bundler = &project.Bundler{
+		Language:  args.Provider.Language(),
+		Framework: args.Provider.Framework(),
+		Runtime:   args.Provider.Runtime(),
+		Agents: project.Agent{
+			Dir: args.Provider.DefaultSrcDir(),
 		},
 	}
 
@@ -254,18 +262,25 @@ var projectNewCmd = &cobra.Command{
 		}
 
 		provider := providers[providerName]
-		if err := provider.NewProject(logger, projectDir, name); err != nil {
-			logger.Fatal("failed to create project: %s", err)
+		if provider == nil {
+			logger.Fatal("invalid provider: %s", providerName)
 		}
 
-		projectData := initProject(logger, InitProjectArgs{
-			BaseURL:           apiUrl,
-			Dir:               projectDir,
-			Token:             apikey,
-			OrgId:             orgId,
-			Provider:          providerName,
-			Name:              name,
-			EnableWebhookAuth: enableWebhookAuth,
+		var projectData *project.ProjectData
+
+		showSpinner(logger, "creating project ...", func() {
+			if err := provider.NewProject(logger, projectDir, name); err != nil {
+				logger.Fatal("failed to create project: %s", err)
+			}
+			projectData = initProject(logger, InitProjectArgs{
+				BaseURL:           apiUrl,
+				Dir:               projectDir,
+				Token:             apikey,
+				OrgId:             orgId,
+				Name:              name,
+				EnableWebhookAuth: enableWebhookAuth,
+				Provider:          provider,
+			})
 		})
 
 		fmt.Println()
@@ -275,10 +290,10 @@ var projectNewCmd = &cobra.Command{
 		fmt.Println("Next steps:")
 		fmt.Println()
 		fmt.Printf("1. Switch into the project directory at %s\n", color.GreenString(projectDir))
-		fmt.Printf("2. Run %s to run the project locally\n", command("run"))
-		fmt.Printf("3. Run %s to deploy the project\n", command("deploy"))
+		fmt.Printf("2. Run %s to run the project locally in development mode\n", command("run"))
+		fmt.Printf("3. Run %s to deploy the project to the Agentuity Agent Cloud\n", command("deploy"))
 		fmt.Println()
-		fmt.Printf("Access your project at %s", link("%s/projects/%s", appUrl, projectData.ProjectId))
+		fmt.Printf("🏠 Access your project at %s", link("%s/projects/%s", appUrl, projectData.ProjectId))
 		fmt.Println()
 
 		if projectData.IOAuthToken != "" {
@@ -316,12 +331,17 @@ var projectInitCmd = &cobra.Command{
 
 		enableWebhookAuth := promptForWebhookAuth(logger)
 
+		provider, err := provider.GetProviderForName(detection.Provider)
+		if err != nil {
+			logger.Fatal("failed to get provider: %s. %s", detection.Provider, err)
+		}
+
 		p := initProject(logger, InitProjectArgs{
 			BaseURL:           apiUrl,
 			Dir:               dir,
 			Token:             token,
 			OrgId:             orgId,
-			Provider:          detection.Provider,
+			Provider:          provider,
 			Name:              detection.Name,
 			Description:       detection.Description,
 			EnableWebhookAuth: enableWebhookAuth,
