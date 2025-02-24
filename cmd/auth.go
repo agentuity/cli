@@ -21,6 +21,14 @@ var authLoginCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		appUrl := viper.GetString("overrides.app_url")
+		apiUrl := viper.GetString("overrides.api_url")
+		if apiUrl == "https://api.agentuity.com" && appUrl != "https://app.agentuity.com" {
+			logger.Debug("switching app url to production since the api url is production")
+			appUrl = "https://app.agentuity.com"
+		} else if apiUrl == "https://api.agentuity.div" && appUrl == "https://app.agentuity.com" {
+			logger.Debug("switching app url to dev since the api url is dev")
+			appUrl = "http://localhost:3000"
+		}
 		initScreenWithLogo()
 		authResult, err := auth.Login(logger, appUrl)
 		if err != nil {
@@ -80,5 +88,5 @@ func init() {
 	authCmd.AddCommand(authLoginCmd)
 	authCmd.AddCommand(authLogoutCmd)
 	authCmd.AddCommand(authWhoamiCmd)
-	addURLFlags(authCmd)
+	rootCmd.AddCommand(authLoginCmd)
 }

@@ -79,14 +79,30 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
-
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/agentuity/config.yaml)")
 	rootCmd.PersistentFlags().String("log-level", "info", "The log level to use")
+
+	rootCmd.PersistentFlags().String("app-url", "https://app.agentuity.com", "The base url of the Agentuity Console app")
+	rootCmd.PersistentFlags().MarkHidden("app-url")
+	viper.BindPFlag("overrides.app_url", rootCmd.PersistentFlags().Lookup("app-url"))
+
+	rootCmd.PersistentFlags().String("api-url", "https://api.agentuity.com", "The base url of the Agentuity API")
+	rootCmd.PersistentFlags().MarkHidden("api-url")
+	viper.BindPFlag("overrides.api_url", rootCmd.PersistentFlags().Lookup("api-url"))
+
+	rootCmd.PersistentFlags().String("websocket-url", "wss://api.agentuity.com", "The base url of the Agentuity WebSocket API")
+	rootCmd.PersistentFlags().MarkHidden("websocket-url")
+	viper.BindPFlag("overrides.websocket_url", rootCmd.PersistentFlags().Lookup("websocket-url"))
+
+	viper.SetDefault("overrides.app_url", "https://app.agentuity.com")
+	viper.SetDefault("overrides.api_url", "https://api.agentuity.com")
+
+	cobra.OnInitialize(initConfig)
 }
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
+
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
@@ -105,10 +121,11 @@ func initConfig() {
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
-	viper.ReadInConfig()
 
-	viper.SetDefault("overrides.app_url", "https://app.agentuity.com")
-	viper.SetDefault("overrides.api_url", "https://api.agentuity.com")
+	// Finally read the config file
+	if err := viper.ReadInConfig(); err != nil {
+		log.Fatalf("Error reading config file: %s\n", err)
+	}
 }
 
 func printSuccess(msg string, args ...any) {
@@ -256,18 +273,4 @@ func resolveProjectDir(logger logger.Logger, cmd *cobra.Command) string {
 		logger.Fatal("no agentuity.yaml file found in the current directory")
 	}
 	return abs
-}
-
-func addURLFlags(cmd *cobra.Command) {
-	cmd.PersistentFlags().String("app-url", "https://app.agentuity.com", "The base url of the Agentuity Console app")
-	cmd.PersistentFlags().MarkHidden("app-url")
-	viper.BindPFlag("overrides.app_url", cmd.PersistentFlags().Lookup("app-url"))
-
-	cmd.PersistentFlags().String("api-url", "https://api.agentuity.com", "The base url of the Agentuity API")
-	cmd.PersistentFlags().MarkHidden("api-url")
-	viper.BindPFlag("overrides.api_url", cmd.PersistentFlags().Lookup("api-url"))
-
-	cmd.PersistentFlags().String("websocket-url", "wss://api.agentuity.com", "The base url of the Agentuity WebSocket API")
-	cmd.PersistentFlags().MarkHidden("websocket-url")
-	viper.BindPFlag("overrides.websocket_url", cmd.PersistentFlags().Lookup("websocket-url"))
 }

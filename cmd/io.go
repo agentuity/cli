@@ -527,7 +527,6 @@ var ioDestinationListCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(ioCmd)
-	addURLFlags(ioCmd)
 
 	ioCmd.AddCommand(ioSourceCmd)
 	ioCmd.AddCommand(ioDestinationCmd)
