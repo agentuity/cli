@@ -457,13 +457,17 @@ var envDeleteCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(envCmd)
-	envCmd.AddCommand(envSetCmd)
+
 	envSetCmd.Flags().StringP("file", "f", "", "The path to a file containing environment variables to set")
 	envSetCmd.Flags().BoolP("secret", "s", false, "Force the value(s) to be treated as a secret")
 	envSetCmd.Flags().Bool("force", !hasTTY, "Don't prompt for confirmation")
+
+	addURLFlags(envCmd)
+	envCmd.AddCommand(envSetCmd)
 	envCmd.AddCommand(envListCmd)
 	envCmd.AddCommand(envGetCmd)
 	envCmd.AddCommand(envDeleteCmd)
+
 	envDeleteCmd.Flags().Bool("force", !hasTTY, "Don't prompt for confirmation")
 	for _, cmd := range []*cobra.Command{envSetCmd, envListCmd, envGetCmd, envDeleteCmd} {
 		cmd.Flags().StringP("dir", "d", ".", "The directory to the project to deploy")

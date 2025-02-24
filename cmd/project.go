@@ -360,6 +360,7 @@ func init() {
 	rootCmd.AddCommand(projectNewCmd)
 	projectCmd.AddCommand(projectInitCmd)
 	projectCmd.AddCommand(projectNewCmd)
+	addURLFlags(projectCmd)
 	projectNewCmd.Flags().StringP("dir", "d", "", "The directory to create the project in")
 	projectNewCmd.Flags().StringP("provider", "p", "", "The provider to use for the project")
 }
