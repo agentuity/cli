@@ -25,6 +25,9 @@ var authLoginCmd = &cobra.Command{
 		if apiUrl == "https://api.agentuity.com" && appUrl != "https://app.agentuity.com" {
 			logger.Debug("switching app url to production since the api url is production")
 			appUrl = "https://app.agentuity.com"
+		} else if apiUrl == "https://api.agentuity.div" && appUrl == "https://app.agentuity.com" {
+			logger.Debug("switching app url to dev since the api url is dev")
+			appUrl = "http://localhost:3000"
 		}
 		initScreenWithLogo()
 		authResult, err := auth.Login(logger, appUrl)
@@ -86,6 +89,4 @@ func init() {
 	authCmd.AddCommand(authLogoutCmd)
 	authCmd.AddCommand(authWhoamiCmd)
 	rootCmd.AddCommand(authLoginCmd)
-	addURLFlags(authCmd)
-	addURLFlags(authLoginCmd)
 }

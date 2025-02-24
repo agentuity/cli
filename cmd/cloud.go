@@ -380,5 +380,4 @@ func init() {
 	rootCmd.AddCommand(cloudDeployCmd)
 	cloudCmd.AddCommand(cloudDeployCmd)
 	cloudDeployCmd.Flags().StringP("dir", "d", ".", "The directory to the project to deploy")
-	addURLFlags(cloudCmd)
 }

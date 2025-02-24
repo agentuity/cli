@@ -462,7 +462,6 @@ func init() {
 	envSetCmd.Flags().BoolP("secret", "s", false, "Force the value(s) to be treated as a secret")
 	envSetCmd.Flags().Bool("force", !hasTTY, "Don't prompt for confirmation")
 
-	addURLFlags(envCmd)
 	envCmd.AddCommand(envSetCmd)
 	envCmd.AddCommand(envListCmd)
 	envCmd.AddCommand(envGetCmd)
