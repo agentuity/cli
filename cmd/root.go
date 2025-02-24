@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/agentuity/cli/internal/project"
@@ -131,7 +132,11 @@ func command(cmd string, args ...string) string {
 }
 
 func link(url string, args ...any) string {
-	return color.HiWhiteString(fmt.Sprintf(url, args...))
+	val := color.HiWhiteString(fmt.Sprintf(url, args...))
+	if runtime.GOOS == "windows" {
+		return val
+	}
+	return "\033[4m" + val + "\033[0m"
 }
 
 func maxString(val string, max int) string {

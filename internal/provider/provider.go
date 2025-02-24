@@ -98,6 +98,18 @@ type Provider interface {
 	// Aliases will return any aliases for the provider for identifier alternatives.
 	Aliases() []string
 
+	// Language will return the language of the provider.
+	Language() string
+
+	// Framework will return the framework of the provider.
+	Framework() string
+
+	// Runtime will return the runtime of the provider.
+	Runtime() string
+
+	// DefaultSrcDir will return the default source directory for the agent project
+	DefaultSrcDir() string
+
 	// Detect will detect the provider for the given directory.
 	// It will return the detection if it is found, otherwise it will return nil.
 	Detect(logger logger.Logger, dir string, state map[string]any) (*Detection, error)
@@ -161,12 +173,9 @@ func NewRunner(logger logger.Logger, dir string, apiUrl string, eventLogFile str
 	if err := project.Load(dir); err != nil {
 		return nil, err
 	}
-	if project.Provider == "" {
-		return nil, fmt.Errorf("no provider found in the agentuity.yaml file")
-	}
-	provider, ok := providers[project.Provider]
+	provider, ok := providers[project.Bundler.Language]
 	if !ok {
-		return nil, fmt.Errorf("provider %s not registered", project.Provider)
+		return nil, fmt.Errorf("provider %s not registered", project.Bundler.Language)
 	}
 	envlines, err := env.ParseEnvFile(filepath.Join(dir, ".env"))
 	if err != nil {

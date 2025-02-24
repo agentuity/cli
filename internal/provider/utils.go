@@ -13,8 +13,9 @@ import (
 	"syscall"
 
 	"github.com/BurntSushi/toml"
+	"github.com/agentuity/cli/internal/project"
+	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
-	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/sys"
 	"github.com/evanw/esbuild/pkg/api"
 	"github.com/marcozac/go-jsonc"
@@ -122,9 +123,11 @@ func runCommand(logger logger.Logger, bin string, dir string, args []string, env
 func runCommandSilent(logger logger.Logger, bin string, dir string, args []string, env []string) error {
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = dir
+	cmd.Stdin = nil
+	cmd.Stdout = io.Discard
+	cmd.Stderr = io.Discard
 	cmd.Env = append(env, os.Environ()...)
 	logger.Debug("running %s with env: %s in directory: %s and args: %s", bin, strings.Join(cmd.Env, " "), dir, strings.Join(args, " "))
-	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
@@ -423,115 +426,6 @@ func loadTSConfig(dir string) (tsconfig, error) {
 	return ts, nil
 }
 
-var jsPreamble = `import { AsyncLocalStorage } from 'node:async_hooks';
-import {
-	createBridge as __createBridge,
-	createAutorunSession as __createAutorunSession,
-	DefinedAgentResponse as __AgentResponse,
-	DefinedAgentRequest as __AgentRequest,
-	DefinedAgentKeyValueStorage as __AgentKeyValueStorage,
-	DefinedAgentVectorStorage as __AgentVectorStorage,
-	loadAgentuity as __loadAgentuity,
-	instrumentations as __agentuityInstrumentations
-} from '@agentuity/sdk';
-
-const __agentuityGlobals__ = {
-	instrumentations: __agentuityInstrumentations,
-	createBridge: __createBridge,
-	createAutorunSession: __createAutorunSession,
-	AgentResponse: __AgentResponse,
-	AgentRequest: __AgentRequest,
-	AgentKeyValueStorage: __AgentKeyValueStorage,
-	AgentVectorStorage: __AgentVectorStorage,
-	loadAgentuity: __loadAgentuity,
-	localStorage: new AsyncLocalStorage(),
-};
-
-__agentuityGlobals__.makeResponsePayload = function makeResponsePayload(response) {
-	if (response.payload) {
-		if (typeof response.payload === 'string') {
-			return btoa(response.payload);
-		}
-		if (typeof response.payload === 'object') {
-			return btoa(JSON.stringify(response.payload));
-		}
-		if (response.payload instanceof ArrayBuffer) {
-			const array = Array.from(new Uint8Array(response.payload));
-			const str = array.map((byte) => String.fromCharCode(byte)).join('');
-			return btoa(str);
-		}
-	}
-	return null;
-}
-
-if (!process.env.AGENTUITY_SDK_AUTORUN && process.env.AGENTUITY_SDK_SOCKET_PATH) {
-	__agentuityGlobals__.startAgentCallback = function startAgentCallback(session, done) {
-		const { request, context } = session;
-		const sessionid = context.sessionId;
-		__agentuityGlobals__.createBridge(sessionid).then((bridge) => {
-			__agentuityGlobals__.localStorage.run({ bridge, sessionid }, () => {
-				__agentuityGlobals__.runFn(new __agentuityGlobals__.AgentRequest(request), new __agentuityGlobals__.AgentResponse(), context).then((r) => {
-					r.payload = __agentuityGlobals__.makeResponsePayload(r);
-					done();
-				}).catch((err) => {
-					done(err);
-				});
-			});
-		});
-	}
-}
-
-`
-
-var jsFooter = `
-__agentuityGlobals__.runFn = %[2]s.run === 'function' ? %[2]s.run : %[2]s;
-__agentuityGlobals__.loadAgentuity(%[1]s, __agentuityGlobals__.startAgentCallback);
-if (!!process.env.AGENTUITY_SDK_AUTORUN) {
-	__agentuityGlobals__.createAutorunSession().then((res) => {
-		if (res.error) {
-			console.error(res.error);
-			process.exit(1);
-		}
-		const session = res.result;
-		const { request, context } = session;
-		const sessionid = context.sessionId;
-		__agentuityGlobals__.createBridge(sessionid).then((bridge) => {
-			context.kv = new __agentuityGlobals__.AgentKeyValueStorage(bridge);
-			context.vector = new __agentuityGlobals__.AgentVectorStorage(bridge);
-			__agentuityGlobals__.localStorage.run({ bridge, sessionid }, () => {
-				__agentuityGlobals__.runFn(new __agentuityGlobals__.AgentRequest(request), new __agentuityGlobals__.AgentResponse(), context).then((r) => {
-					r.payload = __agentuityGlobals__.makeResponsePayload(r);
-					bridge.shutdown(r).then(() => process.exit(0));
-				}).catch((err) => {
-					console.error(err);
-					process.exit(1);
-				});
-			});
-		});
-	});
-} else if (!process.env.AGENTUITY_SDK_SOCKET_PATH) {
-	const sessionid = Math.random().toString(36).substring(2, 15);
-	const request = { trigger: 'manual', contentType: 'text/plain' };
-	const context = { sessionId: sessionid };
-	__agentuityGlobals__.createBridge(sessionid).then((bridge) => {
-		context.kv = new __agentuityGlobals__.AgentKeyValueStorage(bridge);
-		context.vector = new __agentuityGlobals__.AgentVectorStorage(bridge);
-		__agentuityGlobals__.localStorage.run({ bridge, sessionid }, () => {
-			__agentuityGlobals__.runFn(new __agentuityGlobals__.AgentRequest(request), new __agentuityGlobals__.AgentResponse(), context).then((r) => {
-				r.payload = __agentuityGlobals__.makeResponsePayload(r);
-				bridge.shutdown(r).then(() => {
-					console.log(r.payload ? atob(r.payload) : '');
-					process.exit(0);
-				});
-			}).catch((err) => {
-				console.error(err);
-				process.exit(1);
-			});
-		});
-	});
-}
-`
-
 func searchBackwards(contents string, offset int, val byte) int {
 	for i := offset; i >= 0; i-- {
 		if contents[i] == val {
@@ -541,27 +435,77 @@ func searchBackwards(contents string, offset int, val byte) int {
 	return -1
 }
 
-type bundleModule struct {
-	Module    string                  `json:"module"`
-	Functions map[string]bundleAction `json:"functions"`
-}
-type bundleAction struct {
-	Before bool `json:"before"`
-	After  bool `json:"after"`
+type patchModule struct {
+	Module    string                 `json:"module"`
+	Functions map[string]patchAction `json:"functions"`
 }
 
-type bundleResult map[string]*bundleModule
+type patchAction struct {
+	Before string
+	After  string
+}
 
-func createPlugin(logger logger.Logger, bundle bundleResult) api.Plugin {
-	var varCounter int
-	modules := make([]string, 0, len(bundle))
-	for k := range bundle {
-		modules = append(modules, k)
+func generateJSArgsPatch(index int, inject string) string {
+	return fmt.Sprintf(`const _newargs = [...(_args ?? [])];
+_newargs[%[1]d] = {..._newargs[%[1]d], %[2]s};
+_args = _newargs;`, index, inject)
+}
+
+func generateEnvGuard(name string, inject string) string {
+	return fmt.Sprintf(`if (!process.env.%[1]s) {
+%[2]s
+}`, name, inject)
+}
+
+func generatePatches(patches ...string) string {
+	var result strings.Builder
+	for _, patch := range patches {
+		result.WriteString(patch)
 	}
+	return result.String()
+}
+
+var patches = map[string]patchModule{
+	"@vercel/ai": {
+		Module: "ai",
+		Functions: map[string]patchAction{
+			"generateText": {
+				Before: generateJSArgsPatch(0, `experimental_telemetry: { isEnabled: true }`),
+			},
+		},
+	},
+	"@vercel/openai": {
+		Module: "@ai-sdk/openai",
+		Functions: map[string]patchAction{
+			"createOpenAI": {
+				Before: generateEnvGuard("OPENAI_API_KEY",
+					generatePatches(
+						generateJSArgsPatch(0, ""),
+						"const opts = {...(_args[0] ?? {}) };",
+						`if (!opts.baseURL) {
+							const apikey = process.env.AGENTUITY_API_KEY;
+							const url = process.env.AGENTUITY_URL;
+							if (url && apikey) {
+								opts.apiKey = 'x';
+								opts.baseURL = url + '/sdk/gateway/openai';
+								opts.headers = {
+									...(opts.headers ?? {}),
+									Authorization: 'Bearer ' + apikey,
+								};
+								_args[0] = opts;
+							}
+						}`,
+					)),
+			},
+		},
+	},
+}
+
+func createPlugin(logger logger.Logger) api.Plugin {
 	return api.Plugin{
 		Name: "inject-agentuity",
 		Setup: func(build api.PluginBuild) {
-			for name, mod := range bundle {
+			for name, mod := range patches {
 				build.OnLoad(api.OnLoadOptions{Filter: "node_modules/" + mod.Module + "/.*", Namespace: "file"}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
 					logger.Debug("re-writing %s for %s", args.Path, name)
 					buf, err := os.ReadFile(args.Path)
@@ -589,22 +533,11 @@ func createPlugin(logger logger.Logger, bundle bundleResult) api.Plugin {
 							fnprefix = "async "
 						}
 						contents = strings.Replace(contents, fnname, newfnname, 1)
-						varCounter++
-						varName := fmt.Sprintf("__var%d", varCounter)
 						suffix.WriteString(fnprefix + fnname + "(...args) {\n")
-						suffix.WriteString(fmt.Sprintf("\tconst %s = __agentuityGlobals__.instrumentations['%s'].functions.find((fn) => fn.name === '%s');\n", varName, name, fn))
 						suffix.WriteString("\tlet _args = args;\n")
-						if mod.Before {
-							suffix.WriteString("\tconst bridge = __agentuityGlobals__.localStorage.getStore()?.bridge;\n")
-							suffix.WriteString("\tconst _ctx = { bridge };\n")
-							if isAsync {
-								suffix.WriteString(fmt.Sprintf("\tconst bargs = await %s.before(_ctx, _args);\n", varName))
-							} else {
-								suffix.WriteString(fmt.Sprintf("\tconst bargs = %s.before(_ctx, _args);\n", varName))
-							}
-							suffix.WriteString("\tif (bargs !== undefined && Array.isArray(bargs)) {\n")
-							suffix.WriteString("\t\t_args = bargs;\n")
-							suffix.WriteString("\t}\n")
+						if mod.Before != "" {
+							suffix.WriteString(mod.Before)
+							suffix.WriteString("\n")
 						}
 						suffix.WriteString("\tlet result = " + newname + "(..._args);\n")
 						if isAsync {
@@ -612,18 +545,13 @@ func createPlugin(logger logger.Logger, bundle bundleResult) api.Plugin {
 							suffix.WriteString("\t\tresult = await result;\n")
 							suffix.WriteString("\t}\n")
 						}
-						if mod.After {
-							if isAsync {
-								suffix.WriteString(fmt.Sprintf("\tlet _result = await %s.after(_ctx, _args, result);\n", varName))
-							} else {
-								suffix.WriteString(fmt.Sprintf("\tlet _result = %s.after(_ctx, _args, result);\n", varName))
-							}
-							suffix.WriteString("\tif (_result !== undefined) {\n")
-							suffix.WriteString("\t\tresult = _result;\n")
-							suffix.WriteString("\t}\n")
+						if mod.After != "" {
+							suffix.WriteString(mod.After)
+							suffix.WriteString("\n")
 						}
 						suffix.WriteString("\treturn result;\n")
 						suffix.WriteString("}\n")
+						logger.Debug("patched %s -> %s", name, fn)
 					}
 					contents = contents + "\n" + suffix.String()
 					loader := api.LoaderJS
@@ -636,36 +564,6 @@ func createPlugin(logger logger.Logger, bundle bundleResult) api.Plugin {
 					}, nil
 				})
 			}
-			build.OnEnd(func(result *api.BuildResult) (api.OnEndResult, error) {
-				for _, r := range result.OutputFiles {
-					if strings.HasSuffix(r.Path, "index.js") {
-						js := string(r.Contents)
-						var m = regexp.MustCompile(`\s(.*?) as default\s}`)
-						var varName string
-						if m.MatchString(js) {
-							tok := m.FindStringSubmatch(js)
-							varName = strings.TrimSpace(tok[1]) + ".run"
-						} else {
-							m = regexp.MustCompile(`export\s{\s+(run)\s+};`)
-							if m.MatchString(js) {
-								tok := m.FindStringSubmatch(js)
-								varName = strings.TrimSpace(tok[1])
-							} else {
-								return api.OnEndResult{}, fmt.Errorf("failed to find run function")
-							}
-						}
-						contents := jsPreamble + js + fmt.Sprintf(jsFooter, cstr.JSONStringify(modules), varName)
-						of, err := os.Create(r.Path)
-						if err != nil {
-							return api.OnEndResult{}, err
-						}
-						defer of.Close()
-						of.WriteString(contents)
-						of.Close()
-					}
-				}
-				return api.OnEndResult{}, nil
-			})
 		},
 	}
 }
@@ -685,7 +583,7 @@ func addAgentuityBuildToGitignore(dir string) error {
 	return os.WriteFile(fn, []byte(contents), 0644)
 }
 
-func BundleJS(logger logger.Logger, dir string, runtime string, production bool) error {
+func BundleJS(logger logger.Logger, project *project.Project, dir string, production bool) error {
 	outdir := filepath.Join(dir, ".agentuity")
 	if sys.Exists(outdir) {
 		if err := os.RemoveAll(outdir); err != nil {
@@ -695,32 +593,33 @@ func BundleJS(logger logger.Logger, dir string, runtime string, production bool)
 	if err := os.MkdirAll(outdir, 0755); err != nil {
 		return fmt.Errorf("failed to create .agentuity directory: %w", err)
 	}
-	node, err := exec.LookPath("node")
+	var entryPoints []string
+	entryPoints = append(entryPoints, filepath.Join(dir, "index.js"))
+	files, err := util.ListDir(project.Bundler.Agents.Dir)
 	if err != nil {
-		return fmt.Errorf("node not found in PATH")
+		return fmt.Errorf("failed to list src directory: %w", err)
 	}
-	script := filepath.Join(dir, "node_modules", "@agentuity", "sdk", "dist", "instrumentation", "bundler.js")
-	c := exec.Command(node, script, dir)
-	c.Dir = outdir
-	modulesOut, err := c.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to run agentuity-builder: %w", err)
+	for _, file := range files {
+		if filepath.Base(file) == "index.ts" {
+			entryPoints = append(entryPoints, file)
+		}
 	}
-	bresult := make(bundleResult)
-	if err := json.Unmarshal(modulesOut, &bresult); err != nil {
-		return fmt.Errorf("failed to unmarshal agentuity-builder output: %w", err)
+	if len(entryPoints) == 0 {
+		return fmt.Errorf("no index.ts files found in %s", project.Bundler.Agents.Dir)
 	}
 	result := api.Build(api.BuildOptions{
-		EntryPoints:   []string{"src/index.ts"},
+		EntryPoints:   entryPoints,
 		Bundle:        true,
 		Outdir:        outdir,
 		Write:         true,
+		Splitting:     false,
+		Sourcemap:     api.SourceMapExternal,
 		Format:        api.FormatESModule,
 		Platform:      api.PlatformNode,
 		External:      []string{"@agentuity/sdk"},
 		AbsWorkingDir: dir,
 		TreeShaking:   api.TreeShakingFalse,
-		Plugins:       []api.Plugin{createPlugin(logger, bresult)},
+		Plugins:       []api.Plugin{createPlugin(logger)},
 	})
 	if len(result.Errors) > 0 {
 		for _, err := range result.Errors {
@@ -741,7 +640,7 @@ func BundleJS(logger logger.Logger, dir string, runtime string, production bool)
 		pkg.RemoveScript("prestart")
 		var bin string
 		var script string
-		if runtime == "bunjs" {
+		if project.Bundler.Runtime == "bunjs" {
 			bin = "bun"
 			script = `#!/bin/bash
 			set -e
@@ -764,12 +663,17 @@ func BundleJS(logger logger.Logger, dir string, runtime string, production bool)
 		if err := os.Chmod(filepath.Join(outdir, "run.sh"), 0755); err != nil {
 			return fmt.Errorf("failed to chmod+x run.sh: %w", err)
 		}
+	} else {
+		util.CopyFile(filepath.Join(dir, "package.json"), filepath.Join(outdir, "package.json"))
 	}
 	return nil
 }
 
 func detectModelTokens(logger logger.Logger, data DeployPreflightCheckData, baseDir string) error {
-	files, err := sys.ListDir(filepath.Join(baseDir, "src"))
+	_ = logger
+	_ = data
+	_ = baseDir
+	/*files, err := sys.ListDir(filepath.Join(baseDir, "src"))
 	if err != nil {
 		return fmt.Errorf("failed to list src directory: %w", err)
 	}
@@ -796,21 +700,70 @@ func detectModelTokens(logger logger.Logger, data DeployPreflightCheckData, base
 				break
 			}
 		}
-	}
+	}*/
 	return nil
 }
 
-const jstemplate = `import { generateText } from "ai";
+const jstemplate = `import type {
+	AgentConfig,
+	AgentRequest,
+	AgentResponse,
+	AgentContext,
+} from "@agentuity/sdk";
+import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
 
-export default {
-	run: async (req, resp, ctx) => {
-		const res = await generateText({
-			model: openai("gpt-4o"),
-			system: "You are a friendly assistant!",
-			prompt: req.text() ?? "Why is the sky blue?",
-		});
-		return resp.text(res.text);
-	},
-} satisfies AgentHandler;
+export const config: AgentConfig = {
+	name: "MyFirstAgent",
+	description: "A simple agent that can generate text",
+};
+
+export default async function Agent(
+	req: AgentRequest,
+	resp: AgentResponse,
+	ctx: AgentContext,
+) {
+	const res = await generateText({
+		model: openai("gpt-4o"),
+		system: "You are a friendly assistant!",
+		prompt: req.text() ?? "Why is the sky blue?",
+	});
+	return resp.text(res.text);
+}
 `
+
+const bootTemplate = `import { runner } from "@agentuity/sdk";
+
+runner(true, import.meta.dirname).catch((err) => {
+	console.error(err);
+	process.exit(1);
+});
+`
+
+const nodeJSTSConfig = `{
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "allowJs": true,
+    "esModuleInterop": true,
+    "lib": [
+      "ESNext",
+      "DOM"
+    ],
+    "module": "ESNext",
+    "moduleDetection": "force",
+    "moduleResolution": "node",
+    "noEmit": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ESNext",
+    "types": [
+      "node",
+      "@agentuity/sdk"
+    ],
+    "verbatimModuleSyntax": true
+  }
+}`

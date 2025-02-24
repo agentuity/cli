@@ -11,7 +11,6 @@ import (
 
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
-
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -121,10 +120,10 @@ type IO struct {
 
 type Project struct {
 	ProjectId  string      `json:"project_id" yaml:"project_id"`
-	Provider   string      `json:"provider" yaml:"provider"`
 	Deployment *Deployment `json:"deployment,omitempty" yaml:"deployment,omitempty"`
 	Inputs     []IO        `json:"inputs,omitempty" yaml:"inputs,omitempty"`
 	Outputs    []IO        `json:"outputs,omitempty" yaml:"outputs,omitempty"`
+	Bundler    *Bundler    `json:"bundler,omitempty" yaml:"bundler,omitempty"`
 }
 
 // Load will load the project from a file in the given directory.
@@ -144,8 +143,26 @@ func (p *Project) Load(dir string) error {
 	if p.ProjectId == "" {
 		return fmt.Errorf("missing project_id value")
 	}
-	if p.Provider == "" {
-		return fmt.Errorf("missing provider value")
+	if p.Bundler == nil {
+		return fmt.Errorf("missing bundler value, please run `agentuity new` to create a new project")
+	}
+	if p.Bundler.Language == "" {
+		return fmt.Errorf("missing bundler.language value, please run `agentuity new` to create a new project")
+	}
+	switch p.Bundler.Language {
+	case "js", "javascript", "typescript":
+		if p.Bundler.Runtime != "bunjs" && p.Bundler.Runtime != "nodejs" && p.Bundler.Runtime != "deno" {
+			return fmt.Errorf("invalid bundler.runtime value: %s. only bunjs, nodejs, and deno are supported", p.Bundler.Runtime)
+		}
+	case "py", "python":
+		if p.Bundler.Runtime != "uv" && p.Bundler.Runtime != "python" && p.Bundler.Runtime != "" {
+			return fmt.Errorf("invalid bundler.runtime value: %s. only uv or python is supported", p.Bundler.Runtime)
+		}
+	default:
+		return fmt.Errorf("invalid bundler.language value: %s. only js or py are supported", p.Bundler.Language)
+	}
+	if p.Bundler.Agents.Dir == "" {
+		return fmt.Errorf("missing bundler.agents.dir value (or its empty), please run `agentuity new` to create a new project")
 	}
 	if p.Deployment != nil {
 		if p.Deployment.Resources != nil {
@@ -288,8 +305,19 @@ func (p *Project) DeleteIO(logger logger.Logger, baseUrl string, token string, i
 	return nil
 }
 
+type Bundler struct {
+	Language  string `yaml:"language" json:"language"`
+	Framework string `yaml:"framework,omitempty" json:"framework,omitempty"`
+	Runtime   string `yaml:"runtime,omitempty" json:"runtime,omitempty"`
+	Agents    Agent  `yaml:"agents" json:"agents"`
+}
+
+type Agent struct {
+	Dir     string `yaml:"dir" json:"dir"`
+	Default string `yaml:"default" json:"default"`
+}
+
 type DeploymentConfig struct {
-	Provider   string      `yaml:"provider" json:"provider"`
 	Language   string      `yaml:"language" json:"language"`
 	Runtime    string      `yaml:"runtime,omitempty" json:"runtime,omitempty"`
 	MinVersion string      `yaml:"min_version,omitempty" json:"min_version,omitempty"`
@@ -297,6 +325,7 @@ type DeploymentConfig struct {
 	Command    []string    `yaml:"command,omitempty" json:"command,omitempty"`
 	Env        []string    `yaml:"env,omitempty" json:"env,omitempty"`
 	Deployment *Deployment `yaml:"deployment,omitempty" json:"deployment,omitempty"`
+	Bundler    *Bundler    `yaml:"bundler,omitempty" json:"bundler,omitempty"`
 }
 
 func NewDeploymentConfig() *DeploymentConfig {
