@@ -612,6 +612,8 @@ func BundleJS(logger logger.Logger, project *project.Project, dir string, produc
 		Bundle:        true,
 		Outdir:        outdir,
 		Write:         true,
+		Splitting:     false,
+		Sourcemap:     api.SourceMapExternal,
 		Format:        api.FormatESModule,
 		Platform:      api.PlatformNode,
 		External:      []string{"@agentuity/sdk"},
@@ -668,6 +670,9 @@ func BundleJS(logger logger.Logger, project *project.Project, dir string, produc
 }
 
 func detectModelTokens(logger logger.Logger, data DeployPreflightCheckData, baseDir string) error {
+	_ = logger
+	_ = data
+	_ = baseDir
 	/*files, err := sys.ListDir(filepath.Join(baseDir, "src"))
 	if err != nil {
 		return fmt.Errorf("failed to list src directory: %w", err)

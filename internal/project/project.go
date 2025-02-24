@@ -313,7 +313,8 @@ type Bundler struct {
 }
 
 type Agent struct {
-	Dir string `yaml:"dir" json:"dir"`
+	Dir     string `yaml:"dir" json:"dir"`
+	Default string `yaml:"default" json:"default"`
 }
 
 type DeploymentConfig struct {

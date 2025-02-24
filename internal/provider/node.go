@@ -12,6 +12,8 @@ import (
 	"github.com/agentuity/go-common/logger"
 )
 
+const minNodeMajorVersion = 22
+
 // NodeJSProvider is the provider implementation a generic Node project.
 //
 // [Node]: https://nodejs.org
@@ -63,8 +65,8 @@ func (p *NodeJSProvider) NewProject(logger logger.Logger, dir string, name strin
 	if err != nil {
 		return fmt.Errorf("invalid node version: %s", nvbuf)
 	}
-	if major < 20 {
-		return fmt.Errorf("nodejs version must be 20 or higher to use Agentuity. You can install the latest version of NodeJS at https://nodejs.org/en/download/")
+	if major < minNodeMajorVersion {
+		return fmt.Errorf("nodejs version must be %d or higher to use Agentuity. You can install the latest version of NodeJS at https://nodejs.org/en/download/", minNodeMajorVersion)
 	}
 	projectJSON, err := loadPackageJSON(dir)
 	if err != nil {
