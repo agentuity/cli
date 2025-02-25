@@ -20,15 +20,7 @@ var authLoginCmd = &cobra.Command{
 	Short: "Login to the Agentuity Cloud Platform",
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		appUrl := viper.GetString("overrides.app_url")
-		apiUrl := viper.GetString("overrides.api_url")
-		if apiUrl == "https://api.agentuity.com" && appUrl != "https://app.agentuity.com" {
-			logger.Debug("switching app url to production since the api url is production")
-			appUrl = "https://app.agentuity.com"
-		} else if apiUrl == "https://api.agentuity.div" && appUrl == "https://app.agentuity.com" {
-			logger.Debug("switching app url to dev since the api url is dev")
-			appUrl = "http://localhost:3000"
-		}
+		_, appUrl := getURLs(logger)
 		initScreenWithLogo()
 		authResult, err := auth.Login(logger, appUrl)
 		if err != nil {
@@ -48,7 +40,7 @@ var authLogoutCmd = &cobra.Command{
 	Short: "Logout of the Agentuity Cloud Platform",
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		appUrl := viper.GetString("overrides.app_url")
+		_, appUrl := getURLs(logger)
 		token := viper.GetString("auth.api_key")
 		if token == "" {
 			logger.Fatal("you are not logged in")

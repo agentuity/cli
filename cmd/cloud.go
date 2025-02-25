@@ -60,8 +60,7 @@ type projectContext struct {
 func ensureProject(cmd *cobra.Command) projectContext {
 	logger := env.NewLogger(cmd)
 	dir := resolveProjectDir(logger, cmd)
-	apiUrl := viper.GetString("overrides.api_url")
-	appUrl := viper.GetString("overrides.app_url")
+	apiUrl, appUrl := getURLs(logger)
 	token := viper.GetString("auth.api_key")
 
 	// validate our project

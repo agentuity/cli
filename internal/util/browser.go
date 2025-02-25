@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"runtime"
 	"sync"
 	"time"
 
@@ -87,6 +88,7 @@ func BrowserFlow(opts BrowserFlowOptions) error {
 				errors <- fmt.Errorf("callback failed: %w", err)
 				return
 			}
+			opts.Callback = nil
 		}
 		callback := query.Get("callback")
 		if callback != "" {
@@ -97,6 +99,7 @@ func BrowserFlow(opts BrowserFlowOptions) error {
 			}
 			q := cu.Query()
 			q.Set("success", "true")
+			q.Del("callback")
 			cu.RawQuery = q.Encode()
 			logger.Trace("redirecting to %s", cu.String())
 			w.Header().Set("Location", cu.String())
@@ -118,13 +121,19 @@ func BrowserFlow(opts BrowserFlowOptions) error {
 	}()
 
 	defer func() {
-		time.Sleep(time.Second)
-		server.Shutdown(context.Background())
+		time.Sleep(time.Millisecond * 250)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*200)
+		server.Shutdown(ctx)
+		cancel()
 	}()
 
 	color.Magenta("Your browser has been opened to visit the URL:")
 	fmt.Println()
-	color.Black(u.String())
+	url := u.String()
+	if runtime.GOOS != "windows" {
+		url = "\033[4m" + url + "\033[0m"
+	}
+	color.Black(url)
 	fmt.Println()
 
 	var returnErr error

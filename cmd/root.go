@@ -129,7 +129,7 @@ func initConfig() {
 }
 
 func printSuccess(msg string, args ...any) {
-	fmt.Printf("%s %s", color.GreenString("✓"), fmt.Sprintf(msg, args...))
+	fmt.Printf("%s %s", color.GreenString("✓"), color.WhiteString(fmt.Sprintf(msg, args...)))
 	fmt.Println()
 }
 
@@ -273,4 +273,17 @@ func resolveProjectDir(logger logger.Logger, cmd *cobra.Command) string {
 		logger.Fatal("no agentuity.yaml file found in the current directory")
 	}
 	return abs
+}
+
+func getURLs(logger logger.Logger) (string, string) {
+	appUrl := viper.GetString("overrides.app_url")
+	apiUrl := viper.GetString("overrides.api_url")
+	if apiUrl == "https://api.agentuity.com" && appUrl != "https://app.agentuity.com" {
+		logger.Debug("switching app url to production since the api url is production")
+		appUrl = "https://app.agentuity.com"
+	} else if apiUrl == "https://api.agentuity.div" && appUrl == "https://app.agentuity.com" {
+		logger.Debug("switching app url to dev since the api url is dev")
+		appUrl = "http://localhost:3000"
+	}
+	return apiUrl, appUrl
 }

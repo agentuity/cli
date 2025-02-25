@@ -145,8 +145,7 @@ var projectNewCmd = &cobra.Command{
 			logger.Fatal("you are not logged in")
 		}
 
-		apiUrl := viper.GetString("overrides.api_url")
-		appUrl := viper.GetString("overrides.app_url")
+		apiUrl, appUrl := getURLs(logger)
 		initScreenWithLogo()
 
 		cwd, err := os.Getwd()
