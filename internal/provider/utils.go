@@ -465,12 +465,46 @@ func generatePatches(patches ...string) string {
 	return result.String()
 }
 
+func generateVercelAIProvider(name string) string {
+	return generateJSArgsPatch(0, "") + fmt.Sprintf(`const opts = {...(_args[0] ?? {}) };
+if (!opts.baseURL) {
+	const apikey = process.env.AGENTUITY_API_KEY;
+	const url = process.env.AGENTUITY_URL;
+	if (url && apikey) {
+		opts.apiKey = 'x';
+		opts.baseURL = url + '/sdk/gateway/%s';
+		opts.headers = {
+			...(opts.headers ?? {}),
+			Authorization: 'Bearer ' + apikey,
+		};
+		_args[0] = opts;
+	}
+}`, name)
+}
+
+var vercelTelemetryPatch = generateJSArgsPatch(0, `experimental_telemetry: { isEnabled: true }`)
+
 var patches = map[string]patchModule{
 	"@vercel/ai": {
 		Module: "ai",
 		Functions: map[string]patchAction{
 			"generateText": {
-				Before: generateJSArgsPatch(0, `experimental_telemetry: { isEnabled: true }`),
+				Before: vercelTelemetryPatch,
+			},
+			"streamText": {
+				Before: vercelTelemetryPatch,
+			},
+			"generateObject": {
+				Before: vercelTelemetryPatch,
+			},
+			"streamObject": {
+				Before: vercelTelemetryPatch,
+			},
+			"embed": {
+				Before: vercelTelemetryPatch,
+			},
+			"embedMany": {
+				Before: vercelTelemetryPatch,
 			},
 		},
 	},
@@ -479,23 +513,8 @@ var patches = map[string]patchModule{
 		Functions: map[string]patchAction{
 			"createOpenAI": {
 				Before: generateEnvGuard("OPENAI_API_KEY",
-					generatePatches(
-						generateJSArgsPatch(0, ""),
-						"const opts = {...(_args[0] ?? {}) };",
-						`if (!opts.baseURL) {
-							const apikey = process.env.AGENTUITY_API_KEY;
-							const url = process.env.AGENTUITY_URL;
-							if (url && apikey) {
-								opts.apiKey = 'x';
-								opts.baseURL = url + '/sdk/gateway/openai';
-								opts.headers = {
-									...(opts.headers ?? {}),
-									Authorization: 'Bearer ' + apikey,
-								};
-								_args[0] = opts;
-							}
-						}`,
-					)),
+					generateVercelAIProvider("openai"),
+				),
 			},
 		},
 	},
