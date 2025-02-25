@@ -38,6 +38,16 @@ type startResponse struct {
 	Message *string `json:"message,omitempty"`
 }
 
+type Agent struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+}
+
+type startRequest struct {
+	Agents []Agent `json:"agents"`
+}
+
 type projectResponse struct {
 	Success bool `json:"success"`
 	Data    struct {
@@ -216,7 +226,32 @@ var cloudDeployCmd = &cobra.Command{
 
 		// Start deployment
 		var startResponse startResponse
-		if err := client.Do("PUT", fmt.Sprintf("/cli/deploy/start/%s/%s", orgId, theproject.ProjectId), nil, &startResponse); err != nil {
+		var startRequest startRequest
+		agentDir := theproject.Bundler.Agents.Dir
+		if agentDir == "" {
+			agentDir = filepath.Join(dir, "src", "agents")
+		}
+		filenames, err := util.ListDir(agentDir)
+		if err != nil {
+			logger.Fatal("error listing agents: %s", err)
+		}
+		for _, filename := range filenames {
+			if filepath.Base(filename) != "index.ts" {
+				continue
+			}
+			cfg, err := util.ParseAgentConfig(theproject.ProjectId, filename)
+			if err != nil {
+				logger.Fatal("error parsing agent config: %s", err)
+			}
+			startRequest.Agents = append(startRequest.Agents, Agent{
+				ID:          cfg.ID,
+				Name:        cfg.Name,
+				Description: cfg.Description,
+			})
+		}
+		fmt.Println(startRequest)
+
+		if err := client.Do("PUT", fmt.Sprintf("/cli/deploy/start/%s/%s", orgId, theproject.ProjectId), startRequest, &startResponse); err != nil {
 			logger.Fatal("error starting deployment: %s", err)
 		}
 

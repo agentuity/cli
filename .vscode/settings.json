@@ -1,0 +1,8 @@
+{
+	"files.associations": {
+		"*.ts": "typescript"
+	},
+	"[typescript]": {
+		"editor.formatOnSave": false
+	}
+}

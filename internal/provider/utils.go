@@ -457,14 +457,6 @@ func generateEnvGuard(name string, inject string) string {
 }`, name, inject)
 }
 
-func generatePatches(patches ...string) string {
-	var result strings.Builder
-	for _, patch := range patches {
-		result.WriteString(patch)
-	}
-	return result.String()
-}
-
 func generateVercelAIProvider(name string) string {
 	return generateJSArgsPatch(0, "") + fmt.Sprintf(`const opts = {...(_args[0] ?? {}) };
 if (!opts.baseURL) {
