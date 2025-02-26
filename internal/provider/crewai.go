@@ -23,6 +23,10 @@ func (p *CrewAIProvider) Name() string {
 	return "CrewAI"
 }
 
+func (p *CrewAIProvider) Description() string {
+	return "CrewAI is a python framework for building AI agents."
+}
+
 func (p *CrewAIProvider) Identifier() string {
 	return "crewai"
 }
@@ -123,5 +127,5 @@ func (p *CrewAIProvider) DefaultSrcDir() string {
 }
 
 func init() {
-	register("crewai", &CrewAIProvider{})
+	// register("crewai", &CrewAIProvider{})
 }

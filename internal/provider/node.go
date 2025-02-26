@@ -26,6 +26,10 @@ func (p *NodeJSProvider) Name() string {
 	return "NodeJS with Vercel AI SDK"
 }
 
+func (p *NodeJSProvider) Description() string {
+	return "NodeJS is a runtime for JavaScript and TypeScript. This provider adds the Vercel AI SDK to a NodeJS project."
+}
+
 func (p *NodeJSProvider) Identifier() string {
 	return "nodejs"
 }

@@ -13,7 +13,10 @@ import (
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	"github.com/charmbracelet/bubbles/list"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -133,6 +136,79 @@ var invalidProjectNames = []any{
 	"agentuity",
 }
 
+var docStyle = lipgloss.NewStyle().Margin(1, 2)
+
+type projectProvider struct {
+	title, desc, id string
+}
+
+func (i projectProvider) Title() string       { return i.title }
+func (i projectProvider) Description() string { return i.desc }
+func (i projectProvider) FilterValue() string { return i.title }
+func (i projectProvider) ID() string          { return i.id }
+
+type projectSelectionModel struct {
+	list      list.Model
+	cancelled bool
+}
+
+func (m *projectSelectionModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m *projectSelectionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if msg.String() == "ctrl+c" || msg.String() == "q" || msg.String() == "esc" {
+			m.cancelled = true
+			return m, tea.Quit
+		}
+		if msg.String() == "enter" {
+			return m, tea.Quit
+		}
+	case tea.WindowSizeMsg:
+		h, v := docStyle.GetFrameSize()
+		m.list.SetSize(msg.Width-h, msg.Height-v)
+	}
+
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
+	return m, cmd
+}
+
+func (m *projectSelectionModel) View() string {
+	return docStyle.Render(m.list.View())
+}
+
+func showProjectSelector(theme *huh.Theme, items []list.Item) string {
+
+	// render the items with the theme
+	for i, item := range items {
+		val := item.(projectProvider)
+		val.title = theme.Focused.Title.Render(val.title)
+		val.desc = theme.Focused.Description.Render(val.desc)
+		items[i] = val
+	}
+
+	m := projectSelectionModel{list: list.New(items, list.NewDefaultDelegate(), 0, 0)}
+	m.list.Title = "Select your project framework"
+	m.list.Styles.Title = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FFFF"))
+
+	p := tea.NewProgram(&m, tea.WithAltScreen())
+
+	if _, err := p.Run(); err != nil {
+		fmt.Println("Error running program:", err)
+		os.Exit(1)
+	}
+
+	if m.cancelled {
+		fmt.Println("Cancelled")
+		os.Exit(1)
+	}
+
+	return items[m.list.Index()].(projectProvider).id
+}
+
 var projectNewCmd = &cobra.Command{
 	Use:     "create [name]",
 	Short:   "Create a new project",
@@ -230,22 +306,17 @@ var projectNewCmd = &cobra.Command{
 
 		if providerName == "" {
 
-			var opts []huh.Option[string]
+			var items []list.Item
 
 			for key, provider := range providers {
-				opts = append(opts, huh.NewOption(provider.Name(), key))
+				items = append(items, projectProvider{id: key, title: provider.Name(), desc: provider.Description()})
 			}
 
-			sort.Slice(opts, func(i, j int) bool {
-				return opts[i].Value < opts[j].Value
+			sort.Slice(items, func(i, j int) bool {
+				return items[i].(projectProvider).title < items[j].(projectProvider).title
 			})
 
-			if huh.NewSelect[string]().
-				Title("What framework should we use?").
-				Options(opts...).
-				Value(&providerName).WithTheme(theme).Run() != nil {
-				logger.Fatal("failed to get project framework")
-			}
+			providerName = showProjectSelector(theme, items)
 		}
 
 		enableWebhookAuth := promptForWebhookAuth(logger)

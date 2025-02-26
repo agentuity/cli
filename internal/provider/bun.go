@@ -22,6 +22,10 @@ func (p *BunProvider) Name() string {
 	return "Bun with Vercel AI SDK"
 }
 
+func (p *BunProvider) Description() string {
+	return "Bun is a fast, modern runtime for TypeScript. This provider adds the Vercel AI SDK to a Bun project."
+}
+
 func (p *BunProvider) Identifier() string {
 	return "bunjs"
 }

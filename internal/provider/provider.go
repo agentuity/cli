@@ -92,6 +92,9 @@ type Provider interface {
 	// Name will return the name of the provider in a format that is easy to use in a CLI.
 	Name() string
 
+	// Description will return the description of the provider in a format that is easy to use in a CLI.
+	Description() string
+
 	// Identifier will return the identifier of the provider in a format that is easy to use in a CLI.
 	Identifier() string
 
