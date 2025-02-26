@@ -249,7 +249,6 @@ var cloudDeployCmd = &cobra.Command{
 				Description: cfg.Description,
 			})
 		}
-		fmt.Println(startRequest)
 
 		if err := client.Do("PUT", fmt.Sprintf("/cli/deploy/start/%s/%s", orgId, theproject.ProjectId), startRequest, &startResponse); err != nil {
 			logger.Fatal("error starting deployment: %s", err)

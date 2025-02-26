@@ -19,7 +19,11 @@ import (
 	"github.com/spf13/viper"
 )
 
-var Version string
+var (
+	Version string
+	Commit  string
+	Date    string
+)
 
 var cfgFile string
 

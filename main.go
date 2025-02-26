@@ -22,19 +22,18 @@ THE SOFTWARE.
 package main
 
 import (
-	"os"
-
 	"github.com/agentuity/cli/cmd"
 )
 
-var version = "dev"
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
 
 func main() {
-	if version == "dev" {
-		if v, ok := os.LookupEnv("GIT_SHA"); ok && v != "" {
-			version = v
-		}
-	}
 	cmd.Version = version
+	cmd.Commit = commit
+	cmd.Date = date
 	cmd.Execute()
 }

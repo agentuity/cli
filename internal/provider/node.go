@@ -129,7 +129,7 @@ func (p *NodeJSProvider) ProjectIgnoreRules() []string {
 func (p *NodeJSProvider) ConfigureDeploymentConfig(config *project.DeploymentConfig) error {
 	config.Language = "javascript"
 	config.Runtime = "nodejs"
-	config.Command = []string{"sh", "/app/.agentuity/run.sh"}
+	config.Command = []string{"node", "/app/.agentuity/index.js"}
 	return nil
 }
 

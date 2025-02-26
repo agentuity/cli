@@ -618,19 +618,53 @@ func BundleJS(logger logger.Logger, project *project.Project, dir string, produc
 	if len(entryPoints) == 0 {
 		return fmt.Errorf("no index.ts files found in %s", project.Bundler.Agents.Dir)
 	}
+	pkg, err := loadPackageJSON(dir)
+	if err != nil {
+		return fmt.Errorf("failed to load package.json: %w", err)
+	}
+	pkg2, err := loadPackageJSON(filepath.Join(dir, "node_modules", "@agentuity", "sdk"))
+	if err != nil {
+		return fmt.Errorf("failed to load package.json: %w", err)
+	}
+	defines := map[string]string{
+		"process.env.AGENTUITY_CLI_VERSION":     fmt.Sprintf("'%s'", project.Bundler.CLIVersion),
+		"process.env.AGENTUITY_SDK_APP_NAME":    fmt.Sprintf("'%s'", pkg["name"]),
+		"process.env.AGENTUITY_SDK_APP_VERSION": fmt.Sprintf("'%s'", pkg["version"]),
+		"process.env.AGENTUITY_SDK_VERSION":     fmt.Sprintf("'%s'", pkg2["version"]),
+	}
+	defines["process.env.AGENTUITY_BUNDLER_RUNTIME"] = fmt.Sprintf("'%s'", project.Bundler.Runtime)
+	if production {
+		defines["process.env.AGENTUITY_SDK_DEV_MODE"] = `"false"`
+		defines["process.env.AGENTUITY_ENVIRONMENT"] = fmt.Sprintf("'%s'", "production")
+		defines["process.env.NODE_ENV"] = fmt.Sprintf("'%s'", "production")
+	} else {
+		if val, ok := os.LookupEnv("AGENTUITY_ENVIRONMENT"); ok {
+			defines["process.env.AGENTUITY_ENVIRONMENT"] = fmt.Sprintf("'%s'", val)
+		} else {
+			defines["process.env.AGENTUITY_ENVIRONMENT"] = fmt.Sprintf("'%s'", "development")
+		}
+	}
 	result := api.Build(api.BuildOptions{
-		EntryPoints:   entryPoints,
-		Bundle:        true,
-		Outdir:        outdir,
-		Write:         true,
-		Splitting:     false,
-		Sourcemap:     api.SourceMapExternal,
-		Format:        api.FormatESModule,
-		Platform:      api.PlatformNode,
-		External:      []string{"@agentuity/sdk"},
+		EntryPoints: entryPoints,
+		Bundle:      true,
+		Outdir:      outdir,
+		Write:       true,
+		Splitting:   false,
+		Sourcemap:   api.SourceMapExternal,
+		Format:      api.FormatESModule,
+		Platform:    api.PlatformNode,
+		Engines: []api.Engine{
+			{Name: api.EngineNode, Version: "22"},
+		},
 		AbsWorkingDir: dir,
-		TreeShaking:   api.TreeShakingFalse,
+		TreeShaking:   api.TreeShakingTrue,
+		Drop:          api.DropDebugger,
 		Plugins:       []api.Plugin{createPlugin(logger)},
+		Define:        defines,
+		LegalComments: api.LegalCommentsNone,
+		Banner: map[string]string{
+			"js": "/* DO NOT EDIT - GENERATED CODE */",
+		},
 	})
 	if len(result.Errors) > 0 {
 		for _, err := range result.Errors {
@@ -641,41 +675,6 @@ func BundleJS(logger logger.Logger, project *project.Project, dir string, produc
 			logger.Error("failed to bundle: %s", err.Text)
 		}
 		return fmt.Errorf("failed to bundle JS")
-	}
-	if production {
-		pkg, err := loadPackageJSON(dir)
-		if err != nil {
-			return fmt.Errorf("failed to load package.json: %w", err)
-		}
-		pkg.RemoveScript("build")
-		pkg.RemoveScript("prestart")
-		var bin string
-		var script string
-		if project.Bundler.Runtime == "bunjs" {
-			bin = "bun"
-			script = `#!/bin/bash
-			set -e
-			cd .agentuity
-			bun install && bun start
-			`
-		} else {
-			bin = "node"
-			script = `#!/bin/bash
-			set -e
-			cd .agentuity
-			npm install && node index.js
-			`
-		}
-		pkg.AddScript("start", bin+" index.js")
-		pkg.Write(outdir)
-		if err := os.WriteFile(filepath.Join(outdir, "run.sh"), []byte(script), 0644); err != nil {
-			return fmt.Errorf("failed to write run.sh: %w", err)
-		}
-		if err := os.Chmod(filepath.Join(outdir, "run.sh"), 0755); err != nil {
-			return fmt.Errorf("failed to chmod+x run.sh: %w", err)
-		}
-	} else {
-		util.CopyFile(filepath.Join(dir, "package.json"), filepath.Join(outdir, "package.json"))
 	}
 	return nil
 }

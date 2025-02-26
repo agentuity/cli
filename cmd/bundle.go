@@ -12,6 +12,7 @@ var bundleCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		projectContext := ensureProject(cmd)
 		production, _ := cmd.Flags().GetBool("production")
+		projectContext.Project.Bundler.CLIVersion = Version
 		if err := provider.BundleJS(projectContext.Logger, projectContext.Project, projectContext.Dir, production); err != nil {
 			projectContext.Logger.Fatal("failed to bundle JS: %s", err)
 		}

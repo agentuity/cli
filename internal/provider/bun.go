@@ -104,7 +104,7 @@ func (p *BunProvider) ProjectIgnoreRules() []string {
 func (p *BunProvider) ConfigureDeploymentConfig(config *project.DeploymentConfig) error {
 	config.Language = "javascript"
 	config.Runtime = "bunjs"
-	config.Command = []string{"sh", "/app/.agentuity/run.sh"}
+	config.Command = []string{"bun", "run", "--no-install", "--prefer-offline", "--silent", "--no-macros", "/app/.agentuity/index.js"}
 	return nil
 }
 

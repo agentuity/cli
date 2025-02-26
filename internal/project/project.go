@@ -306,10 +306,11 @@ func (p *Project) DeleteIO(logger logger.Logger, baseUrl string, token string, i
 }
 
 type Bundler struct {
-	Language  string `yaml:"language" json:"language"`
-	Framework string `yaml:"framework,omitempty" json:"framework,omitempty"`
-	Runtime   string `yaml:"runtime,omitempty" json:"runtime,omitempty"`
-	Agents    Agent  `yaml:"agents" json:"agents"`
+	Language   string `yaml:"language" json:"language"`
+	Framework  string `yaml:"framework,omitempty" json:"framework,omitempty"`
+	Runtime    string `yaml:"runtime,omitempty" json:"runtime,omitempty"`
+	Agents     Agent  `yaml:"agents" json:"agents"`
+	CLIVersion string `yaml:"-" json:"-"`
 }
 
 type Agent struct {
