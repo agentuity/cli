@@ -160,10 +160,14 @@ func getAgentList(logger logger.Logger, apiUrl string, apikey string, project pr
 	return remoteAgents, err
 }
 
+func normalAgentName(name string) string {
+	return util.SafeFilename(strings.ToLower(name))
+}
+
 func reconcileAgentList(logger logger.Logger, apiUrl string, apikey string, project projectContext) ([]string, map[string]agentListState) {
 	remoteAgents, err := getAgentList(logger, apiUrl, apikey, project)
 	if err != nil {
-		logger.Fatal("failed to list agents: %s", err)
+		logger.Fatal("failed to fetch agents for project: %s", err)
 	}
 	agentFilename := project.Provider.AgentFilename()
 	agentSrcDir := filepath.Join(project.Dir, project.Project.Bundler.AgentConfig.Dir)
@@ -171,10 +175,10 @@ func reconcileAgentList(logger logger.Logger, apiUrl string, apikey string, proj
 	// perform the reconcilation
 	state := make(map[string]agentListState)
 	for _, agent := range remoteAgents {
-		state[strings.ToLower(agent.Name)] = agentListState{
+		state[normalAgentName(agent.Name)] = agentListState{
 			Agent:       &agent,
-			Filename:    filepath.Join(agentSrcDir, agent.Name, agentFilename),
-			FoundLocal:  util.Exists(filepath.Join(agentSrcDir, agent.Name, agentFilename)),
+			Filename:    filepath.Join(agentSrcDir, util.SafeFilename(agent.Name), agentFilename),
+			FoundLocal:  util.Exists(filepath.Join(agentSrcDir, util.SafeFilename(agent.Name), agentFilename)),
 			FoundRemote: true,
 		}
 	}
@@ -185,7 +189,7 @@ func reconcileAgentList(logger logger.Logger, apiUrl string, apikey string, proj
 	for _, filename := range localAgents {
 		if filepath.Base(filename) == agentFilename {
 			agentName := filepath.Base(filepath.Dir(filename))
-			key := strings.ToLower(agentName)
+			key := normalAgentName(agentName)
 			if found, ok := state[key]; ok {
 				state[key] = agentListState{
 					Agent:       found.Agent,
