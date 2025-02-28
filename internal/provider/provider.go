@@ -113,12 +113,21 @@ type Provider interface {
 	// DefaultSrcDir will return the default source directory for the agent project
 	DefaultSrcDir() string
 
+	// AgentFilename will return the filename of the agent for the given provider.
+	AgentFilename() string
+
 	// Detect will detect the provider for the given directory.
 	// It will return the detection if it is found, otherwise it will return nil.
 	Detect(logger logger.Logger, dir string, state map[string]any) (*Detection, error)
 
 	// NewProject will create a new project for the given provider.
 	NewProject(logger logger.Logger, dir string, name string) error
+
+	// NewAgent will create a new agent for the given provider.
+	NewAgent(logger logger.Logger, dir string, id string, name string, description string) error
+
+	// InitProject will initialize a project for the given provider and write any specific files after the project is created.
+	InitProject(logger logger.Logger, dir string, data *project.ProjectData) error
 
 	// RunDev will run the development mode for the given provider.
 	// It will return the runner if it is found, otherwise it will return nil.

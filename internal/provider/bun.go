@@ -50,17 +50,6 @@ func (p *BunProvider) NewProject(logger logger.Logger, dir string, name string) 
 	if err := runCommandSilent(logger, bunjs, dir, []string{"add", "@agentuity/sdk", "ai", "@ai-sdk/openai"}, nil); err != nil {
 		return fmt.Errorf("failed to add npm modules: %w", err)
 	}
-	srcDir := filepath.Join(dir, p.DefaultSrcDir())
-	if err := os.MkdirAll(srcDir, 0755); err != nil {
-		return fmt.Errorf("failed to create src directory: %w", err)
-	}
-	if err := os.MkdirAll(filepath.Join(srcDir, "myfirstagent"), 0755); err != nil {
-		return fmt.Errorf("failed to create src/myfirstagent directory: %w", err)
-	}
-	indexts := filepath.Join(srcDir, "myfirstagent", "index.ts")
-	if err := os.WriteFile(indexts, []byte(jstemplate), 0644); err != nil {
-		return fmt.Errorf("failed to write index.ts to %s: %w", indexts, err)
-	}
 	os.Remove(filepath.Join(dir, "index.ts"))
 	boot := filepath.Join(dir, "index.js")
 	if err := os.WriteFile(boot, []byte(bootTemplate), 0644); err != nil {
@@ -97,6 +86,21 @@ func (p *BunProvider) NewProject(logger logger.Logger, dir string, name string) 
 	return nil
 }
 
+func (p *BunProvider) NewAgent(logger logger.Logger, dir string, id string, name string, description string) error {
+	return generateJSAgentTemplate(dir, p.DefaultSrcDir(), name)
+}
+
+func (p *BunProvider) InitProject(logger logger.Logger, dir string, data *project.ProjectData) error {
+	if err := generateJSAgentTemplate(dir, p.DefaultSrcDir(), MyFirstAgentName); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *BunProvider) AgentFilename() string {
+	return "index.ts"
+}
+
 func (p *BunProvider) ProjectIgnoreRules() []string {
 	return []string{"node_modules/**", "dist/**", "src/**"}
 }
@@ -127,7 +131,7 @@ func (p *BunProvider) Language() string {
 }
 
 func (p *BunProvider) Framework() string {
-	return "bunjs"
+	return "" // EMPTY STRING MEANS NO FRAMEWORK
 }
 
 func (p *BunProvider) Runtime() string {

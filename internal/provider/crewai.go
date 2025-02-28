@@ -84,6 +84,18 @@ func (p *CrewAIProvider) NewProject(logger logger.Logger, dir string, name strin
 	return nil
 }
 
+func (p *CrewAIProvider) NewAgent(logger logger.Logger, dir string, id string, name string, description string) error {
+	return nil
+}
+
+func (p *CrewAIProvider) AgentFilename() string {
+	return "agent.py"
+}
+
+func (p *CrewAIProvider) InitProject(logger logger.Logger, dir string, data *project.ProjectData) error {
+	return nil
+}
+
 func (p *CrewAIProvider) ProjectIgnoreRules() []string {
 	return nil
 }

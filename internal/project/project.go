@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -32,6 +33,7 @@ type ProjectData struct {
 	Secrets     map[string]string `json:"secrets"`
 	IOId        string            `json:"ioId"`
 	IOAuthToken string            `json:"ioAuthToken,omitempty"`
+	AgentID     string            `json:"agentId"`
 }
 
 type InitProjectArgs struct {
@@ -43,6 +45,9 @@ type InitProjectArgs struct {
 	Name              string
 	Description       string
 	EnableWebhookAuth bool
+	AgentName         string
+	AgentDescription  string
+	AgentID           string
 }
 
 // InitProject will create a new project in the organization.
@@ -55,6 +60,7 @@ func InitProject(logger logger.Logger, args InitProjectArgs) (*ProjectData, erro
 		"name":              args.Name,
 		"description":       args.Description,
 		"enableWebhookAuth": args.EnableWebhookAuth,
+		"agent":             map[string]string{"name": args.AgentName, "description": args.AgentDescription},
 	}
 
 	body, err := json.Marshal(payload)
@@ -111,19 +117,25 @@ type Deployment struct {
 	Resources *Resources `json:"resources,omitempty" yaml:"resources,omitempty"`
 }
 
-type IO struct {
-	Type      string         `json:"type" yaml:"type"`
-	ID        string         `json:"id,omitempty" yaml:"id,omitempty"`
-	Direction string         `json:"direction" yaml:"-"`
-	Config    map[string]any `json:"config,omitempty" yaml:"config,omitempty"`
+type Development struct {
+	Port  int  `json:"port,omitempty" yaml:"port,omitempty"`
+	Watch bool `json:"watch,omitempty" yaml:"watch,omitempty"`
+}
+
+type AgentConfig struct {
+	ID          string `json:"id" yaml:"id"`
+	Name        string `json:"name" yaml:"name"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 }
 
 type Project struct {
-	ProjectId  string      `json:"project_id" yaml:"project_id"`
-	Deployment *Deployment `json:"deployment,omitempty" yaml:"deployment,omitempty"`
-	Inputs     []IO        `json:"inputs,omitempty" yaml:"inputs,omitempty"`
-	Outputs    []IO        `json:"outputs,omitempty" yaml:"outputs,omitempty"`
-	Bundler    *Bundler    `json:"bundler,omitempty" yaml:"bundler,omitempty"`
+	ProjectId   string        `json:"project_id" yaml:"project_id"`
+	Name        string        `json:"name" yaml:"name"`
+	Description string        `json:"description" yaml:"description"`
+	Development *Development  `json:"development,omitempty" yaml:"development,omitempty"`
+	Deployment  *Deployment   `json:"deployment,omitempty" yaml:"deployment,omitempty"`
+	Bundler     *Bundler      `json:"bundler,omitempty" yaml:"bundler,omitempty"`
+	Agents      []AgentConfig `json:"agents" yaml:"agents"`
 }
 
 // Load will load the project from a file in the given directory.
@@ -161,8 +173,11 @@ func (p *Project) Load(dir string) error {
 	default:
 		return fmt.Errorf("invalid bundler.language value: %s. only js or py are supported", p.Bundler.Language)
 	}
-	if p.Bundler.Agents.Dir == "" {
+	if p.Bundler.AgentConfig.Dir == "" {
 		return fmt.Errorf("missing bundler.agents.dir value (or its empty), please run `agentuity new` to create a new project")
+	}
+	if len(p.Agents) == 0 {
+		return fmt.Errorf("missing agents, please run `agentuity new` to create a new project or `agentuity agent new` to create a new agent")
 	}
 	if p.Deployment != nil {
 		if p.Deployment.Resources != nil {
@@ -202,10 +217,9 @@ const (
 // NewProject will create a new project that is empty.
 func NewProject() *Project {
 	return &Project{
-		Inputs: []IO{
-			{
-				Type: "webhook",
-			},
+		Development: &Development{
+			Port:  3500,
+			Watch: true,
 		},
 		Deployment: &Deployment{
 			Resources: &Resources{
@@ -223,6 +237,48 @@ type Response[T any] struct {
 }
 
 type ProjectResponse = Response[ProjectData]
+
+func ProjectWithNameExists(logger logger.Logger, baseUrl string, token string, name string) (bool, error) {
+	client := util.NewAPIClient(logger, baseUrl, token)
+
+	var resp Response[bool]
+	if err := client.Do("GET", fmt.Sprintf("/cli/project/exists/%s", url.PathEscape(name)), nil, &resp); err != nil {
+		return false, fmt.Errorf("error validating project name: %s", err)
+	}
+	return resp.Data, nil
+}
+
+type ProjectListData struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+func ListProjects(logger logger.Logger, baseUrl string, token string) ([]ProjectListData, error) {
+	client := util.NewAPIClient(logger, baseUrl, token)
+
+	var resp Response[[]ProjectListData]
+	if err := client.Do("GET", "/cli/project", nil, &resp); err != nil {
+		return nil, fmt.Errorf("error listing projects: %s", err)
+	}
+	return resp.Data, nil
+}
+
+func DeleteProjects(logger logger.Logger, baseUrl string, token string, ids []string) ([]string, error) {
+	client := util.NewAPIClient(logger, baseUrl, token)
+
+	var resp Response[[]string]
+	var payload = map[string]any{
+		"ids": ids,
+	}
+	if err := client.Do("DELETE", "/cli/project", payload, &resp); err != nil {
+		return nil, fmt.Errorf("error deleting projects: %s", err)
+	}
+	if !resp.Success {
+		return nil, errors.New(resp.Message)
+	}
+	return resp.Data, nil
+}
 
 func (p *Project) ListProjectEnv(logger logger.Logger, baseUrl string, token string) (*ProjectData, error) {
 	client := util.NewAPIClient(logger, baseUrl, token)
@@ -267,53 +323,15 @@ func (p *Project) DeleteProjectEnv(logger logger.Logger, baseUrl string, token s
 	return nil
 }
 
-type IOResponse = Response[IO]
-
-func (p *Project) CreateIO(logger logger.Logger, baseUrl string, token string, direction string, io IO) (*IO, error) {
-	client := util.NewAPIClient(logger, baseUrl, token)
-	var ioResponse IOResponse
-	if err := client.Do("POST", fmt.Sprintf("/cli/project/%s/io", p.ProjectId), io, &ioResponse); err != nil {
-		logger.Fatal("error creating io: %s", err)
-	}
-	if !ioResponse.Success {
-		return nil, errors.New(ioResponse.Message)
-	}
-	return &ioResponse.Data, nil
-}
-
-func (p *Project) ListIO(logger logger.Logger, baseUrl string, token string, direction string) ([]IO, error) {
-	client := util.NewAPIClient(logger, baseUrl, token)
-	var response Response[[]IO]
-	if err := client.Do("GET", fmt.Sprintf("/cli/project/%s/io/%s", p.ProjectId, direction), nil, &response); err != nil {
-		logger.Fatal("error creating io: %s", err)
-	}
-	if !response.Success {
-		return nil, errors.New(response.Message)
-	}
-	return response.Data, nil
-}
-
-func (p *Project) DeleteIO(logger logger.Logger, baseUrl string, token string, id string) error {
-	client := util.NewAPIClient(logger, baseUrl, token)
-	var response Response[any]
-	if err := client.Do("DELETE", fmt.Sprintf("/cli/project/%s/io/%s", p.ProjectId, id), nil, &response); err != nil {
-		logger.Fatal("error creating io: %s", err)
-	}
-	if !response.Success {
-		return errors.New(response.Message)
-	}
-	return nil
-}
-
 type Bundler struct {
-	Language   string `yaml:"language" json:"language"`
-	Framework  string `yaml:"framework,omitempty" json:"framework,omitempty"`
-	Runtime    string `yaml:"runtime,omitempty" json:"runtime,omitempty"`
-	Agents     Agent  `yaml:"agents" json:"agents"`
-	CLIVersion string `yaml:"-" json:"-"`
+	Language    string             `yaml:"language" json:"language"`
+	Framework   string             `yaml:"framework,omitempty" json:"framework,omitempty"`
+	Runtime     string             `yaml:"runtime,omitempty" json:"runtime,omitempty"`
+	AgentConfig AgentBundlerConfig `yaml:"agents" json:"agents"`
+	CLIVersion  string             `yaml:"-" json:"-"`
 }
 
-type Agent struct {
+type AgentBundlerConfig struct {
 	Dir string `yaml:"dir" json:"dir"`
 }
 

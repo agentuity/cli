@@ -42,6 +42,8 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 		}
 	}
 
+	c.logger.Trace("request: %s %s", method, u.String())
+
 	req, err := http.NewRequest(method, u.String(), bytes.NewBuffer(body))
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
@@ -54,18 +56,19 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 		return fmt.Errorf("error sending request: %w", err)
 	}
 	defer resp.Body.Close()
-	c.logger.Trace("response: %s", resp.Status)
-	c.logger.Trace("response body: %s", resp.Body)
+	c.logger.Trace("response status: %s", resp.Status)
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("error reading response body: %w", err)
+	}
+	c.logger.Trace("response body: %s", string(respBody))
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted && response == nil {
 		return fmt.Errorf("request failed with status (%s)", resp.Status)
 	}
 
 	if response != nil {
-		respBody, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return fmt.Errorf("error reading response body: %w", err)
-		}
 		if err := json.NewDecoder(bytes.NewReader(respBody)).Decode(response); err != nil {
 			return fmt.Errorf("error decoding response: %w", err)
 		}
