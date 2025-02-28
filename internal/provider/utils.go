@@ -16,9 +16,15 @@ import (
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
+	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/sys"
 	"github.com/evanw/esbuild/pkg/api"
 	"github.com/marcozac/go-jsonc"
+)
+
+const (
+	MyFirstAgentName        = "MyFirstAgent"
+	MyFirstAgentDescription = "A simple agent that can generate text"
 )
 
 // PyProject is the structure that is used to parse the pyproject.toml file.
@@ -579,6 +585,12 @@ func createPlugin(logger logger.Logger) api.Plugin {
 	}
 }
 
+type AgentConfig struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Filename string `json:"filename"`
+}
+
 func addAgentuityBuildToGitignore(dir string) error {
 	fn := filepath.Join(dir, ".gitignore")
 	var contents string
@@ -606,7 +618,7 @@ func BundleJS(logger logger.Logger, project *project.Project, dir string, produc
 	}
 	var entryPoints []string
 	entryPoints = append(entryPoints, filepath.Join(dir, "index.js"))
-	files, err := util.ListDir(project.Bundler.Agents.Dir)
+	files, err := util.ListDir(project.Bundler.AgentConfig.Dir)
 	if err != nil {
 		return fmt.Errorf("failed to list src directory: %w", err)
 	}
@@ -616,7 +628,7 @@ func BundleJS(logger logger.Logger, project *project.Project, dir string, produc
 		}
 	}
 	if len(entryPoints) == 0 {
-		return fmt.Errorf("no index.ts files found in %s", project.Bundler.Agents.Dir)
+		return fmt.Errorf("no index.ts files found in %s", project.Bundler.AgentConfig.Dir)
 	}
 	pkg, err := loadPackageJSON(dir)
 	if err != nil {
@@ -644,6 +656,16 @@ func BundleJS(logger logger.Logger, project *project.Project, dir string, produc
 			defines["process.env.AGENTUITY_ENVIRONMENT"] = fmt.Sprintf("'%s'", "development")
 		}
 	}
+	var agents []AgentConfig
+	for _, agent := range project.Agents {
+		agents = append(agents, AgentConfig{
+			ID:       agent.ID,
+			Name:     agent.Name,
+			Filename: filepath.Join(project.Bundler.AgentConfig.Dir, agent.Name, "index.js"),
+		})
+	}
+	defines["process.env.AGENTUITY_CLOUD_AGENTS_JSON"] = fmt.Sprintf("'%s'", cstr.JSONStringify(agents))
+
 	result := api.Build(api.BuildOptions{
 		EntryPoints: entryPoints,
 		Bundle:      true,
@@ -714,19 +736,33 @@ func detectModelTokens(logger logger.Logger, data DeployPreflightCheckData, base
 	return nil
 }
 
+func generateJSAgentTemplate(dir string, srcdir string, name string) error {
+	srcDir := filepath.Join(dir, srcdir)
+	if err := os.MkdirAll(srcDir, 0755); err != nil {
+		return fmt.Errorf("failed to create src directory: %w", err)
+	}
+	filename := util.SafeFilename(name)
+	if err := os.MkdirAll(filepath.Join(srcDir, filename), 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", filepath.Join(srcDir, name), err)
+	}
+	indexts := filepath.Join(srcDir, filename, "index.ts")
+	if err := generateJSAgent(indexts); err != nil {
+		return fmt.Errorf("failed to generate file %s: %w", indexts, err)
+	}
+	return nil
+}
+
+func generateJSAgent(filename string) error {
+	return os.WriteFile(filename, []byte(jstemplate), 0644)
+}
+
 const jstemplate = `import type {
-	AgentConfig,
 	AgentRequest,
 	AgentResponse,
 	AgentContext,
 } from "@agentuity/sdk";
 import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
-
-export const config: AgentConfig = {
-	name: "MyFirstAgent",
-	description: "A simple agent that can generate text",
-};
 
 export default async function Agent(
 	req: AgentRequest,

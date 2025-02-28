@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
 	cstr "github.com/agentuity/go-common/string"
@@ -53,6 +54,7 @@ func promptForEnv(logger logger.Logger, key string, isSecret bool, localenv map[
 	prompt := "Enter your environment variable value for " + key
 	var help string
 	var defaultValue string
+	var value string
 	if isSecret {
 		prompt = "Enter your secret value for " + key
 		if val, ok := localenv[key]; ok {
@@ -64,8 +66,11 @@ func promptForEnv(logger logger.Logger, key string, isSecret bool, localenv map[
 		} else {
 			help = "Your input will be masked"
 		}
+		value = tui.Password(logger, prompt, help)
+	} else {
+		value = tui.Input(logger, prompt, help)
 	}
-	value := getInput(logger, prompt, help, "", isSecret, "", nil)
+
 	if value == "" && defaultValue != "" {
 		value = defaultValue
 	}
@@ -141,19 +146,13 @@ var envSetCmd = &cobra.Command{
 		}
 
 		if len(args) == 0 && hasEnvFile && len(localenv) > 0 && !hasSetFromFile && !noConfirm {
-			var options []huh.Option[string]
+			var options []tui.Option
 			for k := range localenv {
 				if !isAgentuityEnv.MatchString(k) {
-					options = append(options, huh.NewOption(k, k).Selected(true))
+					options = append(options, tui.Option{ID: k, Text: k, Selected: true})
 				}
 			}
-			var results []string
-			if huh.NewMultiSelect[string]().
-				Options(options...).
-				Title("Set environment variables from .env").
-				Value(&results).Run() != nil {
-				logger.Fatal("error getting environments")
-			}
+			results := tui.MultiSelect(logger, "Set environment variables from .env", "", options)
 			for _, result := range results {
 				val := localenv[result]
 				if looksLikeSecret.MatchString(result) || forceSecret {
@@ -186,7 +185,7 @@ var envSetCmd = &cobra.Command{
 			if len(envs) > 0 || len(secrets) > 0 {
 				help = "Press enter to save..."
 			}
-			key = getInput(logger, "Enter your environment variable name", help, "", false, "", nil)
+			key := tui.Input(logger, "Enter your environment variable name", help)
 			if key == "" {
 				askMore = false
 			}
@@ -209,10 +208,10 @@ var envSetCmd = &cobra.Command{
 		if key != "" && value != "" {
 			if isSecret {
 				secrets[key] = value
-				printSuccess("%s=%s", key, maxString(cstr.Mask(value), 40))
+				tui.ShowSuccess("%s=%s", key, maxString(cstr.Mask(value), 40))
 			} else {
 				envs[key] = value
-				printSuccess("%s=%s", key, maxString(value, 40))
+				tui.ShowSuccess("%s=%s", key, maxString(value, 40))
 			}
 		}
 		if askMore {
@@ -241,15 +240,15 @@ var envSetCmd = &cobra.Command{
 
 		switch {
 		case len(envs) > 0 && len(secrets) > 0:
-			printSuccess("Environment variables and secrets saved")
+			tui.ShowSuccess("Environment variables and secrets saved")
 		case len(envs) == 1:
-			printSuccess("Environment variable saved")
+			tui.ShowSuccess("Environment variable saved")
 		case len(secrets) == 1:
-			printSuccess("Secret saved")
+			tui.ShowSuccess("Secret saved")
 		case len(envs) > 0:
-			printSuccess("Environment variables saved")
+			tui.ShowSuccess("Environment variables saved")
 		case len(secrets) > 0:
-			printSuccess("Secrets saved")
+			tui.ShowSuccess("Secrets saved")
 		}
 	},
 }
@@ -295,7 +294,7 @@ var envGetCmd = &cobra.Command{
 			}
 		}
 		if !found {
-			printWarning("No environment variables or secrets set for this project named %s", args[0])
+			tui.ShowWarning("No environment variables or secrets set for this project named %s", args[0])
 		}
 	},
 }
@@ -331,9 +330,9 @@ var envListCmd = &cobra.Command{
 			}
 		}
 		if len(projectData.Env) == 0 && len(projectData.Secrets) == 0 {
-			printWarning("No environment variables or secrets set for this project")
+			tui.ShowWarning("No environment variables or secrets set for this project")
 			fmt.Println()
-			fmt.Printf("You can set environment variables with %s", command("env", "set", "<key>", "<value>"))
+			fmt.Printf("You can set environment variables with %s", tui.Command("env", "set", "<key>", "<value>"))
 			fmt.Println()
 		}
 	},
@@ -428,8 +427,8 @@ var envDeleteCmd = &cobra.Command{
 				case len(envsToDelete) == 1:
 					title = "Are you sure you want to delete this environment variable?"
 				}
-				if !ask(logger, title, false) {
-					printWarning("cancelled")
+				if !tui.Ask(logger, title, false) {
+					tui.ShowWarning("cancelled")
 					return
 				}
 			}
@@ -439,18 +438,18 @@ var envDeleteCmd = &cobra.Command{
 			}
 			switch {
 			case len(envsToDelete) > 0 && len(secretsToDelete) > 0:
-				printSuccess("Environment variables and secrets deleted")
+				tui.ShowSuccess("Environment variables and secrets deleted")
 			case len(envsToDelete) == 1:
-				printSuccess("Environment variable deleted")
+				tui.ShowSuccess("Environment variable deleted")
 			case len(envsToDelete) > 0:
-				printSuccess("Environment variables deleted")
+				tui.ShowSuccess("Environment variables deleted")
 			case len(secretsToDelete) == 1:
-				printSuccess("Secret deleted")
+				tui.ShowSuccess("Secret deleted")
 			case len(secretsToDelete) > 0:
-				printSuccess("Secrets deleted")
+				tui.ShowSuccess("Secrets deleted")
 			}
 		} else if force {
-			printWarning("No environment variables or secrets to delete")
+			tui.ShowWarning("No environment variables or secrets to delete")
 		}
 	},
 }

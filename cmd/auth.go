@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/agentuity/cli/internal/auth"
+	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/go-common/env"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -31,7 +32,7 @@ var authLoginCmd = &cobra.Command{
 		if err := viper.WriteConfig(); err != nil {
 			logger.Fatal("failed to write config: %s", err)
 		}
-		printSuccess("You are now logged in")
+		tui.ShowSuccess("You are now logged in")
 	},
 }
 
@@ -54,7 +55,7 @@ var authLogoutCmd = &cobra.Command{
 		if err := auth.Logout(logger, appUrl, token); err != nil {
 			logger.Fatal("failed to logout: %s", err)
 		}
-		printSuccess("You have been logged out")
+		tui.ShowSuccess("You have been logged out")
 	},
 }
 

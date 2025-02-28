@@ -122,6 +122,21 @@ func (p *NodeJSProvider) NewProject(logger logger.Logger, dir string, name strin
 	return nil
 }
 
+func (p *NodeJSProvider) NewAgent(logger logger.Logger, dir string, id string, name string, description string) error {
+	return generateJSAgentTemplate(dir, p.DefaultSrcDir(), name)
+}
+
+func (p *NodeJSProvider) InitProject(logger logger.Logger, dir string, data *project.ProjectData) error {
+	if err := generateJSAgentTemplate(dir, p.DefaultSrcDir(), MyFirstAgentName); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *NodeJSProvider) AgentFilename() string {
+	return "index.ts"
+}
+
 func (p *NodeJSProvider) ProjectIgnoreRules() []string {
 	return []string{"node_modules/**", "dist/**", "src/**"}
 }
@@ -129,7 +144,7 @@ func (p *NodeJSProvider) ProjectIgnoreRules() []string {
 func (p *NodeJSProvider) ConfigureDeploymentConfig(config *project.DeploymentConfig) error {
 	config.Language = "javascript"
 	config.Runtime = "nodejs"
-	config.Command = []string{"node", "/app/.agentuity/index.js"}
+	config.Command = []string{"node", "--disable-sigusr1", "--disallow-code-generation-from-strings", "--no-addons", "--no-deprecation", "--no-global-search-paths", "--report-uncaught-exception", "/app/.agentuity/index.js"}
 	return nil
 }
 
@@ -152,7 +167,7 @@ func (p *NodeJSProvider) Language() string {
 }
 
 func (p *NodeJSProvider) Framework() string {
-	return "nodejs"
+	return "" // EMPTY STRING MEANS NO FRAMEWORK
 }
 
 func (p *NodeJSProvider) Runtime() string {

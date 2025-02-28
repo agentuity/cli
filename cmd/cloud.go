@@ -13,10 +13,10 @@ import (
 	"github.com/agentuity/cli/internal/ignore"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/provider"
+	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -59,12 +59,13 @@ type projectResponse struct {
 }
 
 type projectContext struct {
-	Logger  logger.Logger
-	Project *project.Project
-	Dir     string
-	APIURL  string
-	APPURL  string
-	Token   string
+	Logger   logger.Logger
+	Project  *project.Project
+	Provider provider.Provider
+	Dir      string
+	APIURL   string
+	APPURL   string
+	Token    string
 }
 
 func ensureProject(cmd *cobra.Command) projectContext {
@@ -79,13 +80,27 @@ func ensureProject(cmd *cobra.Command) projectContext {
 		logger.Fatal("error loading project: %s", err)
 	}
 
+	name := theproject.Bundler.Framework
+	if name == "" {
+		name = theproject.Bundler.Runtime
+	}
+	if name == "" {
+		name = theproject.Bundler.Language
+	}
+
+	p, err := provider.GetProviderForName(name)
+	if err != nil {
+		logger.Fatal("%s", err)
+	}
+
 	return projectContext{
-		Logger:  logger,
-		Project: theproject,
-		Dir:     dir,
-		APIURL:  apiUrl,
-		APPURL:  appUrl,
-		Token:   token,
+		Logger:   logger,
+		Project:  theproject,
+		Provider: p,
+		Dir:      dir,
+		APIURL:   apiUrl,
+		APPURL:   appUrl,
+		Token:    token,
 	}
 }
 
@@ -128,7 +143,7 @@ var cloudDeployCmd = &cobra.Command{
 				logger.Fatal("error listing project env: %s", err)
 			}
 		}
-		showSpinner(logger, "", action)
+		tui.ShowSpinner(logger, "", action)
 
 		// check to see if we have any env vars that are not in the project
 		envfilename := filepath.Join(dir, ".env")
@@ -163,8 +178,8 @@ var cloudDeployCmd = &cobra.Command{
 				default:
 					title = fmt.Sprintf("There are %d environment variables from .envthat are not in the project. Would you like to add them?", len(foundkeys))
 				}
-				if !ask(logger, title, true) {
-					printWarning("cancelled")
+				if !tui.Ask(logger, title, true) {
+					tui.ShowWarning("cancelled")
 					return
 				}
 				envs, secrets := loadEnvFile(le, false)
@@ -175,15 +190,15 @@ var cloudDeployCmd = &cobra.Command{
 				projectData = pd // overwrite with the new version
 				switch {
 				case len(envs) > 0 && len(secrets) > 0:
-					printSuccess("Environment variables and secrets added")
+					tui.ShowSuccess("Environment variables and secrets added")
 				case len(envs) == 1:
-					printSuccess("Environment variable added")
+					tui.ShowSuccess("Environment variable added")
 				case len(envs) > 1:
-					printSuccess("Environment variables added")
+					tui.ShowSuccess("Environment variables added")
 				case len(secrets) == 1:
-					printSuccess("Secret added")
+					tui.ShowSuccess("Secret added")
 				case len(secrets) > 1:
-					printSuccess("Secrets added")
+					tui.ShowSuccess("Secrets added")
 				}
 			}
 		}
@@ -224,32 +239,19 @@ var cloudDeployCmd = &cobra.Command{
 		}
 		orgId := projectResponse.Data.OrgId
 
-		// Start deployment
 		var startResponse startResponse
 		var startRequest startRequest
-		agentDir := theproject.Bundler.Agents.Dir
-		if agentDir == "" {
-			agentDir = filepath.Join(dir, "src", "agents")
-		}
-		filenames, err := util.ListDir(agentDir)
-		if err != nil {
-			logger.Fatal("error listing agents: %s", err)
-		}
-		for _, filename := range filenames {
-			if filepath.Base(filename) != "index.ts" {
-				continue
-			}
-			cfg, err := util.ParseAgentConfig(theproject.ProjectId, filename)
-			if err != nil {
-				logger.Fatal("error parsing agent config: %s", err)
-			}
+
+		startRequest.Agents = make([]Agent, 0)
+		for _, agent := range theproject.Agents {
 			startRequest.Agents = append(startRequest.Agents, Agent{
-				ID:          cfg.ID,
-				Name:        cfg.Name,
-				Description: cfg.Description,
+				ID:          agent.ID,
+				Name:        agent.Name,
+				Description: agent.Description,
 			})
 		}
 
+		// Start deployment
 		if err := client.Do("PUT", fmt.Sprintf("/cli/deploy/start/%s/%s", orgId, theproject.ProjectId), startRequest, &startResponse); err != nil {
 			logger.Fatal("error starting deployment: %s", err)
 		}
@@ -299,7 +301,7 @@ var cloudDeployCmd = &cobra.Command{
 			logger.Debug("zip file created in %v", time.Since(started))
 		}
 
-		showSpinner(logger, "Packaging ...", zipaction)
+		tui.ShowSpinner(logger, "Packaging ...", zipaction)
 
 		of, err := os.Open(tmpfile.Name())
 		if err != nil {
@@ -309,7 +311,7 @@ var cloudDeployCmd = &cobra.Command{
 
 		fi, _ := os.Stat(tmpfile.Name())
 		started := time.Now()
-		var webhookToken string
+		// var webhookToken string
 
 		action = func() {
 			// send the zip file to the upload endpoint provided
@@ -318,6 +320,7 @@ var cloudDeployCmd = &cobra.Command{
 				logger.Fatal("error creating PUT request", err)
 			}
 			req.ContentLength = fi.Size()
+			// NOTE: this is a one-time signed url so we don't need to add authorization header
 			req.Header.Set("Content-Type", "application/zip")
 			req.Header.Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
 
@@ -338,61 +341,18 @@ var cloudDeployCmd = &cobra.Command{
 			resp.Body.Close()
 			logger.Debug("deployment uploaded %d bytes in %v", fi.Size(), time.Since(started))
 
-			sources := []string{}
-			destinations := []string{}
-			var hasWebhook bool
-			for _, io := range theproject.Inputs {
-				if io.Type == "webhook" && hasWebhook {
-					printWarning("Multiple source webhooks found. Only the first one will be used.")
-					continue
-				}
-				sources = append(sources, io.ID)
-				if io.Type == "webhook" {
-					hasWebhook = true
-				}
-			}
-			for _, io := range theproject.Outputs {
-				destinations = append(destinations, io.ID)
-			}
 			// tell the api that we've completed the upload for the deployment
-			if err := updateDeploymentStatusCompleted(logger, apiUrl, token, startResponse.Data.DeploymentId, sources, destinations); err != nil {
+			if err := updateDeploymentStatusCompleted(logger, apiUrl, token, startResponse.Data.DeploymentId); err != nil {
 				logger.Fatal("%s", err)
 			}
-			res, err := theproject.ListIO(logger, apiUrl, token, "source")
-			if err != nil {
-				logger.Fatal("error listing sources: %s", err)
-			}
-			for _, io := range res {
-				if io.Type == "webhook" && io.Config != nil {
-					if auth, ok := io.Config["authorization"].(map[string]any); ok {
-						if val, ok := auth["token"].(string); ok {
-							webhookToken = val
-						}
-					}
-				}
-			}
 		}
 
-		showSpinner(logger, "Deploying ...", action)
+		tui.ShowSpinner(logger, "Deploying ...", action)
 
-		printSuccess("Your project was deployed successfully. It is available at %s", link("%s/projects/%s?deploymentId=%s", appUrl, theproject.ProjectId, startResponse.Data.DeploymentId))
+		body := tui.Body("· Track Agent deployment at " + tui.Link("%s/projects/%s?deploymentId=%s", appUrl, theproject.ProjectId, startResponse.Data.DeploymentId))
+		body2 := tui.Body(fmt.Sprintf("· Send %s webhook request to ", theproject.Agents[0].Name) + tui.Link("%s/run/%s", appUrl, theproject.Agents[0].ID))
 
-		if len(theproject.Inputs) > 0 {
-			var found bool
-			for _, io := range theproject.Inputs {
-				if io.Type == "webhook" {
-					found = true
-					break
-				}
-			}
-			if found {
-				if webhookToken != "" {
-					printSuccess("You can send a POST to %s with the following Bearer token: %s", link("%s/project/%s/run", apiUrl, theproject.ProjectId), color.BlackString(webhookToken))
-				} else {
-					printSuccess("You can send a POST to %s", link("%s/project/%s/run", apiUrl, theproject.ProjectId))
-				}
-			}
-		}
+		tui.ShowBanner("Your project was deployed successfully!", body+"\n\n"+body2, true)
 	},
 }
 
@@ -402,9 +362,9 @@ func updateDeploymentStatus(logger logger.Logger, apiUrl, token, deploymentId, s
 	return client.Do("PUT", fmt.Sprintf("/cli/deploy/upload/%s", deploymentId), payload, nil)
 }
 
-func updateDeploymentStatusCompleted(logger logger.Logger, apiUrl, token, deploymentId string, sources []string, destinations []string) error {
+func updateDeploymentStatusCompleted(logger logger.Logger, apiUrl, token, deploymentId string) error {
 	client := util.NewAPIClient(logger, apiUrl, token)
-	payload := map[string]any{"state": "completed", "sources": sources, "destinations": destinations}
+	payload := map[string]any{"state": "completed"}
 	return client.Do("PUT", fmt.Sprintf("/cli/deploy/upload/%s", deploymentId), payload, nil)
 }
 

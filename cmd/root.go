@@ -1,20 +1,14 @@
 package cmd
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
-	"strings"
 
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/provider"
+	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/go-common/logger"
-	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/huh/spinner"
-	"github.com/fatih/color"
-	"github.com/inancgumus/screen"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -27,48 +21,12 @@ var (
 
 var cfgFile string
 
-const logoHeader = `
-                 ---                 
-                -----                
-               -------               
-              ---- ----              
-             ----   ----             
-            ----     ----            
-           ----       ----           
-          ----------------------     
-         ------------------------    
-
-
- -------------------------------     
----------------------------------    
-   ----                       ----   
-  ----                         ----  
- ----------------------------------- 
--------------------------------------
-`
-
-func center(s string, width int) string {
-	padding := width - len(s)
-	if padding <= 0 {
-		return s
-	}
-	leftPadding := padding / 2
-	rightPadding := padding - leftPadding
-	return strings.Repeat(" ", leftPadding) + s + strings.Repeat(" ", rightPadding)
-}
-
-func printLogo() {
-	color.RGB(0, 255, 255).Print(logoHeader)
-	fmt.Println(color.RGB(0, 255, 255).Sprint(center("Agentuity Agent Cloud", 40)))
-	fmt.Println()
-}
-
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:     "agentuity",
 	Aliases: []string{"ag"},
 	Run: func(cmd *cobra.Command, args []string) {
-		printLogo()
+		tui.Logo()
 		cmd.Help()
 	},
 }
@@ -132,34 +90,6 @@ func initConfig() {
 	}
 }
 
-func printSuccess(msg string, args ...any) {
-	fmt.Printf("%s %s", color.GreenString("✓"), color.WhiteString(fmt.Sprintf(msg, args...)))
-	fmt.Println()
-}
-
-func printLock(msg string, args ...any) {
-	fmt.Printf("🔒 %s", fmt.Sprintf(msg, args...))
-	fmt.Println()
-}
-
-func printWarning(msg string, args ...any) {
-	fmt.Printf("%s %s", color.RedString("✕"), fmt.Sprintf(msg, args...))
-	fmt.Println()
-}
-
-func command(cmd string, args ...string) string {
-	cmdline := "agentuity " + strings.Join(append([]string{cmd}, args...), " ")
-	return color.HiCyanString(cmdline)
-}
-
-func link(url string, args ...any) string {
-	val := color.HiWhiteString(fmt.Sprintf(url, args...))
-	if runtime.GOOS == "windows" {
-		return val
-	}
-	return "\033[4m" + val + "\033[0m"
-}
-
 func maxString(val string, max int) string {
 	if len(val) > max {
 		return val[:max] + "..."
@@ -167,96 +97,22 @@ func maxString(val string, max int) string {
 	return val
 }
 
-func showSpinner(logger logger.Logger, title string, action func()) {
-	if err := spinner.New().Title(title).Action(action).Run(); err != nil {
-		logger.Fatal("%s", err)
-	}
-}
-
-var theme = huh.ThemeCatppuccin()
-
-func getInput(logger logger.Logger, title string, description string, prompt string, mask bool, defaultValue string, validate func(string) error) string {
-	value := defaultValue
-	if prompt == "" {
-		prompt = "> "
-	}
-	echoMode := huh.EchoModeNormal
-	if mask {
-		echoMode = huh.EchoModePassword
-	}
-	if validate == nil {
-		validate = func(string) error {
-			return nil
-		}
-	}
-	if huh.NewInput().
-		Title(title).
-		Description(description).
-		Prompt(prompt).
-		Value(&value).
-		EchoMode(echoMode).
-		Validate(validate).
-		WithHeight(100).WithTheme(theme).Run() != nil {
-		logger.Fatal("failed to get input value")
-	}
-	return value
-}
-
-func ask(logger logger.Logger, title string, defaultValue bool) bool {
-	confirm := defaultValue
-	if huh.NewConfirm().
-		Title(title).
-		Affirmative("Yes!").
-		Negative("No").
-		Value(&confirm).
-		Inline(true).
-		WithTheme(theme).
-		Run() != nil {
-		logger.Fatal("failed to confirm")
-	}
-	return confirm
-}
-
 func initScreenWithLogo() {
-	screen.Clear()
-	screen.MoveTopLeft()
-	printLogo()
-	fmt.Println()
-	fmt.Println()
+	tui.ClearScreen()
+	tui.Logo()
 }
 
 func createPromptHelper() provider.PromptHelpers {
 	return provider.PromptHelpers{
-		ShowSpinner:   showSpinner,
-		PrintSuccess:  printSuccess,
-		CommandString: command,
-		LinkString:    link,
-		PrintLock:     printLock,
-		PrintWarning:  printWarning,
-		Ask:           ask,
+		ShowSpinner:   tui.ShowSpinner,
+		PrintSuccess:  tui.ShowSuccess,
+		CommandString: tui.Command,
+		LinkString:    tui.Link,
+		PrintLock:     tui.ShowLock,
+		PrintWarning:  tui.ShowWarning,
+		Ask:           tui.Ask,
 		PromptForEnv:  promptForEnv,
 	}
-}
-
-func resolveDir(logger logger.Logger, dir string, createIfNotExists bool) string {
-	if dir == "." {
-		cwd, err := os.Getwd()
-		if err != nil {
-			logger.Fatal("failed to get current directory: %s", err)
-		}
-		dir = cwd
-	}
-
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		if createIfNotExists {
-			if err := os.MkdirAll(dir, 0700); err != nil {
-				logger.Fatal("failed to create directory: %s", err)
-			}
-		} else {
-			logger.Fatal("directory does not exist: %s", dir)
-		}
-	}
-	return dir
 }
 
 func resolveProjectDir(logger logger.Logger, cmd *cobra.Command) string {
