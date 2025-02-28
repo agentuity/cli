@@ -27,13 +27,12 @@ type initProjectResult struct {
 }
 
 type ProjectData struct {
-	APIKey      string            `json:"api_key"`
-	ProjectId   string            `json:"id"`
-	Env         map[string]string `json:"env"`
-	Secrets     map[string]string `json:"secrets"`
-	IOId        string            `json:"ioId"`
-	IOAuthToken string            `json:"ioAuthToken,omitempty"`
-	AgentID     string            `json:"agentId"`
+	APIKey           string            `json:"api_key"`
+	ProjectId        string            `json:"id"`
+	Env              map[string]string `json:"env"`
+	Secrets          map[string]string `json:"secrets"`
+	WebhookAuthToken string            `json:"webhookAuthToken,omitempty"`
+	AgentID          string            `json:"agentId"`
 }
 
 type InitProjectArgs struct {

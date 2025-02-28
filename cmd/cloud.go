@@ -349,9 +349,10 @@ var cloudDeployCmd = &cobra.Command{
 
 		tui.ShowSpinner(logger, "Deploying ...", action)
 
-		body := tui.Body("· Track agent deployment at " + tui.Link("%s/projects/%s?deploymentId=%s", appUrl, theproject.ProjectId, startResponse.Data.DeploymentId))
+		body := tui.Body("· Track Agent deployment at " + tui.Link("%s/projects/%s?deploymentId=%s", appUrl, theproject.ProjectId, startResponse.Data.DeploymentId))
+		body2 := tui.Body(fmt.Sprintf("· Send %s webhook request to ", theproject.Agents[0].Name) + tui.Link("%s/run/%s", appUrl, theproject.Agents[0].ID))
 
-		tui.ShowBanner("Your project was deployed successfully!", body, true)
+		tui.ShowBanner("Your project was deployed successfully!", body+"\n\n"+body2, true)
 	},
 }
 
