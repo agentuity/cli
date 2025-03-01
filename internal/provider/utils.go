@@ -661,7 +661,7 @@ func BundleJS(logger logger.Logger, project *project.Project, dir string, produc
 		agents = append(agents, AgentConfig{
 			ID:       agent.ID,
 			Name:     agent.Name,
-			Filename: filepath.Join(project.Bundler.AgentConfig.Dir, agent.Name, "index.js"),
+			Filename: filepath.Join(project.Bundler.AgentConfig.Dir, util.SafeFilename(agent.Name), "index.js"),
 		})
 	}
 	defines["process.env.AGENTUITY_CLOUD_AGENTS_JSON"] = fmt.Sprintf("'%s'", cstr.JSONStringify(agents))
