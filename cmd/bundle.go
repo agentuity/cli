@@ -1,7 +1,10 @@
 package cmd
 
 import (
-	"github.com/agentuity/cli/internal/provider"
+	"context"
+	"time"
+
+	"github.com/agentuity/cli/internal/bundler"
 	"github.com/spf13/cobra"
 )
 
@@ -10,12 +13,19 @@ var bundleCmd = &cobra.Command{
 	Short:  "Run the build bundle process",
 	Hidden: true,
 	Run: func(cmd *cobra.Command, args []string) {
+		started := time.Now()
 		projectContext := ensureProject(cmd)
 		production, _ := cmd.Flags().GetBool("production")
 		projectContext.Project.Bundler.CLIVersion = Version
-		if err := provider.BundleJS(projectContext.Logger, projectContext.Project, projectContext.Dir, production); err != nil {
-			projectContext.Logger.Fatal("failed to bundle JS: %s", err)
+		if err := bundler.BundleJS(bundler.BundleJSContext{
+			Context:    context.Background(),
+			Logger:     projectContext.Logger,
+			ProjectDir: projectContext.Dir,
+			Production: production,
+		}); err != nil {
+			projectContext.Logger.Fatal("%s", err)
 		}
+		projectContext.Logger.Debug("bundled in %s", time.Since(started))
 	},
 }
 

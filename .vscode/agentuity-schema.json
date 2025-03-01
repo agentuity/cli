@@ -1,0 +1,45 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Agentuity Template Schema",
+	"description": "Schema for Agentuity template files",
+	"type": "object",
+	"requires": ["identifier", "language", "src_dir", "filename", "new_project"],
+	"properties": {
+		"identifier": {
+			"type": "string",
+			"description": "The unique identifier for the template"
+		},
+		"language": {
+			"type": "string",
+			"description": "The programming language used by the template"
+		},
+		"src_dir": {
+			"type": "string",
+			"description": "The source directory for the template"
+		},
+		"filename": {
+			"type": "string",
+			"description": "The main filename for the template"
+		},
+		"ignore": {
+			"type": "array",
+			"description": "List of patterns to ignore",
+			"items": {
+				"type": "string"
+			}
+		},
+		"new_project": {
+			"type": "object",
+			"description": "Steps to create a new project",
+			"properties": {
+				"steps": {
+					"type": "array",
+					"description": "List of steps to execute",
+					"items": {
+						"type": "object"
+					}
+				}
+			}
+		}
+	}
+}

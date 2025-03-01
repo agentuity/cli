@@ -59,13 +59,13 @@ type projectResponse struct {
 }
 
 type projectContext struct {
-	Logger   logger.Logger
-	Project  *project.Project
-	Provider provider.Provider
-	Dir      string
-	APIURL   string
-	APPURL   string
-	Token    string
+	Logger  logger.Logger
+	Project *project.Project
+	// Provider provider.Provider
+	Dir    string
+	APIURL string
+	APPURL string
+	Token  string
 }
 
 func ensureProject(cmd *cobra.Command) projectContext {
@@ -80,27 +80,27 @@ func ensureProject(cmd *cobra.Command) projectContext {
 		logger.Fatal("error loading project: %s", err)
 	}
 
-	name := theproject.Bundler.Framework
-	if name == "" {
-		name = theproject.Bundler.Runtime
-	}
-	if name == "" {
-		name = theproject.Bundler.Language
-	}
+	// name := theproject.Bundler.Framework
+	// if name == "" {
+	// 	name = theproject.Bundler.Runtime
+	// }
+	// if name == "" {
+	// 	name = theproject.Bundler.Language
+	// }
 
-	p, err := provider.GetProviderForName(name)
-	if err != nil {
-		logger.Fatal("%s", err)
-	}
+	// p, err := provider.GetProviderForName(name)
+	// if err != nil {
+	// 	logger.Fatal("%s", err)
+	// }
 
 	return projectContext{
-		Logger:   logger,
-		Project:  theproject,
-		Provider: p,
-		Dir:      dir,
-		APIURL:   apiUrl,
-		APPURL:   appUrl,
-		Token:    token,
+		Logger:  logger,
+		Project: theproject,
+		// Provider: p,
+		Dir:    dir,
+		APIURL: apiUrl,
+		APPURL: appUrl,
+		Token:  token,
 	}
 }
 
