@@ -49,7 +49,7 @@ func (r *Requirement) checkForBrew(brew string, formula string) bool {
 }
 
 func (r *Requirement) upgradeBrew(brew string, formula string) error {
-	c := exec.Command(brew, "update", formula)
+	c := exec.Command(brew, "update")
 	c.Stdin = nil
 	c.Stdout = io.Discard
 	c.Stderr = io.Discard
