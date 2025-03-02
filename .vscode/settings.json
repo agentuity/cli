@@ -1,8 +1,22 @@
 {
 	"files.associations": {
-		"*.ts": "typescript"
+		"*.ts": "typescript",
+		"**/internal/templates/data/**/*.yaml": "yaml"
 	},
 	"[typescript]": {
 		"editor.formatOnSave": false
-	}
+	},
+	"yaml.schemas": {
+		".vscode/agentuity-schema.json": [
+			"**/internal/templates/data/**/rules.yaml"
+		]
+	},
+	"yaml.validate": true,
+	"yaml.customTags": [
+		"!include scalar",
+		"!include mapping",
+		"!include sequence"
+	],
+	"yaml.schemaStore.enable": false,
+	"yaml.disableDefaultProperties": true
 }

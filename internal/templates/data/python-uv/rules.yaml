@@ -1,0 +1,49 @@
+identifier: "python-uv"
+language: "py"
+runtime: "uv"
+src_dir: "agents"
+filename: "agent.py"
+bundle:
+  enabled: false
+  ignore:
+deployment:
+  command: uv
+  args:
+new_project:
+  resources:
+    memory: 500Mi
+    cpu: 500M
+  initial:
+    name: "myfirstagent"
+    description: "This is my first agent which uses the LiteLLM to generate a text response"
+  steps:
+    - command: uv
+      args:
+        - venv
+        - --python
+        - ">=3.10"
+    - command: uv
+      args:
+        - init
+        - --name
+        - "{{ .Name }}"
+        - --no-package
+        - --python
+        - ">=3.10"
+        - --description
+        - "{{ .Description }}"
+        - --no-readme
+        - --quiet
+        - --no-workspace
+        - --app
+    - command: uv
+      args:
+        - add
+        - --quiet
+        - agentuity
+    - action: delete_file
+      files:
+        - "hello.py"
+    - action: copy_dir
+      from: "common/cursor"
+      to: ".cursorrules"

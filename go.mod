@@ -3,7 +3,7 @@ module github.com/agentuity/cli
 go 1.24
 
 require (
-	github.com/BurntSushi/toml v1.4.0
+	github.com/Masterminds/semver v1.5.0
 	github.com/agentuity/go-common v1.0.2
 	github.com/bmatcuk/doublestar/v4 v4.8.1
 	github.com/buger/goterm v1.0.4

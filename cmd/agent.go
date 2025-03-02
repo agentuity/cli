@@ -9,6 +9,7 @@ import (
 
 	"github.com/agentuity/cli/internal/agent"
 	"github.com/agentuity/cli/internal/project"
+	"github.com/agentuity/cli/internal/templates"
 	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
@@ -124,7 +125,17 @@ var agentCreateCmd = &cobra.Command{
 				logger.Fatal("failed to create agent: %s", err)
 			}
 
-			if err := theproject.Provider.NewAgent(logger, theproject.Dir, agentID, name, description); err != nil {
+			rules, err := templates.LoadTemplateRuleForIdentifier(theproject.Project.Bundler.Identifier)
+			if err != nil {
+				logger.Fatal("failed to load template rules for %s: %s", theproject.Project.Bundler.Identifier, err)
+			}
+
+			if err := rules.NewAgent(templates.TemplateContext{
+				Logger:      logger,
+				Name:        name,
+				Description: description,
+				ProjectDir:  theproject.Dir,
+			}); err != nil {
 				logger.Fatal("failed to create agent: %s", err)
 			}
 
@@ -169,7 +180,8 @@ func reconcileAgentList(logger logger.Logger, apiUrl string, apikey string, proj
 	if err != nil {
 		logger.Fatal("failed to fetch agents for project: %s", err)
 	}
-	agentFilename := project.Provider.AgentFilename()
+	var agentFilename string // FIXME
+	// agentFilename := project.Provider.AgentFilename()
 	agentSrcDir := filepath.Join(project.Dir, project.Project.Bundler.AgentConfig.Dir)
 
 	// perform the reconcilation

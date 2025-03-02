@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,7 +9,7 @@ import (
 
 	"github.com/agentuity/cli/internal/organization"
 	"github.com/agentuity/cli/internal/project"
-	"github.com/agentuity/cli/internal/provider"
+	"github.com/agentuity/cli/internal/templates"
 	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
@@ -36,7 +37,7 @@ type InitProjectArgs struct {
 	Name              string
 	Description       string
 	EnableWebhookAuth bool
-	Provider          provider.Provider
+	Provider          *templates.TemplateRules
 	AgentName         string
 	AgentDescription  string
 }
@@ -51,7 +52,7 @@ func initProject(logger logger.Logger, args InitProjectArgs) *project.ProjectDat
 		Description:       args.Description,
 		EnableWebhookAuth: args.EnableWebhookAuth,
 		Dir:               args.Dir,
-		Provider:          args.Provider.Name(),
+		Provider:          args.Provider.Identifier,
 		AgentName:         args.AgentName,
 		AgentDescription:  args.AgentDescription,
 	})
@@ -59,23 +60,31 @@ func initProject(logger logger.Logger, args InitProjectArgs) *project.ProjectDat
 		logger.Fatal("failed to initialize project: %s", err)
 	}
 
-	if err := args.Provider.InitProject(logger, args.Dir, result); err != nil {
-		logger.Fatal("failed to initialize project: %s", err)
-	}
-
 	proj := project.NewProject()
 	proj.ProjectId = result.ProjectId
+	proj.OrgId = args.OrgId
 	proj.Name = args.Name
 	proj.Description = args.Description
 
 	proj.Bundler = &project.Bundler{
-		Language:  args.Provider.Language(),
-		Framework: args.Provider.Framework(),
-		Runtime:   args.Provider.Runtime(),
+		Enabled:    args.Provider.Bundle.Enabled,
+		Identifier: args.Provider.Identifier,
+		Language:   args.Provider.Language,
+		Framework:  args.Provider.Framework,
+		Runtime:    args.Provider.Runtime,
+		Ignore:     args.Provider.Bundle.Ignore,
 		AgentConfig: project.AgentBundlerConfig{
-			Dir: args.Provider.DefaultSrcDir(),
+			Dir: args.Provider.SrcDir,
 		},
 	}
+
+	fmt.Println("!!", args.Provider)
+
+	// copy over the deployment command and args from the template
+	proj.Deployment.Command = args.Provider.Deployment.Command
+	proj.Deployment.Args = args.Provider.Deployment.Args
+	proj.Deployment.Resources.CPU = args.Provider.Deployment.Resources.CPU
+	proj.Deployment.Resources.Memory = args.Provider.Deployment.Resources.Memory
 
 	// add the initial agent
 	proj.Agents = []project.AgentConfig{
@@ -141,6 +150,7 @@ var docStyle = lipgloss.NewStyle().Margin(1, 2)
 
 type projectProvider struct {
 	title, desc, id string
+	template        *templates.Template
 }
 
 func (i projectProvider) Title() string       { return i.title }
@@ -181,9 +191,18 @@ func (m *projectSelectionModel) View() string {
 	return docStyle.Render(m.list.View())
 }
 
-func showProjectSelector(items []list.Item) string {
+func showProjectSelector(items []list.Item) *templates.Template {
 
-	m := projectSelectionModel{list: list.New(items, list.NewDefaultDelegate(), 0, 0)}
+	for i, item := range items {
+		var p = item.(projectProvider)
+		p.desc = lipgloss.NewStyle().SetString(p.desc).Width(60).AlignHorizontal(lipgloss.Left).Render()
+		items[i] = p
+	}
+
+	delegate := list.NewDefaultDelegate()
+	delegate.SetHeight(4)
+
+	m := projectSelectionModel{list: list.New(items, delegate, 0, 0)}
 	m.list.Title = "Select your project framework"
 	m.list.Styles.Title = lipgloss.NewStyle().Foreground(tui.TitleColor())
 
@@ -199,7 +218,7 @@ func showProjectSelector(items []list.Item) string {
 		os.Exit(1)
 	}
 
-	return items[m.list.Index()].(projectProvider).id
+	return items[m.list.Index()].(projectProvider).template
 }
 
 var projectNewCmd = &cobra.Command{
@@ -272,23 +291,35 @@ var projectNewCmd = &cobra.Command{
 		}
 
 		var providerName string
-		providers := provider.GetProviders()
+		var provider *templates.Template
+
+		// providers := provider.GetProviders()
 		providerArg, _ := cmd.Flags().GetString("provider")
+
+		tmpls, err := templates.LoadTemplates()
+		if err != nil {
+			logger.Fatal("failed to load templates: %s", err)
+		}
+
+		if len(tmpls) == 0 {
+			logger.Fatal("no templates found")
+		}
 
 		if providerArg != "" {
 			providerName = providerArg
 			var found bool
-			for _, provider := range providers {
-				if provider.Identifier() == providerName {
+			for _, tmpl := range tmpls {
+				if tmpl.Identifier == providerName {
 					found = true
+					provider = &tmpl
 					break
 				}
-				for _, alias := range provider.Aliases() {
-					if alias == providerName {
-						found = true
-						break
-					}
-				}
+				// for _, alias := range provider.Aliases() {
+				// 	if alias == providerName {
+				// 		found = true
+				// 		break
+				// 	}
+				// }
 				if found {
 					break
 				}
@@ -302,15 +333,20 @@ var projectNewCmd = &cobra.Command{
 
 			var items []list.Item
 
-			for key, provider := range providers {
-				items = append(items, projectProvider{id: key, title: provider.Name(), desc: provider.Description()})
+			for _, tmpls := range tmpls {
+				items = append(items, projectProvider{
+					id:       tmpls.Identifier,
+					title:    tmpls.Name,
+					desc:     tmpls.Description,
+					template: &tmpls,
+				})
 			}
 
 			sort.Slice(items, func(i, j int) bool {
 				return items[i].(projectProvider).title < items[j].(projectProvider).title
 			})
 
-			providerName = showProjectSelector(items)
+			provider = showProjectSelector(items)
 		}
 
 		if util.Exists(projectDir) {
@@ -323,17 +359,20 @@ var projectNewCmd = &cobra.Command{
 			}
 		}
 
-		theprovider := providers[providerName]
-		if theprovider == nil {
-			logger.Fatal("invalid provider: %s", providerName)
-		}
-
 		var projectData *project.ProjectData
 
 		tui.ShowSpinner(logger, "creating project ...", func() {
-			if err := theprovider.NewProject(logger, projectDir, name); err != nil {
+			rules, err := provider.NewProject(templates.TemplateContext{
+				Context:     context.Background(),
+				Logger:      logger,
+				Name:        name,
+				Description: description,
+				ProjectDir:  projectDir,
+			})
+			if err != nil {
 				logger.Fatal("failed to create project: %s", err)
 			}
+
 			projectData = initProject(logger, InitProjectArgs{
 				BaseURL:          apiUrl,
 				Dir:              projectDir,
@@ -341,9 +380,9 @@ var projectNewCmd = &cobra.Command{
 				OrgId:            orgId,
 				Name:             name,
 				Description:      description,
-				Provider:         theprovider,
-				AgentName:        provider.MyFirstAgentName,
-				AgentDescription: provider.MyFirstAgentDescription,
+				Provider:         rules,
+				AgentName:        rules.NewProjectSteps.InitialAgent.Name,
+				AgentDescription: rules.NewProjectSteps.InitialAgent.Description,
 			})
 		})
 

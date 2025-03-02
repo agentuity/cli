@@ -1,0 +1,14 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+# Specify the following for Cursor rules
+description: Guidelines for the Agentuity AI Configuration file
+globs: "agentuity.yaml"
+---
+
+# Agentuity Configuration File
+
+This file is used by agentuity to configure the AI Agent project.  You should NOT suggest edits to this file.

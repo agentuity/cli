@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/agentuity/cli/internal/deployer"
 	"github.com/agentuity/cli/internal/project"
-	"github.com/agentuity/cli/internal/provider"
 	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/go-common/logger"
 	"github.com/spf13/cobra"
@@ -102,8 +102,8 @@ func initScreenWithLogo() {
 	tui.Logo()
 }
 
-func createPromptHelper() provider.PromptHelpers {
-	return provider.PromptHelpers{
+func createPromptHelper() deployer.PromptHelpers {
+	return deployer.PromptHelpers{
 		ShowSpinner:   tui.ShowSpinner,
 		PrintSuccess:  tui.ShowSuccess,
 		CommandString: tui.Command,

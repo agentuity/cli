@@ -1,0 +1,85 @@
+identifier: "nodejs"
+language: "javascript"
+runtime: "nodejs"
+src_dir: "src/agents"
+filename: "index.ts"
+bundle:
+  enabled: true
+  ignore:
+    - "node_modules/**"
+    - "dist/**"
+    - "src/**"
+deployment:
+  resources:
+    memory: 250Mi
+    cpu: 500M
+  command: node
+  args:
+    - --disable-sigusr1
+    - --disallow-code-generation-from-strings
+    - --no-addons
+    - --no-deprecation
+    - --no-global-search-paths
+    - --report-uncaught-exception
+    - /app/.agentuity/index.js
+new_agent:
+  steps:
+    - action: create_file
+      filename: "src/agents/{{ .Name | safe_filename }}/index.ts"
+      from: "common/js/agent.ts"
+new_project:
+  initial:
+    name: "MyFirstAgent"
+    description: "This is my first agent which uses the Vercel AI SDK to generate a text response"
+  steps:
+    - command: npm
+      args:
+        - init
+        - --yes
+    - command: npm
+      args:
+        - install
+        - "@agentuity/sdk"
+        - ai
+        - "@ai-sdk/openai"
+    - command: npm
+      args:
+        - install
+        - typescript
+        - "@types/node"
+        - -D
+    - action: delete_file
+      files:
+        - "index.ts"
+    - action: modify_package_json
+      script:
+        - name: "build"
+          value: "agentuity build"
+        - name: "prestart"
+          value: "agentuity bundle"
+        - name: "start"
+          value: "node --env-file .env .agentuity/index.js"
+      main: "index.js"
+      type: "module"
+      name: "{{ .Name }}"
+      version: "0.0.1"
+      description: "{{ .Description }}"
+      keywords: ["agentuity", "agent", "ai", "ai agent", "vercel", "bun"]
+    - action: create_file
+      filename: tsconfig.json
+      from: "data/nodejs/tsconfig.json"
+    - action: create_file
+      filename: "index.ts"
+      from: "common/js/boot.ts"
+    - action: create_file
+      filename: ".gitignore"
+      from: "data/nodejs/gitignore"
+    - action: create_file
+      filename: "src/agents/MyFirstAgent/index.ts"
+      from: "common/js/agent.ts"
+    - action: copy_dir
+      from: "common/js/cursor"
+      to: ".cursorrules"
+    - action: copy_dir
+      from: "common/cursor"
+      to: ".cursorrules"
