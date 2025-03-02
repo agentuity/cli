@@ -78,8 +78,6 @@ func initProject(logger logger.Logger, args InitProjectArgs) *project.ProjectDat
 		},
 	}
 
-	fmt.Println("!!", args.Provider)
-
 	// copy over the deployment command and args from the template
 	proj.Deployment.Command = args.Provider.Deployment.Command
 	proj.Deployment.Args = args.Provider.Deployment.Args
