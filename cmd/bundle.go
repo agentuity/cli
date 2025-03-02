@@ -16,7 +16,7 @@ var bundleCmd = &cobra.Command{
 		started := time.Now()
 		projectContext := ensureProject(cmd)
 		production, _ := cmd.Flags().GetBool("production")
-		if err := bundler.Bundle(bundler.BundleJSContext{
+		if err := bundler.Bundle(bundler.BundleContext{
 			Context:    context.Background(),
 			Logger:     projectContext.Logger,
 			ProjectDir: projectContext.Dir,

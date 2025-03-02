@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	Version string
-	Commit  string
+	Version string = "dev"
+	Commit  string = "dev"
 	Date    string
 )
 

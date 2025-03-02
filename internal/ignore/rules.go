@@ -67,6 +67,7 @@ func (r *Rules) AddDefaults() {
 	r.parseRule("LICENSE.md")
 	r.parseRule("LICENSE")
 	r.parseRule("Makefile")
+	r.parseRule(".cursorrules/**")
 }
 
 // Add a rule to the ignore set.
