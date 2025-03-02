@@ -70,7 +70,7 @@ type DeployPreflightCheckData struct {
 func PreflightCheck(ctx context.Context, logger logger.Logger, data DeployPreflightCheckData) error {
 	if data.Project.Bundler.Enabled {
 		started := time.Now()
-		if err := bundler.Bundle(bundler.BundleJSContext{
+		if err := bundler.Bundle(bundler.BundleContext{
 			Context:    context.Background(),
 			Logger:     logger,
 			ProjectDir: data.Dir,

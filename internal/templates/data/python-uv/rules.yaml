@@ -1,18 +1,26 @@
-identifier: "python-uv"
-language: "py"
-runtime: "uv"
-src_dir: "agents"
-filename: "agent.py"
+identifier: python-uv
+language: python
+runtime: uv
+src_dir: agents
+filename: agent.py
 bundle:
-  enabled: false
+  enabled: true
   ignore:
+    - "**/__pycache__/**"
 deployment:
+  resources:
+    memory: 250Mi
+    cpu: 500M
   command: uv
   args:
+    - run
+    - server.py
+new_agent:
+  steps:
+    - action: create_file
+      filename: "agents/{{ .Name | safe_filename }}/agent.py"
+      from: "common/py/agent.py"
 new_project:
-  resources:
-    memory: 500Mi
-    cpu: 500M
   initial:
     name: "myfirstagent"
     description: "This is my first agent which uses the LiteLLM to generate a text response"
@@ -47,3 +55,12 @@ new_project:
     - action: copy_dir
       from: "common/cursor"
       to: ".cursorrules"
+    - action: create_file
+      filename: "server.py"
+      from: "common/py/boot.py"
+    - action: create_file
+      filename: ".gitignore"
+      from: "data/common/py/gitignore"
+    - action: create_file
+      filename: "agents/myfirstagent/agent.py"
+      from: "common/py/agent.py"

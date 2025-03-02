@@ -1,12 +1,7 @@
 ---
-description: 
-globs: 
-alwaysApply: false
----
----
-# Specify the following for Cursor rules
 description: Guidelines for the Agentuity AI Configuration file
 globs: "agentuity.yaml"
+alwaysApply: true 
 ---
 
 # Agentuity Configuration File
