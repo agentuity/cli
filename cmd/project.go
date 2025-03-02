@@ -62,22 +62,29 @@ func initProject(logger logger.Logger, args InitProjectArgs) *project.ProjectDat
 
 	proj := project.NewProject()
 	proj.ProjectId = result.ProjectId
+	proj.OrgId = args.OrgId
 	proj.Name = args.Name
 	proj.Description = args.Description
 
 	proj.Bundler = &project.Bundler{
+		Enabled:    args.Provider.Bundle.Enabled,
 		Identifier: args.Provider.Identifier,
 		Language:   args.Provider.Language,
 		Framework:  args.Provider.Framework,
 		Runtime:    args.Provider.Runtime,
+		Ignore:     args.Provider.Bundle.Ignore,
 		AgentConfig: project.AgentBundlerConfig{
 			Dir: args.Provider.SrcDir,
 		},
 	}
 
+	fmt.Println("!!", args.Provider)
+
 	// copy over the deployment command and args from the template
 	proj.Deployment.Command = args.Provider.Deployment.Command
 	proj.Deployment.Args = args.Provider.Deployment.Args
+	proj.Deployment.Resources.CPU = args.Provider.Deployment.Resources.CPU
+	proj.Deployment.Resources.Memory = args.Provider.Deployment.Resources.Memory
 
 	// add the initial agent
 	proj.Agents = []project.AgentConfig{

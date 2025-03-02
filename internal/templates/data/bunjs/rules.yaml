@@ -1,14 +1,18 @@
 identifier: "bunjs"
-language: "js"
+language: "javascript"
 runtime: "bunjs"
 src_dir: "src/agents"
 filename: "index.ts"
 bundle:
+  enabled: true
   ignore:
     - "node_modules/**"
     - "dist/**"
     - "src/**"
 deployment:
+  resources:
+    memory: 250Mi
+    cpu: 500M
   command: bun
   args:
     - run

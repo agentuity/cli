@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,15 +11,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agentuity/cli/internal/deployer"
 	"github.com/agentuity/cli/internal/ignore"
 	"github.com/agentuity/cli/internal/project"
-	"github.com/agentuity/cli/internal/provider"
 	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 var cloudCmd = &cobra.Command{
@@ -29,43 +31,39 @@ var cloudCmd = &cobra.Command{
 	},
 }
 
-type startResponse struct {
-	Success bool `json:"success"`
-	Data    struct {
-		DeploymentId string `json:"deploymentId"`
-		Url          string `json:"url"`
-	}
-	Message *string `json:"message,omitempty"`
-}
-
 type Agent struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 }
-
-type startRequest struct {
-	Agents []Agent `json:"agents"`
-}
-
-type projectResponse struct {
+type startResponse struct {
 	Success bool `json:"success"`
 	Data    struct {
-		Id    string `json:"id"`
-		OrgId string `json:"orgId"`
-		Name  string `json:"name"`
+		DeploymentId string  `json:"deploymentId"`
+		Url          string  `json:"url"`
+		Created      []Agent `json:"created,omitempty"`
 	}
 	Message *string `json:"message,omitempty"`
+}
+
+type Resources struct {
+	Memory int64 `json:"memory,omitempty"`
+	CPU    int64 `json:"cpu,omitempty"`
+	Disk   int64 `json:"disk,omitempty"`
+}
+
+type startRequest struct {
+	Agents    []Agent    `json:"agents"`
+	Resources *Resources `json:"resources,omitempty"`
 }
 
 type projectContext struct {
 	Logger  logger.Logger
 	Project *project.Project
-	// Provider provider.Provider
-	Dir    string
-	APIURL string
-	APPURL string
-	Token  string
+	Dir     string
+	APIURL  string
+	APPURL  string
+	Token   string
 }
 
 func ensureProject(cmd *cobra.Command) projectContext {
@@ -108,6 +106,7 @@ var cloudDeployCmd = &cobra.Command{
 	Use:   "deploy",
 	Short: "Deploy project to the cloud",
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx := context.Background()
 		context := ensureProject(cmd)
 		logger := context.Logger
 		theproject := context.Project
@@ -118,22 +117,10 @@ var cloudDeployCmd = &cobra.Command{
 
 		deploymentConfig := project.NewDeploymentConfig()
 
-		name := theproject.Bundler.Framework
-		if name == "" {
-			name = theproject.Bundler.Runtime
-		}
-		if name == "" {
-			name = theproject.Bundler.Language
-		}
-
-		p, err := provider.GetProviderForName(name)
-		if err != nil {
-			logger.Fatal("%s", err)
-		}
-
 		client := util.NewAPIClient(logger, apiUrl, token)
+		var err error
 		var le []env.EnvLine
-		var envFile *provider.EnvFile
+		var envFile *deployer.EnvFile
 		var projectData *project.ProjectData
 
 		action := func() {
@@ -153,7 +140,7 @@ var cloudDeployCmd = &cobra.Command{
 			if err != nil {
 				logger.Fatal("error parsing env file: %s. %s", envfilename, err)
 			}
-			envFile = &provider.EnvFile{Filepath: envfilename, Env: le}
+			envFile = &deployer.EnvFile{Filepath: envfilename, Env: le}
 
 			var foundkeys []string
 			for _, ev := range le {
@@ -203,10 +190,12 @@ var cloudDeployCmd = &cobra.Command{
 			}
 		}
 
-		deploymentConfig.Deployment = theproject.Deployment
+		deploymentConfig.Provider = theproject.Bundler.Identifier
+		deploymentConfig.Language = theproject.Bundler.Language
+		deploymentConfig.Runtime = theproject.Bundler.Runtime
+		deploymentConfig.Command = append([]string{theproject.Deployment.Command}, theproject.Deployment.Args...)
 
-		// allow the provider to perform any preflight checks
-		if err := p.DeployPreflightCheck(logger, provider.DeployPreflightCheckData{
+		if err := deployer.PreflightCheck(ctx, logger, deployer.DeployPreflightCheckData{
 			Dir:           dir,
 			APIClient:     client,
 			APIURL:        apiUrl,
@@ -218,31 +207,25 @@ var cloudDeployCmd = &cobra.Command{
 			OSEnvironment: loadOSEnv(),
 			PromptHelpers: createPromptHelper(),
 		}); err != nil {
-			logger.Fatal("error performing pre-flight check: %s", err)
+			logger.Fatal("%s", err)
 		}
 
-		// have the provider set any specific deployment configuration
-		if err := p.ConfigureDeploymentConfig(deploymentConfig); err != nil {
-			logger.Fatal("error configuring deployment config: %s", err)
-		}
-
-		cleanup, err := deploymentConfig.Write(dir)
+		cleanup, err := deploymentConfig.Write(logger, dir)
 		if err != nil {
 			logger.Fatal("error writing deployment config: %s", err)
 		}
 		defer cleanup()
 
-		// Get project details
-		var projectResponse projectResponse
-		if err := client.Do("GET", fmt.Sprintf("/cli/project/%s", theproject.ProjectId), nil, &projectResponse); err != nil {
-			logger.Fatal("error requesting project: %s", err)
-		}
-		orgId := projectResponse.Data.OrgId
-
 		var startResponse startResponse
 		var startRequest startRequest
 
-		startRequest.Agents = make([]Agent, 0)
+		if theproject.Deployment.Resources != nil {
+			startRequest.Resources = &Resources{
+				Memory: theproject.Deployment.Resources.MemoryQuantity.ScaledValue(resource.Mega),
+				CPU:    theproject.Deployment.Resources.CPUQuantity.ScaledValue(resource.Mega),
+				Disk:   theproject.Deployment.Resources.DiskQuantity.ScaledValue(resource.Mega),
+			}
+		}
 		for _, agent := range theproject.Agents {
 			startRequest.Agents = append(startRequest.Agents, Agent{
 				ID:          agent.ID,
@@ -252,8 +235,30 @@ var cloudDeployCmd = &cobra.Command{
 		}
 
 		// Start deployment
-		if err := client.Do("PUT", fmt.Sprintf("/cli/deploy/start/%s/%s", orgId, theproject.ProjectId), startRequest, &startResponse); err != nil {
+		if err := client.Do("PUT", fmt.Sprintf("/cli/deploy/start/%s", theproject.ProjectId), startRequest, &startResponse); err != nil {
 			logger.Fatal("error starting deployment: %s", err)
+		}
+
+		if !startResponse.Success {
+			if startResponse.Message != nil {
+				logger.Fatal("error starting deployment: %s", *startResponse.Message)
+			}
+			logger.Fatal("unknown error starting deployment")
+		}
+
+		// save any new agents to the project that we're created as part of the deployment
+		if len(startResponse.Data.Created) > 0 {
+			for _, agent := range startResponse.Data.Created {
+				theproject.Agents = append(theproject.Agents, project.AgentConfig{
+					ID:          agent.ID,
+					Name:        agent.Name,
+					Description: agent.Description,
+				})
+			}
+			if err := theproject.Save(dir); err != nil {
+				logger.Fatal("error saving project with new agents: %s", err)
+			}
+			logger.Debug("saved project with new agents")
 		}
 
 		// load up any gitignore files
@@ -269,7 +274,7 @@ var cloudDeployCmd = &cobra.Command{
 		rules.AddDefaults()
 
 		// add any provider specific ignore rules
-		for _, rule := range p.ProjectIgnoreRules() {
+		for _, rule := range theproject.Bundler.Ignore {
 			if err := rules.Add(rule); err != nil {
 				logger.Fatal("error adding project ignore rule: %s. %s", rule, err)
 			}

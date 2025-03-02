@@ -15,6 +15,8 @@ import (
 	"github.com/evanw/esbuild/pkg/api"
 )
 
+var Version = "dev"
+
 type AgentConfig struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
@@ -28,7 +30,7 @@ type BundleJSContext struct {
 	Production bool
 }
 
-func BundleJS(ctx BundleJSContext) error {
+func Bundle(ctx BundleJSContext) error {
 	theproject := project.NewProject()
 	if err := theproject.Load(ctx.ProjectDir); err != nil {
 		return err

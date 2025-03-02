@@ -16,8 +16,7 @@ var bundleCmd = &cobra.Command{
 		started := time.Now()
 		projectContext := ensureProject(cmd)
 		production, _ := cmd.Flags().GetBool("production")
-		projectContext.Project.Bundler.CLIVersion = Version
-		if err := bundler.BundleJS(bundler.BundleJSContext{
+		if err := bundler.Bundle(bundler.BundleJSContext{
 			Context:    context.Background(),
 			Logger:     projectContext.Logger,
 			ProjectDir: projectContext.Dir,
@@ -30,6 +29,7 @@ var bundleCmd = &cobra.Command{
 }
 
 func init() {
+	bundler.Version = Version
 	rootCmd.AddCommand(bundleCmd)
 	bundleCmd.Flags().StringP("dir", "d", ".", "The directory to the project")
 	bundleCmd.Flags().BoolP("production", "p", false, "Whether to bundle for production")

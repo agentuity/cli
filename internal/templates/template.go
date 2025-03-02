@@ -59,12 +59,19 @@ type NewAgentSteps struct {
 }
 
 type Bundle struct {
-	Ignore []string `yaml:"ignore"`
+	Enabled bool     `yaml:"enabled"`
+	Ignore  []string `yaml:"ignore"`
+}
+
+type Resources struct {
+	Memory string `yaml:"memory"`
+	CPU    string `yaml:"cpu"`
 }
 
 type Deployment struct {
-	Command string   `yaml:"command"`
-	Args    []string `yaml:"args"`
+	Resources Resources `yaml:"resources"`
+	Command   string    `yaml:"command"`
+	Args      []string  `yaml:"args"`
 }
 
 type InitialAgent struct {

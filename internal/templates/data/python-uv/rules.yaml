@@ -4,11 +4,15 @@ runtime: "uv"
 src_dir: "agents"
 filename: "agent.py"
 bundle:
+  enabled: false
   ignore:
 deployment:
   command: uv
   args:
 new_project:
+  resources:
+    memory: 500Mi
+    cpu: 500M
   initial:
     name: "myfirstagent"
     description: "This is my first agent which uses the LiteLLM to generate a text response"

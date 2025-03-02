@@ -1,14 +1,18 @@
 identifier: "nodejs"
-language: "js"
+language: "javascript"
 runtime: "nodejs"
 src_dir: "src/agents"
 filename: "index.ts"
 bundle:
+  enabled: true
   ignore:
     - "node_modules/**"
     - "dist/**"
     - "src/**"
 deployment:
+  resources:
+    memory: 250Mi
+    cpu: 500M
   command: node
   args:
     - --disable-sigusr1
