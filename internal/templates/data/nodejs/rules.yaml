@@ -9,6 +9,15 @@ bundle:
     - "node_modules/**"
     - "dist/**"
     - "src/**"
+development:
+  port: 3500
+  watch:
+    enabled: true
+    files:
+      - "src/**"
+  command: node
+  args:
+    - .agentuity/index.js
 deployment:
   resources:
     memory: 250Mi
@@ -21,7 +30,7 @@ deployment:
     - --no-deprecation
     - --no-global-search-paths
     - --report-uncaught-exception
-    - /app/.agentuity/index.js
+    - .agentuity/index.js
 new_agent:
   steps:
     - action: create_file
