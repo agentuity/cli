@@ -114,8 +114,8 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 }
 
 var (
-	pyProjectNameRegex    = regexp.MustCompile(`name\s+=\s+"(\w+)"`)
-	pyProjectVersionRegex = regexp.MustCompile(`version\s+=\s+"([\w-_\.]+)"`)
+	pyProjectNameRegex    = regexp.MustCompile(`name\s+=\s+"(.*?)"`)
+	pyProjectVersionRegex = regexp.MustCompile(`version\s+=\s+"(.*?)"`)
 )
 
 func bundlePython(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
