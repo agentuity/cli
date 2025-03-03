@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"io/fs"
 	"log"
 	"os"
@@ -27,6 +28,10 @@ var rootCmd = &cobra.Command{
 	Use:     "agentuity",
 	Aliases: []string{"ag"},
 	Run: func(cmd *cobra.Command, args []string) {
+		if version, _ := cmd.Flags().GetBool("version"); version {
+			fmt.Println(Version)
+			return
+		}
 		tui.Logo()
 		cmd.Help()
 	},
@@ -42,6 +47,12 @@ func Execute() {
 }
 
 func init() {
+
+	// NOTE: this is not a persistent flag is hidden but since it's a unix default for most
+	// commands its a natural flag to expect
+	rootCmd.Flags().BoolP("version", "v", false, "print out the version")
+	rootCmd.Flags().MarkHidden("version")
+
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/agentuity/config.yaml)")
 	rootCmd.PersistentFlags().String("log-level", "info", "The log level to use")
 
