@@ -178,9 +178,6 @@ func (p *Project) Load(dir string) error {
 	if p.Bundler.AgentConfig.Dir == "" {
 		return fmt.Errorf("missing bundler.Agents.dir value (or its empty), please run `agentuity new` to create a new project")
 	}
-	// if len(p.Agents) == 0 {
-	// 	return fmt.Errorf("missing Agents, please run `agentuity new` to create a new project or `agentuity agent new` to create a new agent")
-	// }
 	if p.Deployment != nil {
 		if p.Deployment.Resources != nil {
 			val, err := resource.ParseQuantity(p.Deployment.Resources.CPU)
