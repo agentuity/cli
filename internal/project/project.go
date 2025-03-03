@@ -374,6 +374,6 @@ func (c *DeploymentConfig) Write(logger logger.Logger, dir string) (CleanupFunc,
 	if err != nil {
 		return cleanup, err
 	}
-	logger.Info("deployment config written to %s", fn)
+	logger.Debug("deployment config written to %s", fn)
 	return cleanup, nil
 }
