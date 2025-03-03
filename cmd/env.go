@@ -15,7 +15,6 @@ import (
 	"github.com/agentuity/go-common/sys"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -274,7 +273,7 @@ var envGetCmd = &cobra.Command{
 				if !hasTTY {
 					fmt.Println(value)
 				} else {
-					fmt.Println(color.CyanString(value))
+					fmt.Println(tui.Title(value))
 				}
 				found = true
 				break
@@ -286,7 +285,7 @@ var envGetCmd = &cobra.Command{
 					if !hasTTY {
 						fmt.Println(value)
 					} else {
-						fmt.Println(color.BlackString(value))
+						fmt.Println(tui.Muted(value))
 					}
 					found = true
 					break
@@ -319,14 +318,14 @@ var envListCmd = &cobra.Command{
 			if !hasTTY {
 				fmt.Printf("%s=%s\n", key, value)
 			} else {
-				fmt.Printf("%s=%s\n", color.WhiteString(key), color.CyanString(value))
+				fmt.Printf("%s=%s\n", tui.Title(key), tui.Body(value))
 			}
 		}
 		for key, value := range projectData.Secrets {
 			if !hasTTY {
 				fmt.Printf("%s=%s\n", key, value)
 			} else {
-				fmt.Printf("%s=%s\n", color.WhiteString(key), color.BlackString(maxString(value, 40)))
+				fmt.Printf("%s=%s\n", tui.Title(key), tui.Muted(maxString(value, 40)))
 			}
 		}
 		if len(projectData.Env) == 0 && len(projectData.Secrets) == 0 {

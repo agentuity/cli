@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -86,7 +87,9 @@ func initConfig() {
 
 	// Finally read the config file
 	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("Error reading config file: %s\n", err)
+		if _, ok := err.(*fs.PathError); !ok {
+			log.Fatalf("Error reading config file: %s\n", err)
+		}
 	}
 }
 

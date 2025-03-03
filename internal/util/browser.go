@@ -7,13 +7,13 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"runtime"
 	"sync"
 	"time"
 
+	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/go-common/logger"
-	"github.com/charmbracelet/huh/spinner"
-	"github.com/fatih/color"
 	"github.com/pkg/browser"
 )
 
@@ -127,13 +127,28 @@ func BrowserFlow(opts BrowserFlowOptions) error {
 		cancel()
 	}()
 
-	color.Magenta("Your browser has been opened to visit the URL:")
+	var skipOpen bool
+	if runtime.GOOS == "linux" {
+		// if we don't have a display, we can't open a browser most likely
+		if _, ok := os.LookupEnv("DISPLAY"); !ok {
+			skipOpen = true
+		}
+	}
+
+	if !skipOpen {
+		fmt.Println(tui.Title("Your browser has been opened to visit the URL:"))
+	} else {
+		// FIXME: this likely isn't going to work until they are on the same machine
+		// we need a non-browser way to handle this via a code that you put in the app or something
+		fmt.Println(tui.Title("Please visit the URL in your browser:"))
+	}
 	fmt.Println()
 	url := u.String()
-	if runtime.GOOS != "windows" {
-		url = "\033[4m" + url + "\033[0m"
+	if !skipOpen {
+		fmt.Println(tui.Muted(url))
+	} else {
+		fmt.Println(tui.Link("%s", url))
 	}
-	color.Black(url)
 	fmt.Println()
 
 	var returnErr error
@@ -141,9 +156,17 @@ func BrowserFlow(opts BrowserFlowOptions) error {
 
 	action := func() {
 		defer wg.Done()
-		if berr := browser.OpenURL(u.String()); berr != nil {
-			returnErr = fmt.Errorf("failed to open browser: %w", err)
-			return
+		var skip bool
+		if runtime.GOOS == "linux" {
+			if _, ok := os.LookupEnv("DISPLAY"); !ok {
+				skip = true
+			}
+		}
+		if !skip {
+			if berr := browser.OpenURL(u.String()); berr != nil {
+				returnErr = fmt.Errorf("failed to open browser: %s", err)
+				return
+			}
 		}
 		logger.Trace("waiting for callback to http://127.0.0.1:%d", port)
 		select {
@@ -159,9 +182,7 @@ func BrowserFlow(opts BrowserFlowOptions) error {
 
 	wg.Add(1)
 
-	if err := spinner.New().Title("Waiting for response...").Action(action).Run(); err != nil {
-		return err
-	}
+	tui.ShowSpinner(logger, "Waiting for response...", action)
 
 	wg.Wait()
 

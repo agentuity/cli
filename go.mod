@@ -13,7 +13,6 @@ require (
 	github.com/charmbracelet/huh/spinner v0.0.0-20250207133237-2eba4f31bf81
 	github.com/charmbracelet/lipgloss v1.0.0
 	github.com/evanw/esbuild v0.25.0
-	github.com/fatih/color v1.18.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/marcozac/go-jsonc v0.1.1
@@ -52,7 +51,6 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
-	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
