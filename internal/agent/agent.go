@@ -22,16 +22,16 @@ type Response[T any] struct {
 
 type ListResponse = Response[[]Agent]
 
-// ListAgents will list all the agents in the project which are deployed
+// ListAgents will list all the Agents in the project which are deployed
 func ListAgents(logger logger.Logger, baseUrl string, token string, projectId string) ([]Agent, error) {
 	client := util.NewAPIClient(logger, baseUrl, token)
 
 	var resp ListResponse
 	if err := client.Do("GET", fmt.Sprintf("/cli/agent/%s", url.PathEscape(projectId)), nil, &resp); err != nil {
-		return nil, fmt.Errorf("error fetching list of agents: %s", err)
+		return nil, fmt.Errorf("error fetching list of Agents: %s", err)
 	}
 	if !resp.Success {
-		return nil, fmt.Errorf("error fetching list of agents: %s", resp.Message)
+		return nil, fmt.Errorf("error fetching list of Agents: %s", resp.Message)
 	}
 	return resp.Data, nil
 }
@@ -50,16 +50,16 @@ func CreateAgent(logger logger.Logger, baseUrl string, token string, projectId s
 	return resp.Data, nil
 }
 
-// DeleteAgent will delete one or more agents from the project
+// DeleteAgent will delete one or more Agents from the project
 func DeleteAgents(logger logger.Logger, baseUrl string, token string, projectId string, agentIds []string) ([]string, error) {
 	client := util.NewAPIClient(logger, baseUrl, token)
 
 	var resp Response[[]string]
 	if err := client.Do("DELETE", "/cli/agent", map[string]any{"ids": agentIds}, &resp); err != nil {
-		return nil, fmt.Errorf("error deleting agents: %s", err)
+		return nil, fmt.Errorf("error deleting Agents: %s", err)
 	}
 	if !resp.Success {
-		return nil, fmt.Errorf("error deleting agents: %s", resp.Message)
+		return nil, fmt.Errorf("error deleting Agents: %s", resp.Message)
 	}
 	return resp.Data, nil
 }

@@ -13,7 +13,7 @@
 > [!WARNING]  
 > This repository is under heavy development and it is not yet stable or ready for use.
 
-The command line tools for the Agentuity Agent Cloud Platform.  These tools are used to build, manage, and deploy agents to the Agentuity platform.
+The command line tools for the Agentuity Agent Cloud Platform.  These tools are used to build, manage, and deploy Agents to the Agentuity platform.
 
 ## Installation
 
@@ -33,7 +33,7 @@ agentuity --help
 
 ## Usage
 
-The Agentuity CLI provides a comprehensive set of commands to help you build, manage, and deploy agents. Here's an overview of the available commands:
+The Agentuity CLI provides a comprehensive set of commands to help you build, manage, and deploy Agents. Here's an overview of the available commands:
 
 ### Basic Commands
 
@@ -69,10 +69,10 @@ agentuity project delete
 # Create a new agent
 agentuity agent create
 
-# List all agents in the project
+# List all Agents in the project
 agentuity agent list
 
-# Delete one or more agents
+# Delete one or more Agents
 agentuity agent delete
 ```
 

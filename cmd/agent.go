@@ -31,7 +31,7 @@ var agentCmd = &cobra.Command{
 
 var agentDeleteCmd = &cobra.Command{
 	Use:     "delete",
-	Short:   "Delete one or more agents",
+	Short:   "Delete one or more Agents",
 	Aliases: []string{"rm", "del"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
@@ -55,10 +55,10 @@ var agentDeleteCmd = &cobra.Command{
 			}
 		}
 
-		selected := tui.MultiSelect(logger, "Select one or more agents to delete", "Toggle selection by pressing the spacebar\nPress enter to confirm\n", options)
+		selected := tui.MultiSelect(logger, "Select one or more Agents to delete", "Toggle selection by pressing the spacebar\nPress enter to confirm\n", options)
 
 		if len(selected) == 0 {
-			tui.ShowWarning("no agents selected")
+			tui.ShowWarning("no Agents selected")
 			return
 		}
 
@@ -68,7 +68,7 @@ var agentDeleteCmd = &cobra.Command{
 			var err error
 			deleted, err = agent.DeleteAgents(logger, apiUrl, apikey, theproject.Project.ProjectId, selected)
 			if err != nil {
-				logger.Fatal("failed to delete agents: %s", err)
+				logger.Fatal("failed to delete Agents: %s", err)
 			}
 			for _, key := range keys {
 				agent := state[key]
@@ -78,12 +78,12 @@ var agentDeleteCmd = &cobra.Command{
 			}
 		}
 
-		if !tui.Ask(logger, tui.Paragraph("Are you sure you want to delete the selected agents?", "This action cannot be undone."), true) {
+		if !tui.Ask(logger, tui.Paragraph("Are you sure you want to delete the selected Agents?", "This action cannot be undone."), true) {
 			tui.ShowWarning("cancelled")
 			return
 		}
 
-		tui.ShowSpinner(logger, "Deleting agents ...", action)
+		tui.ShowSpinner(logger, "Deleting Agents ...", action)
 		tui.ShowSuccess("%s deleted successfully", util.Pluralize(len(deleted), "Agent", "Agents"))
 	},
 }
@@ -103,7 +103,7 @@ var agentCreateCmd = &cobra.Command{
 
 		remoteAgents, err := getAgentList(logger, apiUrl, apikey, theproject)
 		if err != nil {
-			logger.Fatal("failed to list agents: %s", err)
+			logger.Fatal("failed to list Agents: %s", err)
 		}
 
 		initScreenWithLogo()
@@ -167,7 +167,7 @@ func getAgentList(logger logger.Logger, apiUrl string, apikey string, project pr
 	action := func() {
 		remoteAgents, err = agent.ListAgents(logger, apiUrl, apikey, project.Project.ProjectId)
 	}
-	tui.ShowSpinner(logger, "Fetching agents ...", action)
+	tui.ShowSpinner(logger, "Fetching Agents ...", action)
 	return remoteAgents, err
 }
 
@@ -175,14 +175,25 @@ func normalAgentName(name string) string {
 	return util.SafeFilename(strings.ToLower(name))
 }
 
-func reconcileAgentList(logger logger.Logger, apiUrl string, apikey string, project projectContext) ([]string, map[string]agentListState) {
-	remoteAgents, err := getAgentList(logger, apiUrl, apikey, project)
+func reconcileAgentList(logger logger.Logger, apiUrl string, apikey string, theproject projectContext) ([]string, map[string]agentListState) {
+	remoteAgents, err := getAgentList(logger, apiUrl, apikey, theproject)
 	if err != nil {
-		logger.Fatal("failed to fetch agents for project: %s", err)
+		logger.Fatal("failed to fetch Agents for project: %s", err)
 	}
-	var agentFilename string // FIXME
-	// agentFilename := project.Provider.AgentFilename()
-	agentSrcDir := filepath.Join(project.Dir, project.Project.Bundler.AgentConfig.Dir)
+
+	rules, err := templates.LoadTemplateRuleForIdentifier(theproject.Project.Bundler.Identifier)
+	if err != nil {
+		logger.Fatal("failed to load the agent template for %s. %s", theproject.Project.Bundler.Identifier, err)
+	}
+
+	// make a map of the agents in the agentuity config file
+	fileAgents := make(map[string]project.AgentConfig)
+	for _, agent := range theproject.Project.Agents {
+		fileAgents[normalAgentName(agent.Name)] = agent
+	}
+
+	agentFilename := rules.Filename
+	agentSrcDir := filepath.Join(theproject.Dir, theproject.Project.Bundler.AgentConfig.Dir)
 
 	// perform the reconcilation
 	state := make(map[string]agentListState)
@@ -196,12 +207,12 @@ func reconcileAgentList(logger logger.Logger, apiUrl string, apikey string, proj
 	}
 	localAgents, err := util.ListDir(agentSrcDir)
 	if err != nil {
-		logger.Fatal("failed to list local agents: %s", err)
+		logger.Fatal("failed to list local Agents: %s", err)
 	}
 	for _, filename := range localAgents {
+		agentName := filepath.Base(filepath.Dir(filename))
+		key := normalAgentName(agentName)
 		if filepath.Base(filename) == agentFilename {
-			agentName := filepath.Base(filepath.Dir(filename))
-			key := normalAgentName(agentName)
 			if found, ok := state[key]; ok {
 				state[key] = agentListState{
 					Agent:       found.Agent,
@@ -209,13 +220,22 @@ func reconcileAgentList(logger logger.Logger, apiUrl string, apikey string, proj
 					FoundLocal:  true,
 					FoundRemote: true,
 				}
-			} else {
-				state[key] = agentListState{
-					Agent:       &agent.Agent{Name: agentName},
-					Filename:    filename,
-					FoundLocal:  true,
-					FoundRemote: false,
-				}
+				continue
+			}
+		}
+		if a, ok := fileAgents[key]; ok {
+			state[key] = agentListState{
+				Agent:       &agent.Agent{Name: a.Name, ID: a.ID, Description: a.Description},
+				Filename:    filename,
+				FoundLocal:  true,
+				FoundRemote: true,
+			}
+		} else {
+			state[key] = agentListState{
+				Agent:       &agent.Agent{Name: agentName},
+				Filename:    filename,
+				FoundLocal:  true,
+				FoundRemote: false,
 			}
 		}
 	}
@@ -231,9 +251,93 @@ func reconcileAgentList(logger logger.Logger, apiUrl string, apikey string, proj
 
 var wrappedPipe = "\n│"
 
+func buildAgentTree(keys []string, state map[string]agentListState, project projectContext) (*tree.Tree, int, int, error) {
+	agentSrcDir := filepath.Join(project.Dir, project.Project.Bundler.AgentConfig.Dir)
+	var root *tree.Tree
+	var files *tree.Tree
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("failed to get current working directory: %w", err)
+	}
+	if filepath.Join(cwd, project.Project.Bundler.AgentConfig.Dir) == agentSrcDir {
+		files = tree.Root(tui.Title(project.Project.Bundler.AgentConfig.Dir) + wrappedPipe)
+		root = files
+	} else {
+		srcdir := tree.New().Root(tui.Title(project.Project.Bundler.AgentConfig.Dir) + wrappedPipe)
+		root = tree.New().Root(tui.Muted(project.Dir) + wrappedPipe).Child(srcdir)
+		files = srcdir
+	}
+
+	var localIssues, remoteIssues int
+
+	for _, k := range keys {
+		st := state[k]
+		label := tui.PadRight(tui.Bold(st.Agent.Name), 20, " ")
+		var sublabels []any
+		if st.FoundLocal && st.FoundRemote {
+			sublabels = append(sublabels, tui.Muted("ID: ")+tui.Secondary(st.Agent.ID))
+			desc := st.Agent.Description
+			if desc == "" {
+				desc = emptyProjectDescription
+			}
+			sublabels = append(sublabels, tui.Muted("Description: ")+tui.Secondary(desc))
+		} else if st.FoundLocal {
+			sublabels = append(sublabels, tui.Warning("⚠ Agent found local but not remotely"))
+			localIssues++
+		} else if st.FoundRemote {
+			sublabels = append(sublabels, tui.Muted("ID: ")+tui.Secondary(st.Agent.ID))
+			sublabels = append(sublabels, tui.Warning("⚠ Agent found remotely but not locally"))
+			remoteIssues++
+		}
+		if len(sublabels) > 0 {
+			sublabels[len(sublabels)-1] = sublabels[len(sublabels)-1].(string) + "\n"
+		}
+		agentTree := tree.New().Root(label).Child(sublabels...)
+		files.Child(agentTree)
+	}
+
+	return root, localIssues, remoteIssues, nil
+}
+
+func showAgentWarnings(remoteIssues int, localIssues int, deploying bool) bool {
+	issues := remoteIssues + localIssues
+	if issues > 0 {
+		var msg string
+		var title string
+		if issues > 1 {
+			title = "Issues"
+		} else {
+			title = "Issue"
+		}
+		localFmt := util.Pluralize(localIssues, "local agent", "local agents")
+		remoteFmt := util.Pluralize(remoteIssues, "remote agent", "remote agents")
+		var prefix string
+		if !deploying {
+			prefix = "When you deploy your project, the"
+		} else {
+			prefix = "The"
+		}
+		switch {
+		case localIssues > 0 && remoteIssues > 0:
+			msg = fmt.Sprintf("%s %s will be deployed and the %s will be undeployed.", prefix, localFmt, remoteFmt)
+		case localIssues > 0:
+			msg = fmt.Sprintf("%s %s will be deployed to the cloud and the ID will be saved.", prefix, localFmt)
+		case remoteIssues > 0:
+			msg = fmt.Sprintf("%s %s will be undeployed from the cloud and the ID will be removed from your project locally.", prefix, remoteFmt)
+		}
+		body := fmt.Sprintf("Detected %s in your project. %s\n\n", util.Pluralize(issues, "discrepancy", "discrepancies"), msg) + tui.Muted("$ ") + tui.Command("deploy")
+		tui.ShowBanner(tui.Warning(fmt.Sprintf("⚠ Agent %s Detected", title)), body, false)
+		if deploying {
+			tui.WaitForAnyKey()
+		}
+		return true
+	}
+	return false
+}
+
 var agentListCmd = &cobra.Command{
 	Use:     "list",
-	Short:   "List all the agents in the project which are deployed",
+	Short:   "List all the Agents in the project which are deployed",
 	Aliases: []string{"ls"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
@@ -253,46 +357,17 @@ var agentListCmd = &cobra.Command{
 			return
 		}
 
-		agentSrcDir := filepath.Join(project.Dir, project.Project.Bundler.AgentConfig.Dir)
-		var root *tree.Tree
-		var files *tree.Tree
-		cwd, err := os.Getwd()
+		root, localIssues, remoteIssues, err := buildAgentTree(keys, state, project)
 		if err != nil {
-			logger.Fatal("failed to get current working directory: %s", err)
-		}
-		if filepath.Join(cwd, project.Project.Bundler.AgentConfig.Dir) == agentSrcDir {
-			files = tree.Root(tui.Title(project.Project.Bundler.AgentConfig.Dir) + wrappedPipe)
-			root = files
-		} else {
-			srcdir := tree.New().Root(tui.Title(project.Project.Bundler.AgentConfig.Dir) + wrappedPipe)
-			root = tree.New().Root(tui.Muted(project.Dir) + wrappedPipe).Child(srcdir)
-			files = srcdir
+			logger.Fatal("%s", err)
 		}
 
-		for _, k := range keys {
-			st := state[k]
-			label := tui.PadRight(tui.Bold(st.Agent.Name), 20, " ")
-			var sublabels []any
-			if st.FoundLocal && st.FoundRemote {
-				sublabels = append(sublabels, tui.Muted("ID: ")+tui.Secondary(st.Agent.ID))
-				desc := st.Agent.Description
-				if desc == "" {
-					desc = emptyProjectDescription
-				}
-				sublabels = append(sublabels, tui.Muted("Description: ")+tui.Secondary(desc))
-			} else if st.FoundLocal {
-				sublabels = append(sublabels, tui.Warning("⚠ agent found local but not remotely"))
-			} else if st.FoundRemote {
-				sublabels = append(sublabels, tui.Muted("ID: ")+tui.Secondary(st.Agent.ID))
-				sublabels = append(sublabels, tui.Warning("⚠ agent found remotely but not locally"))
-			}
-			if len(sublabels) > 0 {
-				sublabels[len(sublabels)-1] = sublabels[len(sublabels)-1].(string) + "\n"
-			}
-			agentTree := tree.New().Root(label).Child(sublabels...)
-			files.Child(agentTree)
-		}
 		fmt.Println(root)
+
+		if showAgentWarnings(remoteIssues, localIssues, false) {
+			os.Exit(1)
+		}
+
 	},
 }
 
