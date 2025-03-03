@@ -16,6 +16,8 @@ var (
 	warningStyleColor   = lipgloss.AdaptiveColor{Light: "#FFA500", Dark: "#FFA500"}
 	titleStyleColor     = lipgloss.AdaptiveColor{Light: "#071330", Dark: "#F652A0"}
 	secondaryStyleColor = lipgloss.AdaptiveColor{Light: "#214358", Dark: "#AEB8C4"}
+	commandStyle        = lipgloss.NewStyle().Foreground(textStyleColor)
+	textStyle           = lipgloss.NewStyle().Foreground(secondaryStyleColor)
 )
 
 func Title(text string) string {
@@ -48,7 +50,14 @@ func Link(url string, args ...any) string {
 
 func Paragraph(text string, lines ...string) string {
 	lines = append([]string{text}, lines...)
-	return paragraphStyle.Render(strings.Join(lines, "\n\n"))
+	var out strings.Builder
+	for i, line := range lines {
+		out.WriteString(paragraphStyle.Render(line))
+		if i < len(lines)-1 {
+			out.WriteString("\n\n")
+		}
+	}
+	return out.String()
 }
 
 func Body(text string) string {
@@ -71,16 +80,16 @@ func PadRight(str string, length int, pad string) string {
 
 func Command(cmd string, args ...string) string {
 	cmdline := "agentuity " + strings.Join(append([]string{cmd}, args...), " ")
-	return lipgloss.NewStyle().Foreground(textStyleColor).Render(cmdline)
+	return commandStyle.Render(cmdline)
 }
 
 func Directory(dir string, args ...string) string {
 	val := strings.Join(append([]string{dir}, args...), " ")
-	return lipgloss.NewStyle().Foreground(textStyleColor).Render(val)
+	return commandStyle.Render(val)
 }
 
 func Text(val string) string {
-	return lipgloss.NewStyle().Foreground(secondaryStyleColor).Render(val)
+	return textStyle.Render(val)
 }
 
 func MaxWidth(text string, width int) string {

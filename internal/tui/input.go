@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/agentuity/go-common/logger"
 	"github.com/charmbracelet/huh"
 )
@@ -58,4 +61,10 @@ func Password(logger logger.Logger, title string, description string) string {
 		logger.Fatal("%s", err)
 	}
 	return value
+}
+
+func WaitForAnyKey() {
+	fmt.Print(Secondary("Press any key to continue... "))
+	buf := make([]byte, 1)
+	os.Stdin.Read(buf)
 }

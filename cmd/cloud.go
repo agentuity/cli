@@ -52,9 +52,14 @@ type Resources struct {
 	Disk   int64 `json:"disk,omitempty"`
 }
 
+type startAgent struct {
+	Agent
+	Remove bool `json:"remove,omitempty"`
+}
+
 type startRequest struct {
-	Agents    []Agent    `json:"agents"`
-	Resources *Resources `json:"resources,omitempty"`
+	Agents    []startAgent `json:"agents"`
+	Resources *Resources   `json:"resources,omitempty"`
 }
 
 type projectContext struct {
@@ -114,6 +119,14 @@ var cloudDeployCmd = &cobra.Command{
 		apiUrl := context.APIURL
 		appUrl := context.APPURL
 		token := context.Token
+
+		keys, state := reconcileAgentList(logger, apiUrl, token, context)
+
+		if len(keys) == 0 {
+			tui.ShowWarning("no Agents found")
+			tui.ShowBanner("Create a new Agent", tui.Text("Use the ")+tui.Command("agent new")+tui.Text(" command to create a new Agent"), false)
+			return
+		}
 
 		deploymentConfig := project.NewDeploymentConfig()
 
@@ -190,6 +203,13 @@ var cloudDeployCmd = &cobra.Command{
 			}
 		}
 
+		_, localIssues, remoteIssues, err := buildAgentTree(keys, state, context)
+		if err != nil {
+			logger.Fatal("%s", err)
+		}
+
+		showAgentWarnings(remoteIssues, localIssues, true)
+
 		deploymentConfig.Provider = theproject.Bundler.Identifier
 		deploymentConfig.Language = theproject.Bundler.Language
 		deploymentConfig.Runtime = theproject.Bundler.Runtime
@@ -227,11 +247,36 @@ var cloudDeployCmd = &cobra.Command{
 			}
 		}
 		for _, agent := range theproject.Agents {
-			startRequest.Agents = append(startRequest.Agents, Agent{
-				ID:          agent.ID,
-				Name:        agent.Name,
-				Description: agent.Description,
+			startRequest.Agents = append(startRequest.Agents, startAgent{
+				Agent: Agent{
+					ID:          agent.ID,
+					Name:        agent.Name,
+					Description: agent.Description,
+				},
 			})
+		}
+		hasLocalDeletes := make(map[string]bool)
+
+		for _, agent := range state {
+			if agent.FoundLocal && !agent.FoundRemote {
+				startRequest.Agents = append(startRequest.Agents, startAgent{
+					Agent: Agent{
+						ID:          "",
+						Name:        agent.Agent.Name,
+						Description: agent.Agent.Description,
+					},
+				})
+			} else if agent.FoundRemote && !agent.FoundLocal {
+				hasLocalDeletes[agent.Agent.ID] = true
+				startRequest.Agents = append(startRequest.Agents, startAgent{
+					Agent: Agent{
+						ID:          agent.Agent.ID,
+						Name:        agent.Agent.Name,
+						Description: agent.Agent.Description,
+					},
+					Remove: true,
+				})
+			}
 		}
 
 		// Start deployment
@@ -246,6 +291,24 @@ var cloudDeployCmd = &cobra.Command{
 			logger.Fatal("unknown error starting deployment")
 		}
 
+		var saveProject bool
+
+		// remove any agents that were deleted from the project
+		if len(hasLocalDeletes) > 0 {
+			var newagents []project.AgentConfig
+			for _, agent := range state {
+				if _, ok := hasLocalDeletes[agent.Agent.ID]; ok {
+					continue
+				}
+				if agent.Agent.ID == "" {
+					continue
+				}
+				newagents = append(newagents, project.AgentConfig(*agent.Agent))
+			}
+			theproject.Agents = newagents
+			saveProject = true
+		}
+
 		// save any new agents to the project that we're created as part of the deployment
 		if len(startResponse.Data.Created) > 0 {
 			for _, agent := range startResponse.Data.Created {
@@ -255,10 +318,14 @@ var cloudDeployCmd = &cobra.Command{
 					Description: agent.Description,
 				})
 			}
+			saveProject = true
+		}
+
+		if saveProject {
 			if err := theproject.Save(dir); err != nil {
-				logger.Fatal("error saving project with new agents: %s", err)
+				logger.Fatal("error saving project with new Agents: %s", err)
 			}
-			logger.Debug("saved project with new agents")
+			logger.Debug("saved project with updated Agents")
 		}
 
 		// load up any gitignore files

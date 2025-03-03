@@ -176,10 +176,7 @@ func (p *Project) Load(dir string) error {
 		return fmt.Errorf("invalid bundler.language value: %s. only js or py are supported", p.Bundler.Language)
 	}
 	if p.Bundler.AgentConfig.Dir == "" {
-		return fmt.Errorf("missing bundler.agents.dir value (or its empty), please run `agentuity new` to create a new project")
-	}
-	if len(p.Agents) == 0 {
-		return fmt.Errorf("missing agents, please run `agentuity new` to create a new project or `agentuity agent new` to create a new agent")
+		return fmt.Errorf("missing bundler.Agents.dir value (or its empty), please run `agentuity new` to create a new project")
 	}
 	if p.Deployment != nil {
 		if p.Deployment.Resources != nil {
