@@ -211,9 +211,6 @@ var _ Step = (*CreateFileAction)(nil)
 
 func (s *CreateFileAction) Run(ctx TemplateContext) error {
 	filename := filepath.Join(ctx.ProjectDir, s.Filename)
-	if util.Exists(filename) {
-		return fmt.Errorf("file already exists: %s", filename)
-	}
 	dir := filepath.Dir(filename)
 	if !util.Exists(dir) {
 		if err := os.MkdirAll(dir, 0755); err != nil {
