@@ -62,7 +62,6 @@ func initProject(logger logger.Logger, args InitProjectArgs) *project.ProjectDat
 
 	proj := project.NewProject()
 	proj.ProjectId = result.ProjectId
-	proj.OrgId = args.OrgId
 	proj.Name = args.Name
 	proj.Description = args.Description
 
