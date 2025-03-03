@@ -65,6 +65,16 @@ func initProject(logger logger.Logger, args InitProjectArgs) *project.ProjectDat
 	proj.Name = args.Name
 	proj.Description = args.Description
 
+	proj.Development = &project.Development{
+		Port: args.Provider.Development.Port,
+		Watch: project.Watch{
+			Enabled: args.Provider.Development.Watch.Enabled,
+			Files:   args.Provider.Development.Watch.Files,
+		},
+		Command: args.Provider.Development.Command,
+		Args:    args.Provider.Development.Args,
+	}
+
 	proj.Bundler = &project.Bundler{
 		Enabled:    args.Provider.Bundle.Enabled,
 		Identifier: args.Provider.Identifier,

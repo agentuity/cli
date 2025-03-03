@@ -119,9 +119,16 @@ type Deployment struct {
 	Resources *Resources `json:"resources" yaml:"resources" hc:"You should tune the resources for the deployment"`
 }
 
+type Watch struct {
+	Enabled bool     `json:"enabled" yaml:"enabled" hc:"Whether to watch for changes and automatically restart the server"`
+	Files   []string `json:"files" yaml:"files" hc:"Rules for files to watch for changes"`
+}
+
 type Development struct {
-	Port  int  `json:"port,omitempty" yaml:"port,omitempty" hc:"The port to run the development server on which can be overridden by setting the PORT environment variable"`
-	Watch bool `json:"watch,omitempty" yaml:"watch,omitempty" hc:"Whether to watch for changes and automatically restart the server"`
+	Port    int      `json:"port" yaml:"port" hc:"The port to run the development server on which can be overridden by setting the PORT environment variable"`
+	Watch   Watch    `json:"watch" yaml:"watch"`
+	Command string   `json:"command" yaml:"command" hc:"The command to run the development server"`
+	Args    []string `json:"args" yaml:"args" hc:"The arguments to pass to the development server"`
 }
 
 type AgentConfig struct {
@@ -217,19 +224,17 @@ func (p *Project) Save(dir string) error {
 const (
 	defaultMemory = "1Gi"
 	defaultCPU    = "1000M"
+	defaultDisk   = "100Mi"
 )
 
 // NewProject will create a new project that is empty.
 func NewProject() *Project {
 	return &Project{
-		Development: &Development{
-			Port:  3500,
-			Watch: true,
-		},
 		Deployment: &Deployment{
 			Resources: &Resources{
 				Memory: defaultMemory,
 				CPU:    defaultCPU,
+				Disk:   defaultDisk,
 			},
 		},
 	}

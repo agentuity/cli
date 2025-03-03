@@ -83,27 +83,13 @@ func ensureProject(cmd *cobra.Command) projectContext {
 		logger.Fatal("error loading project: %s", err)
 	}
 
-	// name := theproject.Bundler.Framework
-	// if name == "" {
-	// 	name = theproject.Bundler.Runtime
-	// }
-	// if name == "" {
-	// 	name = theproject.Bundler.Language
-	// }
-
-	// p, err := provider.GetProviderForName(name)
-	// if err != nil {
-	// 	logger.Fatal("%s", err)
-	// }
-
 	return projectContext{
 		Logger:  logger,
 		Project: theproject,
-		// Provider: p,
-		Dir:    dir,
-		APIURL: apiUrl,
-		APPURL: appUrl,
-		Token:  token,
+		Dir:     dir,
+		APIURL:  apiUrl,
+		APPURL:  appUrl,
+		Token:   token,
 	}
 }
 

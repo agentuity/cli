@@ -68,6 +68,18 @@ type Resources struct {
 	CPU    string `yaml:"cpu"`
 }
 
+type Watch struct {
+	Enabled bool     `yaml:"enabled"`
+	Files   []string `yaml:"files"`
+}
+
+type Development struct {
+	Port    int      `yaml:"port"`
+	Watch   Watch    `yaml:"watch"`
+	Command string   `yaml:"command"`
+	Args    []string `yaml:"args"`
+}
+
 type Deployment struct {
 	Resources Resources `yaml:"resources"`
 	Command   string    `yaml:"command"`
@@ -87,6 +99,7 @@ type TemplateRules struct {
 	SrcDir          string          `yaml:"src_dir"`
 	Filename        string          `yaml:"filename"`
 	Bundle          Bundle          `yaml:"bundle"`
+	Development     Development     `yaml:"development"`
 	Deployment      Deployment      `yaml:"deployment"`
 	NewProjectSteps NewProjectSteps `yaml:"new_project"`
 	NewAgentSteps   NewAgentSteps   `yaml:"new_agent"`

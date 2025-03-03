@@ -7,6 +7,16 @@ bundle:
   enabled: true
   ignore:
     - "**/__pycache__/**"
+development:
+  port: 3500
+  watch:
+    enabled: true
+    files:
+      - "agents/**"
+  command: uv
+  args:
+    - run
+    - server.py
 deployment:
   resources:
     memory: 250Mi
