@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	bannerForegroupColor = lipgloss.AdaptiveColor{Light: "#071330", Dark: "#F652A0"}
+	bannerForegroupColor = lipgloss.AdaptiveColor{Light: "#a60853", Dark: "#F652A0"}
 	bannerBorderColor    = lipgloss.AdaptiveColor{Light: "#999999", Dark: "#AAAAAA"}
 	bannerTitleColor     = lipgloss.AdaptiveColor{Light: "#36EEE0", Dark: "#00FFFF"}
 	bannerMaxWidth       = 80
@@ -15,14 +15,13 @@ var (
 	bannerMargin         = 1
 	bannerBorder         = lipgloss.RoundedBorder()
 	bannerStyle          = lipgloss.NewStyle().
-				Width(bannerMaxWidth).
 				Padding(bannerPadding).
 				Margin(bannerMargin).
 				AlignVertical(lipgloss.Top).
 				AlignHorizontal(lipgloss.Left).
 				Border(bannerBorder).
-				BorderForeground(bannerBorderColor).
-				Foreground(bannerForegroupColor)
+				BorderForeground(bannerBorderColor)
+	bannerBodyStyle  = lipgloss.NewStyle().Width(bannerMaxWidth).Foreground(bannerForegroupColor)
 	bannerTitleStyle = lipgloss.NewStyle().AlignHorizontal(lipgloss.Center).Bold(true).Foreground(bannerTitleColor)
 )
 
@@ -30,7 +29,7 @@ func ShowBanner(title string, body string, clearScreen bool) {
 	if clearScreen {
 		ClearScreen()
 	}
-	block := bannerTitleStyle.Render(title) + "\n\n" + body
+	block := bannerTitleStyle.Render(title) + "\n\n" + bannerBodyStyle.Render(body)
 	banner := bannerStyle.Render(block)
 	fmt.Println(banner)
 }

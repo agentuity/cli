@@ -295,7 +295,7 @@ func (p *Project) ListProjectEnv(logger logger.Logger, baseUrl string, token str
 
 	var projectResponse ProjectResponse
 	if err := client.Do("GET", fmt.Sprintf("/cli/project/%s", p.ProjectId), nil, &projectResponse); err != nil {
-		logger.Fatal("error getting project env: %s", err)
+		return nil, fmt.Errorf("error getting project env: %s", err)
 	}
 	if !projectResponse.Success {
 		return nil, errors.New(projectResponse.Message)
@@ -310,7 +310,7 @@ func (p *Project) SetProjectEnv(logger logger.Logger, baseUrl string, token stri
 		"env":     env,
 		"secrets": secrets,
 	}, &projectResponse); err != nil {
-		logger.Fatal("error setting project env: %s", err)
+		return nil, fmt.Errorf("error setting project env: %s", err)
 	}
 	if !projectResponse.Success {
 		return nil, errors.New(projectResponse.Message)
@@ -325,7 +325,7 @@ func (p *Project) DeleteProjectEnv(logger logger.Logger, baseUrl string, token s
 		"env":     env,
 		"secrets": secrets,
 	}, &projectResponse); err != nil {
-		logger.Fatal("error deleting project env: %s", err)
+		return fmt.Errorf("error deleting project env: %s", err)
 	}
 	if !projectResponse.Success {
 		return errors.New(projectResponse.Message)

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/agentuity/cli/internal/agent"
+	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/templates"
 	"github.com/agentuity/cli/internal/tui"
@@ -37,7 +38,7 @@ var agentDeleteCmd = &cobra.Command{
 		logger := env.NewLogger(cmd)
 		apikey := viper.GetString("auth.api_key")
 		if apikey == "" {
-			logger.Fatal("you are not logged in")
+			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
 		}
 		theproject := ensureProject(cmd)
 		apiUrl, _ := getURLs(logger)
@@ -68,7 +69,7 @@ var agentDeleteCmd = &cobra.Command{
 			var err error
 			deleted, err = agent.DeleteAgents(logger, apiUrl, apikey, theproject.Project.ProjectId, selected)
 			if err != nil {
-				logger.Fatal("failed to delete Agents: %s", err)
+				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to delete agents")).ShowErrorAndExit()
 			}
 			for _, key := range keys {
 				agent := state[key]
@@ -83,7 +84,7 @@ var agentDeleteCmd = &cobra.Command{
 			return
 		}
 
-		tui.ShowSpinner(logger, "Deleting Agents ...", action)
+		tui.ShowSpinner("Deleting Agents ...", action)
 		tui.ShowSuccess("%s deleted successfully", util.Pluralize(len(deleted), "Agent", "Agents"))
 	},
 }
@@ -96,14 +97,14 @@ var agentCreateCmd = &cobra.Command{
 		logger := env.NewLogger(cmd)
 		apikey := viper.GetString("auth.api_key")
 		if apikey == "" {
-			logger.Fatal("you are not logged in")
+			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
 		}
 		theproject := ensureProject(cmd)
 		apiUrl, _ := getURLs(logger)
 
 		remoteAgents, err := getAgentList(logger, apiUrl, apikey, theproject)
 		if err != nil {
-			logger.Fatal("failed to list Agents: %s", err)
+			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent list")).ShowErrorAndExit()
 		}
 
 		initScreenWithLogo()
@@ -122,12 +123,12 @@ var agentCreateCmd = &cobra.Command{
 		action := func() {
 			agentID, err := agent.CreateAgent(logger, apiUrl, apikey, theproject.Project.ProjectId, name, description)
 			if err != nil {
-				logger.Fatal("failed to create agent: %s", err)
+				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to create agent")).ShowErrorAndExit()
 			}
 
 			rules, err := templates.LoadTemplateRuleForIdentifier(theproject.Project.Bundler.Identifier)
 			if err != nil {
-				logger.Fatal("failed to load template rules for %s: %s", theproject.Project.Bundler.Identifier, err)
+				errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithAttributes(map[string]any{"identifier": theproject.Project.Bundler.Identifier})).ShowErrorAndExit()
 			}
 
 			if err := rules.NewAgent(templates.TemplateContext{
@@ -136,7 +137,7 @@ var agentCreateCmd = &cobra.Command{
 				Description: description,
 				ProjectDir:  theproject.Dir,
 			}); err != nil {
-				logger.Fatal("failed to create agent: %s", err)
+				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithAttributes(map[string]any{"name": name})).ShowErrorAndExit()
 			}
 
 			theproject.Project.Agents = append(theproject.Project.Agents, project.AgentConfig{
@@ -146,10 +147,10 @@ var agentCreateCmd = &cobra.Command{
 			})
 
 			if err := theproject.Project.Save(theproject.Dir); err != nil {
-				logger.Fatal("failed to save project: %s", err)
+				errsystem.New(errsystem.ErrSaveProject, err, errsystem.WithContextMessage("Failed to save project to disk")).ShowErrorAndExit()
 			}
 		}
-		tui.ShowSpinner(logger, "Creating agent ...", action)
+		tui.ShowSpinner("Creating agent ...", action)
 		tui.ShowSuccess("Agent created successfully")
 	},
 }
@@ -167,7 +168,7 @@ func getAgentList(logger logger.Logger, apiUrl string, apikey string, project pr
 	action := func() {
 		remoteAgents, err = agent.ListAgents(logger, apiUrl, apikey, project.Project.ProjectId)
 	}
-	tui.ShowSpinner(logger, "Fetching Agents ...", action)
+	tui.ShowSpinner("Fetching Agents ...", action)
 	return remoteAgents, err
 }
 
@@ -178,12 +179,14 @@ func normalAgentName(name string) string {
 func reconcileAgentList(logger logger.Logger, apiUrl string, apikey string, theproject projectContext) ([]string, map[string]agentListState) {
 	remoteAgents, err := getAgentList(logger, apiUrl, apikey, theproject)
 	if err != nil {
-		logger.Fatal("failed to fetch Agents for project: %s", err)
+		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent list")).ShowErrorAndExit()
 	}
 
 	rules, err := templates.LoadTemplateRuleForIdentifier(theproject.Project.Bundler.Identifier)
 	if err != nil {
-		logger.Fatal("failed to load the agent template for %s. %s", theproject.Project.Bundler.Identifier, err)
+		errsystem.New(errsystem.ErrInvalidConfiguration, err,
+			errsystem.WithContextMessage("Failed loading template rule"),
+			errsystem.WithAttributes(map[string]any{"identifier": theproject.Project.Bundler.Identifier})).ShowErrorAndExit()
 	}
 
 	// make a map of the agents in the agentuity config file
@@ -207,7 +210,7 @@ func reconcileAgentList(logger logger.Logger, apiUrl string, apikey string, thep
 	}
 	localAgents, err := util.ListDir(agentSrcDir)
 	if err != nil {
-		logger.Fatal("failed to list local Agents: %s", err)
+		errsystem.New(errsystem.ErrListFilesAndDirectories, err, errsystem.WithContextMessage("Failed to list agent source directory")).ShowErrorAndExit()
 	}
 	for _, filename := range localAgents {
 		agentName := filepath.Base(filepath.Dir(filename))
@@ -337,13 +340,13 @@ func showAgentWarnings(remoteIssues int, localIssues int, deploying bool) bool {
 
 var agentListCmd = &cobra.Command{
 	Use:     "list",
-	Short:   "List all the Agents in the project which are deployed",
+	Short:   "List all Agents in the project",
 	Aliases: []string{"ls"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		apikey := viper.GetString("auth.api_key")
 		if apikey == "" {
-			logger.Fatal("you are not logged in")
+			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
 		}
 		project := ensureProject(cmd)
 		apiUrl, _ := getURLs(logger)
@@ -359,7 +362,7 @@ var agentListCmd = &cobra.Command{
 
 		root, localIssues, remoteIssues, err := buildAgentTree(keys, state, project)
 		if err != nil {
-			logger.Fatal("%s", err)
+			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to build agent tree")).ShowErrorAndExit()
 		}
 
 		fmt.Println(root)

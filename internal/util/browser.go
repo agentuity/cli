@@ -14,6 +14,7 @@ import (
 
 	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/go-common/logger"
+	"github.com/agentuity/go-common/sys"
 	"github.com/pkg/browser"
 )
 
@@ -170,6 +171,9 @@ func BrowserFlow(opts BrowserFlowOptions) error {
 		}
 		logger.Trace("waiting for callback to http://127.0.0.1:%d", port)
 		select {
+		case <-sys.CreateShutdownChannel():
+			returnErr = fmt.Errorf("shutdown")
+			return
 		case e := <-errors:
 			returnErr = e
 			return
@@ -177,12 +181,14 @@ func BrowserFlow(opts BrowserFlowOptions) error {
 			returnErr = ErrTimeout
 			return
 		case <-ctx.Done():
+			returnErr = fmt.Errorf("shutdown")
+			return
 		}
 	}
 
 	wg.Add(1)
 
-	tui.ShowSpinner(logger, "Waiting for response...", action)
+	tui.ShowSpinner("Waiting for response...", action)
 
 	wg.Wait()
 

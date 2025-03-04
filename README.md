@@ -104,6 +104,20 @@ For more detailed information about any command, you can use:
 agentuity [command] --help
 ```
 
+## Development
+
+### Error Code System
+
+The CLI uses a centralized error code system to provide consistent error messages and codes. Error codes are defined in `error_codes.yaml` at the root of the project and are automatically generated into Go code.
+
+To add a new error code:
+
+1. Edit `error_codes.yaml` and add a new entry with a unique code and descriptive message
+2. Run `go generate ./...` to update the Go code
+3. Use the generated error type in your code with `errsystem.New(errsystem.ErrYourError, err)`
+
+For more details, see the [Error Code System documentation](tools/README.md).
+
 ## License
 
 See the [LICENSE](LICENSE.md) file for details.

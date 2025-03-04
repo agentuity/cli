@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
@@ -112,7 +113,7 @@ var envSetCmd = &cobra.Command{
 		localenv := make(map[string]string)
 		osenv := make(map[string]string)
 
-		setFromFile, _ := cmd.Flags().GetString("file")
+		setFromFile, err := cmd.Flags().GetString("file")
 		if setFromFile != "" {
 			if sys.Exists(setFromFile) {
 				le, _ := env.ParseEnvFile(setFromFile)
@@ -122,7 +123,7 @@ var envSetCmd = &cobra.Command{
 					setFromEnv = true
 				}
 			} else {
-				logger.Fatal("file does not exist: %s", setFromFile)
+				errsystem.New(errsystem.ErrInvalidCommandFlag, err).ShowErrorAndExit()
 			}
 		}
 		if !hasSetFromFile {
@@ -229,13 +230,11 @@ var envSetCmd = &cobra.Command{
 			}
 			_, err := theproject.SetProjectEnv(logger, apiUrl, apiKey, envs, secrets)
 			if err != nil {
-				logger.Fatal("failed to set project env: %s", err)
+				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithUserMessage("Failed to save project settings")).ShowErrorAndExit()
 			}
 		}
 
-		if err := spinner.New().Title("Saving ...").Action(action).Run(); err != nil {
-			logger.Fatal("%s", err)
-		}
+		spinner.New().Title("Saving ...").Action(action).Run()
 
 		switch {
 		case len(envs) > 0 && len(secrets) > 0:
@@ -265,7 +264,7 @@ var envGetCmd = &cobra.Command{
 
 		projectData, err := theproject.ListProjectEnv(logger, apiUrl, apiKey)
 		if err != nil {
-			logger.Fatal("failed to list project env: %s", err)
+			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}
 		var found bool
 		for key, value := range projectData.Env {
@@ -312,7 +311,7 @@ var envListCmd = &cobra.Command{
 
 		projectData, err := theproject.ListProjectEnv(logger, apiUrl, apiKey)
 		if err != nil {
-			logger.Fatal("failed to list project env: %s", err)
+			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}
 		for key, value := range projectData.Env {
 			if !hasTTY {
@@ -351,7 +350,7 @@ var envDeleteCmd = &cobra.Command{
 
 		projectData, err := theproject.ListProjectEnv(logger, apiUrl, apiKey)
 		if err != nil {
-			logger.Fatal("failed to list project env: %s", err)
+			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}
 		force, _ := cmd.Flags().GetBool("force")
 		var options []huh.Option[string]
@@ -400,7 +399,7 @@ var envDeleteCmd = &cobra.Command{
 					Options(options...).
 					Title(title).
 					Value(&results).Run() != nil {
-					logger.Fatal("error getting environments")
+					return
 				}
 				for _, result := range results {
 					if secretKeys[result] {
@@ -433,7 +432,7 @@ var envDeleteCmd = &cobra.Command{
 			}
 			err := theproject.DeleteProjectEnv(logger, apiUrl, apiKey, envsToDelete, secretsToDelete)
 			if err != nil {
-				logger.Fatal("failed to delete project env: %s", err)
+				errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 			}
 			switch {
 			case len(envsToDelete) > 0 && len(secretsToDelete) > 0:

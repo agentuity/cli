@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 
+	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
@@ -36,7 +37,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 	entryPoints = append(entryPoints, filepath.Join(dir, "index.js"))
 	files, err := util.ListDir(theproject.Bundler.AgentConfig.Dir)
 	if err != nil {
-		return fmt.Errorf("failed to list src directory: %w", err)
+		errsystem.New(errsystem.ErrListFilesAndDirectories, err).ShowErrorAndExit()
 	}
 	for _, file := range files {
 		if filepath.Base(file) == "index.ts" {

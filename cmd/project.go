@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/organization"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/templates"
@@ -57,7 +58,7 @@ func initProject(logger logger.Logger, args InitProjectArgs) *project.ProjectDat
 		AgentDescription:  args.AgentDescription,
 	})
 	if err != nil {
-		logger.Fatal("failed to initialize project: %s", err)
+		errsystem.New(errsystem.ErrCreateProject, err, errsystem.WithContextMessage("Failed to init project")).ShowErrorAndExit()
 	}
 
 	proj := project.NewProject()
@@ -103,12 +104,12 @@ func initProject(logger logger.Logger, args InitProjectArgs) *project.ProjectDat
 	}
 
 	if err := proj.Save(args.Dir); err != nil {
-		logger.Fatal("failed to save project: %s", err)
+		errsystem.New(errsystem.ErrSaveProject, err, errsystem.WithContextMessage("Failed to save project to disk")).ShowErrorAndExit()
 	}
 	filename := filepath.Join(args.Dir, ".env")
 	envLines, err := env.ParseEnvFile(filename)
 	if err != nil {
-		logger.Fatal("failed to parse .env file: %s", err)
+		errsystem.New(errsystem.ErrReadConfigurationFile, err, errsystem.WithContextMessage("Failed to parse .env file")).ShowErrorAndExit()
 	}
 	var found bool
 	for i, envLine := range envLines {
@@ -121,18 +122,19 @@ func initProject(logger logger.Logger, args InitProjectArgs) *project.ProjectDat
 		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_API_KEY", Val: result.APIKey})
 	}
 	if err := env.WriteEnvFile(filename, envLines); err != nil {
-		logger.Fatal("failed to write .env file: %s", err)
+		errsystem.New(errsystem.ErrWriteConfigurationFile, err, errsystem.WithContextMessage("Failed to write .env file")).ShowErrorAndExit()
 	}
 	return result
 }
 
-func promptForOrganization(logger logger.Logger, apiUrl string, token string) (string, error) {
+func promptForOrganization(logger logger.Logger, apiUrl string, token string) string {
 	orgs, err := organization.ListOrganizations(logger, apiUrl, token)
 	if err != nil {
-		logger.Fatal("failed to list organizations: %s", err)
+		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list organizations")).ShowErrorAndExit()
 	}
 	if len(orgs) == 0 {
 		logger.Fatal("you are not a member of any organizations")
+		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithUserMessage("You are not a member of any organizations")).ShowErrorAndExit()
 	}
 	var orgId string
 	if len(orgs) == 1 {
@@ -144,7 +146,7 @@ func promptForOrganization(logger logger.Logger, apiUrl string, token string) (s
 		}
 		orgId = tui.Select(logger, "What organization should we create the project in?", "", opts)
 	}
-	return orgId, nil
+	return orgId
 }
 
 var invalidProjectNames = []any{
@@ -237,7 +239,7 @@ var projectNewCmd = &cobra.Command{
 		logger := env.NewLogger(cmd)
 		apikey := viper.GetString("auth.api_key")
 		if apikey == "" {
-			logger.Fatal("you are not logged in")
+			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
 		}
 
 		apiUrl, appUrl := getURLs(logger)
@@ -245,20 +247,17 @@ var projectNewCmd = &cobra.Command{
 
 		cwd, err := os.Getwd()
 		if err != nil {
-			logger.Fatal("failed to get current directory: %s", err)
+			errsystem.New(errsystem.ErrListFilesAndDirectories, err, errsystem.WithContextMessage("Failed to get current working directory")).ShowErrorAndExit()
 		}
 
-		orgId, err := promptForOrganization(logger, apiUrl, apikey)
-		if err != nil {
-			logger.Fatal("failed to get organization: %s", err)
-		}
+		orgId := promptForOrganization(logger, apiUrl, apikey)
 
 		var name string
 
 		if len(args) > 0 {
 			name = args[0]
 			if exists, err := project.ProjectWithNameExists(logger, apiUrl, apikey, name); err != nil {
-				logger.Fatal("failed to check if project exists: %s", err)
+				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to check if project name exists")).ShowErrorAndExit()
 			} else if exists {
 				logger.Fatal("project %s already exists in this organization. please choose another name", name)
 			}
@@ -272,7 +271,7 @@ var projectNewCmd = &cobra.Command{
 					}
 				}
 				if exists, err := project.ProjectWithNameExists(logger, apiUrl, apikey, name); err != nil {
-					return fmt.Errorf("failed to check if project exists: %s", err)
+					errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to check if project name exists")).ShowErrorAndExit()
 				} else if exists {
 					return fmt.Errorf("project %s already exists in this organization. please choose another name", name)
 				}
@@ -300,16 +299,15 @@ var projectNewCmd = &cobra.Command{
 		var providerName string
 		var provider *templates.Template
 
-		// providers := provider.GetProviders()
 		providerArg, _ := cmd.Flags().GetString("provider")
 
 		tmpls, err := templates.LoadTemplates()
 		if err != nil {
-			logger.Fatal("failed to load templates: %s", err)
+			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates")).ShowErrorAndExit()
 		}
 
 		if len(tmpls) == 0 {
-			logger.Fatal("no templates found")
+			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("No templates returned from load templates")).ShowErrorAndExit()
 		}
 
 		if providerArg != "" {
@@ -321,12 +319,6 @@ var projectNewCmd = &cobra.Command{
 					provider = &tmpl
 					break
 				}
-				// for _, alias := range provider.Aliases() {
-				// 	if alias == providerName {
-				// 		found = true
-				// 		break
-				// 	}
-				// }
 				if found {
 					break
 				}
@@ -362,13 +354,13 @@ var projectNewCmd = &cobra.Command{
 			}
 		} else {
 			if err := os.MkdirAll(projectDir, 0700); err != nil {
-				logger.Fatal("failed to create project directory: %s", err)
+				errsystem.New(errsystem.ErrCreateDirectory, err, errsystem.WithContextMessage("Failed to create project directory")).ShowErrorAndExit()
 			}
 		}
 
 		var projectData *project.ProjectData
 
-		tui.ShowSpinner(logger, "creating project ...", func() {
+		tui.ShowSpinner("creating project ...", func() {
 			rules, err := provider.NewProject(templates.TemplateContext{
 				Context:     context.Background(),
 				Logger:      logger,
@@ -377,7 +369,7 @@ var projectNewCmd = &cobra.Command{
 				ProjectDir:  projectDir,
 			})
 			if err != nil {
-				logger.Fatal("failed to create project: %s", err)
+				errsystem.New(errsystem.ErrCreateProject, err, errsystem.WithContextMessage("Failed to create project")).ShowErrorAndExit()
 			}
 
 			projectData = initProject(logger, InitProjectArgs{
@@ -415,7 +407,7 @@ var projectListCmd = &cobra.Command{
 		logger := env.NewLogger(cmd)
 		apikey := viper.GetString("auth.api_key")
 		if apikey == "" {
-			logger.Fatal("you are not logged in")
+			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
 		}
 		apiUrl, _ := getURLs(logger)
 		var projects []project.ProjectListData
@@ -423,10 +415,10 @@ var projectListCmd = &cobra.Command{
 			var err error
 			projects, err = project.ListProjects(logger, apiUrl, apikey)
 			if err != nil {
-				logger.Fatal("failed to list projects: %s", err)
+				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list projects")).ShowErrorAndExit()
 			}
 		}
-		tui.ShowSpinner(logger, "fetching projects ...", action)
+		tui.ShowSpinner("fetching projects ...", action)
 		if len(projects) == 0 {
 			tui.ShowWarning("no projects found")
 			tui.ShowBanner("Create a new project", tui.Text("Use the ")+tui.Command("new")+tui.Text(" command to create a new project"), false)
@@ -458,7 +450,7 @@ var projectDeleteCmd = &cobra.Command{
 		logger := env.NewLogger(cmd)
 		apikey := viper.GetString("auth.api_key")
 		if apikey == "" {
-			logger.Fatal("you are not logged in")
+			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
 		}
 		apiUrl, _ := getURLs(logger)
 		var projects []project.ProjectListData
@@ -466,10 +458,10 @@ var projectDeleteCmd = &cobra.Command{
 			var err error
 			projects, err = project.ListProjects(logger, apiUrl, apikey)
 			if err != nil {
-				logger.Fatal("failed to list projects: %s", err)
+				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list projects")).ShowErrorAndExit()
 			}
 		}
-		tui.ShowSpinner(logger, "fetching projects ...", action)
+		tui.ShowSpinner("fetching projects ...", action)
 		var options []tui.Option
 		for _, project := range projects {
 			desc := project.Description
@@ -500,11 +492,11 @@ var projectDeleteCmd = &cobra.Command{
 			var err error
 			deleted, err = project.DeleteProjects(logger, apiUrl, apikey, selected)
 			if err != nil {
-				logger.Fatal("failed to delete projects: %s", err)
+				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to delete projects")).ShowErrorAndExit()
 			}
 		}
 
-		tui.ShowSpinner(logger, "Deleting projects ...", action)
+		tui.ShowSpinner("Deleting projects ...", action)
 		tui.ShowSuccess("%s deleted successfully", util.Pluralize(len(deleted), "project", "projects"))
 	},
 }

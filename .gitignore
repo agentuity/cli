@@ -5,3 +5,4 @@ dist/
 **/.DS_Store
 /my*test*
 /test*
+.agentuity-crash-*

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/agentuity/cli/internal/bundler"
+	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +23,7 @@ var bundleCmd = &cobra.Command{
 			ProjectDir: projectContext.Dir,
 			Production: production,
 		}); err != nil {
-			projectContext.Logger.Fatal("%s", err)
+			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to bundle project")).ShowErrorAndExit()
 		}
 		projectContext.Logger.Debug("bundled in %s", time.Since(started))
 	},
