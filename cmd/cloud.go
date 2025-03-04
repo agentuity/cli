@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/agentuity/cli/internal/deployer"
+	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/ignore"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/tui"
@@ -73,14 +74,15 @@ type projectContext struct {
 
 func ensureProject(cmd *cobra.Command) projectContext {
 	logger := env.NewLogger(cmd)
-	dir := resolveProjectDir(logger, cmd)
+	dir := resolveProjectDir(cmd)
 	apiUrl, appUrl := getURLs(logger)
 	token := viper.GetString("auth.api_key")
 
 	// validate our project
 	theproject := project.NewProject()
 	if err := theproject.Load(dir); err != nil {
-		logger.Fatal("error loading project: %s", err)
+		errsystem.New(errsystem.ErrInvalidConfiguration, err,
+			errsystem.WithContextMessage("Error loading project from disk")).ShowErrorAndExit()
 	}
 
 	return projectContext{
@@ -126,10 +128,11 @@ var cloudDeployCmd = &cobra.Command{
 			var err error
 			projectData, err = theproject.ListProjectEnv(logger, apiUrl, token)
 			if err != nil {
-				logger.Fatal("error listing project env: %s", err)
+				errsystem.New(errsystem.ErrApiRequest, err,
+					errsystem.WithContextMessage("Error listing project environment")).ShowErrorAndExit()
 			}
 		}
-		tui.ShowSpinner(logger, "", action)
+		tui.ShowSpinner("", action)
 
 		// check to see if we have any env vars that are not in the project
 		envfilename := filepath.Join(dir, ".env")
@@ -137,7 +140,8 @@ var cloudDeployCmd = &cobra.Command{
 
 			le, err = env.ParseEnvFile(envfilename)
 			if err != nil {
-				logger.Fatal("error parsing env file: %s. %s", envfilename, err)
+				errsystem.New(errsystem.ErrParseEnvironmentFile, err,
+					errsystem.WithContextMessage("Error parsing .env file")).ShowErrorAndExit()
 			}
 			envFile = &deployer.EnvFile{Filepath: envfilename, Env: le}
 
@@ -171,7 +175,8 @@ var cloudDeployCmd = &cobra.Command{
 				envs, secrets := loadEnvFile(le, false)
 				pd, err := theproject.SetProjectEnv(logger, apiUrl, token, envs, secrets)
 				if err != nil {
-					logger.Fatal("failed to set project env: %s", err)
+					errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
+						errsystem.WithContextMessage("Failed to set project environment variables")).ShowErrorAndExit()
 				}
 				projectData = pd // overwrite with the new version
 				switch {
@@ -191,7 +196,8 @@ var cloudDeployCmd = &cobra.Command{
 
 		_, localIssues, remoteIssues, err := buildAgentTree(keys, state, context)
 		if err != nil {
-			logger.Fatal("%s", err)
+			errsystem.New(errsystem.ErrInvalidConfiguration, err,
+				errsystem.WithContextMessage("Failed to build agent tree")).ShowErrorAndExit()
 		}
 
 		showAgentWarnings(remoteIssues, localIssues, true)
@@ -213,12 +219,13 @@ var cloudDeployCmd = &cobra.Command{
 			OSEnvironment: loadOSEnv(),
 			PromptHelpers: createPromptHelper(),
 		}); err != nil {
-			logger.Fatal("%s", err)
+			errsystem.New(errsystem.ErrDeployProject, err).ShowErrorAndExit()
 		}
 
 		cleanup, err := deploymentConfig.Write(logger, dir)
 		if err != nil {
-			logger.Fatal("error writing deployment config: %s", err)
+			errsystem.New(errsystem.ErrWriteConfigurationFile, err,
+				errsystem.WithContextMessage("Error writing deployment config to disk")).ShowErrorAndExit()
 		}
 		defer cleanup()
 
@@ -267,14 +274,17 @@ var cloudDeployCmd = &cobra.Command{
 
 		// Start deployment
 		if err := client.Do("PUT", fmt.Sprintf("/cli/deploy/start/%s", theproject.ProjectId), startRequest, &startResponse); err != nil {
-			logger.Fatal("error starting deployment: %s", err)
+			errsystem.New(errsystem.ErrDeployProject, err,
+				errsystem.WithContextMessage("Error starting deployment")).ShowErrorAndExit()
 		}
 
 		if !startResponse.Success {
 			if startResponse.Message != nil {
-				logger.Fatal("error starting deployment: %s", *startResponse.Message)
+				errsystem.New(errsystem.ErrDeployProject, fmt.Errorf("%s", *startResponse.Message),
+					errsystem.WithContextMessage("Error starting deployment")).ShowErrorAndExit()
 			}
-			logger.Fatal("unknown error starting deployment")
+			errsystem.New(errsystem.ErrDeployProject, fmt.Errorf("unknown error"),
+				errsystem.WithContextMessage("Unknown API error starting deployment")).ShowErrorAndExit()
 		}
 
 		var saveProject bool
@@ -309,7 +319,8 @@ var cloudDeployCmd = &cobra.Command{
 
 		if saveProject {
 			if err := theproject.Save(dir); err != nil {
-				logger.Fatal("error saving project with new Agents: %s", err)
+				errsystem.New(errsystem.ErrSaveProject, err,
+					errsystem.WithContextMessage("Error saving project with new Agents")).ShowErrorAndExit()
 			}
 			logger.Debug("saved project with updated Agents")
 		}
@@ -320,7 +331,8 @@ var cloudDeployCmd = &cobra.Command{
 		if util.Exists(gitignore) {
 			r, err := ignore.ParseFile(gitignore)
 			if err != nil {
-				logger.Fatal("error parsing gitignore: %s", err)
+				errsystem.New(errsystem.ErrInvalidConfiguration, err,
+					errsystem.WithContextMessage("Error parsing .gitignore file")).ShowErrorAndExit()
 			}
 			rules = r
 		}
@@ -329,14 +341,16 @@ var cloudDeployCmd = &cobra.Command{
 		// add any provider specific ignore rules
 		for _, rule := range theproject.Bundler.Ignore {
 			if err := rules.Add(rule); err != nil {
-				logger.Fatal("error adding project ignore rule: %s. %s", rule, err)
+				errsystem.New(errsystem.ErrInvalidConfiguration, err,
+					errsystem.WithContextMessage(fmt.Sprintf("Error adding project ignore rule: %s. %s", rule, err))).ShowErrorAndExit()
 			}
 		}
 
 		// create a temp file we're going to use for zip and upload
 		tmpfile, err := os.CreateTemp("", "agentuity-deploy-*.zip")
 		if err != nil {
-			logger.Fatal("error creating temp file: %s", err)
+			errsystem.New(errsystem.ErrCreateTemporaryFile, err,
+				errsystem.WithContextMessage("Error creating temp file")).ShowErrorAndExit()
 		}
 		defer os.Remove(tmpfile.Name())
 		tmpfile.Close()
@@ -354,16 +368,18 @@ var cloudDeployCmd = &cobra.Command{
 				}
 				return !notok
 			}); err != nil {
-				logger.Fatal("error zipping project: %s", err)
+				errsystem.New(errsystem.ErrCreateZipFile, err,
+					errsystem.WithContextMessage("Error zipping project")).ShowErrorAndExit()
 			}
 			logger.Debug("zip file created in %v", time.Since(started))
 		}
 
-		tui.ShowSpinner(logger, "Packaging ...", zipaction)
+		tui.ShowSpinner("Packaging ...", zipaction)
 
 		of, err := os.Open(tmpfile.Name())
 		if err != nil {
-			logger.Fatal("error opening deloyment zip file: %s", err)
+			errsystem.New(errsystem.ErrOpenFile, err,
+				errsystem.WithContextMessage("Error opening deployment zip file")).ShowErrorAndExit()
 		}
 		defer of.Close()
 
@@ -375,7 +391,8 @@ var cloudDeployCmd = &cobra.Command{
 			// send the zip file to the upload endpoint provided
 			req, err := http.NewRequest("PUT", startResponse.Data.Url, of)
 			if err != nil {
-				logger.Fatal("error creating PUT request", err)
+				errsystem.New(errsystem.ErrUploadProject, err,
+					errsystem.WithContextMessage("Error creating PUT request")).ShowErrorAndExit()
 			}
 			req.ContentLength = fi.Size()
 			// NOTE: this is a one-time signed url so we don't need to add authorization header
@@ -385,27 +402,33 @@ var cloudDeployCmd = &cobra.Command{
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				if err := updateDeploymentStatus(logger, apiUrl, token, startResponse.Data.DeploymentId, "failed"); err != nil {
-					logger.Fatal("%s", err)
+					errsystem.New(errsystem.ErrApiRequest, err,
+						errsystem.WithContextMessage("Error updating deployment status to failed")).ShowErrorAndExit()
 				}
-				logger.Fatal("error uploading deployment: %s", err)
+				errsystem.New(errsystem.ErrUploadProject, err,
+					errsystem.WithContextMessage("Error deploying project")).ShowErrorAndExit()
 			}
 			if resp.StatusCode != http.StatusOK {
 				buf, _ := io.ReadAll(resp.Body)
 				if err := updateDeploymentStatus(logger, apiUrl, token, startResponse.Data.DeploymentId, "failed"); err != nil {
-					logger.Fatal("%s", err)
+					errsystem.New(errsystem.ErrApiRequest, err,
+						errsystem.WithContextMessage("Error updating deployment status to failed")).ShowErrorAndExit()
 				}
-				logger.Fatal("error uploading deployment (%s) %s", resp.Status, string(buf))
+				errsystem.New(errsystem.ErrUploadProject, nil,
+					errsystem.WithContextMessage(fmt.Sprintf("Unexpected response: %s", string(buf))),
+					errsystem.WithUserMessage("Unexpected response from API for deployment")).ShowErrorAndExit()
 			}
 			resp.Body.Close()
 			logger.Debug("deployment uploaded %d bytes in %v", fi.Size(), time.Since(started))
 
 			// tell the api that we've completed the upload for the deployment
 			if err := updateDeploymentStatusCompleted(logger, apiUrl, token, startResponse.Data.DeploymentId); err != nil {
-				logger.Fatal("%s", err)
+				errsystem.New(errsystem.ErrApiRequest, err,
+					errsystem.WithContextMessage("Error updating deployment status to completed")).ShowErrorAndExit()
 			}
 		}
 
-		tui.ShowSpinner(logger, "Deploying ...", action)
+		tui.ShowSpinner("Deploying ...", action)
 
 		body := tui.Body("· Track Agent deployment at " + tui.Link("%s/projects/%s?deploymentId=%s", appUrl, theproject.ProjectId, startResponse.Data.DeploymentId))
 		body2 := tui.Body(fmt.Sprintf("· Send %s webhook request to ", theproject.Agents[0].Name) + tui.Link("%s/run/%s", apiUrl, theproject.Agents[0].ID))
