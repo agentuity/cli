@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"sync"
 
+	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
 
@@ -98,12 +99,10 @@ func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketI
 
 	urlString := u.String()
 
-	logger.Info("dialing %s", urlString)
+	logger.Trace("dialing %s", urlString)
 	headers := http.Header{}
 	headers.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
 	var httpResponse *http.Response
-	fmt.Println("dialing: ", urlString)
-	fmt.Println("headers: ", headers)
 	self.conn, httpResponse, err = websocket.DefaultDialer.Dial(urlString, headers)
 	if err != nil {
 		if httpResponse != nil {
@@ -116,14 +115,13 @@ func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketI
 
 	self.otelToken = httpResponse.Header.Get("X-AGENTUITY-OTLP-BEARER-TOKEN")
 	if self.otelToken == "" {
-		logger.Fatal("no otel token found")
+		errsystem.New(errsystem.ErrAuthOtel, nil, errsystem.WithUserMessage("Failed to authenticate with otel server"))
 	}
-	logger.Info("otel token: %s", self.otelToken)
 	self.otelUrl = httpResponse.Header.Get("X-AGENTUITY-OTLP-URL")
 	if self.otelUrl == "" {
-		logger.Fatal("no otel url found")
+		errsystem.New(errsystem.ErrAuthOtel, nil, errsystem.WithUserMessage("Failed to get otel server url"))
 	}
-	logger.Info("otel url: %s", self.otelUrl)
+
 	// writer
 	go func() {
 		for {
@@ -411,7 +409,7 @@ var devRunCmd = &cobra.Command{
 		}
 
 		liveDevConnection.SetOnMessage(func(message []byte) error {
-			logger.Info("recv: %s", string(message))
+			logger.Trace("recv: %s", string(message))
 
 			var agentMessage AgentMessage
 			if err := json.Unmarshal(message, &agentMessage); err != nil {
@@ -459,7 +457,7 @@ var devRunCmd = &cobra.Command{
 				return err
 			}
 
-			logger.Info("response body: %s", string(body))
+			logger.Trace("response body: %s", string(body))
 
 			liveDevConnection.SendMessage(map[string]any{
 				"sessionId":   inputMsg.Payload.SessionID,
