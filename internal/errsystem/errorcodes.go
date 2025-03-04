@@ -78,8 +78,4 @@ var (
 		Code:    "CLI-0019",
 		Message: "Failed to load templates",
 	}
-	ErrAuthOtel = errorType{
-		Code:    "CLI-0020",
-		Message: "Failed to authenticate otel",
-	}
 )
