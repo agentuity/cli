@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/agentuity/cli/internal/auth"
+	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/go-common/env"
 	"github.com/spf13/cobra"
@@ -25,12 +26,14 @@ var authLoginCmd = &cobra.Command{
 		initScreenWithLogo()
 		authResult, err := auth.Login(logger, appUrl)
 		if err != nil {
-			logger.Fatal("failed to login: %s", err)
+			errsystem.New(errsystem.ErrAuthenticateUser, err,
+				errsystem.WithContextMessage("Failed to login")).ShowErrorAndExit()
 		}
 		viper.Set("auth.api_key", authResult.APIKey)
 		viper.Set("auth.user_id", authResult.UserId)
 		if err := viper.WriteConfig(); err != nil {
-			logger.Fatal("failed to write config: %s", err)
+			errsystem.New(errsystem.ErrWriteConfigurationFile, err,
+				errsystem.WithContextMessage("Failed to write viper config")).ShowErrorAndExit()
 		}
 		tui.ShowSuccess("You are now logged in")
 	},
@@ -44,16 +47,18 @@ var authLogoutCmd = &cobra.Command{
 		_, appUrl := getURLs(logger)
 		token := viper.GetString("auth.api_key")
 		if token == "" {
-			logger.Fatal("you are not logged in")
+			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
 		}
 		viper.Set("auth.api_key", "")
 		viper.Set("auth.user_id", "")
 		if err := viper.WriteConfig(); err != nil {
-			logger.Fatal("failed to write config: %s", err)
+			errsystem.New(errsystem.ErrWriteConfigurationFile, err,
+				errsystem.WithContextMessage("Failed to write viper config")).ShowErrorAndExit()
 		}
 		initScreenWithLogo()
 		if err := auth.Logout(logger, appUrl, token); err != nil {
-			logger.Fatal("failed to logout: %s", err)
+			errsystem.New(errsystem.ErrApiRequest, err,
+				errsystem.WithContextMessage("Failed to logout")).ShowErrorAndExit()
 		}
 		tui.ShowSuccess("You have been logged out")
 	},
@@ -66,11 +71,11 @@ var authWhoamiCmd = &cobra.Command{
 		logger := env.NewLogger(cmd)
 		apikey := viper.GetString("auth.api_key")
 		if apikey == "" {
-			logger.Fatal("you are not logged in")
+			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
 		}
 		userId := viper.GetString("auth.user_id")
 		if userId == "" {
-			logger.Fatal("you are not logged in")
+			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
 		}
 		logger.Info("You are logged in with user id: %s", userId)
 	},

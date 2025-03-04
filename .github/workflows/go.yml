@@ -17,6 +17,9 @@ jobs:
       with:
         go-version: '1.24'
 
+    - name: Generate Error Codes
+      run: go generate ./...
+
     - name: Build
       run: go build -v .
 

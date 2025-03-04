@@ -27,7 +27,7 @@ func (e *EnvFile) Lookup(key string) (string, bool) {
 
 type PromptHelpers struct {
 	// ShowSpinner will show a spinner with the title while the action is running
-	ShowSpinner func(logger logger.Logger, title string, action func())
+	ShowSpinner func(title string, action func())
 	// PrintSuccess will print a check mark and the message provided with optional formatting arguments
 	PrintSuccess func(msg string, args ...any)
 	// PrintLock will print a lock and the message provided with optional formatting arguments

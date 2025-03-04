@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/agentuity/cli/internal/deployer"
+	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/go-common/logger"
@@ -37,6 +39,16 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+var testCmd = &cobra.Command{
+	Use: "error",
+	Run: func(cmd *cobra.Command, args []string) {
+		err1 := errors.New("test")
+		err := errors.New("this is a long test error message that should be truncated")
+		errs := errors.Join(err, err1)
+		errsystem.New(errsystem.ErrDeleteAgents, errs, errsystem.WithUserMessage("This is a test error. It is a very good test message. It might be the best test message ever to be displayed. If you don't believe me, just ask anyone else. They will tell you the same thing. It is a very good test message. It might be the best test message ever to be displayed. If you don't believe me, just ask anyone else. They will tell you the same thing.")).ShowErrorAndExit()
+	},
+}
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
@@ -47,6 +59,7 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.AddCommand(testCmd) // FIXME
 
 	// NOTE: this is not a persistent flag is hidden but since it's a unix default for most
 	// commands its a natural flag to expect
@@ -129,10 +142,11 @@ func createPromptHelper() deployer.PromptHelpers {
 	}
 }
 
-func resolveProjectDir(logger logger.Logger, cmd *cobra.Command) string {
+func resolveProjectDir(cmd *cobra.Command) string {
 	cwd, err := os.Getwd()
 	if err != nil {
-		logger.Fatal("failed to get current directory: %s", err)
+		errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
+			errsystem.WithUserMessage(fmt.Sprintf("Failed to get current directory: %s", err))).ShowErrorAndExit()
 	}
 	dir := cwd
 	dirFlag, _ := cmd.Flags().GetString("dir")
@@ -141,10 +155,12 @@ func resolveProjectDir(logger logger.Logger, cmd *cobra.Command) string {
 	}
 	abs, err := filepath.Abs(dir)
 	if err != nil {
-		logger.Fatal("failed to get absolute path: %s", err)
+		errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
+			errsystem.WithUserMessage(fmt.Sprintf("Failed to get absolute path: %s", err))).ShowErrorAndExit()
 	}
 	if !project.ProjectExists(abs) {
-		logger.Fatal("no agentuity.yaml file found in the current directory")
+		errsystem.New(errsystem.ErrInvalidConfiguration, fmt.Errorf("no agentuity.yaml file found"),
+			errsystem.WithUserMessage("No agentuity.yaml file found in the current directory")).ShowErrorAndExit()
 	}
 	return abs
 }

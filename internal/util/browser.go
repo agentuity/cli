@@ -177,12 +177,13 @@ func BrowserFlow(opts BrowserFlowOptions) error {
 			returnErr = ErrTimeout
 			return
 		case <-ctx.Done():
+			return
 		}
 	}
 
 	wg.Add(1)
 
-	tui.ShowSpinner(logger, "Waiting for response...", action)
+	tui.ShowSpinner("Waiting for response...", action)
 
 	wg.Wait()
 

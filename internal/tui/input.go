@@ -64,7 +64,11 @@ func Password(logger logger.Logger, title string, description string) string {
 }
 
 func WaitForAnyKey() {
-	fmt.Print(Secondary("Press any key to continue... "))
+	WaitForAnyKeyMessage("Press any key to continue... ")
+}
+
+func WaitForAnyKeyMessage(message string) {
+	fmt.Print(Secondary(message))
 	buf := make([]byte, 1)
 	os.Stdin.Read(buf)
 }
