@@ -92,6 +92,7 @@ func (e *errSystem) sendReport(filename string) {
 // and then upload the error report to the Agentuity team.
 // If the program is not running in a terminal, it will just exit with a non-zero exit code.
 func (e *errSystem) ShowErrorAndExit() {
+	tui.CancelSpinner() // cancel in case we get an error inside a spinner action
 	stackTrace := string(debug.Stack())
 	var body strings.Builder
 	if e.message != "" {
