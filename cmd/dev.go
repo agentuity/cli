@@ -370,6 +370,7 @@ var devRunCmd = &cobra.Command{
 		if websocketId == "" {
 			websocketId = uuid.New().String()[:6]
 		}
+
 		liveDevConnection, err := NewLiveDevConnection(log, sdkEventsFile, websocketId, websocketUrl, apiKey)
 		if err != nil {
 			log.Fatal("failed to create live dev connection: %s", err)
@@ -389,8 +390,9 @@ var devRunCmd = &cobra.Command{
 		projectServerCmd.Env = os.Environ()
 		projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_OTLP_BEARER_TOKEN=%s", liveDevConnection.otelToken))
 		projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_OTLP_URL=%s", liveDevConnection.otelUrl))
-		projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_SDK_DEV_MODE=true"))
 		projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_SDK_DIR=%s", dir))
+		projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_DEPLOYMENT_ID=%s", liveDevConnection.websocketId))
+
 		projectServerCmd.Stdout = os.Stdout
 		projectServerCmd.Stderr = os.Stderr
 		projectServerCmd.Stdin = os.Stdin
