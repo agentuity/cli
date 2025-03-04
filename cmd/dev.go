@@ -115,11 +115,11 @@ func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketI
 
 	self.otelToken = httpResponse.Header.Get("X-AGENTUITY-OTLP-BEARER-TOKEN")
 	if self.otelToken == "" {
-		errsystem.New(errsystem.ErrAuthOtel, nil, errsystem.WithUserMessage("Failed to authenticate with otel server"))
+		errsystem.New(errsystem.ErrAuthenticateOtelServer, nil, errsystem.WithUserMessage("Failed to authenticate with otel server"))
 	}
 	self.otelUrl = httpResponse.Header.Get("X-AGENTUITY-OTLP-URL")
 	if self.otelUrl == "" {
-		errsystem.New(errsystem.ErrAuthOtel, nil, errsystem.WithUserMessage("Failed to get otel server url"))
+		errsystem.New(errsystem.ErrAuthenticateOtelServer, nil, errsystem.WithUserMessage("Failed to get otel server url"))
 	}
 
 	// writer
@@ -200,8 +200,7 @@ func (c *LiveDevConnection) SendMessage(payload map[string]any, messageType stri
 	if err != nil {
 		return err
 	}
-	c.writeMutex.Lock()
-	defer c.writeMutex.Unlock()
+
 	if err := c.conn.WriteMessage(websocket.TextMessage, buf); err != nil {
 		return err
 	}
