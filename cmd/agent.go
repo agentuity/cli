@@ -84,10 +84,38 @@ var agentDeleteCmd = &cobra.Command{
 	},
 }
 
+func getAgentInfoFlow(logger logger.Logger, remoteAgents []agent.Agent, name string, description string) (string, string) {
+	if name == "" {
+		var prompt, help string
+		if len(remoteAgents) > 0 {
+			prompt = "What should we name the agent?"
+			help = "The name of the agent must be unique within the project"
+		} else {
+			prompt = "What should we name the initial agent?"
+			help = "The name can be changed at any time and helps identify the agent"
+		}
+		name = tui.InputWithValidation(logger, prompt, help, 255, func(name string) error {
+			for _, agent := range remoteAgents {
+				if strings.EqualFold(agent.Name, name) {
+					return fmt.Errorf("agent %s already exists with this name", name)
+				}
+			}
+			return nil
+		})
+	}
+
+	if description == "" {
+		description = tui.Input(logger, "How should we describe what the "+name+" agent does?", "The description of the agent is optional but helpful for understanding the role of the agent")
+	}
+
+	return name, description
+}
+
 var agentCreateCmd = &cobra.Command{
-	Use:     "create",
+	Use:     "create [name] [description]",
 	Short:   "Create a new agent",
 	Aliases: []string{"new"},
+	Args:    cobra.MaximumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		theproject := ensureProject(cmd)
@@ -101,16 +129,18 @@ var agentCreateCmd = &cobra.Command{
 
 		initScreenWithLogo()
 
-		name := tui.InputWithValidation(logger, "What should we name the agent?", "The name of the agent must be unique within the project", 255, func(name string) error {
-			for _, agent := range remoteAgents {
-				if strings.EqualFold(agent.Name, name) {
-					return fmt.Errorf("agent %s already exists with this name", name)
-				}
-			}
-			return nil
-		})
+		var name string
+		var description string
 
-		description := tui.Input(logger, "How should we describe what the "+name+" agent does?", "The description of the agent is optional but helpful for understanding the role of the agent")
+		if len(args) > 0 {
+			name = args[0]
+		}
+
+		if len(args) > 1 {
+			description = args[1]
+		}
+
+		name, description = getAgentInfoFlow(logger, remoteAgents, name, description)
 
 		action := func() {
 			agentID, err := agent.CreateAgent(logger, apiUrl, apikey, theproject.Project.ProjectId, name, description)
@@ -124,10 +154,12 @@ var agentCreateCmd = &cobra.Command{
 			}
 
 			if err := rules.NewAgent(templates.TemplateContext{
-				Logger:      logger,
-				Name:        name,
-				Description: description,
-				ProjectDir:  theproject.Dir,
+				Logger:           logger,
+				AgentName:        name,
+				Name:             name,
+				Description:      description,
+				AgentDescription: description,
+				ProjectDir:       theproject.Dir,
 			}); err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithAttributes(map[string]any{"name": name})).ShowErrorAndExit()
 			}

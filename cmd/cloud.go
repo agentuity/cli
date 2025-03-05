@@ -71,18 +71,12 @@ type projectContext struct {
 	Token   string
 }
 
-func ensureProject(cmd *cobra.Command) projectContext {
-	logger := env.NewLogger(cmd)
-	dir := resolveProjectDir(cmd)
-	apiUrl, appUrl := getURLs(logger)
-	token, _ := ensureLoggedIn()
-
+func loadProject(logger logger.Logger, dir string, apiUrl string, appUrl string, token string) projectContext {
 	theproject := project.NewProject()
 	if err := theproject.Load(dir); err != nil {
 		errsystem.New(errsystem.ErrInvalidConfiguration, err,
 			errsystem.WithContextMessage("Error loading project from disk")).ShowErrorAndExit()
 	}
-
 	return projectContext{
 		Logger:  logger,
 		Project: theproject,
@@ -91,6 +85,14 @@ func ensureProject(cmd *cobra.Command) projectContext {
 		APPURL:  appUrl,
 		Token:   token,
 	}
+}
+
+func ensureProject(cmd *cobra.Command) projectContext {
+	logger := env.NewLogger(cmd)
+	dir := resolveProjectDir(cmd)
+	apiUrl, appUrl := getURLs(logger)
+	token, _ := ensureLoggedIn()
+	return loadProject(logger, dir, apiUrl, appUrl, token)
 }
 
 var cloudDeployCmd = &cobra.Command{

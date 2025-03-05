@@ -31,9 +31,6 @@ new_agent:
       filename: "agents/{{ .Name | safe_filename }}/agent.py"
       from: "common/py/agent.py"
 new_project:
-  initial:
-    name: "myfirstagent"
-    description: "This is my first agent which uses the LiteLLM to generate a text response"
   steps:
     - command: uv
       args:
@@ -44,7 +41,7 @@ new_project:
       args:
         - init
         - --name
-        - "{{ .Name }}"
+        - "{{ .Name | safe_filename }}"
         - --no-package
         - --python
         - ">=3.10"
@@ -72,5 +69,5 @@ new_project:
       filename: ".gitignore"
       from: "data/common/py/gitignore"
     - action: create_file
-      filename: "agents/myfirstagent/agent.py"
+      filename: "agents/{{ .AgentName | safe_filename }}/agent.py"
       from: "common/py/agent.py"
