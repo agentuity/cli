@@ -17,12 +17,12 @@ import (
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	"github.com/pkg/browser"
 
 	csys "github.com/agentuity/go-common/sys"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/nxadm/tail"
-	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -89,7 +89,9 @@ func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketI
 		return nil, fmt.Errorf("failed to parse url: %s", err)
 	}
 	u.Path = fmt.Sprintf("/websocket/devmode/%s", websocketId)
-	u.RawQuery = fmt.Sprintf("from=%s", "cli")
+	u.RawQuery = url.Values{
+		"from": []string{"cli"},
+	}.Encode()
 
 	if u.Scheme == "http" {
 		u.Scheme = "ws"
@@ -335,7 +337,6 @@ func SaveInput(logger logger.Logger, message []byte) (string, string, error) {
 	os.Setenv("AGENTUITY_SDK_INPUT_FILE", inputPath)
 	os.Setenv("AGENTUITY_SDK_OUTPUT_FILE", outputPath)
 	os.Setenv("AGENTUITY_SDK_SESSION_ID", sessionId)
-	os.Setenv("AGENTUITY_SDK_DEV_MODE", "true")
 	os.Setenv("AGENTUITY_SDK_AUTORUN", "true")
 
 	return outputPath, sessionId, nil
