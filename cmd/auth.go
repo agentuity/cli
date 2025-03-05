@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
+	"github.com/99designs/keyring"
 	"github.com/agentuity/cli/internal/auth"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/tui"
@@ -27,11 +29,71 @@ func showLogin() {
 	tui.ShowBanner("Login", tui.Text("Use ")+tui.Command("login")+tui.Text(" to login to Agentuity"), false)
 }
 
+func ensureKeyring(profile string) keyring.Keyring {
+	keyring, err := keyring.Open(keyring.Config{
+		ServiceName:                    "agentuity-" + profile,
+		KeychainTrustApplication:       true,
+		KeychainSynchronizable:         false,
+		KeychainAccessibleWhenUnlocked: false,
+		FileDir:                        filepath.Dir(cfgFile),
+	})
+	if err != nil {
+		errsystem.New(errsystem.ErrAuthenticateUser, err,
+			errsystem.WithContextMessage("Failed to open keyring")).ShowErrorAndExit()
+	}
+	return keyring
+}
+
+func getProfileName() string {
+	profile := viper.GetString("name")
+	if profile == "" {
+		profile = "default"
+		viper.Set("name", profile)
+		if err := viper.WriteConfig(); err != nil {
+			errsystem.New(errsystem.ErrWriteConfigurationFile, err,
+				errsystem.WithContextMessage("Failed to write viper config")).ShowErrorAndExit()
+		}
+	}
+	return profile
+}
+
+func deleteAPIKey() {
+	profile := getProfileName()
+	ring := ensureKeyring(profile)
+	err := ring.Remove("apikey")
+	if err != nil {
+		if errors.Is(err, keyring.ErrKeyNotFound) {
+			return
+		}
+		errsystem.New(errsystem.ErrAuthenticateUser, err,
+			errsystem.WithContextMessage("Failed to delete apikey from keyring")).ShowErrorAndExit()
+	}
+}
+
+func saveAPIKey(apikey string) {
+	profile := getProfileName()
+	ring := ensureKeyring(profile)
+	err := ring.Set(keyring.Item{
+		Key:  "apikey",
+		Data: []byte(apikey),
+	})
+	if err != nil {
+		errsystem.New(errsystem.ErrAuthenticateUser, err,
+			errsystem.WithContextMessage("Failed to save apikey to keyring")).ShowErrorAndExit()
+	}
+}
+
 func ensureLoggedIn() (string, string) {
-	apikey := viper.GetString("auth.api_key")
-	if apikey == "" {
-		showLogin()
-		os.Exit(1)
+	profile := getProfileName()
+	ring := ensureKeyring(profile)
+	apikey, err := ring.Get("apikey")
+	if err != nil {
+		if errors.Is(err, keyring.ErrKeyNotFound) {
+			showLogin()
+			os.Exit(1)
+		}
+		errsystem.New(errsystem.ErrAuthenticateUser, err,
+			errsystem.WithContextMessage("Failed to get apikey from keyring")).ShowErrorAndExit()
 	}
 	userId := viper.GetString("auth.user_id")
 	if userId == "" {
@@ -43,7 +105,7 @@ func ensureLoggedIn() (string, string) {
 		showLogin()
 		os.Exit(1)
 	}
-	return apikey, userId
+	return string(apikey.Data), userId
 }
 
 var authLoginCmd = &cobra.Command{
@@ -84,7 +146,7 @@ var authLoginCmd = &cobra.Command{
 				errsystem.New(errsystem.ErrAuthenticateUser, err,
 					errsystem.WithContextMessage("Failed to login")).ShowErrorAndExit()
 			}
-			viper.Set("auth.api_key", authResult.APIKey)
+			saveAPIKey(authResult.APIKey)
 			viper.Set("auth.user_id", authResult.UserId)
 			viper.Set("auth.expires", authResult.Expires.UnixMilli())
 			if err := viper.WriteConfig(); err != nil {
@@ -95,6 +157,7 @@ var authLoginCmd = &cobra.Command{
 
 		tui.ClearScreen()
 		initScreenWithLogo()
+		tui.ShowLock("Your API key has been saved to your machine's secure storage")
 		tui.ShowSuccess("Welcome to Agentuity! You are now logged in")
 	},
 }
@@ -103,7 +166,7 @@ var authLogoutCmd = &cobra.Command{
 	Use:   "logout",
 	Short: "Logout of the Agentuity Cloud Platform",
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("auth.api_key", "")
+		deleteAPIKey()
 		viper.Set("auth.user_id", "")
 		viper.Set("auth.expires", time.Now().UnixMilli())
 		if err := viper.WriteConfig(); err != nil {

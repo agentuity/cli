@@ -15,6 +15,8 @@ var (
 	messageTextStyle    = lipgloss.NewStyle().Foreground(messageTextColor)
 	messageWarningColor = lipgloss.AdaptiveColor{Light: "#990000", Dark: "#FF0000"}
 	messageWarningStyle = lipgloss.NewStyle().Foreground(messageWarningColor)
+	messageLockColor    = lipgloss.AdaptiveColor{Light: "#DE970B", Dark: "#F6BE00"}
+	messageLockStyle    = lipgloss.NewStyle().Foreground(messageLockColor)
 )
 
 func ShowSuccess(msg string, args ...any) {
@@ -24,7 +26,8 @@ func ShowSuccess(msg string, args ...any) {
 }
 
 func ShowLock(msg string, args ...any) {
-	fmt.Printf(" 🔒 %s", messageTextStyle.Render(fmt.Sprintf(msg, args...)))
+	body := messageLockStyle.Render(" 🔒" + messageLockStyle.Render(fmt.Sprintf(msg, args...)))
+	fmt.Println(body)
 	fmt.Println()
 }
 

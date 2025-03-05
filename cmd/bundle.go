@@ -10,9 +10,11 @@ import (
 )
 
 var bundleCmd = &cobra.Command{
-	Use:    "bundle",
-	Short:  "Run the build bundle process",
-	Hidden: true,
+	Use:     "bundle",
+	Short:   "Run the build bundle process",
+	Args:    cobra.NoArgs,
+	Aliases: []string{"build"},
+	Hidden:  true,
 	Run: func(cmd *cobra.Command, args []string) {
 		started := time.Now()
 		projectContext := ensureProject(cmd)
