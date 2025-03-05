@@ -1,49 +1,71 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
-	"net/url"
+	"time"
 
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
 )
 
-const (
-	loginPath        = "/auth/cli"
-	loginWaitMessage = "Waiting for login to complete in the browser..."
-)
+var ErrLoginTimeout = errors.New("timed out")
 
 type LoginResult struct {
 	APIKey string
 	UserId string
 }
 
-// Login will open a browser and wait for the user to login. It will return the token if the user logs in successfully.
-// It will return an error if the user cancels the login or if the login fails.
-// If the user cancels the login or after a period of 1 minute, the login will fail and return an ErrTimeout error.
-func Login(logger logger.Logger, baseUrl string) (*LoginResult, error) {
-	var result LoginResult
-	callback := func(query url.Values) error {
-		apiKey := query.Get("api_key")
-		userId := query.Get("user_id")
-		if apiKey == "" {
-			return fmt.Errorf("no api_key found from the callback result")
-		}
-		if userId == "" {
-			return fmt.Errorf("no user_id found found from the callback result")
-		}
-		result.APIKey = apiKey
-		result.UserId = userId
-		return nil
+type OTPStartResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Data    struct {
+		OTP string `json:"otp"`
+	} `json:"data"`
+}
+
+func GenerateLoginOTP(logger logger.Logger, baseUrl string) (string, error) {
+	client := util.NewAPIClient(logger, baseUrl, "")
+
+	var resp OTPStartResponse
+	if err := client.Do("GET", "/cli/auth/start", nil, &resp); err != nil {
+		return "", err
 	}
-	if err := util.BrowserFlow(util.BrowserFlowOptions{
-		Logger:      logger,
-		BaseUrl:     baseUrl,
-		StartPath:   loginPath,
-		WaitMessage: loginWaitMessage,
-		Callback:    callback,
-	}); err != nil {
-		return nil, err
+	if !resp.Success {
+		return "", fmt.Errorf("%s", resp.Message)
 	}
-	return &result, nil
+	return resp.Data.OTP, nil
+}
+
+type OTPCompleteResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Data    *struct {
+		APIKey string `json:"apiKey"`
+		UserId string `json:"userId"`
+	} `json:"data,omitempty"`
+}
+
+func PollForLoginCompletion(logger logger.Logger, baseUrl string, otp string) (*LoginResult, error) {
+	client := util.NewAPIClient(logger, baseUrl, "")
+	body := map[string]string{"otp": otp}
+	started := time.Now()
+	for time.Since(started) < time.Minute {
+		var resp OTPCompleteResponse
+		if err := client.Do("POST", "/cli/auth/check", body, &resp); err != nil {
+			return nil, err
+		}
+		if !resp.Success {
+			return nil, fmt.Errorf("%s", resp.Message)
+		}
+		if resp.Data == nil {
+			time.Sleep(time.Second * 2)
+			continue
+		}
+		return &LoginResult{
+			APIKey: resp.Data.APIKey,
+			UserId: resp.Data.UserId,
+		}, nil
+	}
+	return nil, ErrLoginTimeout
 }
