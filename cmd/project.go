@@ -398,6 +398,12 @@ var projectNewCmd = &cobra.Command{
 	},
 }
 
+func showNoProjects() {
+	fmt.Println()
+	tui.ShowWarning("no projects found")
+	tui.ShowBanner("Create a new project", tui.Text("Use the ")+tui.Command("new")+tui.Text(" command to create a new project"), false)
+}
+
 var projectListCmd = &cobra.Command{
 	Use:     "list",
 	Short:   "List all projects",
@@ -420,8 +426,7 @@ var projectListCmd = &cobra.Command{
 		}
 		tui.ShowSpinner("fetching projects ...", action)
 		if len(projects) == 0 {
-			tui.ShowWarning("no projects found")
-			tui.ShowBanner("Create a new project", tui.Text("Use the ")+tui.Command("new")+tui.Text(" command to create a new project"), false)
+			showNoProjects()
 			return
 		}
 		headers := []string{tui.Title("Project Id"), tui.Title("Name"), tui.Title("Description")}
@@ -472,6 +477,11 @@ var projectDeleteCmd = &cobra.Command{
 				ID:   project.ID,
 				Text: tui.Bold(tui.PadRight(project.Name, 20, " ")) + tui.Muted(project.ID),
 			})
+		}
+
+		if len(options) == 0 {
+			showNoProjects()
+			return
 		}
 
 		selected := tui.MultiSelect(logger, "Select one or more projects to delete", "", options)
