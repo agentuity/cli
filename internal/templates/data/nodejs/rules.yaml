@@ -37,9 +37,6 @@ new_agent:
       filename: "src/agents/{{ .Name | safe_filename }}/index.ts"
       from: "common/js/agent.ts"
 new_project:
-  initial:
-    name: "MyFirstAgent"
-    description: "This is my first agent which uses the Vercel AI SDK to generate a text response"
   steps:
     - command: npm
       args:
@@ -84,7 +81,7 @@ new_project:
       filename: ".gitignore"
       from: "data/nodejs/gitignore"
     - action: create_file
-      filename: "src/agents/MyFirstAgent/index.ts"
+      filename: "src/agents/{{ .AgentName | safe_filename }}/index.ts"
       from: "common/js/agent.ts"
     - action: copy_dir
       from: "common/js/cursor"

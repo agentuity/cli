@@ -12,12 +12,14 @@ import (
 )
 
 type TemplateContext struct {
-	Context     context.Context
-	Logger      logger.Logger
-	Name        string
-	Description string
-	ProjectDir  string
-	Template    *Template
+	Context          context.Context
+	Logger           logger.Logger
+	Name             string
+	Description      string
+	AgentName        string
+	AgentDescription string
+	ProjectDir       string
+	Template         *Template
 }
 
 func funcTemplates(t *template.Template) *template.Template {
@@ -50,8 +52,7 @@ func (t *TemplateContext) Interpolate(val any) any {
 }
 
 type NewProjectSteps struct {
-	InitialAgent InitialAgent `yaml:"initial"`
-	Steps        []any        `yaml:"steps"`
+	Steps []any `yaml:"steps"`
 }
 
 type NewAgentSteps struct {
@@ -84,11 +85,6 @@ type Deployment struct {
 	Resources Resources `yaml:"resources"`
 	Command   string    `yaml:"command"`
 	Args      []string  `yaml:"args"`
-}
-
-type InitialAgent struct {
-	Name        string `yaml:"name"`
-	Description string `yaml:"description"`
 }
 
 type TemplateRules struct {

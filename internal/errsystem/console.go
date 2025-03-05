@@ -57,7 +57,9 @@ func (e *errSystem) writeCrashReportFile(stackTrace string) string {
 	report.Attributes = e.attributes
 	report.CLIVersion = Version
 	report.StackTrace = stackTrace
-	json.NewEncoder(tmp).Encode(report)
+	enc := json.NewEncoder(tmp)
+	enc.SetIndent(" ", " ")
+	enc.Encode(report)
 	return tmp.Name()
 }
 
