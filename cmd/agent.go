@@ -249,20 +249,20 @@ func reconcileAgentList(logger logger.Logger, apiUrl string, apikey string, thep
 				}
 				continue
 			}
-		}
-		if a, ok := fileAgents[key]; ok {
-			state[key] = agentListState{
-				Agent:       &agent.Agent{Name: a.Name, ID: a.ID, Description: a.Description},
-				Filename:    filename,
-				FoundLocal:  true,
-				FoundRemote: true,
-			}
-		} else {
-			state[key] = agentListState{
-				Agent:       &agent.Agent{Name: agentName},
-				Filename:    filename,
-				FoundLocal:  true,
-				FoundRemote: false,
+			if a, ok := fileAgents[key]; ok {
+				state[key] = agentListState{
+					Agent:       &agent.Agent{Name: a.Name, ID: a.ID, Description: a.Description},
+					Filename:    filename,
+					FoundLocal:  true,
+					FoundRemote: true,
+				}
+			} else {
+				state[key] = agentListState{
+					Agent:       &agent.Agent{Name: agentName},
+					Filename:    filename,
+					FoundLocal:  true,
+					FoundRemote: false,
+				}
 			}
 		}
 	}
