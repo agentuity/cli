@@ -78,4 +78,8 @@ var (
 		Code:    "CLI-0019",
 		Message: "Failed to load templates",
 	}
+	ErrAuthenticateOtelServer = errorType{
+		Code:    "CLI-0020",
+		Message: "Failed to authenticate with otel server",
+	}
 )

@@ -61,3 +61,6 @@ errors:
 
   - code: CLI-0019
     message: Failed to load templates
+
+  - code: CLI-0020
+    message: Failed to authenticate with otel server
