@@ -49,7 +49,9 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 		return fmt.Errorf("error creating request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.token)
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {

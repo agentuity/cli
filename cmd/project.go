@@ -411,10 +411,7 @@ var projectListCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apikey := viper.GetString("auth.api_key")
-		if apikey == "" {
-			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
-		}
+		apikey, _ := ensureLoggedIn()
 		apiUrl, _ := getURLs(logger)
 		var projects []project.ProjectListData
 		action := func() {

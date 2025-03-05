@@ -17,7 +17,6 @@ import (
 	"github.com/agentuity/go-common/logger"
 	"github.com/charmbracelet/lipgloss/tree"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 const emptyProjectDescription = "No description provided"
@@ -36,14 +35,10 @@ var agentDeleteCmd = &cobra.Command{
 	Aliases: []string{"rm", "del"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apikey := viper.GetString("auth.api_key")
-		if apikey == "" {
-			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
-		}
 		theproject := ensureProject(cmd)
 		apiUrl, _ := getURLs(logger)
 
-		keys, state := reconcileAgentList(logger, apiUrl, apikey, theproject)
+		keys, state := reconcileAgentList(logger, apiUrl, theproject.Token, theproject)
 
 		var options []tui.Option
 		for _, key := range keys {
@@ -67,7 +62,7 @@ var agentDeleteCmd = &cobra.Command{
 
 		action := func() {
 			var err error
-			deleted, err = agent.DeleteAgents(logger, apiUrl, apikey, theproject.Project.ProjectId, selected)
+			deleted, err = agent.DeleteAgents(logger, apiUrl, theproject.Token, theproject.Project.ProjectId, selected)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to delete agents")).ShowErrorAndExit()
 			}
@@ -95,11 +90,8 @@ var agentCreateCmd = &cobra.Command{
 	Aliases: []string{"new"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apikey := viper.GetString("auth.api_key")
-		if apikey == "" {
-			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
-		}
 		theproject := ensureProject(cmd)
+		apikey := theproject.Token
 		apiUrl, _ := getURLs(logger)
 
 		remoteAgents, err := getAgentList(logger, apiUrl, apikey, theproject)
@@ -344,15 +336,11 @@ var agentListCmd = &cobra.Command{
 	Aliases: []string{"ls"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apikey := viper.GetString("auth.api_key")
-		if apikey == "" {
-			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
-		}
 		project := ensureProject(cmd)
 		apiUrl, _ := getURLs(logger)
 
 		// perform the reconcilation
-		keys, state := reconcileAgentList(logger, apiUrl, apikey, project)
+		keys, state := reconcileAgentList(logger, apiUrl, project.Token, project)
 
 		if len(keys) == 0 {
 			tui.ShowWarning("no Agents found")
