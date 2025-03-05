@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"time"
 
 	"github.com/agentuity/cli/internal/auth"
 	"github.com/agentuity/cli/internal/errsystem"
@@ -18,6 +20,30 @@ var authCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
+}
+
+func showLogin() {
+	fmt.Println(tui.Warning("You are not currently logged in or your session has expired."))
+	tui.ShowBanner("Login", tui.Text("Use ")+tui.Command("login")+tui.Text(" to login to Agentuity"), false)
+}
+
+func ensureLoggedIn() (string, string) {
+	apikey := viper.GetString("auth.api_key")
+	if apikey == "" {
+		showLogin()
+		os.Exit(1)
+	}
+	userId := viper.GetString("auth.user_id")
+	if userId == "" {
+		showLogin()
+		os.Exit(1)
+	}
+	expires := viper.GetInt64("auth.expires")
+	if expires < time.Now().UnixMilli() {
+		showLogin()
+		os.Exit(1)
+	}
+	return apikey, userId
 }
 
 var authLoginCmd = &cobra.Command{
@@ -60,6 +86,7 @@ var authLoginCmd = &cobra.Command{
 			}
 			viper.Set("auth.api_key", authResult.APIKey)
 			viper.Set("auth.user_id", authResult.UserId)
+			viper.Set("auth.expires", authResult.Expires.UnixMilli())
 			if err := viper.WriteConfig(); err != nil {
 				errsystem.New(errsystem.ErrWriteConfigurationFile, err,
 					errsystem.WithContextMessage("Failed to write viper config")).ShowErrorAndExit()
@@ -78,6 +105,7 @@ var authLogoutCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		viper.Set("auth.api_key", "")
 		viper.Set("auth.user_id", "")
+		viper.Set("auth.expires", time.Now().UnixMilli())
 		if err := viper.WriteConfig(); err != nil {
 			errsystem.New(errsystem.ErrWriteConfigurationFile, err,
 				errsystem.WithContextMessage("Failed to write viper config")).ShowErrorAndExit()
@@ -91,15 +119,18 @@ var authWhoamiCmd = &cobra.Command{
 	Short: "Print the current logged in user details",
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apikey := viper.GetString("auth.api_key")
-		if apikey == "" {
-			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
+		apiUrl, _ := getURLs(logger)
+		apiKey, userId := ensureLoggedIn()
+		user, err := auth.GetUser(logger, apiUrl, apiKey)
+		if err != nil {
+			errsystem.New(errsystem.ErrAuthenticateUser, err,
+				errsystem.WithContextMessage("Failed to get user")).ShowErrorAndExit()
 		}
-		userId := viper.GetString("auth.user_id")
-		if userId == "" {
-			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
-		}
-		logger.Info("You are logged in with user id: %s", userId)
+		body := tui.Paragraph(
+			tui.PadRight("Name:", 15, " ")+" "+tui.Bold(tui.PadRight(user.FirstName+" "+user.LastName, 30, " "))+" "+tui.Muted(userId),
+			tui.PadRight("Organization:", 15, " ")+" "+tui.Bold(tui.PadRight(user.OrgName, 31, " "))+" "+tui.Muted(user.OrgId),
+		)
+		tui.ShowBanner(tui.Muted("Currently logged in as"), body, false)
 	},
 }
 

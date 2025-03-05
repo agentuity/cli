@@ -20,7 +20,6 @@ import (
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -76,9 +75,8 @@ func ensureProject(cmd *cobra.Command) projectContext {
 	logger := env.NewLogger(cmd)
 	dir := resolveProjectDir(cmd)
 	apiUrl, appUrl := getURLs(logger)
-	token := viper.GetString("auth.api_key")
+	token, _ := ensureLoggedIn()
 
-	// validate our project
 	theproject := project.NewProject()
 	if err := theproject.Load(dir); err != nil {
 		errsystem.New(errsystem.ErrInvalidConfiguration, err,

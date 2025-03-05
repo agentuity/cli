@@ -12,8 +12,9 @@ import (
 var ErrLoginTimeout = errors.New("timed out")
 
 type LoginResult struct {
-	APIKey string
-	UserId string
+	APIKey  string
+	UserId  string
+	Expires time.Time
 }
 
 type OTPStartResponse struct {
@@ -41,8 +42,9 @@ type OTPCompleteResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
 	Data    *struct {
-		APIKey string `json:"apiKey"`
-		UserId string `json:"userId"`
+		APIKey  string `json:"apiKey"`
+		UserId  string `json:"userId"`
+		Expires int64  `json:"expires"`
 	} `json:"data,omitempty"`
 }
 
@@ -63,9 +65,36 @@ func PollForLoginCompletion(logger logger.Logger, baseUrl string, otp string) (*
 			continue
 		}
 		return &LoginResult{
-			APIKey: resp.Data.APIKey,
-			UserId: resp.Data.UserId,
+			APIKey:  resp.Data.APIKey,
+			UserId:  resp.Data.UserId,
+			Expires: time.UnixMilli(resp.Data.Expires),
 		}, nil
 	}
 	return nil, ErrLoginTimeout
+}
+
+type User struct {
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	OrgId     string `json:"orgId"`
+	OrgName   string `json:"name"`
+}
+
+type UserResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Data    *User  `json:"data"`
+}
+
+func GetUser(logger logger.Logger, baseUrl string, apiKey string) (*User, error) {
+	client := util.NewAPIClient(logger, baseUrl, apiKey)
+
+	var resp UserResponse
+	if err := client.Do("GET", "/cli/auth/user", nil, &resp); err != nil {
+		return nil, err
+	}
+	if !resp.Success {
+		return nil, fmt.Errorf("%s", resp.Message)
+	}
+	return resp.Data, nil
 }
