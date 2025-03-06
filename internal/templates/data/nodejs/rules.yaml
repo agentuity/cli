@@ -70,7 +70,7 @@ new_project:
       name: "{{ .Name }}"
       version: "0.0.1"
       description: "{{ .Description }}"
-      keywords: ["agentuity", "agent", "ai", "ai agent", "vercel", "bun"]
+      keywords: ["agentuity", "agent", "ai", "ai agent"]
     - action: create_file
       filename: tsconfig.json
       from: "data/nodejs/tsconfig.json"
