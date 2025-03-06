@@ -14,6 +14,10 @@ var (
 
 // ShowSpinner will display a spinner while the action is being performed
 func ShowSpinner(title string, action func()) {
+	if !HasTTY {
+		action()
+		return
+	}
 	var wg sync.WaitGroup
 	if currentSpinnerDone != nil {
 		currentSpinnerDone()

@@ -38,6 +38,9 @@ var (
 )
 
 func Logo() {
+	if !HasTTY {
+		return
+	}
 	logo := logoStyle.Render(logoHeader)
 	title := logoStyle.Render("Agentuity Agent Cloud")
 	fmt.Println(logoBox.Render(logo + "\n" + title))

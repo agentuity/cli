@@ -321,7 +321,7 @@ var devRunCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		log := env.NewLogger(cmd)
 		sdkEventsFile := "events.log"
-		dir := resolveProjectDir(cmd)
+		dir := resolveProjectDir(log, cmd)
 		apiUrl, appUrl := getURLs(log)
 		websocketUrl := viper.GetString("overrides.websocket_url")
 		websocketId, _ := cmd.Flags().GetString("websocket-id")
