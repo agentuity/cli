@@ -12,7 +12,7 @@ var (
 	bannerTitleColor     = lipgloss.AdaptiveColor{Light: "#36EEE0", Dark: "#00FFFF"}
 	bannerMaxWidth       = 80
 	bannerPadding        = 1
-	bannerMargin         = 1
+	bannerMargin         = 0
 	bannerBorder         = lipgloss.RoundedBorder()
 	bannerStyle          = lipgloss.NewStyle().
 				Padding(bannerPadding).

@@ -24,6 +24,7 @@ package main
 import (
 	"github.com/agentuity/cli/cmd"
 	"github.com/agentuity/cli/internal/errsystem"
+	"github.com/agentuity/cli/internal/project"
 )
 
 var (
@@ -37,5 +38,6 @@ func main() {
 	cmd.Commit = commit
 	cmd.Date = date
 	errsystem.Version = version
+	project.Version = version
 	cmd.Execute()
 }

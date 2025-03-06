@@ -129,7 +129,7 @@ func createPromptHelper() deployer.PromptHelpers {
 	}
 }
 
-func resolveProjectDir(cmd *cobra.Command) string {
+func resolveProjectDir(logger logger.Logger, cmd *cobra.Command) string {
 	cwd, err := os.Getwd()
 	if err != nil {
 		errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
@@ -146,8 +146,7 @@ func resolveProjectDir(cmd *cobra.Command) string {
 			errsystem.WithUserMessage(fmt.Sprintf("Failed to get absolute path: %s", err))).ShowErrorAndExit()
 	}
 	if !project.ProjectExists(abs) {
-		errsystem.New(errsystem.ErrInvalidConfiguration, fmt.Errorf("no agentuity.yaml file found"),
-			errsystem.WithUserMessage("No agentuity.yaml file found in the current directory")).ShowErrorAndExit()
+		logger.Fatal("Project file not found: %s", filepath.Join(abs, "agentuity.yaml"))
 	}
 	return abs
 }

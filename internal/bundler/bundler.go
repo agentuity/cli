@@ -35,7 +35,7 @@ type BundleContext struct {
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
 	var entryPoints []string
 	entryPoints = append(entryPoints, filepath.Join(dir, "index.js"))
-	files, err := util.ListDir(theproject.Bundler.AgentConfig.Dir)
+	files, err := util.ListDir(filepath.Join(dir, theproject.Bundler.AgentConfig.Dir))
 	if err != nil {
 		errsystem.New(errsystem.ErrListFilesAndDirectories, err).ShowErrorAndExit()
 	}

@@ -21,6 +21,8 @@ const (
 	initPath = "/cli/project"
 )
 
+var Version string
+
 type initProjectResult struct {
 	Success bool        `json:"success"`
 	Data    ProjectData `json:"data"`
@@ -138,6 +140,7 @@ type AgentConfig struct {
 }
 
 type Project struct {
+	Version     string        `json:"version" yaml:"version" hc:"The version semver range required to run this project"`
 	ProjectId   string        `json:"project_id" yaml:"project_id" hc:"The ID of the project which is automatically generated"`
 	Name        string        `json:"name" yaml:"name" hc:"The name of the project which is editable"`
 	Description string        `json:"description" yaml:"description" hc:"The description of the project which is editable"`
@@ -229,7 +232,14 @@ const (
 
 // NewProject will create a new project that is empty.
 func NewProject() *Project {
+	var version string
+	if Version == "" || Version == "dev" {
+		version = ">=0.0.0" // should only happen in dev cli
+	} else {
+		version = Version
+	}
 	return &Project{
+		Version: version,
 		Deployment: &Deployment{
 			Resources: &Resources{
 				Memory: defaultMemory,

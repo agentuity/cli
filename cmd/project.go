@@ -230,10 +230,10 @@ func showProjectSelector(items []list.Item) *templates.Template {
 }
 
 var projectNewCmd = &cobra.Command{
-	Use:     "create [name] [description] [agent-name] [agent-description]",
+	Use:     "create [name] [description] [agent-name] [agent-description] [auth-type]",
 	Short:   "Create a new project",
 	Aliases: []string{"new"},
-	Args:    cobra.MaximumNArgs(4),
+	Args:    cobra.MaximumNArgs(5),
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		apikey, _ := ensureLoggedIn()
@@ -247,7 +247,7 @@ var projectNewCmd = &cobra.Command{
 
 		orgId := promptForOrganization(logger, apiUrl, apikey)
 
-		var name, description, agentName, agentDescription string
+		var name, description, agentName, agentDescription, authType string
 
 		if len(args) > 0 {
 			name = args[0]
@@ -356,7 +356,7 @@ var projectNewCmd = &cobra.Command{
 		}
 
 		if agentName == "" {
-			agentName, agentDescription = getAgentInfoFlow(logger, nil, agentName, agentDescription)
+			agentName, agentDescription, authType = getAgentInfoFlow(logger, nil, agentName, agentDescription)
 		}
 
 		var projectData *project.ProjectData
@@ -376,16 +376,18 @@ var projectNewCmd = &cobra.Command{
 			}
 
 			projectData = initProject(logger, InitProjectArgs{
-				BaseURL:          apiUrl,
-				Dir:              projectDir,
-				Token:            apikey,
-				OrgId:            orgId,
-				Name:             name,
-				Description:      description,
-				Provider:         rules,
-				AgentName:        agentName,
-				AgentDescription: agentDescription,
+				BaseURL:           apiUrl,
+				Dir:               projectDir,
+				Token:             apikey,
+				OrgId:             orgId,
+				Name:              name,
+				Description:       description,
+				Provider:          rules,
+				AgentName:         agentName,
+				AgentDescription:  agentDescription,
+				EnableWebhookAuth: authType != "none",
 			})
+
 		})
 
 		tui.ShowBanner("You're ready to deploy your first Agent!",
@@ -393,6 +395,7 @@ var projectNewCmd = &cobra.Command{
 				tui.Secondary("1. Switch into the project directory at ")+tui.Directory(projectDir),
 				tui.Secondary("2. Run ")+tui.Command("run")+tui.Secondary(" to run the project locally in development mode"),
 				tui.Secondary("3. Run ")+tui.Command("deploy")+tui.Secondary(" to deploy the project to the Agentuity Agent Cloud"),
+				tui.Secondary("4. Run ")+tui.Command("agent apikey")+tui.Secondary(" to fetch the API key for the agent"),
 				tui.Secondary("🏠 Access your project at ")+tui.Link("%s/projects/%s", appUrl, projectData.ProjectId),
 			),
 			true,

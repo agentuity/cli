@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver"
+	"github.com/agentuity/cli/internal/agent"
 	"github.com/agentuity/cli/internal/deployer"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/ignore"
@@ -89,10 +91,22 @@ func loadProject(logger logger.Logger, dir string, apiUrl string, appUrl string,
 
 func ensureProject(cmd *cobra.Command) projectContext {
 	logger := env.NewLogger(cmd)
-	dir := resolveProjectDir(cmd)
+	dir := resolveProjectDir(logger, cmd)
 	apiUrl, appUrl := getURLs(logger)
 	token, _ := ensureLoggedIn()
-	return loadProject(logger, dir, apiUrl, appUrl, token)
+	p := loadProject(logger, dir, apiUrl, appUrl, token)
+	if Version != "" && Version != "dev" && p.Project.Version != "" {
+		v := semver.MustParse(Version)
+		c, err := semver.NewConstraint(p.Project.Version)
+		if err != nil {
+			errsystem.New(errsystem.ErrInvalidConfiguration, err,
+				errsystem.WithContextMessage(fmt.Sprintf("Error parsing project version constraint: %s", p.Project.Version))).ShowErrorAndExit()
+		}
+		if !c.Check(v) {
+			logger.Fatal("This project is not compatible with CLI version %s. Please upgrade your Agentuity CLI to version %s.", Version, p.Project.Version)
+		}
+	}
+	return p
 }
 
 var cloudDeployCmd = &cobra.Command{
@@ -385,7 +399,7 @@ var cloudDeployCmd = &cobra.Command{
 
 		fi, _ := os.Stat(tmpfile.Name())
 		started := time.Now()
-		// var webhookToken string
+		var webhookToken string
 
 		action = func() {
 			// send the zip file to the upload endpoint provided
@@ -426,14 +440,30 @@ var cloudDeployCmd = &cobra.Command{
 				errsystem.New(errsystem.ErrApiRequest, err,
 					errsystem.WithContextMessage("Error updating deployment status to completed")).ShowErrorAndExit()
 			}
+			if len(theproject.Agents) == 1 {
+				webhookToken, err = agent.GetApiKey(logger, apiUrl, token, theproject.Agents[0].ID)
+				if err != nil {
+					errsystem.New(errsystem.ErrApiRequest, err,
+						errsystem.WithContextMessage("Error getting Agent API key")).ShowErrorAndExit()
+				}
+			}
 		}
 
 		tui.ShowSpinner("Deploying ...", action)
 
-		body := tui.Body("· Track Agent deployment at " + tui.Link("%s/projects/%s?deploymentId=%s", appUrl, theproject.ProjectId, startResponse.Data.DeploymentId))
-		body2 := tui.Body(fmt.Sprintf("· Send %s webhook request to ", theproject.Agents[0].Name) + tui.Link("%s/run/%s", apiUrl, theproject.Agents[0].ID))
+		body := tui.Body("· Track your project at\n  " + tui.Link("%s/projects/%s", appUrl, theproject.ProjectId))
+		var body2 string
 
-		tui.ShowBanner("Your project was deployed successfully!", body+"\n\n"+body2, true)
+		if len(theproject.Agents) == 1 {
+			body2 = "\n\n"
+			if webhookToken != "" {
+				body2 += tui.Body("· Run ") + tui.Command("agent apikey "+theproject.Agents[0].ID) + tui.Body("\n  to fetch the API key for this webhook")
+				body2 += "\n\n"
+			}
+			body2 += tui.Body(fmt.Sprintf("· Send %s webhook request to\n  ", theproject.Agents[0].Name) + tui.Link("%s/run/%s", apiUrl, theproject.Agents[0].ID))
+		}
+
+		tui.ShowBanner("Your project was deployed successfully!", body+body2, true)
 	},
 }
 
