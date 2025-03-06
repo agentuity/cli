@@ -40,7 +40,7 @@ func generateGatewayEnvGuard(apikey string, apikeyval string, apibase string, pr
 	if (url && apikey) {
 		process.env.%[1]s = %[2]s;
 		process.env.%[3]s = url + '/sdk/gateway/%[4]s';
-		console.debug('Enabled Agentuity API Gateway for %[4]s');
+		console.debug('Enabled Agentuity AI Gateway for %[4]s');
 	}
 }
 `, apikey, apikeyval, apibase, provider)
