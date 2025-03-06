@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -27,8 +26,7 @@ var cfgFile string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:     "agentuity",
-	Aliases: []string{"ag"},
+	Use: "agentuity",
 	Run: func(cmd *cobra.Command, args []string) {
 		if version, _ := cmd.Flags().GetBool("version"); version {
 			fmt.Println(Version)
@@ -36,16 +34,6 @@ var rootCmd = &cobra.Command{
 		}
 		tui.Logo()
 		cmd.Help()
-	},
-}
-
-var testCmd = &cobra.Command{
-	Use: "error",
-	Run: func(cmd *cobra.Command, args []string) {
-		err1 := errors.New("test")
-		err := errors.New("this is a long test error message that should be truncated")
-		errs := errors.Join(err, err1)
-		errsystem.New(errsystem.ErrDeleteAgents, errs, errsystem.WithUserMessage("This is a test error. It is a very good test message. It might be the best test message ever to be displayed. If you don't believe me, just ask anyone else. They will tell you the same thing. It is a very good test message. It might be the best test message ever to be displayed. If you don't believe me, just ask anyone else. They will tell you the same thing.")).ShowErrorAndExit()
 	},
 }
 
@@ -59,7 +47,6 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.AddCommand(testCmd) // FIXME
 
 	// NOTE: this is not a persistent flag is hidden but since it's a unix default for most
 	// commands its a natural flag to expect

@@ -374,7 +374,7 @@ func resolveStep(ctx TemplateContext, step any) (Step, bool) {
 				}
 				var name string
 				if val, ok := kv["name"].(string); ok {
-					name = ctx.Interpolate(val).(string)
+					name = util.SafeFilename(ctx.Interpolate(val).(string))
 				}
 				var version string
 				if val, ok := kv["version"].(string); ok {

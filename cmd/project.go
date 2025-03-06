@@ -19,7 +19,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var projectCmd = &cobra.Command{
@@ -231,17 +230,13 @@ func showProjectSelector(items []list.Item) *templates.Template {
 }
 
 var projectNewCmd = &cobra.Command{
-	Use:     "create [name]",
+	Use:     "create [name] [description] [agent-name] [agent-description]",
 	Short:   "Create a new project",
 	Aliases: []string{"new"},
-	Args:    cobra.MaximumNArgs(1),
+	Args:    cobra.MaximumNArgs(4),
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apikey := viper.GetString("auth.api_key")
-		if apikey == "" {
-			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
-		}
-
+		apikey, _ := ensureLoggedIn()
 		apiUrl, appUrl := getURLs(logger)
 		initScreenWithLogo()
 
@@ -252,7 +247,7 @@ var projectNewCmd = &cobra.Command{
 
 		orgId := promptForOrganization(logger, apiUrl, apikey)
 
-		var name string
+		var name, description, agentName, agentDescription string
 
 		if len(args) > 0 {
 			name = args[0]
@@ -279,7 +274,9 @@ var projectNewCmd = &cobra.Command{
 			})
 		}
 
-		description := tui.Input(logger, "How should we describe what the "+name+" project does?", "The description of the project is optional but helpful")
+		if description == "" {
+			description = tui.Input(logger, "How should we describe what the "+name+" project does?", "The description of the project is optional but helpful")
+		}
 
 		projectDir := filepath.Join(cwd, util.SafeFilename(name))
 		dir, _ := cmd.Flags().GetString("dir")
@@ -358,15 +355,21 @@ var projectNewCmd = &cobra.Command{
 			}
 		}
 
+		if agentName == "" {
+			agentName, agentDescription = getAgentInfoFlow(logger, nil, agentName, agentDescription)
+		}
+
 		var projectData *project.ProjectData
 
 		tui.ShowSpinner("creating project ...", func() {
 			rules, err := provider.NewProject(templates.TemplateContext{
-				Context:     context.Background(),
-				Logger:      logger,
-				Name:        name,
-				Description: description,
-				ProjectDir:  projectDir,
+				Context:          context.Background(),
+				Logger:           logger,
+				Name:             name,
+				Description:      description,
+				ProjectDir:       projectDir,
+				AgentName:        agentName,
+				AgentDescription: agentDescription,
 			})
 			if err != nil {
 				errsystem.New(errsystem.ErrCreateProject, err, errsystem.WithContextMessage("Failed to create project")).ShowErrorAndExit()
@@ -380,8 +383,8 @@ var projectNewCmd = &cobra.Command{
 				Name:             name,
 				Description:      description,
 				Provider:         rules,
-				AgentName:        rules.NewProjectSteps.InitialAgent.Name,
-				AgentDescription: rules.NewProjectSteps.InitialAgent.Description,
+				AgentName:        agentName,
+				AgentDescription: agentDescription,
 			})
 		})
 
@@ -398,6 +401,12 @@ var projectNewCmd = &cobra.Command{
 	},
 }
 
+func showNoProjects() {
+	fmt.Println()
+	tui.ShowWarning("no projects found")
+	tui.ShowBanner("Create a new project", tui.Text("Use the ")+tui.Command("new")+tui.Text(" command to create a new project"), false)
+}
+
 var projectListCmd = &cobra.Command{
 	Use:     "list",
 	Short:   "List all projects",
@@ -405,10 +414,7 @@ var projectListCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apikey := viper.GetString("auth.api_key")
-		if apikey == "" {
-			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
-		}
+		apikey, _ := ensureLoggedIn()
 		apiUrl, _ := getURLs(logger)
 		var projects []project.ProjectListData
 		action := func() {
@@ -420,8 +426,7 @@ var projectListCmd = &cobra.Command{
 		}
 		tui.ShowSpinner("fetching projects ...", action)
 		if len(projects) == 0 {
-			tui.ShowWarning("no projects found")
-			tui.ShowBanner("Create a new project", tui.Text("Use the ")+tui.Command("new")+tui.Text(" command to create a new project"), false)
+			showNoProjects()
 			return
 		}
 		headers := []string{tui.Title("Project Id"), tui.Title("Name"), tui.Title("Description")}
@@ -448,10 +453,7 @@ var projectDeleteCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apikey := viper.GetString("auth.api_key")
-		if apikey == "" {
-			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
-		}
+		apikey, _ := ensureLoggedIn()
 		apiUrl, _ := getURLs(logger)
 		var projects []project.ProjectListData
 		action := func() {
@@ -472,6 +474,11 @@ var projectDeleteCmd = &cobra.Command{
 				ID:   project.ID,
 				Text: tui.Bold(tui.PadRight(project.Name, 20, " ")) + tui.Muted(project.ID),
 			})
+		}
+
+		if len(options) == 0 {
+			showNoProjects()
+			return
 		}
 
 		selected := tui.MultiSelect(logger, "Select one or more projects to delete", "", options)
@@ -509,5 +516,5 @@ func init() {
 	projectCmd.AddCommand(projectDeleteCmd)
 
 	projectNewCmd.Flags().StringP("dir", "d", "", "The directory to create the project in")
-	projectNewCmd.Flags().StringP("provider", "p", "", "The provider to use for the project")
+	projectNewCmd.Flags().StringP("provider", "p", "", "The provider template to use for the project")
 }

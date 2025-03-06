@@ -17,7 +17,6 @@ import (
 	"github.com/agentuity/go-common/logger"
 	"github.com/charmbracelet/lipgloss/tree"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 const emptyProjectDescription = "No description provided"
@@ -36,14 +35,10 @@ var agentDeleteCmd = &cobra.Command{
 	Aliases: []string{"rm", "del"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apikey := viper.GetString("auth.api_key")
-		if apikey == "" {
-			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
-		}
 		theproject := ensureProject(cmd)
 		apiUrl, _ := getURLs(logger)
 
-		keys, state := reconcileAgentList(logger, apiUrl, apikey, theproject)
+		keys, state := reconcileAgentList(logger, apiUrl, theproject.Token, theproject)
 
 		var options []tui.Option
 		for _, key := range keys {
@@ -67,7 +62,7 @@ var agentDeleteCmd = &cobra.Command{
 
 		action := func() {
 			var err error
-			deleted, err = agent.DeleteAgents(logger, apiUrl, apikey, theproject.Project.ProjectId, selected)
+			deleted, err = agent.DeleteAgents(logger, apiUrl, theproject.Token, theproject.Project.ProjectId, selected)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to delete agents")).ShowErrorAndExit()
 			}
@@ -89,17 +84,42 @@ var agentDeleteCmd = &cobra.Command{
 	},
 }
 
+func getAgentInfoFlow(logger logger.Logger, remoteAgents []agent.Agent, name string, description string) (string, string) {
+	if name == "" {
+		var prompt, help string
+		if len(remoteAgents) > 0 {
+			prompt = "What should we name the agent?"
+			help = "The name of the agent must be unique within the project"
+		} else {
+			prompt = "What should we name the initial agent?"
+			help = "The name can be changed at any time and helps identify the agent"
+		}
+		name = tui.InputWithValidation(logger, prompt, help, 255, func(name string) error {
+			for _, agent := range remoteAgents {
+				if strings.EqualFold(agent.Name, name) {
+					return fmt.Errorf("agent %s already exists with this name", name)
+				}
+			}
+			return nil
+		})
+	}
+
+	if description == "" {
+		description = tui.Input(logger, "How should we describe what the "+name+" agent does?", "The description of the agent is optional but helpful for understanding the role of the agent")
+	}
+
+	return name, description
+}
+
 var agentCreateCmd = &cobra.Command{
-	Use:     "create",
+	Use:     "create [name] [description]",
 	Short:   "Create a new agent",
 	Aliases: []string{"new"},
+	Args:    cobra.MaximumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apikey := viper.GetString("auth.api_key")
-		if apikey == "" {
-			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
-		}
 		theproject := ensureProject(cmd)
+		apikey := theproject.Token
 		apiUrl, _ := getURLs(logger)
 
 		remoteAgents, err := getAgentList(logger, apiUrl, apikey, theproject)
@@ -109,16 +129,18 @@ var agentCreateCmd = &cobra.Command{
 
 		initScreenWithLogo()
 
-		name := tui.InputWithValidation(logger, "What should we name the agent?", "The name of the agent must be unique within the project", 255, func(name string) error {
-			for _, agent := range remoteAgents {
-				if strings.EqualFold(agent.Name, name) {
-					return fmt.Errorf("agent %s already exists with this name", name)
-				}
-			}
-			return nil
-		})
+		var name string
+		var description string
 
-		description := tui.Input(logger, "How should we describe what the "+name+" agent does?", "The description of the agent is optional but helpful for understanding the role of the agent")
+		if len(args) > 0 {
+			name = args[0]
+		}
+
+		if len(args) > 1 {
+			description = args[1]
+		}
+
+		name, description = getAgentInfoFlow(logger, remoteAgents, name, description)
 
 		action := func() {
 			agentID, err := agent.CreateAgent(logger, apiUrl, apikey, theproject.Project.ProjectId, name, description)
@@ -132,10 +154,12 @@ var agentCreateCmd = &cobra.Command{
 			}
 
 			if err := rules.NewAgent(templates.TemplateContext{
-				Logger:      logger,
-				Name:        name,
-				Description: description,
-				ProjectDir:  theproject.Dir,
+				Logger:           logger,
+				AgentName:        name,
+				Name:             name,
+				Description:      description,
+				AgentDescription: description,
+				ProjectDir:       theproject.Dir,
 			}); err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithAttributes(map[string]any{"name": name})).ShowErrorAndExit()
 			}
@@ -225,20 +249,20 @@ func reconcileAgentList(logger logger.Logger, apiUrl string, apikey string, thep
 				}
 				continue
 			}
-		}
-		if a, ok := fileAgents[key]; ok {
-			state[key] = agentListState{
-				Agent:       &agent.Agent{Name: a.Name, ID: a.ID, Description: a.Description},
-				Filename:    filename,
-				FoundLocal:  true,
-				FoundRemote: true,
-			}
-		} else {
-			state[key] = agentListState{
-				Agent:       &agent.Agent{Name: agentName},
-				Filename:    filename,
-				FoundLocal:  true,
-				FoundRemote: false,
+			if a, ok := fileAgents[key]; ok {
+				state[key] = agentListState{
+					Agent:       &agent.Agent{Name: a.Name, ID: a.ID, Description: a.Description},
+					Filename:    filename,
+					FoundLocal:  true,
+					FoundRemote: true,
+				}
+			} else {
+				state[key] = agentListState{
+					Agent:       &agent.Agent{Name: agentName},
+					Filename:    filename,
+					FoundLocal:  true,
+					FoundRemote: false,
+				}
 			}
 		}
 	}
@@ -344,15 +368,11 @@ var agentListCmd = &cobra.Command{
 	Aliases: []string{"ls"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apikey := viper.GetString("auth.api_key")
-		if apikey == "" {
-			logger.Fatal("You are not logged in. Please run `agentuity login` to login.")
-		}
 		project := ensureProject(cmd)
 		apiUrl, _ := getURLs(logger)
 
 		// perform the reconcilation
-		keys, state := reconcileAgentList(logger, apiUrl, apikey, project)
+		keys, state := reconcileAgentList(logger, apiUrl, project.Token, project)
 
 		if len(keys) == 0 {
 			tui.ShowWarning("no Agents found")
