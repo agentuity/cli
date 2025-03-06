@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -12,7 +13,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"time"
 
+	"github.com/agentuity/cli/internal/bundler"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
@@ -340,14 +343,18 @@ var devRunCmd = &cobra.Command{
 		log := env.NewLogger(cmd)
 		sdkEventsFile := "events.log"
 		dir := resolveProjectDir(log, cmd)
-		apiUrl, appUrl := getURLs(log)
+		_, appUrl := getURLs(log)
 		websocketUrl := viper.GetString("overrides.websocket_url")
 		websocketId, _ := cmd.Flags().GetString("websocket-id")
 		apiKey, _ := ensureLoggedIn()
 		theproject := ensureProject(cmd)
 
-		log.Trace("dir: %s", dir)
-		log.Trace("apiUrl: %s", apiUrl)
+		project, err := theproject.Project.GetProject(log, theproject.APIURL, apiKey)
+		if err != nil {
+			log.Fatal("failed to get project: %s", err)
+		}
+
+		orgId := project.OrgId
 
 		if _, err := os.Stat(sdkEventsFile); err == nil {
 			if err := os.Remove(sdkEventsFile); err != nil {
@@ -381,10 +388,21 @@ var devRunCmd = &cobra.Command{
 		projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_OTLP_URL=%s", liveDevConnection.otelUrl))
 		projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_SDK_DIR=%s", dir))
 		projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_DEPLOYMENT_ID=%s", liveDevConnection.websocketId))
-
+		projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_ORG_ID=%s", orgId))
 		projectServerCmd.Stdout = os.Stdout
 		projectServerCmd.Stderr = os.Stderr
 		projectServerCmd.Stdin = os.Stdin
+
+		started := time.Now()
+		if err := bundler.Bundle(bundler.BundleContext{
+			Context:    context.Background(),
+			Logger:     log,
+			ProjectDir: dir,
+			Production: false,
+		}); err != nil {
+			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to bundle project")).ShowErrorAndExit()
+		}
+		theproject.Logger.Debug("bundled in %s", time.Since(started))
 
 		if err := projectServerCmd.Start(); err != nil {
 			log.Fatal("failed to start command: %s", err)
