@@ -12,28 +12,18 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"sync"
 
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
-	"github.com/pkg/browser"
-
 	csys "github.com/agentuity/go-common/sys"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/nxadm/tail"
+	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
-
-var devCmd = &cobra.Command{
-	Use:   "dev",
-	Short: "Development related commands",
-	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
-	},
-}
 
 type LiveDevConnection struct {
 	sdkEventsFile string
@@ -42,7 +32,6 @@ type LiveDevConnection struct {
 	conn          *websocket.Conn
 	logQueue      chan []byte
 	onMessage     func(message []byte) error
-	writeMutex    sync.Mutex
 	otelToken     string
 	otelUrl       string
 }
@@ -343,8 +332,10 @@ func SaveInput(logger logger.Logger, message []byte) (string, string, error) {
 }
 
 var devRunCmd = &cobra.Command{
-	Use:   "run",
-	Short: "Run the development server",
+	Use:     "run",
+	Aliases: []string{"dev"},
+	Args:    cobra.NoArgs,
+	Short:   "Run the development server",
 	Run: func(cmd *cobra.Command, args []string) {
 		log := env.NewLogger(cmd)
 		sdkEventsFile := "events.log"
@@ -352,7 +343,7 @@ var devRunCmd = &cobra.Command{
 		apiUrl, appUrl := getURLs(log)
 		websocketUrl := viper.GetString("overrides.websocket_url")
 		websocketId, _ := cmd.Flags().GetString("websocket-id")
-		apiKey := viper.GetString("auth.api_key")
+		apiKey, _ := ensureLoggedIn()
 		theproject := ensureProject(cmd)
 
 		log.Trace("dir: %s", dir)
@@ -473,9 +464,7 @@ var devRunCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(devCmd)
 	rootCmd.AddCommand(devRunCmd)
-	devCmd.AddCommand(devRunCmd)
 	devRunCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
 	devRunCmd.Flags().String("websocket-id", "", "The websocket room id to use for the development agent")
 }
