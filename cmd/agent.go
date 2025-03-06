@@ -467,15 +467,19 @@ var agentGetApiKeyCmd = &cobra.Command{
 			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent API key")).ShowErrorAndExit()
 		}
 		if !tui.HasTTY {
-			fmt.Print(apikey)
-			return
+			if apikey != "" {
+				fmt.Print(apikey)
+				return
+			}
 		}
 		if agentID != "" {
 			fmt.Println()
 			tui.ShowLock("Agent %s API key: %s", theagent.Agent.Name, apikey)
 			tip := fmt.Sprintf(`$(agentuity agent apikey %s)`, agentID)
 			tui.ShowBanner("Developer Pro Tip", tui.Paragraph("Fetch your Agent's API key into a shell command dynamically:", tip), false)
+			return
 		}
+		os.Exit(1) // no key
 	},
 }
 

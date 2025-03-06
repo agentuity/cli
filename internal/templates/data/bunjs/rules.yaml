@@ -72,7 +72,7 @@ new_project:
       name: "{{ .Name }}"
       version: "0.0.1"
       description: "{{ .Description }}"
-      keywords: ["agentuity", "agent", "ai", "ai agent", "vercel", "bun"]
+      keywords: ["agentuity", "agent", "ai", "ai agent", "bun"]
     - action: modify_ts_config
       types:
         - bun
@@ -88,9 +88,6 @@ new_project:
     - action: create_file
       filename: "index.ts"
       from: "common/js/boot.ts"
-    - action: create_file
-      filename: "src/agents/{{ .AgentName | safe_filename }}/index.ts"
-      from: "common/js/agent.ts"
     - action: copy_dir
       from: "common/js/cursor"
       to: ".cursorrules"

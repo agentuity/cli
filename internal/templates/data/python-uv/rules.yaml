@@ -68,6 +68,3 @@ new_project:
     - action: create_file
       filename: ".gitignore"
       from: "data/common/py/gitignore"
-    - action: create_file
-      filename: "agents/{{ .AgentName | safe_filename }}/agent.py"
-      from: "common/py/agent.py"

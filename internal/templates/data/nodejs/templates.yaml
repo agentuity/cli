@@ -1,0 +1,50 @@
+- name: "OpenAI SDK for Typescript"
+  description: "Official TypeScript library for the OpenAI"
+  steps:
+    - command: npm
+      args:
+        - install
+        - --no-fund
+        - --no-audit
+        - openai
+    - action: create_file
+      filename: "src/agents/{{ .AgentName | safe_filename }}/index.ts"
+      from: "common/js/openai.ts"
+- name: "Anthropic SDK for Typescript"
+  description: "Official TypeScript library for the Anthropic"
+  steps:
+    - command: npm
+      args:
+        - install
+        - --no-fund
+        - --no-audit
+        - "@anthropic-ai/sdk"
+    - action: create_file
+      filename: "src/agents/{{ .AgentName | safe_filename }}/index.ts"
+      from: "common/js/anthropic.ts"
+- name: "Vercel AI SDK with OpenAI"
+  description: "Vercel AI SDK is a TypeScript SDK for building AI powered applications. This template adds the OpenAI provider using the Vercel AI SDK."
+  steps:
+    - command: npm
+      args:
+        - install
+        - --no-fund
+        - --no-audit
+        - ai
+        - "@ai-sdk/openai"
+    - action: create_file
+      filename: "src/agents/{{ .AgentName | safe_filename }}/index.ts"
+      from: "common/js/vercel/openai.ts"
+- name: "Vercel AI SDK with Anthropic"
+  description: "Vercel AI SDK is a TypeScript SDK for building AI powered applications. This template adds the Anthropic provider using the Vercel AI SDK."
+  steps:
+    - command: npm
+      args:
+        - install
+        - --no-fund
+        - --no-audit
+        - ai
+        - "@ai-sdk/anthropic"
+    - action: create_file
+      filename: "src/agents/{{ .AgentName | safe_filename }}/index.ts"
+      from: "common/js/vercel/anthropic.ts"

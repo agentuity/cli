@@ -1,6 +1,7 @@
-- name: "Bun with Vercel AI SDK"
-  description: "Bun is a fast, modern runtime for TypeScript. This provider adds the Vercel AI SDK to a Bun project."
+- name: "Bun"
+  description: "Bun is a fast, modern runtime for TypeScript."
   identifier: "bunjs"
+  language: "javascript"
   requirements:
     - command: bun
       args:
@@ -12,9 +13,10 @@
         command: bun
         args:
           - upgrade
-- name: "NodeJS with Vercel AI SDK"
-  description: "NodeJS is a runtime for JavaScript and TypeScript. This provider adds the Vercel AI SDK to a NodeJS project."
+- name: "NodeJS"
+  description: "NodeJS is a runtime for JavaScript and TypeScript."
   identifier: "nodejs"
+  language: "javascript"
   requirements:
     - command: node
       args:
@@ -23,8 +25,9 @@
       brew: node@22
       url: https://nodejs.org/en/download
 - name: "Python with uv"
-  description: "Python is a runtime for Python. This provider adds the uv package manager."
+  description: "Python with the extremely fast Python package and project manager, uv."
   identifier: "python-uv"
+  language: "python"
   requirements:
     - command: uv
       args:
