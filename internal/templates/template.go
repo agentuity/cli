@@ -20,6 +20,7 @@ type TemplateContext struct {
 	AgentDescription string
 	ProjectDir       string
 	Template         *Template
+	TemplateName     string
 }
 
 func funcTemplates(t *template.Template) *template.Template {
@@ -49,6 +50,13 @@ func (t *TemplateContext) Interpolate(val any) any {
 		return out.String()
 	}
 	return val
+}
+
+type ProjectTemplate struct {
+	Name         string   `yaml:"name"`
+	Description  string   `yaml:"description"`
+	Dependencies []string `yaml:"dependencies"`
+	Steps        []any    `yaml:"steps"`
 }
 
 type NewProjectSteps struct {
@@ -101,6 +109,8 @@ type TemplateRules struct {
 	NewAgentSteps   NewAgentSteps   `yaml:"new_agent"`
 }
 
+type LanguageTemplates []ProjectTemplate
+
 func LoadTemplateRuleForIdentifier(identifier string) (*TemplateRules, error) {
 	reader, err := getEmbeddedFile(identifier + "/rules.yaml")
 	if err != nil {
@@ -114,11 +124,27 @@ func LoadTemplateRuleForIdentifier(identifier string) (*TemplateRules, error) {
 }
 
 func (t *TemplateRules) NewProject(ctx TemplateContext) error {
+	templates, err := LoadLanguageTemplates(t.Identifier)
+	if err != nil {
+		return err
+	}
 	for _, step := range t.NewProjectSteps.Steps {
 		if command, ok := resolveStep(ctx, step); ok {
 			if err := command.Run(ctx); err != nil {
 				return err
 			}
+		}
+	}
+	for _, template := range templates {
+		if template.Name == ctx.TemplateName {
+			for _, step := range template.Steps {
+				if command, ok := resolveStep(ctx, step); ok {
+					if err := command.Run(ctx); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
 		}
 	}
 	return nil

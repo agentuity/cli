@@ -137,6 +137,7 @@ type Template struct {
 	Name         string        `yaml:"name"`
 	Description  string        `yaml:"description"`
 	Identifier   string        `yaml:"identifier"`
+	Language     string        `yaml:"language"`
 	Requirements []Requirement `yaml:"requirements"`
 }
 
@@ -195,4 +196,32 @@ func LoadTemplates() (Templates, error) {
 		return nil, fmt.Errorf("failed to open embedded templates file: %s", err)
 	}
 	return loadTemplates(reader)
+}
+
+func LoadLanguageTemplates(runtime string) (LanguageTemplates, error) {
+	reader, err := getEmbeddedFile(runtime + "/templates.yaml")
+	if err != nil {
+		return nil, fmt.Errorf("failed to load embedded file for %s: %s", runtime+"/templates.yaml", err)
+	}
+	if reader == nil {
+		return nil, fmt.Errorf("template %s not found", runtime+"/templates.yaml")
+	}
+	templates := make(LanguageTemplates, 0)
+	if err := yaml.NewDecoder(reader).Decode(&templates); err != nil {
+		return nil, fmt.Errorf("failed to decode templates for %s: %s", runtime+"/templates.yaml", err)
+	}
+	return templates, nil
+}
+
+func IsValidRuntimeTemplateName(runtime string, name string) bool {
+	templates, err := LoadLanguageTemplates(runtime)
+	if err != nil {
+		return false
+	}
+	for _, t := range templates {
+		if t.Name == name {
+			return true
+		}
+	}
+	return false
 }

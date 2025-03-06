@@ -156,15 +156,15 @@ var invalidProjectNames = []any{
 
 var docStyle = lipgloss.NewStyle().Margin(1, 2)
 
-type projectProvider struct {
+type listItemProvider struct {
 	title, desc, id string
-	template        *templates.Template
+	object          any
 }
 
-func (i projectProvider) Title() string       { return i.title }
-func (i projectProvider) Description() string { return i.desc }
-func (i projectProvider) FilterValue() string { return i.title }
-func (i projectProvider) ID() string          { return i.id }
+func (i listItemProvider) Title() string       { return i.title }
+func (i listItemProvider) Description() string { return i.desc }
+func (i listItemProvider) FilterValue() string { return i.title }
+func (i listItemProvider) ID() string          { return i.id }
 
 type projectSelectionModel struct {
 	list      list.Model
@@ -199,10 +199,10 @@ func (m *projectSelectionModel) View() string {
 	return docStyle.Render(m.list.View())
 }
 
-func showProjectSelector(items []list.Item) *templates.Template {
+func showItemSelector(title string, items []list.Item) list.Item {
 
 	for i, item := range items {
-		var p = item.(projectProvider)
+		var p = item.(listItemProvider)
 		p.desc = lipgloss.NewStyle().SetString(p.desc).Width(60).AlignHorizontal(lipgloss.Left).Render()
 		items[i] = p
 	}
@@ -211,7 +211,7 @@ func showProjectSelector(items []list.Item) *templates.Template {
 	delegate.SetHeight(4)
 
 	m := projectSelectionModel{list: list.New(items, delegate, 0, 0)}
-	m.list.Title = "Select your project framework"
+	m.list.Title = title
 	m.list.Styles.Title = lipgloss.NewStyle().Foreground(tui.TitleColor())
 
 	p := tea.NewProgram(&m, tea.WithAltScreen())
@@ -226,7 +226,7 @@ func showProjectSelector(items []list.Item) *templates.Template {
 		os.Exit(1)
 	}
 
-	return items[m.list.Index()].(projectProvider).template
+	return items[m.list.Index()]
 }
 
 var projectNewCmd = &cobra.Command{
@@ -294,9 +294,11 @@ var projectNewCmd = &cobra.Command{
 		}
 
 		var providerName string
+		var templateName string
 		var provider *templates.Template
 
 		providerArg, _ := cmd.Flags().GetString("provider")
+		templateArg, _ := cmd.Flags().GetString("template")
 
 		tmpls, err := templates.LoadTemplates()
 		if err != nil {
@@ -325,24 +327,50 @@ var projectNewCmd = &cobra.Command{
 			}
 		}
 
+		if provider != nil && templateArg != "" {
+			if ok := templates.IsValidRuntimeTemplateName(provider.Identifier, templateArg); !ok {
+				logger.Fatal("invalid template name %s for %s", templateArg, provider.Name)
+			}
+			templateName = templateArg
+		}
+
 		if providerName == "" {
 
 			var items []list.Item
 
 			for _, tmpls := range tmpls {
-				items = append(items, projectProvider{
-					id:       tmpls.Identifier,
-					title:    tmpls.Name,
-					desc:     tmpls.Description,
-					template: &tmpls,
+				items = append(items, listItemProvider{
+					id:     tmpls.Identifier,
+					title:  tmpls.Name,
+					desc:   tmpls.Description,
+					object: &tmpls,
 				})
 			}
 
 			sort.Slice(items, func(i, j int) bool {
-				return items[i].(projectProvider).title < items[j].(projectProvider).title
+				return items[i].(listItemProvider).title < items[j].(listItemProvider).title
 			})
 
-			provider = showProjectSelector(items)
+			provider = showItemSelector("Select the project runtime", items).(listItemProvider).object.(*templates.Template)
+		}
+
+		if templateName == "" {
+			templates, err := templates.LoadLanguageTemplates(provider.Identifier)
+			if err != nil {
+				errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from template provider")).ShowErrorAndExit()
+			}
+
+			var tmplTemplates []list.Item
+			for _, t := range templates {
+				tmplTemplates = append(tmplTemplates, listItemProvider{
+					id:     t.Name,
+					title:  t.Name,
+					desc:   t.Description,
+					object: &t,
+				})
+			}
+			templateId := showItemSelector("Select a project template", tmplTemplates)
+			templateName = templateId.(listItemProvider).id
 		}
 
 		if util.Exists(projectDir) {
@@ -370,6 +398,7 @@ var projectNewCmd = &cobra.Command{
 				ProjectDir:       projectDir,
 				AgentName:        agentName,
 				AgentDescription: agentDescription,
+				TemplateName:     templateName,
 			})
 			if err != nil {
 				errsystem.New(errsystem.ErrCreateProject, err, errsystem.WithContextMessage("Failed to create project")).ShowErrorAndExit()
@@ -390,14 +419,17 @@ var projectNewCmd = &cobra.Command{
 
 		})
 
+		var para []string
+		para = append(para, tui.Secondary("1. Switch into the project directory at ")+tui.Directory(projectDir))
+		para = append(para, tui.Secondary("2. Run ")+tui.Command("run")+tui.Secondary(" to run the project locally in development mode"))
+		para = append(para, tui.Secondary("3. Run ")+tui.Command("deploy")+tui.Secondary(" to deploy the project to the Agentuity Agent Cloud"))
+		if authType != "none" {
+			para = append(para, tui.Secondary("4. Run ")+tui.Command("agent apikey")+tui.Secondary(" to fetch the API key for the agent"))
+		}
+		para = append(para, tui.Secondary("🏠 Access your project at ")+tui.Link("%s/projects/%s", appUrl, projectData.ProjectId))
+
 		tui.ShowBanner("You're ready to deploy your first Agent!",
-			tui.Paragraph("Next steps:",
-				tui.Secondary("1. Switch into the project directory at ")+tui.Directory(projectDir),
-				tui.Secondary("2. Run ")+tui.Command("run")+tui.Secondary(" to run the project locally in development mode"),
-				tui.Secondary("3. Run ")+tui.Command("deploy")+tui.Secondary(" to deploy the project to the Agentuity Agent Cloud"),
-				tui.Secondary("4. Run ")+tui.Command("agent apikey")+tui.Secondary(" to fetch the API key for the agent"),
-				tui.Secondary("🏠 Access your project at ")+tui.Link("%s/projects/%s", appUrl, projectData.ProjectId),
-			),
+			tui.Paragraph("Next steps:", para...),
 			true,
 		)
 
@@ -520,4 +552,5 @@ func init() {
 
 	projectNewCmd.Flags().StringP("dir", "d", "", "The directory to create the project in")
 	projectNewCmd.Flags().StringP("provider", "p", "", "The provider template to use for the project")
+	projectNewCmd.Flags().StringP("template", "t", "", "The template to use for the project")
 }

@@ -1,0 +1,11 @@
+- name: "OpenAI"
+  description: "OpenAI Python SDK"
+  steps:
+    - command: uv
+      args:
+        - add
+        - --quiet
+        - openai
+    - action: create_file
+      filename: "agents/{{ .AgentName | safe_filename }}/agent.py"
+      from: "common/py/openai.py"

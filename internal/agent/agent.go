@@ -91,5 +91,5 @@ func GetApiKey(logger logger.Logger, baseUrl string, token string, agentId strin
 		}
 	}
 
-	return "", fmt.Errorf("no API key found for Agent %s", agentId)
+	return "", nil
 }

@@ -80,9 +80,6 @@ new_project:
     - action: create_file
       filename: ".gitignore"
       from: "data/nodejs/gitignore"
-    - action: create_file
-      filename: "src/agents/{{ .AgentName | safe_filename }}/index.ts"
-      from: "common/js/agent.ts"
     - action: copy_dir
       from: "common/js/cursor"
       to: ".cursorrules"
