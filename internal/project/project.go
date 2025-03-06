@@ -32,6 +32,7 @@ type initProjectResult struct {
 type ProjectData struct {
 	APIKey           string            `json:"api_key"`
 	ProjectId        string            `json:"id"`
+	OrgId            string            `json:"orgId"`
 	Env              map[string]string `json:"env"`
 	Secrets          map[string]string `json:"secrets"`
 	WebhookAuthToken string            `json:"webhookAuthToken,omitempty"`
@@ -300,7 +301,7 @@ func DeleteProjects(logger logger.Logger, baseUrl string, token string, ids []st
 	return resp.Data, nil
 }
 
-func (p *Project) ListProjectEnv(logger logger.Logger, baseUrl string, token string) (*ProjectData, error) {
+func (p *Project) GetProject(logger logger.Logger, baseUrl string, token string) (*ProjectData, error) {
 	client := util.NewAPIClient(logger, baseUrl, token)
 
 	var projectResponse ProjectResponse

@@ -140,7 +140,7 @@ var cloudDeployCmd = &cobra.Command{
 
 		action := func() {
 			var err error
-			projectData, err = theproject.ListProjectEnv(logger, apiUrl, token)
+			projectData, err = theproject.GetProject(logger, apiUrl, token)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err,
 					errsystem.WithContextMessage("Error listing project environment")).ShowErrorAndExit()
