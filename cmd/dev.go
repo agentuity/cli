@@ -355,8 +355,8 @@ var devRunCmd = &cobra.Command{
 		apiKey := viper.GetString("auth.api_key")
 		theproject := ensureProject(cmd)
 
-		log.Info("dir: %s", dir)
-		log.Info("apiUrl: %s", apiUrl)
+		log.Trace("dir: %s", dir)
+		log.Trace("apiUrl: %s", apiUrl)
 
 		if _, err := os.Stat(sdkEventsFile); err == nil {
 			if err := os.Remove(sdkEventsFile); err != nil {
