@@ -90,6 +90,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		Engines: []api.Engine{
 			{Name: api.EngineNode, Version: "22"},
 		},
+		External:      []string{"bun"},
 		AbsWorkingDir: dir,
 		TreeShaking:   api.TreeShakingTrue,
 		Drop:          api.DropDebugger,
