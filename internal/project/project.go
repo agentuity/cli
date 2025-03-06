@@ -237,7 +237,7 @@ func NewProject() *Project {
 	if Version == "" || Version == "dev" {
 		version = ">=0.0.0" // should only happen in dev cli
 	} else {
-		version = Version
+		version = ">=" + Version
 	}
 	return &Project{
 		Version: version,
