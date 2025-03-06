@@ -10,8 +10,10 @@ import (
 )
 
 type patchModule struct {
-	Module    string                 `json:"module"`
-	Functions map[string]patchAction `json:"functions"`
+	Module    string
+	Filename  string
+	Functions map[string]patchAction
+	Body      *patchAction
 }
 
 type patchAction struct {
@@ -31,6 +33,19 @@ func generateEnvGuard(name string, inject string) string {
 }`, name, inject)
 }
 
+func generateGatewayEnvGuard(apikey string, apikeyval string, apibase string, provider string) string {
+	return fmt.Sprintf(`{
+	const apikey = process.env.AGENTUITY_API_KEY;
+	const url = process.env.AGENTUITY_URL;
+	if (url && apikey) {
+		process.env.%[1]s = %[2]s;
+		process.env.%[3]s = url + '/sdk/gateway/%[4]s';
+		console.debug('Enabled Agentuity API Gateway for %[4]s');
+	}
+}
+`, apikey, apikeyval, apibase, provider)
+}
+
 var patches = map[string]patchModule{}
 
 func searchBackwards(contents string, offset int, val byte) int {
@@ -47,7 +62,11 @@ func createPlugin(logger logger.Logger) api.Plugin {
 		Name: "inject-agentuity",
 		Setup: func(build api.PluginBuild) {
 			for name, mod := range patches {
-				build.OnLoad(api.OnLoadOptions{Filter: "node_modules/" + mod.Module + "/.*", Namespace: "file"}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
+				path := "node_modules/" + mod.Module + "/.*"
+				if mod.Filename != "" {
+					path = "node_modules/" + mod.Module + "/" + mod.Filename + ".*"
+				}
+				build.OnLoad(api.OnLoadOptions{Filter: path, Namespace: "file"}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
 					logger.Debug("re-writing %s for %s", args.Path, name)
 					buf, err := os.ReadFile(args.Path)
 					if err != nil {
@@ -95,6 +114,14 @@ func createPlugin(logger logger.Logger) api.Plugin {
 						logger.Debug("patched %s -> %s", name, fn)
 					}
 					contents = contents + "\n" + suffix.String()
+					if mod.Body != nil {
+						if mod.Body.Before != "" {
+							contents = mod.Body.Before + "\n" + contents
+						}
+						if mod.Body.After != "" {
+							contents = contents + "\n" + mod.Body.After
+						}
+					}
 					loader := api.LoaderJS
 					if strings.HasSuffix(args.Path, ".ts") {
 						loader = api.LoaderTS
