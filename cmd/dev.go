@@ -394,12 +394,11 @@ var devRunCmd = &cobra.Command{
 		projectServerCmd.Stdin = os.Stdin
 
 		started := time.Now()
-		production, _ := cmd.Flags().GetBool("production")
 		if err := bundler.Bundle(bundler.BundleContext{
 			Context:    context.Background(),
 			Logger:     log,
 			ProjectDir: dir,
-			Production: production,
+			Production: false,
 		}); err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to bundle project")).ShowErrorAndExit()
 		}
