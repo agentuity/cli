@@ -262,7 +262,7 @@ var envGetCmd = &cobra.Command{
 		apiUrl := context.APIURL
 		apiKey := context.Token
 
-		projectData, err := theproject.ListProjectEnv(logger, apiUrl, apiKey)
+		projectData, err := theproject.GetProject(logger, apiUrl, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}
@@ -309,7 +309,7 @@ var envListCmd = &cobra.Command{
 		apiUrl := context.APIURL
 		apiKey := context.Token
 
-		projectData, err := theproject.ListProjectEnv(logger, apiUrl, apiKey)
+		projectData, err := theproject.GetProject(logger, apiUrl, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}
@@ -348,7 +348,7 @@ var envDeleteCmd = &cobra.Command{
 		apiUrl := context.APIURL
 		apiKey := context.Token
 
-		projectData, err := theproject.ListProjectEnv(logger, apiUrl, apiKey)
+		projectData, err := theproject.GetProject(logger, apiUrl, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}

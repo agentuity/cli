@@ -349,6 +349,13 @@ var devRunCmd = &cobra.Command{
 		apiKey, _ := ensureLoggedIn()
 		theproject := ensureProject(cmd)
 
+		project, err := theproject.Project.GetProject(log, theproject.APIURL, apiKey)
+		if err != nil {
+			log.Fatal("failed to get project: %s", err)
+		}
+
+		orgId := project.OrgId
+
 		if _, err := os.Stat(sdkEventsFile); err == nil {
 			if err := os.Remove(sdkEventsFile); err != nil {
 				log.Trace("failed to delete sdkEventsFile: %s", err)
@@ -381,7 +388,7 @@ var devRunCmd = &cobra.Command{
 		projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_OTLP_URL=%s", liveDevConnection.otelUrl))
 		projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_SDK_DIR=%s", dir))
 		projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_DEPLOYMENT_ID=%s", liveDevConnection.websocketId))
-
+		projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_ORG_ID=%s", orgId))
 		projectServerCmd.Stdout = os.Stdout
 		projectServerCmd.Stderr = os.Stderr
 		projectServerCmd.Stdin = os.Stdin
