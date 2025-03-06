@@ -1,22 +1,28 @@
 package cmd
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sync"
 
+	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	"github.com/pkg/browser"
 
 	csys "github.com/agentuity/go-common/sys"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/nxadm/tail"
-	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -36,6 +42,9 @@ type LiveDevConnection struct {
 	conn          *websocket.Conn
 	logQueue      chan []byte
 	onMessage     func(message []byte) error
+	writeMutex    sync.Mutex
+	otelToken     string
+	otelUrl       string
 }
 
 var looksLikeJson = regexp.MustCompile(`^\{.*\}$`)
@@ -79,8 +88,11 @@ func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketI
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse url: %s", err)
 	}
-	u.RawQuery = url.Values{"id": {websocketId}, "type": {"LIVE_DEV"}}.Encode()
-	u.Path = "/websocket"
+	u.Path = fmt.Sprintf("/websocket/devmode/%s", websocketId)
+	u.RawQuery = url.Values{
+		"from": []string{"cli"},
+	}.Encode()
+
 	if u.Scheme == "http" {
 		u.Scheme = "ws"
 	} else if u.Scheme == "https" {
@@ -101,6 +113,15 @@ func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketI
 			}
 		}
 		return nil, fmt.Errorf("failed to dial: %s", err)
+	}
+
+	self.otelToken = httpResponse.Header.Get("X-AGENTUITY-OTLP-BEARER-TOKEN")
+	if self.otelToken == "" {
+		errsystem.New(errsystem.ErrAuthenticateOtelServer, nil, errsystem.WithUserMessage("Failed to authenticate with otel server"))
+	}
+	self.otelUrl = httpResponse.Header.Get("X-AGENTUITY-OTLP-URL")
+	if self.otelUrl == "" {
+		errsystem.New(errsystem.ErrAuthenticateOtelServer, nil, errsystem.WithUserMessage("Failed to get otel server url"))
 	}
 
 	// writer
@@ -176,10 +197,12 @@ func (c *LiveDevConnection) SendMessage(payload map[string]any, messageType stri
 		Type:    messageType,
 		Payload: payload,
 	}
+
 	buf, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}
+
 	if err := c.conn.WriteMessage(websocket.TextMessage, buf); err != nil {
 		return err
 	}
@@ -203,6 +226,10 @@ func (c *LiveDevConnection) WebURL(appUrl string) string {
 	return fmt.Sprintf("%s/live/%s", appUrl, c.websocketId)
 }
 
+type AgentMessage struct {
+	Type string `json:"type"`
+}
+
 type InputMessage struct {
 	ID      string `json:"id"`
 	Type    string `json:"type"`
@@ -210,6 +237,7 @@ type InputMessage struct {
 	Payload struct {
 		SessionID   string `json:"sessionId"`
 		Trigger     string `json:"trigger"`
+		AgentID     string `json:"agentId"`
 		ContentType string `json:"contentType"`
 		Payload     string `json:"payload"`
 	} `json:"payload"`
@@ -309,7 +337,6 @@ func SaveInput(logger logger.Logger, message []byte) (string, string, error) {
 	os.Setenv("AGENTUITY_SDK_INPUT_FILE", inputPath)
 	os.Setenv("AGENTUITY_SDK_OUTPUT_FILE", outputPath)
 	os.Setenv("AGENTUITY_SDK_SESSION_ID", sessionId)
-	os.Setenv("AGENTUITY_SDK_DEV_MODE", "true")
 	os.Setenv("AGENTUITY_SDK_AUTORUN", "true")
 
 	return outputPath, sessionId, nil
@@ -326,6 +353,10 @@ var devRunCmd = &cobra.Command{
 		websocketUrl := viper.GetString("overrides.websocket_url")
 		websocketId, _ := cmd.Flags().GetString("websocket-id")
 		apiKey := viper.GetString("auth.api_key")
+		theproject := ensureProject(cmd)
+
+		log.Trace("dir: %s", dir)
+		log.Trace("apiUrl: %s", apiUrl)
 
 		if _, err := os.Stat(sdkEventsFile); err == nil {
 			if err := os.Remove(sdkEventsFile); err != nil {
@@ -337,6 +368,7 @@ var devRunCmd = &cobra.Command{
 		if websocketId == "" {
 			websocketId = uuid.New().String()[:6]
 		}
+
 		liveDevConnection, err := NewLiveDevConnection(log, sdkEventsFile, websocketId, websocketUrl, apiKey)
 		if err != nil {
 			log.Fatal("failed to create live dev connection: %s", err)
@@ -351,38 +383,87 @@ var devRunCmd = &cobra.Command{
 		}
 		logger := logger.NewMultiLogger(log, logger.NewJSONLoggerWithSink(liveDevConnection, logger.LevelInfo))
 
+		// set the vars
+		projectServerCmd := exec.Command(theproject.Project.Development.Command, theproject.Project.Development.Args...)
+		projectServerCmd.Env = os.Environ()
+		projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_OTLP_BEARER_TOKEN=%s", liveDevConnection.otelToken))
+		projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_OTLP_URL=%s", liveDevConnection.otelUrl))
+		projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_SDK_DIR=%s", dir))
+		projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_DEPLOYMENT_ID=%s", liveDevConnection.websocketId))
+
+		projectServerCmd.Stdout = os.Stdout
+		projectServerCmd.Stderr = os.Stderr
+		projectServerCmd.Stdin = os.Stdin
+
+		if err := projectServerCmd.Start(); err != nil {
+			log.Fatal("failed to start command: %s", err)
+		}
+
+		agents := make([]map[string]any, 0)
+		for _, agent := range theproject.Project.Agents {
+			agents = append(agents, map[string]any{
+				"name":        agent.Name,
+				"id":          agent.ID,
+				"description": agent.Description,
+			})
+		}
+
 		liveDevConnection.SetOnMessage(func(message []byte) error {
-			logger.Trace("recv: %s", message)
-			// FIXME:
+			logger.Trace("recv: %s", string(message))
 
-			_ = dir
-			_ = apiUrl
+			var agentMessage AgentMessage
+			if err := json.Unmarshal(message, &agentMessage); err != nil {
+				logger.Error("failed to unmarshal agent message: %s", err)
+				return err
+			}
 
-			// runner, err := provider.NewRunner(logger, dir, apiUrl, sdkEventsFile, args)
-			// if err != nil {
-			// 	logger.Fatal("failed to run development agent: %s", err)
-			// }
-			// outputPath, sessionId, err := SaveInput(logger, message)
-			// if err != nil {
-			// 	logger.Error("failed to save input: %s", err)
-			// }
+			if agentMessage.Type == "getAgents" {
+				liveDevConnection.SendMessage(map[string]any{
+					"agents": agents,
+				}, "agents")
+				return nil
+			}
 
-			// if err := runner.Start(); err != nil {
-			// 	logger.Fatal("failed to start development agent: %s", err)
-			// }
-			// <-runner.Done()
+			var inputMsg InputMessage
+			if err := json.Unmarshal(message, &inputMsg); err != nil {
+				logger.Error("failed to unmarshal input message: %s", err)
+				return err
+			}
+			// Decode base64 payload
+			decodedPayload, err := base64.StdEncoding.DecodeString(inputMsg.Payload.Payload)
+			if err != nil {
+				logger.Error("failed to decode payload: %s", err)
+				return err
+			}
 
-			// output, err := ReadOutput(logger, outputPath, sessionId)
-			// if err != nil {
-			// 	logger.Error("failed to read output: %s", err)
-			// 	return nil
-			// }
-			// if output == nil {
-			// 	logger.Error("failed to read output: %s", err)
-			// 	return nil
-			// }
+			url := fmt.Sprintf("http://localhost:%d/%s", theproject.Project.Development.Port, inputMsg.Payload.AgentID)
 
-			// liveDevConnection.SendMessage(output, "output")
+			resp, err := http.Post(url, inputMsg.Payload.ContentType, bytes.NewBuffer(decodedPayload))
+			if err != nil {
+				logger.Error("failed to post to agent: %s", err)
+				return err
+			}
+			defer resp.Body.Close()
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				logger.Error("failed to read response body: %s", err)
+				return err
+			}
+
+			outputPayload, err := isOutputPayload(body)
+			if err != nil {
+				logger.Error("failed to parse output payload: %s", err)
+				return err
+			}
+
+			logger.Trace("response body: %s", string(body))
+
+			liveDevConnection.SendMessage(map[string]any{
+				"sessionId":   inputMsg.Payload.SessionID,
+				"contentType": outputPayload.ContentType,
+				"payload":     outputPayload.Payload,
+			}, "output")
 
 			return nil
 		})
