@@ -43,3 +43,14 @@
     - action: create_file
       filename: "agents/{{ .AgentName | safe_filename }}/agent.py"
       from: "common/py/langchain/openai.py"
+- name: "LlamaIndex"
+  description: "LlamaIndex Python SDK with OpenAI"
+  steps:
+    - command: uv
+      args:
+        - add
+        - --quiet
+        - llama-index
+    - action: create_file
+      filename: "agents/{{ .AgentName | safe_filename }}/agent.py"
+      from: "common/py/llamaindex/openai.py"
