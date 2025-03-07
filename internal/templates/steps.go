@@ -220,7 +220,16 @@ func (s *CreateFileAction) Run(ctx TemplateContext) error {
 	ctx.Logger.Debug("Creating file: %s", filename)
 	var output []byte
 	if s.Template != "" {
-		tmpl, err := template.New(s.Filename).Parse(s.Template)
+		fr, err := getEmbeddedFile(s.Template)
+		if err != nil {
+			return fmt.Errorf("failed to get embedded file: %s", err)
+		}
+		tbuf, err := io.ReadAll(fr)
+		if err != nil {
+			return fmt.Errorf("failed to read embedded file: %s", err)
+		}
+		tmpl := template.New(s.Template)
+		tmpl, err = funcTemplates(tmpl).Parse(string(tbuf))
 		if err != nil {
 			return fmt.Errorf("failed to parse template: %s", err)
 		}
