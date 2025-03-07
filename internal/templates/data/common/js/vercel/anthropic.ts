@@ -8,7 +8,7 @@ export default async function Agent(
 	ctx: AgentContext,
 ) {
 	const res = await generateText({
-		model: anthropic("claude-3-7-sonnet-20250219"),
+		model: anthropic("claude-3-5-sonnet-latest"),
 		system: "You are a friendly assistant!",
 		prompt: req.text() ?? "Why is the sky blue?",
 	});

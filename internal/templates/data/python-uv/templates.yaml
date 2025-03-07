@@ -9,3 +9,25 @@
     - action: create_file
       filename: "agents/{{ .AgentName | safe_filename }}/agent.py"
       from: "common/py/openai.py"
+- name: "LiteLLM"
+  description: "LiteLLM Python SDK"
+  steps:
+    - command: uv
+      args:
+        - add
+        - --quiet
+        - litellm
+    - action: create_file
+      filename: "agents/{{ .AgentName | safe_filename }}/agent.py"
+      from: "common/py/litellm.py"
+- name: "Anthropic"
+  description: "Anthropic Python SDK"
+  steps:
+    - command: uv
+      args:
+        - add
+        - --quiet
+        - anthropic
+    - action: create_file
+      filename: "agents/{{ .AgentName | safe_filename }}/agent.py"
+      from: "common/py/anthropic.py"
