@@ -51,12 +51,12 @@ func loadEnvFile(le []env.EnvLine, forceSecret bool) (map[string]string, map[str
 }
 
 func promptForEnv(logger logger.Logger, key string, isSecret bool, localenv map[string]string, osenv map[string]string) string {
-	prompt := "Enter your environment variable value for " + key
+	prompt := "Enter the value for " + key
 	var help string
 	var defaultValue string
 	var value string
 	if isSecret {
-		prompt = "Enter your secret value for " + key
+		prompt = "Enter the secret value for " + key
 		if val, ok := localenv[key]; ok {
 			help = "Press enter to set as " + maxString(cstr.Mask(val), 30) + " from your .env file"
 			defaultValue = val
@@ -185,7 +185,7 @@ var envSetCmd = &cobra.Command{
 			if len(envs) > 0 || len(secrets) > 0 {
 				help = "Press enter to save..."
 			}
-			key := tui.Input(logger, "Enter your environment variable name", help)
+			key = tui.Input(logger, "Enter the environment variable name", help)
 			if key == "" {
 				askMore = false
 			}

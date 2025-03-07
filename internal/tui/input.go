@@ -19,7 +19,7 @@ func InputWithPlaceholder(logger logger.Logger, title string, description string
 	if err := huh.NewInput().
 		Title(title).
 		Prompt("> ").
-		Description(description + "\n").
+		Description(description).
 		Placeholder(placeholder).
 		Value(&value).
 		WithTheme(inputTheme).
