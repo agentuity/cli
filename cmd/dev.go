@@ -454,7 +454,21 @@ var devRunCmd = &cobra.Command{
 
 			url := fmt.Sprintf("http://localhost:%d/%s", theproject.Project.Development.Port, inputMsg.Payload.AgentID)
 
-			resp, err := http.Post(url, inputMsg.Payload.ContentType, bytes.NewBuffer(decodedPayload))
+			// make a json object with the payload
+			payload := map[string]any{
+				"sessionId":   inputMsg.Payload.SessionID,
+				"contentType": inputMsg.Payload.ContentType,
+				"payload":     decodedPayload,
+				"trigger":     "manual",
+			}
+
+			jsonPayload, err := json.Marshal(payload)
+			if err != nil {
+				logger.Error("failed to marshal payload: %s", err)
+				return err
+			}
+
+			resp, err := http.Post(url, inputMsg.Payload.ContentType, bytes.NewBuffer(jsonPayload))
 			if err != nil {
 				logger.Error("failed to post to agent: %s", err)
 				return err
@@ -468,8 +482,10 @@ var devRunCmd = &cobra.Command{
 			}
 
 			outputPayload, err := isOutputPayload(body)
+
 			if err != nil {
-				logger.Error("failed to parse output payload: %s", err)
+				// print the body as a string if you can
+				logger.Error("failed to parse output payload: %s. body was: %s", err, string(body))
 				return err
 			}
 
