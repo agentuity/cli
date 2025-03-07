@@ -54,3 +54,20 @@
     - action: create_file
       filename: "agents/{{ .AgentName | safe_filename }}/agent.py"
       from: "common/py/llamaindex/openai.py"
+- name: "CrewAI"
+  description: "CrewAI Python SDK"
+  steps:
+    - command: uv
+      args:
+        - add
+        - --quiet
+        - crewai
+    - action: create_file
+      filename: "agents/{{ .AgentName | safe_filename }}/agent.py"
+      template: "common/py/crewai/agent.py"
+    - action: create_file
+      filename: "agents/{{ .AgentName | safe_filename }}/crew.py"
+      template: "common/py/crewai/crew.py"
+    - action: copy_dir
+      from: "common/py/crewai/config"
+      to: "agents/{{ .AgentName | safe_filename }}/config"
