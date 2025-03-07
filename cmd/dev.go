@@ -485,9 +485,7 @@ var devRunCmd = &cobra.Command{
 
 			if err != nil {
 				// print the body as a string if you can
-				logger.Error("failed to parse output payload: %s", string(body))
-
-				logger.Error("failed to parse output payload: %s", err)
+				logger.Error("failed to parse output payload: %s. body was: %s", err, string(body))
 				return err
 			}
 
