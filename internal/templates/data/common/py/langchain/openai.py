@@ -1,4 +1,4 @@
-from agentuity.server.types import AgentRequest, AgentResponse, AgentContext
+from agentuity import AgentRequest, AgentResponse, AgentContext
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -6,7 +6,7 @@ from langchain_core.output_parsers import StrOutputParser
 llm = ChatOpenAI()
 
 
-def run(request: AgentRequest, response: AgentResponse, context: AgentContext):
+async def run(request: AgentRequest, response: AgentResponse, context: AgentContext):
     prompt = ChatPromptTemplate.from_messages(
         [
             (

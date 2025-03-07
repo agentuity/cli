@@ -1,10 +1,10 @@
 from openai import OpenAI
-from agentuity.server.types import AgentRequest, AgentResponse, AgentContext
+from agentuity import AgentRequest, AgentResponse, AgentContext
 
 client = OpenAI()
 
 
-def run(request: AgentRequest, response: AgentResponse, context: AgentContext):
+async def run(request: AgentRequest, response: AgentResponse, context: AgentContext):
     chat_completion = client.chat.completions.create(
         messages=[
             {
