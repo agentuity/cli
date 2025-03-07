@@ -408,6 +408,13 @@ var devRunCmd = &cobra.Command{
 			log.Fatal("failed to start command: %s", err)
 		}
 
+		ctx, cancel := context.WithCancel(context.Background())
+
+		go func() {
+			defer cancel()
+			projectServerCmd.Wait()
+		}()
+
 		agents := make([]map[string]any, 0)
 		for _, agent := range theproject.Project.Agents {
 			agents = append(agents, map[string]any{
@@ -477,7 +484,13 @@ var devRunCmd = &cobra.Command{
 			return nil
 		})
 
-		<-csys.CreateShutdownChannel()
+		select {
+		case <-ctx.Done():
+			log.Info("context done, shutting down")
+		case <-csys.CreateShutdownChannel():
+			log.Info("shutdown signal received, shutting down")
+			projectServerCmd.Process.Kill()
+		}
 	},
 }
 
