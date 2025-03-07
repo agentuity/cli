@@ -8,12 +8,8 @@ if (!opts.baseURL) {
 	const apikey = process.env.AGENTUITY_API_KEY;
 	const url = process.env.AGENTUITY_URL;
 	if (url && apikey) {
-		opts.apiKey = 'x';
+		opts.apiKey = apikey;
 		opts.baseURL = url + '/sdk/gateway/%s';
-		opts.headers = {
-			...(opts.headers ?? {}),
-			Authorization: 'Bearer ' + apikey,
-		};
 		_args[0] = opts;
 	}
 }`, name)
