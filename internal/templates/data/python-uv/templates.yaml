@@ -31,3 +31,15 @@
     - action: create_file
       filename: "agents/{{ .AgentName | safe_filename }}/agent.py"
       from: "common/py/anthropic.py"
+- name: "LangChain"
+  description: "LangChain Python SDK with OpenAI"
+  steps:
+    - command: uv
+      args:
+        - add
+        - --quiet
+        - langchain
+        - langchain-openai
+    - action: create_file
+      filename: "agents/{{ .AgentName | safe_filename }}/agent.py"
+      from: "common/py/langchain/openai.py"
