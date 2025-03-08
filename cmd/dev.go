@@ -19,6 +19,7 @@ import (
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/tui"
+	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
 	csys "github.com/agentuity/go-common/sys"
@@ -345,10 +346,10 @@ var devRunCmd = &cobra.Command{
 		log := env.NewLogger(cmd)
 		sdkEventsFile := "events.log"
 		dir := resolveProjectDir(log, cmd)
-		_, appUrl := getURLs(log)
+		_, appUrl := util.GetURLs(log)
 		websocketUrl := viper.GetString("overrides.websocket_url")
 		websocketId, _ := cmd.Flags().GetString("websocket-id")
-		apiKey, _ := ensureLoggedIn()
+		apiKey, _ := util.EnsureLoggedIn()
 		theproject := ensureProject(cmd)
 
 		project, err := theproject.Project.GetProject(log, theproject.APIURL, apiKey)

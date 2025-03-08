@@ -92,8 +92,8 @@ func loadProject(logger logger.Logger, dir string, apiUrl string, appUrl string,
 func ensureProject(cmd *cobra.Command) projectContext {
 	logger := env.NewLogger(cmd)
 	dir := resolveProjectDir(logger, cmd)
-	apiUrl, appUrl := getURLs(logger)
-	token, _ := ensureLoggedIn()
+	apiUrl, appUrl := util.GetURLs(logger)
+	token, _ := util.EnsureLoggedIn()
 	p := loadProject(logger, dir, apiUrl, appUrl, token)
 	if Version != "" && Version != "dev" && p.Project.Version != "" {
 		v := semver.MustParse(Version)
