@@ -73,6 +73,7 @@ var devRunCmd = &cobra.Command{
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start project: %s", err))).ShowErrorAndExit()
 		}
 
+		liveDevConnection.StartReadingMessages(log)
 		devUrl := liveDevConnection.WebURL(appUrl)
 
 		// Display local interaction instructions
