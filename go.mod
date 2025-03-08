@@ -17,7 +17,6 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/marcozac/go-jsonc v0.1.1
 	github.com/mattn/go-isatty v0.0.20
-	github.com/nxadm/tail v1.4.11
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
@@ -87,5 +86,4 @@ require (
 	golang.org/x/text v0.21.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
-	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 )
