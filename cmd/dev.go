@@ -17,9 +17,11 @@ import (
 
 	"github.com/agentuity/cli/internal/bundler"
 	"github.com/agentuity/cli/internal/errsystem"
+	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
 	csys "github.com/agentuity/go-common/sys"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/nxadm/tail"
@@ -375,9 +377,11 @@ var devRunCmd = &cobra.Command{
 		devUrl := liveDevConnection.WebURL(appUrl)
 		log.Info("development server at url: %s", devUrl)
 
+		// Display local interaction instructions
+		displayLocalInstructions(theproject.Project.Development.Port, theproject.Project.Agents)
+
 		if err := browser.OpenURL(devUrl); err != nil {
 			log.Fatal("failed to open browser: %s", err)
-
 		}
 		logger := logger.NewMultiLogger(log, logger.NewJSONLoggerWithSink(liveDevConnection, logger.LevelInfo))
 
@@ -514,4 +518,58 @@ func init() {
 	rootCmd.AddCommand(devRunCmd)
 	devRunCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
 	devRunCmd.Flags().String("websocket-id", "", "The websocket room id to use for the development agent")
+}
+
+func displayLocalInstructions(port int, agents []project.AgentConfig) {
+	teal := lipgloss.Color("86")
+	lightTeal := lipgloss.Color("122")
+
+	titleStyle := lipgloss.NewStyle().
+		Foreground(teal).
+		Bold(true).
+		MarginTop(1)
+
+	textStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("252"))
+
+	codeStyle := lipgloss.NewStyle().
+		Foreground(teal).
+		Background(lipgloss.Color("237")).
+		Padding(0, 1)
+
+	title := titleStyle.Render("🚀 Local Agent Interaction")
+
+	// Combine all elements with appropriate spacing
+	fmt.Println()
+	fmt.Println(title)
+
+	// Create list of available agents
+	if len(agents) > 0 {
+		fmt.Println()
+		fmt.Println(textStyle.Render("Available agents:"))
+
+		// Create a custom style for the list
+		listHeaderStyle := lipgloss.NewStyle().Bold(true)
+		listItemStyle := lipgloss.NewStyle().Foreground(lightTeal)
+
+		for _, agent := range agents {
+			// Display agent name and ID
+			fmt.Println(listHeaderStyle.Render("  • " + agent.Name))
+			fmt.Println(listItemStyle.Render("    ID: " + agent.ID))
+		}
+	}
+
+	// Get a sample agent ID if available
+	sampleAgentID := "agent_ID"
+	if len(agents) > 0 {
+		sampleAgentID = agents[0].ID
+	}
+
+	curlCommand := fmt.Sprintf("curl -v http://localhost:%d/%s --json '{\"input\": \"Hello, world!\"}'", port, sampleAgentID)
+	formattedCommand := codeStyle.Render(curlCommand)
+
+	fmt.Println()
+	fmt.Println(textStyle.Render("To interact with your agents locally, you can use:"))
+	fmt.Println(formattedCommand)
+	fmt.Println()
 }
