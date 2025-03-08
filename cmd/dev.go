@@ -17,6 +17,8 @@ import (
 
 	"github.com/agentuity/cli/internal/bundler"
 	"github.com/agentuity/cli/internal/errsystem"
+	"github.com/agentuity/cli/internal/project"
+	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
 	csys "github.com/agentuity/go-common/sys"
@@ -375,9 +377,11 @@ var devRunCmd = &cobra.Command{
 		devUrl := liveDevConnection.WebURL(appUrl)
 		log.Info("development server at url: %s", devUrl)
 
+		// Display local interaction instructions
+		displayLocalInstructions(theproject.Project.Development.Port, theproject.Project.Agents)
+
 		if err := browser.OpenURL(devUrl); err != nil {
 			log.Fatal("failed to open browser: %s", err)
-
 		}
 		logger := logger.NewMultiLogger(log, logger.NewJSONLoggerWithSink(liveDevConnection, logger.LevelInfo))
 
@@ -514,4 +518,37 @@ func init() {
 	rootCmd.AddCommand(devRunCmd)
 	devRunCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
 	devRunCmd.Flags().String("websocket-id", "", "The websocket room id to use for the development agent")
+}
+
+func displayLocalInstructions(port int, agents []project.AgentConfig) {
+	title := tui.Title("🚀 Local Agent Interaction")
+
+	// Combine all elements with appropriate spacing
+	fmt.Println()
+	fmt.Println(title)
+
+	// Create list of available agents
+	if len(agents) > 0 {
+		fmt.Println()
+		fmt.Println(tui.Bold("Available agents:"))
+
+		for _, agent := range agents {
+			// Display agent name and ID
+			fmt.Println(tui.Text("  • " + agent.Name))
+			fmt.Println(tui.Secondary("    ID: " + agent.ID))
+		}
+	}
+
+	// Get a sample agent ID if available
+	sampleAgentID := "agent_ID"
+	if len(agents) > 0 {
+		sampleAgentID = agents[0].ID
+	}
+
+	curlCommand := fmt.Sprintf("curl -v http://localhost:%d/run/%s --json '{\"input\": \"Hello, world!\"}'", port, sampleAgentID)
+
+	fmt.Println()
+	fmt.Println(tui.Text("To interact with your agents locally, you can use:"))
+	fmt.Println(tui.Command(curlCommand))
+	fmt.Println()
 }
