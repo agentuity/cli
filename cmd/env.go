@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/agentuity/cli/internal/errsystem"
+	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
@@ -93,7 +94,7 @@ var envSetCmd = &cobra.Command{
 	Aliases: []string{"add", "put"},
 	Short:   "Set environment variables",
 	Run: func(cmd *cobra.Command, args []string) {
-		context := ensureProject(cmd)
+		context := project.EnsureProject(cmd)
 		logger := context.Logger
 		dir := context.Dir
 		apiUrl := context.APIURL
@@ -256,7 +257,7 @@ var envGetCmd = &cobra.Command{
 	Short: "Get an environment or secret value",
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		context := ensureProject(cmd)
+		context := project.EnsureProject(cmd)
 		logger := context.Logger
 		theproject := context.Project
 		apiUrl := context.APIURL
@@ -303,7 +304,7 @@ var envListCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	Short:   "List all environment variables and secrets",
 	Run: func(cmd *cobra.Command, args []string) {
-		context := ensureProject(cmd)
+		context := project.EnsureProject(cmd)
 		logger := context.Logger
 		theproject := context.Project
 		apiUrl := context.APIURL
@@ -342,7 +343,7 @@ var envDeleteCmd = &cobra.Command{
 	Args:    cobra.MinimumNArgs(1),
 	Short:   "Delete one or more environment variables and secrets",
 	Run: func(cmd *cobra.Command, args []string) {
-		context := ensureProject(cmd)
+		context := project.EnsureProject(cmd)
 		logger := context.Logger
 		theproject := context.Project
 		apiUrl := context.APIURL

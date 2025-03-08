@@ -236,7 +236,7 @@ var projectNewCmd = &cobra.Command{
 	Args:    cobra.MaximumNArgs(5),
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apikey, _ := ensureLoggedIn()
+		apikey, _ := util.EnsureLoggedIn()
 		apiUrl, appUrl := getURLs(logger)
 		initScreenWithLogo()
 
@@ -449,7 +449,7 @@ var projectListCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apikey, _ := ensureLoggedIn()
+		apikey, _ := util.EnsureLoggedIn()
 		apiUrl, _ := getURLs(logger)
 		var projects []project.ProjectListData
 		action := func() {
@@ -488,7 +488,7 @@ var projectDeleteCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apikey, _ := ensureLoggedIn()
+		apikey, _ := util.EnsureLoggedIn()
 		apiUrl, _ := getURLs(logger)
 		var projects []project.ProjectListData
 		action := func() {

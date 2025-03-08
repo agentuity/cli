@@ -10,8 +10,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Masterminds/semver"
+	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/util"
+	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	"github.com/spf13/cobra"
 	yc "github.com/zijiren233/yaml-comment"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -393,4 +397,71 @@ func (c *DeploymentConfig) Write(logger logger.Logger, dir string) (CleanupFunc,
 	}
 	logger.Debug("deployment config written to %s", fn)
 	return cleanup, nil
+}
+
+type ProjectContext struct {
+	Logger  logger.Logger
+	Project *Project
+	Dir     string
+	APIURL  string
+	APPURL  string
+	Token   string
+}
+
+func LoadProject(logger logger.Logger, dir string, apiUrl string, appUrl string, token string) ProjectContext {
+	theproject := NewProject()
+	if err := theproject.Load(dir); err != nil {
+		errsystem.New(errsystem.ErrInvalidConfiguration, err,
+			errsystem.WithContextMessage("Error loading project from disk")).ShowErrorAndExit()
+	}
+	return ProjectContext{
+		Logger:  logger,
+		Project: theproject,
+		Dir:     dir,
+		APIURL:  apiUrl,
+		APPURL:  appUrl,
+		Token:   token,
+	}
+}
+
+func EnsureProject(cmd *cobra.Command) ProjectContext {
+	logger := env.NewLogger(cmd)
+	dir := ResolveProjectDir(logger, cmd)
+	apiUrl, appUrl := util.GetURLs(logger)
+	token, _ := util.EnsureLoggedIn()
+	p := LoadProject(logger, dir, apiUrl, appUrl, token)
+	if Version != "" && Version != "dev" && p.Project.Version != "" {
+		v := semver.MustParse(Version)
+		c, err := semver.NewConstraint(p.Project.Version)
+		if err != nil {
+			errsystem.New(errsystem.ErrInvalidConfiguration, err,
+				errsystem.WithContextMessage(fmt.Sprintf("Error parsing project version constraint: %s", p.Project.Version))).ShowErrorAndExit()
+		}
+		if !c.Check(v) {
+			logger.Fatal("This project is not compatible with CLI version %s. Please upgrade your Agentuity CLI to version %s.", Version, p.Project.Version)
+		}
+	}
+	return p
+}
+
+func ResolveProjectDir(logger logger.Logger, cmd *cobra.Command) string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
+			errsystem.WithUserMessage(fmt.Sprintf("Failed to get current directory: %s", err))).ShowErrorAndExit()
+	}
+	dir := cwd
+	dirFlag, _ := cmd.Flags().GetString("dir")
+	if dirFlag != "" {
+		dir = dirFlag
+	}
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
+			errsystem.WithUserMessage(fmt.Sprintf("Failed to get absolute path: %s", err))).ShowErrorAndExit()
+	}
+	if !ProjectExists(abs) {
+		logger.Fatal("Project file not found: %s", filepath.Join(abs, "agentuity.yaml"))
+	}
+	return abs
 }

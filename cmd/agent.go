@@ -35,7 +35,7 @@ var agentDeleteCmd = &cobra.Command{
 	Aliases: []string{"rm", "del"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		theproject := ensureProject(cmd)
+		theproject := project.EnsureProject(cmd)
 		apiUrl, _ := getURLs(logger)
 
 		keys, state := reconcileAgentList(logger, apiUrl, theproject.Token, theproject)
@@ -123,7 +123,7 @@ var agentCreateCmd = &cobra.Command{
 	Args:    cobra.MaximumNArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		theproject := ensureProject(cmd)
+		theproject := project.EnsureProject(cmd)
 		apikey := theproject.Token
 		apiUrl, _ := getURLs(logger)
 
@@ -192,7 +192,7 @@ type agentListState struct {
 	FoundRemote bool
 }
 
-func getAgentList(logger logger.Logger, apiUrl string, apikey string, project projectContext) ([]agent.Agent, error) {
+func getAgentList(logger logger.Logger, apiUrl string, apikey string, project project.ProjectContext) ([]agent.Agent, error) {
 	var remoteAgents []agent.Agent
 	var err error
 	action := func() {
@@ -206,7 +206,7 @@ func normalAgentName(name string) string {
 	return util.SafeFilename(strings.ToLower(name))
 }
 
-func reconcileAgentList(logger logger.Logger, apiUrl string, apikey string, theproject projectContext) ([]string, map[string]agentListState) {
+func reconcileAgentList(logger logger.Logger, apiUrl string, apikey string, theproject project.ProjectContext) ([]string, map[string]agentListState) {
 	remoteAgents, err := getAgentList(logger, apiUrl, apikey, theproject)
 	if err != nil {
 		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent list")).ShowErrorAndExit()
@@ -284,7 +284,7 @@ func reconcileAgentList(logger logger.Logger, apiUrl string, apikey string, thep
 
 var wrappedPipe = "\n│"
 
-func buildAgentTree(keys []string, state map[string]agentListState, project projectContext) (*tree.Tree, int, int, error) {
+func buildAgentTree(keys []string, state map[string]agentListState, project project.ProjectContext) (*tree.Tree, int, int, error) {
 	agentSrcDir := filepath.Join(project.Dir, project.Project.Bundler.AgentConfig.Dir)
 	var root *tree.Tree
 	var files *tree.Tree
@@ -374,7 +374,7 @@ var agentListCmd = &cobra.Command{
 	Aliases: []string{"ls"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		project := ensureProject(cmd)
+		project := project.EnsureProject(cmd)
 		apiUrl, _ := getURLs(logger)
 
 		// perform the reconcilation
@@ -407,7 +407,7 @@ var agentGetApiKeyCmd = &cobra.Command{
 	Aliases: []string{"key"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		project := ensureProject(cmd)
+		project := project.EnsureProject(cmd)
 		apiUrl, _ := getURLs(logger)
 
 		// perform the reconcilation

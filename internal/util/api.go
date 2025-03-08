@@ -7,8 +7,12 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"time"
 
+	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/go-common/logger"
+	"github.com/spf13/viper"
 )
 
 type APIClient struct {
@@ -76,4 +80,41 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 		}
 	}
 	return nil
+}
+
+func GetURLs(logger logger.Logger) (string, string) {
+	appUrl := viper.GetString("overrides.app_url")
+	apiUrl := viper.GetString("overrides.api_url")
+	if apiUrl == "https://api.agentuity.com" && appUrl != "https://app.agentuity.com" {
+		logger.Debug("switching app url to production since the api url is production")
+		appUrl = "https://app.agentuity.com"
+	} else if apiUrl == "https://api.agentuity.div" && appUrl == "https://app.agentuity.com" {
+		logger.Debug("switching app url to dev since the api url is dev")
+		appUrl = "http://localhost:3000"
+	}
+	return apiUrl, appUrl
+}
+
+func ShowLogin() {
+	fmt.Println(tui.Warning("You are not currently logged in or your session has expired."))
+	tui.ShowBanner("Login", tui.Text("Use ")+tui.Command("login")+tui.Text(" to login to Agentuity"), false)
+}
+
+func EnsureLoggedIn() (string, string) {
+	apikey := viper.GetString("auth.api_key")
+	if apikey == "" {
+		ShowLogin()
+		os.Exit(1)
+	}
+	userId := viper.GetString("auth.user_id")
+	if userId == "" {
+		ShowLogin()
+		os.Exit(1)
+	}
+	expires := viper.GetInt64("auth.expires")
+	if expires < time.Now().UnixMilli() {
+		ShowLogin()
+		os.Exit(1)
+	}
+	return apikey, userId
 }
