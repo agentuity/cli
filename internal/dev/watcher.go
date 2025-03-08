@@ -1,0 +1,131 @@
+package dev
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/fsnotify/fsnotify"
+)
+
+type FileWatcher struct {
+	watcher  *fsnotify.Watcher
+	patterns []string
+	callback func(string)
+	dir      string
+}
+
+func NewWatcher(dir string, patterns []string, callback func(string)) (*FileWatcher, error) {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return nil, err
+	}
+
+	fw := &FileWatcher{
+		watcher:  watcher,
+		patterns: patterns,
+		callback: callback,
+		dir:      dir,
+	}
+
+	err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return watcher.Add(path)
+		}
+		return nil
+	})
+
+	go fw.watch()
+	return fw, err
+}
+
+func (fw *FileWatcher) watch() {
+	for {
+		select {
+		case event, ok := <-fw.watcher.Events:
+			if !ok {
+				return
+			}
+			// Watch new directories
+			if event.Op&fsnotify.Create == fsnotify.Create {
+				if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
+					fw.watcher.Add(event.Name)
+				}
+			}
+			if event.Op&fsnotify.Write == fsnotify.Write {
+				if fw.matchesPattern(event.Name) {
+					fw.callback(event.Name)
+				}
+			}
+		case err, ok := <-fw.watcher.Errors:
+			if !ok {
+				return
+			}
+			// Handle error if needed
+			_ = err
+		}
+	}
+}
+
+func (fw *FileWatcher) matchesPattern(filename string) bool {
+	fmt.Printf("Checking file: %s against patterns: %v\n", filename, fw.patterns)
+	for _, pattern := range fw.patterns {
+		// Make pattern relative to watched directory
+		fmt.Printf("Pattern: %s\n", pattern)
+		if ok, _ := doubleStarMatch(pattern, filename, fw.dir); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func doubleStarMatch(pattern, path, baseDir string) (bool, error) {
+	fmt.Printf("doubleStarMatch - pattern: %s, path: %s, baseDir: %s\n", pattern, path, baseDir)
+
+	// Convert absolute path to relative path from baseDir
+	relPath, err := filepath.Rel(baseDir, path)
+	if err != nil {
+		fmt.Printf("Failed to get relative path: %v\n", err)
+		return false, err
+	}
+	fmt.Printf("Relative path: %s\n", relPath)
+
+	// Clean and split paths
+	relPath = filepath.ToSlash(relPath)
+	pattern = filepath.ToSlash(pattern)
+
+	segments := strings.Split(relPath, "/")
+	patternParts := strings.Split(pattern, "/")
+
+	fmt.Printf("Path segments: %v\nPattern parts: %v\n", segments, patternParts)
+
+	// Base cases
+	if pattern == "**" {
+		return true, nil
+	}
+
+	// If pattern ends with **, it matches any path that starts with the pattern prefix
+	if patternParts[len(patternParts)-1] == "**" {
+		prefix := strings.Join(patternParts[:len(patternParts)-1], "/")
+		return strings.HasPrefix(relPath, prefix), nil
+	}
+
+	// If pattern starts with **, it matches any path that ends with the pattern suffix
+	if patternParts[0] == "**" {
+		suffix := strings.Join(patternParts[1:], "/")
+		return strings.HasSuffix(relPath, suffix), nil
+	}
+
+	// Regular path matching
+	matched, err := filepath.Match(pattern, relPath)
+	fmt.Printf("Regular match result: %v\n", matched)
+	return matched, err
+}
+
+func (fw *FileWatcher) Close() error {
+	return fw.watcher.Close()
+}

@@ -56,18 +56,31 @@ var devRunCmd = &cobra.Command{
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 		}
 
-		fmt.Println(tui.Text(fmt.Sprintf("🔨 Building project...")))
-		started := time.Now()
-		if err := bundler.Bundle(bundler.BundleContext{
-			Context:    context.Background(),
-			Logger:     log,
-			ProjectDir: dir,
-			Production: false,
-		}); err != nil {
-			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to bundle project: %s", err))).ShowErrorAndExit()
+		build := func() {
+			fmt.Println(tui.Text(fmt.Sprintf("🔨 Building project...")))
+			started := time.Now()
+			if err := bundler.Bundle(bundler.BundleContext{
+				Context:    context.Background(),
+				Logger:     log,
+				ProjectDir: dir,
+				Production: false,
+			}); err != nil {
+				errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to bundle project: %s", err))).ShowErrorAndExit()
+			}
+			fmt.Printf("✨ Built in %s\n", time.Since(started).Round(time.Millisecond))
 		}
 
-		theproject.Logger.Debug("bundled in %s", time.Since(started))
+		// Initial build
+		build()
+
+		// Watch for changes
+		watcher, err := dev.NewWatcher(dir, []string{"src/**"}, func(path string) {
+			build()
+		})
+		if err != nil {
+			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start watcher: %s", err))).ShowErrorAndExit()
+		}
+		defer watcher.Close()
 
 		if err := projectServerCmd.Start(); err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start project: %s", err))).ShowErrorAndExit()
