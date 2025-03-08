@@ -18,10 +18,10 @@ import (
 	"github.com/agentuity/cli/internal/bundler"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
+	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
 	csys "github.com/agentuity/go-common/sys"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/nxadm/tail"
@@ -521,23 +521,7 @@ func init() {
 }
 
 func displayLocalInstructions(port int, agents []project.AgentConfig) {
-	teal := lipgloss.Color("86")
-	lightTeal := lipgloss.Color("122")
-
-	titleStyle := lipgloss.NewStyle().
-		Foreground(teal).
-		Bold(true).
-		MarginTop(1)
-
-	textStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("252"))
-
-	codeStyle := lipgloss.NewStyle().
-		Foreground(teal).
-		Background(lipgloss.Color("237")).
-		Padding(0, 1)
-
-	title := titleStyle.Render("🚀 Local Agent Development")
+	title := tui.Title("🚀 Local Agent Interaction")
 
 	// Combine all elements with appropriate spacing
 	fmt.Println()
@@ -546,16 +530,12 @@ func displayLocalInstructions(port int, agents []project.AgentConfig) {
 	// Create list of available agents
 	if len(agents) > 0 {
 		fmt.Println()
-		fmt.Println(textStyle.Render("Available agents:"))
-
-		// Create a custom style for the list
-		listHeaderStyle := lipgloss.NewStyle().Bold(true)
-		listItemStyle := lipgloss.NewStyle().Foreground(lightTeal)
+		fmt.Println(tui.Bold("Available agents:"))
 
 		for _, agent := range agents {
 			// Display agent name and ID
-			fmt.Println(listHeaderStyle.Render("  • " + agent.Name))
-			fmt.Println(listItemStyle.Render("    ID: " + agent.ID))
+			fmt.Println(tui.Text("  • " + agent.Name))
+			fmt.Println(tui.Secondary("    ID: " + agent.ID))
 		}
 	}
 
@@ -565,11 +545,10 @@ func displayLocalInstructions(port int, agents []project.AgentConfig) {
 		sampleAgentID = agents[0].ID
 	}
 
-	curlCommand := fmt.Sprintf("curl -v http://localhost:%d/%s --json '{\"input\": \"Hello, world!\"}'", port, sampleAgentID)
-	formattedCommand := codeStyle.Render(curlCommand)
+	curlCommand := fmt.Sprintf("curl -v http://localhost:%d/run/%s --json '{\"input\": \"Hello, world!\"}'", port, sampleAgentID)
 
 	fmt.Println()
-	fmt.Println(textStyle.Render("To trigger your agents locally, you can use something like:"))
-	fmt.Println(formattedCommand)
+	fmt.Println(tui.Text("To interact with your agents locally, you can use:"))
+	fmt.Println(tui.Command(curlCommand))
 	fmt.Println()
 }
