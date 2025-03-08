@@ -49,26 +49,14 @@ var devRunCmd = &cobra.Command{
 		if err != nil {
 			log.Fatal("failed to create live dev connection: %s", err)
 		}
-		liveDevConnection.StartReadingMessages(log)
 		defer liveDevConnection.Close()
-		devUrl := liveDevConnection.WebURL(appUrl)
-
-		log.Info("development server at url: %s", devUrl)
-
-		// Display local interaction instructions
-		displayLocalInstructions(theproject.Project.Development.Port, theproject.Project.Agents)
-
-		if err := browser.OpenURL(devUrl); err != nil {
-			log.Fatal("failed to open browser: %s", err)
-		}
 
 		projectServerCmd, err := dev.CreateRunProjectCmd(log, theproject, liveDevConnection, dir, orgId)
-
 		if err != nil {
-			log.Fatal("failed to run project: %s", err)
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 		}
 
+		fmt.Println(tui.Text(fmt.Sprintf("🔨 Building project...")))
 		started := time.Now()
 		if err := bundler.Bundle(bundler.BundleContext{
 			Context:    context.Background(),
@@ -76,16 +64,25 @@ var devRunCmd = &cobra.Command{
 			ProjectDir: dir,
 			Production: false,
 		}); err != nil {
-			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to bundle project")).ShowErrorAndExit()
+			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to bundle project: %s", err))).ShowErrorAndExit()
 		}
+
 		theproject.Logger.Debug("bundled in %s", time.Since(started))
 
 		if err := projectServerCmd.Start(); err != nil {
-			log.Fatal("failed to start command: %s", err)
+			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start project: %s", err))).ShowErrorAndExit()
+		}
+
+		devUrl := liveDevConnection.WebURL(appUrl)
+
+		// Display local interaction instructions
+		displayLocalInstructions(theproject.Project.Development.Port, theproject.Project.Agents, devUrl)
+
+		if err := browser.OpenURL(devUrl); err != nil {
+			log.Fatal("failed to open browser: %s", err)
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
-
 		go func() {
 			defer cancel()
 			projectServerCmd.Wait()
@@ -109,7 +106,7 @@ func init() {
 	devRunCmd.Flags().String("websocket-id", "", "The websocket room id to use for the development agent")
 }
 
-func displayLocalInstructions(port int, agents []project.AgentConfig) {
+func displayLocalInstructions(port int, agents []project.AgentConfig, devModeUrl string) {
 	title := tui.Title("🚀 Local Agent Interaction")
 
 	// Combine all elements with appropriate spacing
@@ -139,5 +136,10 @@ func displayLocalInstructions(port int, agents []project.AgentConfig) {
 	fmt.Println()
 	fmt.Println(tui.Text("To interact with your agents locally, you can use:"))
 	fmt.Println(tui.Command(curlCommand))
+	fmt.Println()
+
+	fmt.Print(tui.Text("Or use the 💻 Live Mode in our app: "))
+	fmt.Println(tui.Link("%s", devModeUrl))
+
 	fmt.Println()
 }
