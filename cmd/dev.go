@@ -569,7 +569,7 @@ func displayLocalInstructions(port int, agents []project.AgentConfig) {
 	formattedCommand := codeStyle.Render(curlCommand)
 
 	fmt.Println()
-	fmt.Println(textStyle.Render("To interact with your agents locally, you can use:"))
+	fmt.Println(textStyle.Render("To trigger your agents locally, you can use something like:"))
 	fmt.Println(formattedCommand)
 	fmt.Println()
 }
