@@ -537,7 +537,7 @@ func displayLocalInstructions(port int, agents []project.AgentConfig) {
 		Background(lipgloss.Color("237")).
 		Padding(0, 1)
 
-	title := titleStyle.Render("🚀 Local Agent Interaction")
+	title := titleStyle.Render("🚀 Local Agent Development")
 
 	// Combine all elements with appropriate spacing
 	fmt.Println()
