@@ -23,6 +23,20 @@ type LiveDevConnection struct {
 	Project     project.ProjectContext
 }
 
+type OutputPayload struct {
+	ContentType string `json:"contentType"`
+	Payload     string `json:"payload"`
+	Trigger     string `json:"trigger"`
+}
+
+func isOutputPayload(message []byte) (*OutputPayload, error) {
+	var op OutputPayload
+	if err := json.Unmarshal(message, &op); err != nil {
+		return nil, err
+	}
+	return &op, nil
+}
+
 func (c *LiveDevConnection) StartReadingMessages(logger logger.Logger) {
 	go func() {
 		for {
@@ -31,7 +45,7 @@ func (c *LiveDevConnection) StartReadingMessages(logger logger.Logger) {
 				logger.Fatal("failed to read message: %s", err)
 				return
 			}
-			logger.Debug("recv: %s", m)
+			logger.Info("recv: %s", string(m))
 
 			var message Message
 			if err := json.Unmarshal(m, &message); err != nil {
@@ -48,31 +62,22 @@ func (c *LiveDevConnection) StartReadingMessages(logger logger.Logger) {
 				processInputMessage(logger, c, m)
 			}
 			if message.Type == "getAgents" {
-				agents := make([]struct {
-					Name        string `json:"name"`
-					ID          string `json:"id"`
-					Description string `json:"description"`
-				}, 0)
+				logger.Info("getAgents")
+				agents := make([]Agent, 0)
 				for _, agent := range c.Project.Project.Agents {
-					agents = append(agents, struct {
-						Name        string `json:"name"`
-						ID          string `json:"id"`
-						Description string `json:"description"`
-					}{
+					agents = append(agents, Agent{
 						Name:        agent.Name,
 						ID:          agent.ID,
 						Description: agent.Description,
 					})
 				}
-				c.SendMessage(NewAgentsMessage(c.WebSocketId, struct {
-					Agents []struct {
-						Name        string `json:"name"`
-						ID          string `json:"id"`
-						Description string `json:"description"`
-					} `json:"agents"`
-				}{
+				logger.Info("sending agents: %+v", agents)
+
+				agentsMessage := NewAgentsMessage(c.WebSocketId, AgentsPayload{
 					Agents: agents,
-				}))
+				})
+
+				c.SendMessage(logger, agentsMessage)
 			}
 		}
 	}()
@@ -130,7 +135,8 @@ func NewLiveDevConnection(logger logger.Logger, websocketId string, websocketUrl
 }
 
 // Update SendMessage to accept the MessageType interface
-func (c *LiveDevConnection) SendMessage(msg Message) error {
+func (c *LiveDevConnection) SendMessage(logger logger.Logger, msg Message) error {
+	logger.Info("sending message: %+v", msg)
 	buf, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -154,9 +160,9 @@ func (c *LiveDevConnection) WebURL(appUrl string) string {
 }
 
 type Message struct {
-	ID      string
-	Type    string
-	Payload map[string]any
+	ID      string         `json:"id"`
+	Type    string         `json:"type"`
+	Payload map[string]any `json:"payload"`
 }
 
 // messages send by server to CLI
@@ -175,27 +181,34 @@ type InputMessage struct {
 
 // messages send by CLI to the server
 func NewOutputMessage(id string, payload struct {
-	ContentType string `json:"content_type"`
+	ContentType string `json:"contentType"`
 	Payload     string `json:"payload"`
+	Trigger     string `json:"trigger"`
 }) Message {
 	payloadMap := map[string]any{
-		"content_type": payload.ContentType,
-		"payload":      payload.Payload,
+		"contentType": payload.ContentType,
+		"payload":     payload.Payload,
+		"trigger":     payload.Trigger,
 	}
 	return Message{
 		ID:      id,
 		Type:    "output",
 		Payload: payloadMap,
 	}
+
 }
 
-func NewAgentsMessage(id string, payload struct {
-	Agents []struct {
-		Name        string `json:"name"`
-		ID          string `json:"id"`
-		Description string `json:"description"`
-	} `json:"agents"`
-}) Message {
+type Agent struct {
+	Name        string `json:"name"`
+	ID          string `json:"id"`
+	Description string `json:"description"`
+}
+
+type AgentsPayload struct {
+	Agents []Agent `json:"agents"`
+}
+
+func NewAgentsMessage(id string, payload AgentsPayload) Message {
 	payloadMap := map[string]any{
 		"agents": payload.Agents,
 	}
@@ -214,7 +227,7 @@ func processInputMessage(logger logger.Logger, c *LiveDevConnection, m []byte) {
 		return
 	}
 
-	// Decode base64 payload
+	// Decode base64 payload this wont work for images I think
 	decodedPayload, err := base64.StdEncoding.DecodeString(inputMsg.Payload.Payload)
 	if err != nil {
 		logger.Error("failed to decode payload: %s", err)
@@ -259,13 +272,19 @@ func processInputMessage(logger logger.Logger, c *LiveDevConnection, m []byte) {
 
 	logger.Debug("response: %s", string(body))
 
-	c.SendMessage(NewOutputMessage(inputMsg.ID, struct {
-		ContentType string `json:"content_type"`
-		Payload     string `json:"payload"`
-	}{
-		ContentType: "application/json",
-		Payload:     string(body),
-	}))
+	output, err := isOutputPayload(body)
+	if err != nil {
+		logger.Error("failed to check if response is output payload: %s", err)
+		return
+	}
+
+	outputMessage := NewOutputMessage(inputMsg.ID, OutputPayload{
+		ContentType: output.ContentType,
+		Payload:     output.Payload,
+		Trigger:     output.Trigger,
+	})
+
+	c.SendMessage(logger, outputMessage)
 
 	return
 }

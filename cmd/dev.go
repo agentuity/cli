@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -19,23 +18,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
-
-type AgentMessage struct {
-	Type string `json:"type"`
-}
-
-type OutputPayload struct {
-	ContentType string `json:"contentType"`
-	Payload     string `json:"payload"`
-}
-
-func isOutputPayload(message []byte) (*OutputPayload, error) {
-	var op OutputPayload
-	if err := json.Unmarshal(message, &op); err != nil {
-		return nil, err
-	}
-	return &op, nil
-}
 
 var devRunCmd = &cobra.Command{
 	Use:     "run",
@@ -67,6 +49,7 @@ var devRunCmd = &cobra.Command{
 		if err != nil {
 			log.Fatal("failed to create live dev connection: %s", err)
 		}
+		liveDevConnection.StartReadingMessages(log)
 		defer liveDevConnection.Close()
 		devUrl := liveDevConnection.WebURL(appUrl)
 
