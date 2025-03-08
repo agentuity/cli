@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Masterminds/semver"
 	"github.com/agentuity/cli/internal/agent"
 	"github.com/agentuity/cli/internal/deployer"
 	"github.com/agentuity/cli/internal/errsystem"
@@ -64,57 +63,12 @@ type startRequest struct {
 	Resources *Resources   `json:"resources,omitempty"`
 }
 
-type projectContext struct {
-	Logger  logger.Logger
-	Project *project.Project
-	Dir     string
-	APIURL  string
-	APPURL  string
-	Token   string
-}
-
-func loadProject(logger logger.Logger, dir string, apiUrl string, appUrl string, token string) projectContext {
-	theproject := project.NewProject()
-	if err := theproject.Load(dir); err != nil {
-		errsystem.New(errsystem.ErrInvalidConfiguration, err,
-			errsystem.WithContextMessage("Error loading project from disk")).ShowErrorAndExit()
-	}
-	return projectContext{
-		Logger:  logger,
-		Project: theproject,
-		Dir:     dir,
-		APIURL:  apiUrl,
-		APPURL:  appUrl,
-		Token:   token,
-	}
-}
-
-func ensureProject(cmd *cobra.Command) projectContext {
-	logger := env.NewLogger(cmd)
-	dir := resolveProjectDir(logger, cmd)
-	apiUrl, appUrl := getURLs(logger)
-	token, _ := ensureLoggedIn()
-	p := loadProject(logger, dir, apiUrl, appUrl, token)
-	if Version != "" && Version != "dev" && p.Project.Version != "" {
-		v := semver.MustParse(Version)
-		c, err := semver.NewConstraint(p.Project.Version)
-		if err != nil {
-			errsystem.New(errsystem.ErrInvalidConfiguration, err,
-				errsystem.WithContextMessage(fmt.Sprintf("Error parsing project version constraint: %s", p.Project.Version))).ShowErrorAndExit()
-		}
-		if !c.Check(v) {
-			logger.Fatal("This project is not compatible with CLI version %s. Please upgrade your Agentuity CLI to version %s.", Version, p.Project.Version)
-		}
-	}
-	return p
-}
-
 var cloudDeployCmd = &cobra.Command{
 	Use:   "deploy",
 	Short: "Deploy project to the cloud",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-		context := ensureProject(cmd)
+		context := project.EnsureProject(cmd)
 		logger := context.Logger
 		theproject := context.Project
 		dir := context.Dir

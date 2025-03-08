@@ -6,6 +6,7 @@ import (
 
 	"github.com/agentuity/cli/internal/bundler"
 	"github.com/agentuity/cli/internal/errsystem"
+	"github.com/agentuity/cli/internal/project"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +18,7 @@ var bundleCmd = &cobra.Command{
 	Hidden:  true,
 	Run: func(cmd *cobra.Command, args []string) {
 		started := time.Now()
-		projectContext := ensureProject(cmd)
+		projectContext := project.EnsureProject(cmd)
 		production, _ := cmd.Flags().GetBool("production")
 		if err := bundler.Bundle(bundler.BundleContext{
 			Context:    context.Background(),

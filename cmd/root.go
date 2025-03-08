@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/agentuity/cli/internal/deployer"
-	"github.com/agentuity/cli/internal/errsystem"
-	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/go-common/logger"
 	"github.com/spf13/cobra"
@@ -127,28 +125,6 @@ func createPromptHelper() deployer.PromptHelpers {
 		Ask:           tui.Ask,
 		PromptForEnv:  promptForEnv,
 	}
-}
-
-func resolveProjectDir(logger logger.Logger, cmd *cobra.Command) string {
-	cwd, err := os.Getwd()
-	if err != nil {
-		errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
-			errsystem.WithUserMessage(fmt.Sprintf("Failed to get current directory: %s", err))).ShowErrorAndExit()
-	}
-	dir := cwd
-	dirFlag, _ := cmd.Flags().GetString("dir")
-	if dirFlag != "" {
-		dir = dirFlag
-	}
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
-			errsystem.WithUserMessage(fmt.Sprintf("Failed to get absolute path: %s", err))).ShowErrorAndExit()
-	}
-	if !project.ProjectExists(abs) {
-		logger.Fatal("Project file not found: %s", filepath.Join(abs, "agentuity.yaml"))
-	}
-	return abs
 }
 
 func getURLs(logger logger.Logger) (string, string) {

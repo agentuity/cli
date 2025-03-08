@@ -2,13 +2,13 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"time"
 
 	"github.com/agentuity/cli/internal/auth"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/tui"
+	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -20,30 +20,6 @@ var authCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
-}
-
-func showLogin() {
-	fmt.Println(tui.Warning("You are not currently logged in or your session has expired."))
-	tui.ShowBanner("Login", tui.Text("Use ")+tui.Command("login")+tui.Text(" to login to Agentuity"), false)
-}
-
-func ensureLoggedIn() (string, string) {
-	apikey := viper.GetString("auth.api_key")
-	if apikey == "" {
-		showLogin()
-		os.Exit(1)
-	}
-	userId := viper.GetString("auth.user_id")
-	if userId == "" {
-		showLogin()
-		os.Exit(1)
-	}
-	expires := viper.GetInt64("auth.expires")
-	if expires < time.Now().UnixMilli() {
-		showLogin()
-		os.Exit(1)
-	}
-	return apikey, userId
 }
 
 var authLoginCmd = &cobra.Command{
@@ -120,7 +96,7 @@ var authWhoamiCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		apiUrl, _ := getURLs(logger)
-		apiKey, userId := ensureLoggedIn()
+		apiKey, userId := util.EnsureLoggedIn()
 		user, err := auth.GetUser(logger, apiUrl, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrAuthenticateUser, err,
