@@ -49,7 +49,7 @@ var bundleCmd = &cobra.Command{
 			if deploymentId != "" {
 				args = append(args, "--deploymentId", deploymentId)
 			}
-			flags := []string{"log-level", "api-url"}
+			flags := []string{"log-level", "api-url", "api-key"}
 			for _, flag := range flags {
 				if cmd.Flags().Changed(flag) {
 					level, _ := cmd.Flags().GetString(flag)
