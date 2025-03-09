@@ -240,8 +240,14 @@ var cloudDeployCmd = &cobra.Command{
 			}
 		}
 
+		// check for a deploymentId flag and if so we can append it to the deployment url
+		deploymentId, _ := cmd.Flags().GetString("deploymentId")
+		if deploymentId != "" {
+			deploymentId = "/" + deploymentId
+		}
+
 		// Start deployment
-		if err := client.Do("PUT", fmt.Sprintf("/cli/deploy/start/%s", theproject.ProjectId), startRequest, &startResponse); err != nil {
+		if err := client.Do("PUT", fmt.Sprintf("/cli/deploy/start/%s%s", theproject.ProjectId, deploymentId), startRequest, &startResponse); err != nil {
 			errsystem.New(errsystem.ErrDeployProject, err,
 				errsystem.WithContextMessage("Error starting deployment")).ShowErrorAndExit()
 		}
@@ -438,4 +444,6 @@ func init() {
 	rootCmd.AddCommand(cloudDeployCmd)
 	cloudCmd.AddCommand(cloudDeployCmd)
 	cloudDeployCmd.Flags().StringP("dir", "d", ".", "The directory to the project to deploy")
+	cloudDeployCmd.Flags().String("deploymentId", "", "Used to track a specific deployment")
+	cloudDeployCmd.Flags().MarkHidden("deploymentId")
 }

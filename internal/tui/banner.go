@@ -26,6 +26,9 @@ var (
 )
 
 func ShowBanner(title string, body string, clearScreen bool) {
+	if !HasTTY {
+		return
+	}
 	if clearScreen {
 		ClearScreen()
 	}

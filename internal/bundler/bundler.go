@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 
@@ -30,9 +31,29 @@ type BundleContext struct {
 	Logger     logger.Logger
 	ProjectDir string
 	Production bool
+	Install    bool
 }
 
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
+
+	if ctx.Install {
+		var install *exec.Cmd
+		switch theproject.Bundler.Runtime {
+		case "nodejs":
+			install = exec.Command("npm", "install", "--no-save", "--no-audit", "--no-fund", "--include=prod")
+		case "bunjs":
+			install = exec.Command("bun", "install", "--production", "--no-save", "--silent", "--no-progress", "--no-summary")
+		default:
+			return fmt.Errorf("unsupported runtime: %s", theproject.Bundler.Runtime)
+		}
+		install.Dir = dir
+		out, err := install.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to install dependencies: %w. %s", err, string(out))
+		}
+		ctx.Logger.Debug("installed dependencies: %s", string(out))
+	}
+
 	var entryPoints []string
 	entryPoints = append(entryPoints, filepath.Join(dir, "index.js"))
 	files, err := util.ListDir(filepath.Join(dir, theproject.Bundler.AgentConfig.Dir))
@@ -121,6 +142,27 @@ var (
 )
 
 func bundlePython(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
+
+	if ctx.Install {
+		var install *exec.Cmd
+		switch theproject.Bundler.Runtime {
+		case "uv":
+			install = exec.Command("uv", "sync", "--no-dev", "--frozen", "--quiet", "--no-progress")
+		case "pip":
+			install = exec.Command("uv", "pip", "install", "--quiet", "--no-progress")
+		case "poetry":
+			return fmt.Errorf("poetry is not supported yet")
+		default:
+			return fmt.Errorf("unsupported runtime: %s", theproject.Bundler.Runtime)
+		}
+		install.Dir = dir
+		out, err := install.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to install dependencies: %w. %s", err, string(out))
+		}
+		ctx.Logger.Debug("installed dependencies: %s", string(out))
+	}
+
 	config := map[string]any{
 		"agents":      getAgents(theproject, "agent.py"),
 		"cli_version": Version,
