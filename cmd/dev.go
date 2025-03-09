@@ -74,13 +74,13 @@ var devRunCmd = &cobra.Command{
 		build()
 
 		// Watch for changes
-		watcher, err := dev.NewWatcher(dir, []string{"src/**"}, func(path string) {
+		watcher, err := dev.NewWatcher(log, dir, theproject.Project.Development.Watch.Files, func(path string) {
 			build()
 		})
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start watcher: %s", err))).ShowErrorAndExit()
 		}
-		defer watcher.Close()
+		defer watcher.Close(log)
 
 		if err := projectServerCmd.Start(); err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start project: %s", err))).ShowErrorAndExit()
@@ -149,7 +149,7 @@ func displayLocalInstructions(port int, agents []project.AgentConfig, devModeUrl
 
 	fmt.Println()
 	fmt.Println(tui.Text("To interact with your agents locally, you can use:"))
-	fmt.Println(tui.Command(curlCommand))
+	fmt.Println(tui.Tertiary(curlCommand))
 	fmt.Println()
 
 	fmt.Print(tui.Text("Or use the 💻 Live Mode in our app: "))

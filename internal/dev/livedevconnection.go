@@ -45,7 +45,7 @@ func (c *LiveDevConnection) StartReadingMessages(logger logger.Logger) {
 				logger.Fatal("failed to read message: %s", err)
 				return
 			}
-			logger.Info("recv: %s", string(m))
+			logger.Trace("recv: %s", string(m))
 
 			var message Message
 			if err := json.Unmarshal(m, &message); err != nil {
@@ -62,7 +62,6 @@ func (c *LiveDevConnection) StartReadingMessages(logger logger.Logger) {
 				processInputMessage(logger, c, m)
 			}
 			if message.Type == "getAgents" {
-				logger.Info("getAgents")
 				agents := make([]Agent, 0)
 				for _, agent := range c.Project.Project.Agents {
 					agents = append(agents, Agent{
@@ -71,7 +70,7 @@ func (c *LiveDevConnection) StartReadingMessages(logger logger.Logger) {
 						Description: agent.Description,
 					})
 				}
-				logger.Info("sending agents: %+v", agents)
+				logger.Trace("sending agents: %+v", agents)
 
 				agentsMessage := NewAgentsMessage(c.WebSocketId, AgentsPayload{
 					Agents: agents,
@@ -136,7 +135,7 @@ func NewLiveDevConnection(logger logger.Logger, websocketId string, websocketUrl
 
 // Update SendMessage to accept the MessageType interface
 func (c *LiveDevConnection) SendMessage(logger logger.Logger, msg Message) error {
-	logger.Info("sending message: %+v", msg)
+	logger.Trace("sending message: %+v", msg)
 	buf, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -245,7 +244,6 @@ func processInputMessage(logger logger.Logger, c *LiveDevConnection, m []byte) {
 
 	// make a json object with the payload
 	payload := map[string]any{
-		"sessionId":   inputMsg.Payload.SessionID,
 		"contentType": inputMsg.Payload.ContentType,
 		"payload":     decodedPayload,
 		"trigger":     "manual",
@@ -257,7 +255,7 @@ func processInputMessage(logger logger.Logger, c *LiveDevConnection, m []byte) {
 		return
 	}
 
-	resp, err := http.Post(url, inputMsg.Payload.ContentType, bytes.NewBuffer(jsonPayload))
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		logger.Error("failed to post to agent: %s", err)
 		return

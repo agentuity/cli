@@ -1,11 +1,11 @@
 package dev
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/agentuity/go-common/logger"
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -16,7 +16,7 @@ type FileWatcher struct {
 	dir      string
 }
 
-func NewWatcher(dir string, patterns []string, callback func(string)) (*FileWatcher, error) {
+func NewWatcher(logger logger.Logger, dir string, patterns []string, callback func(string)) (*FileWatcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
@@ -39,11 +39,11 @@ func NewWatcher(dir string, patterns []string, callback func(string)) (*FileWatc
 		return nil
 	})
 
-	go fw.watch()
+	go fw.watch(logger)
 	return fw, err
 }
 
-func (fw *FileWatcher) watch() {
+func (fw *FileWatcher) watch(logger logger.Logger) {
 	for {
 		select {
 		case event, ok := <-fw.watcher.Events:
@@ -57,7 +57,7 @@ func (fw *FileWatcher) watch() {
 				}
 			}
 			if event.Op&fsnotify.Write == fsnotify.Write {
-				if fw.matchesPattern(event.Name) {
+				if fw.matchesPattern(logger, event.Name) {
 					fw.callback(event.Name)
 				}
 			}
@@ -71,28 +71,28 @@ func (fw *FileWatcher) watch() {
 	}
 }
 
-func (fw *FileWatcher) matchesPattern(filename string) bool {
-	fmt.Printf("Checking file: %s against patterns: %v\n", filename, fw.patterns)
+func (fw *FileWatcher) matchesPattern(logger logger.Logger, filename string) bool {
+	logger.Trace("matchesPattern - filename: %s, patterns: %v", filename, fw.patterns)
 	for _, pattern := range fw.patterns {
 		// Make pattern relative to watched directory
-		fmt.Printf("Pattern: %s\n", pattern)
-		if ok, _ := doubleStarMatch(pattern, filename, fw.dir); ok {
+		logger.Trace("Pattern: %s", pattern)
+		if ok, _ := doubleStarMatch(logger, pattern, filename, fw.dir); ok {
 			return true
 		}
 	}
 	return false
 }
 
-func doubleStarMatch(pattern, path, baseDir string) (bool, error) {
-	fmt.Printf("doubleStarMatch - pattern: %s, path: %s, baseDir: %s\n", pattern, path, baseDir)
+func doubleStarMatch(logger logger.Logger, pattern, path, baseDir string) (bool, error) {
+	logger.Trace("doubleStarMatch - pattern: %s, path: %s, baseDir: %s", pattern, path, baseDir)
 
 	// Convert absolute path to relative path from baseDir
 	relPath, err := filepath.Rel(baseDir, path)
 	if err != nil {
-		fmt.Printf("Failed to get relative path: %v\n", err)
+		logger.Error("Failed to get relative path: %v", err)
 		return false, err
 	}
-	fmt.Printf("Relative path: %s\n", relPath)
+	logger.Trace("Relative path: %s", relPath)
 
 	// Clean and split paths
 	relPath = filepath.ToSlash(relPath)
@@ -101,7 +101,7 @@ func doubleStarMatch(pattern, path, baseDir string) (bool, error) {
 	segments := strings.Split(relPath, "/")
 	patternParts := strings.Split(pattern, "/")
 
-	fmt.Printf("Path segments: %v\nPattern parts: %v\n", segments, patternParts)
+	logger.Trace("Path segments: %v\nPattern parts: %v\n", segments, patternParts)
 
 	// Base cases
 	if pattern == "**" {
@@ -122,10 +122,11 @@ func doubleStarMatch(pattern, path, baseDir string) (bool, error) {
 
 	// Regular path matching
 	matched, err := filepath.Match(pattern, relPath)
-	fmt.Printf("Regular match result: %v\n", matched)
+	logger.Trace("Regular match result: %v", matched)
 	return matched, err
 }
 
-func (fw *FileWatcher) Close() error {
+func (fw *FileWatcher) Close(logger logger.Logger) error {
+	logger.Trace("Closing watcher")
 	return fw.watcher.Close()
 }

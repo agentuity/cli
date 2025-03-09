@@ -36,6 +36,10 @@ func Secondary(text string) string {
 	return lipgloss.NewStyle().Foreground(secondaryStyleColor).Render(text)
 }
 
+func Tertiary(text string) string {
+	return commandStyle.Render(text)
+}
+
 func Muted(text string) string {
 	return lipgloss.NewStyle().Foreground(mutedStyleColor).Render(text)
 }
