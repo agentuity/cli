@@ -9,7 +9,7 @@ export default async function Agent(
 	ctx: AgentContext,
 ) {
 	const completion = await client.chat.completions.create({
-    messages: [{ role: 'user', content: req.text() ?? 'Say this is a test' }],
+    messages: [{ role: 'user', content: req.data.text ?? 'Say this is a test' }],
     model: 'gpt-4o',
   });
 	const message = completion.choices[0]?.message;
