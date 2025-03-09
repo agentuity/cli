@@ -2,7 +2,10 @@ package dev
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -146,6 +149,10 @@ func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketI
 		for {
 			_, message, err := self.conn.ReadMessage()
 			if err != nil {
+				if errors.Is(err, websocket.ErrCloseSent) || errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
+					logger.Trace("connection closed")
+					return
+				}
 				logger.Fatal("failed to read message: %s", err)
 				return
 			}

@@ -244,12 +244,10 @@ func displayLocalInstructions(port int, agents []project.AgentConfig) {
 	// Create list of available agents
 	if len(agents) > 0 {
 		fmt.Println()
-		fmt.Println(tui.Bold("Available agents:"))
 
 		for _, agent := range agents {
 			// Display agent name and ID
-			fmt.Println(tui.Text("  • " + agent.Name))
-			fmt.Println(tui.Secondary("    ID: " + agent.ID))
+			fmt.Println(tui.Text("  • ") + tui.PadRight(agent.Name, 20, " ") + " " + tui.Muted(agent.ID))
 		}
 	}
 
@@ -263,6 +261,7 @@ func displayLocalInstructions(port int, agents []project.AgentConfig) {
 
 	fmt.Println()
 	fmt.Println(tui.Text("To interact with your agents locally, you can use:"))
-	fmt.Println(tui.Command(curlCommand))
+	fmt.Println()
+	fmt.Println(tui.Highlight(curlCommand))
 	fmt.Println()
 }

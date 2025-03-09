@@ -83,6 +83,11 @@ func Command(cmd string, args ...string) string {
 	return commandStyle.Render(cmdline)
 }
 
+func Highlight(cmd string, args ...string) string {
+	cmdline := strings.Join(append([]string{cmd}, args...), " ")
+	return commandStyle.Render(cmdline)
+}
+
 func Directory(dir string, args ...string) string {
 	val := strings.Join(append([]string{dir}, args...), " ")
 	return commandStyle.Render(val)
