@@ -52,8 +52,8 @@ var bundleCmd = &cobra.Command{
 			flags := []string{"log-level", "api-url", "api-key"}
 			for _, flag := range flags {
 				if cmd.Flags().Changed(flag) {
-					level, _ := cmd.Flags().GetString(flag)
-					args = append(args, "--"+flag, level)
+					val, _ := cmd.Flags().GetString(flag)
+					args = append(args, "--"+flag, val)
 				}
 			}
 			started = time.Now()
