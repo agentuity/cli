@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"syscall"
 	"time"
 
 	"github.com/agentuity/cli/internal/bundler"
@@ -103,13 +104,23 @@ var devRunCmd = &cobra.Command{
 		}()
 
 		select {
+		case <-liveDevConnection.Done:
+			log.Info("live dev connection closed, shutting down")
+			projectServerCmd.Process.Signal(syscall.SIGTERM)
+			// Give it a chance to shutdown gracefully
+			time.Sleep(time.Second)
+			projectServerCmd.Process.Kill()
+			projectServerCmd.Process.Wait()
+			watcher.Close(log)
 		case <-ctx.Done():
 			log.Info("context done, shutting down")
 			liveDevConnection.Close()
+			watcher.Close(log)
 		case <-csys.CreateShutdownChannel():
 			log.Info("shutdown signal received, shutting down")
 			projectServerCmd.Process.Kill()
 			liveDevConnection.Close()
+			watcher.Close(log)
 		}
 	},
 }

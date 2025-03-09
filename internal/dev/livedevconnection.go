@@ -21,6 +21,7 @@ type LiveDevConnection struct {
 	OtelToken   string
 	OtelUrl     string
 	Project     project.ProjectContext
+	Done        chan struct{}
 }
 
 type OutputPayload struct {
@@ -39,10 +40,11 @@ func isOutputPayload(message []byte) (*OutputPayload, error) {
 
 func (c *LiveDevConnection) StartReadingMessages(logger logger.Logger) {
 	go func() {
+		defer close(c.Done)
 		for {
 			_, m, err := c.conn.ReadMessage()
 			if err != nil {
-				logger.Fatal("failed to read message: %s", err)
+				logger.Error("failed to read message: %s", err)
 				return
 			}
 			logger.Trace("recv: %s", string(m))
@@ -86,6 +88,7 @@ func NewLiveDevConnection(logger logger.Logger, websocketId string, websocketUrl
 	self := LiveDevConnection{
 		WebSocketId: websocketId,
 		Project:     theproject,
+		Done:        make(chan struct{}),
 	}
 	u, err := url.Parse(websocketUrl)
 	if err != nil {
