@@ -57,14 +57,19 @@ var bundleCmd = &cobra.Command{
 				}
 			}
 			started = time.Now()
-			projectContext.Logger.Trace("deploying to cloud with args: %v", args)
+			projectContext.Logger.Trace("deploying to cloud with %s and args: %v", bin, args)
+			cwd, err := os.Getwd()
+			if err != nil {
+				projectContext.Logger.Fatal("Failed to get current working directory: %s", err)
+			}
 			c := exec.Command(bin, args...)
+			c.Dir = cwd
 			c.Stdin = nil
+			c.Env = os.Environ()
 			c.Stdout = os.Stdout
 			c.Stderr = os.Stderr
 			if err := c.Run(); err != nil {
-				projectContext.Logger.Error("Failed to deploy to cloud: %s", err)
-				os.Exit(1)
+				projectContext.Logger.Fatal("Failed to deploy to cloud: %s", err)
 			}
 			projectContext.Logger.Info("deployment completed in %s", time.Since(started))
 		}

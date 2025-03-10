@@ -115,6 +115,10 @@ func (e *errSystem) ShowErrorAndExit() {
 	for _, d := range detail {
 		body.WriteString(tui.Muted(d) + "\n")
 	}
+	if !tui.HasTTY {
+		fmt.Println(body.String())
+		os.Exit(1)
+	}
 	tui.ShowBanner(tui.Warning("☹ Error Detected"), body.String(), false)
 	if isatty.IsTerminal(os.Stdout.Fd()) {
 		tui.WaitForAnyKeyMessage(" Press any key to upload the error report\n to the Agentuity team or press Ctrl+C to cancel ...")
