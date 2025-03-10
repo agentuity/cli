@@ -82,7 +82,7 @@ new_project:
       from: "data/nodejs/gitignore"
     - action: copy_dir
       from: "common/js/cursor"
-      to: ".cursorrules"
+      to: ".cursor/rules"
     - action: copy_dir
       from: "common/cursor"
-      to: ".cursorrules"
+      to: ".cursor/rules"
