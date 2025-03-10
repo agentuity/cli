@@ -13,8 +13,8 @@ import (
 	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
+	cstr "github.com/agentuity/go-common/string"
 	csys "github.com/agentuity/go-common/sys"
-	"github.com/google/uuid"
 	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -31,7 +31,7 @@ var devRunCmd = &cobra.Command{
 		_, appUrl := getURLs(log)
 		websocketUrl := viper.GetString("overrides.websocket_url")
 		websocketId, _ := cmd.Flags().GetString("websocket-id")
-		apiKey, _ := util.EnsureLoggedIn()
+		apiKey, userId := util.EnsureLoggedIn()
 		theproject := project.EnsureProject(cmd)
 
 		// get project from api
@@ -41,9 +41,8 @@ var devRunCmd = &cobra.Command{
 		}
 		orgId := project.OrgId
 
-		// need to fixs this!!!!!!!
 		if websocketId == "" {
-			websocketId = uuid.New().String()[:6]
+			websocketId = cstr.NewHash(orgId, userId)
 		}
 
 		liveDevConnection, err := dev.NewLiveDevConnection(log, websocketId, websocketUrl, apiKey, theproject)
