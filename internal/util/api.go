@@ -8,10 +8,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/go-common/logger"
+	"github.com/agentuity/go-common/sys"
 	"github.com/spf13/viper"
 )
 
@@ -82,6 +85,23 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 	return nil
 }
 
+func transformUrl(url string) string {
+	// NOTE: these urls are special cases for local development inside a container
+	if strings.Contains(url, "api.agentuity.dev") || strings.Contains(url, "localhost:") {
+		if sys.Exists("/.dockerenv") || sys.Exists("/proc/1/cgroup") {
+			if strings.HasPrefix(url, "https://api.agentuity.dev") {
+				return "http://host.docker.internal:3012"
+			}
+			port := regexp.MustCompile(`:(\d+)`)
+			if port.MatchString(url) {
+				return "http://host.docker.internal:" + port.FindString(url)
+			}
+			return "http://host.docker.internal:3000"
+		}
+	}
+	return url
+}
+
 func GetURLs(logger logger.Logger) (string, string) {
 	appUrl := viper.GetString("overrides.app_url")
 	apiUrl := viper.GetString("overrides.api_url")
@@ -92,7 +112,7 @@ func GetURLs(logger logger.Logger) (string, string) {
 		logger.Debug("switching app url to dev since the api url is dev")
 		appUrl = "http://localhost:3000"
 	}
-	return apiUrl, appUrl
+	return transformUrl(apiUrl), transformUrl(appUrl)
 }
 
 func ShowLogin() {
