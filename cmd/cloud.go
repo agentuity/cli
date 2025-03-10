@@ -365,9 +365,10 @@ var cloudDeployCmd = &cobra.Command{
 		var webhookToken string
 
 		action = func() {
+			url := util.TransformUrl(startResponse.Data.Url)
 			// send the zip file to the upload endpoint provided
-			logger.Trace("uploading to %s", startResponse.Data.Url)
-			req, err := http.NewRequest("PUT", startResponse.Data.Url, of)
+			logger.Trace("uploading to %s", url)
+			req, err := http.NewRequest("PUT", url, of)
 			if err != nil {
 				errsystem.New(errsystem.ErrUploadProject, err,
 					errsystem.WithContextMessage("Error creating PUT request")).ShowErrorAndExit()

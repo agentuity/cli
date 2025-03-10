@@ -85,7 +85,7 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 	return nil
 }
 
-func transformUrl(url string) string {
+func TransformUrl(url string) string {
 	// NOTE: these urls are special cases for local development inside a container
 	if strings.Contains(url, "api.agentuity.dev") || strings.Contains(url, "localhost:") {
 		if sys.Exists("/.dockerenv") || sys.Exists("/proc/1/cgroup") {
@@ -112,7 +112,7 @@ func GetURLs(logger logger.Logger) (string, string) {
 		logger.Debug("switching app url to dev since the api url is dev")
 		appUrl = "http://localhost:3000"
 	}
-	return transformUrl(apiUrl), transformUrl(appUrl)
+	return TransformUrl(apiUrl), TransformUrl(appUrl)
 }
 
 func ShowLogin() {

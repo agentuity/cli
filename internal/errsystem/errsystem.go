@@ -5,6 +5,7 @@ package errsystem
 import (
 	"fmt"
 
+	"github.com/agentuity/cli/internal/util"
 	"github.com/google/uuid"
 	"github.com/spf13/viper"
 )
@@ -41,6 +42,7 @@ func New(code errorType, err error, opts ...option) *errSystem {
 	if res.apiurl == "" {
 		res.apiurl = "https://api.agentuity.com"
 	}
+	res.apiurl = util.TransformUrl(res.apiurl)
 	for _, opt := range opts {
 		opt(res)
 	}
