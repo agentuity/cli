@@ -10,7 +10,7 @@ export default async function Agent(
 	const res = await generateText({
 		model: openai("gpt-4o"),
 		system: "You are a friendly assistant!",
-		prompt: req.text() ?? "Why is the sky blue?",
+		prompt: req.data.text ?? "Why is the sky blue?",
 	});
 	return resp.text(res.text);
 }
