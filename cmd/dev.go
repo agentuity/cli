@@ -60,15 +60,18 @@ var devRunCmd = &cobra.Command{
 		build := func() {
 			fmt.Println(tui.Text(fmt.Sprintf("🔨 Building project...")))
 			started := time.Now()
-			if err := bundler.Bundle(bundler.BundleContext{
-				Context:    context.Background(),
-				Logger:     log,
-				ProjectDir: dir,
-				Production: false,
-			}); err != nil {
-				errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to bundle project: %s", err))).ShowErrorAndExit()
-			}
-			fmt.Printf("✨ Built in %s\n", time.Since(started).Round(time.Millisecond))
+			tui.ShowSpinner("Building project ...", func() {
+				if err := bundler.Bundle(bundler.BundleContext{
+					Context:    context.Background(),
+					Logger:     log,
+					ProjectDir: dir,
+					Production: false,
+				}); err != nil {
+					errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to bundle project: %s", err))).ShowErrorAndExit()
+				}
+			})
+			fmt.Println(tui.Text(fmt.Sprintf("✨ Built in %s", time.Since(started).Round(time.Millisecond))))
+
 		}
 
 		// Initial build
