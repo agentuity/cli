@@ -81,7 +81,7 @@ var cloudDeployCmd = &cobra.Command{
 		if len(keys) == 0 {
 			tui.ShowWarning("no Agents found")
 			tui.ShowBanner("Create a new Agent", tui.Text("Use the ")+tui.Command("agent new")+tui.Text(" command to create a new Agent"), false)
-			return
+			os.Exit(1)
 		}
 
 		deploymentConfig := project.NewDeploymentConfig()
@@ -104,7 +104,7 @@ var cloudDeployCmd = &cobra.Command{
 
 		// check to see if we have any env vars that are not in the project
 		envfilename := filepath.Join(dir, ".env")
-		if util.Exists(envfilename) {
+		if tui.HasTTY && util.Exists(envfilename) {
 
 			le, err = env.ParseEnvFile(envfilename)
 			if err != nil {
@@ -162,13 +162,15 @@ var cloudDeployCmd = &cobra.Command{
 			}
 		}
 
-		_, localIssues, remoteIssues, err := buildAgentTree(keys, state, context)
-		if err != nil {
-			errsystem.New(errsystem.ErrInvalidConfiguration, err,
-				errsystem.WithContextMessage("Failed to build agent tree")).ShowErrorAndExit()
-		}
+		if tui.HasTTY {
+			_, localIssues, remoteIssues, err := buildAgentTree(keys, state, context)
+			if err != nil {
+				errsystem.New(errsystem.ErrInvalidConfiguration, err,
+					errsystem.WithContextMessage("Failed to build agent tree")).ShowErrorAndExit()
+			}
 
-		showAgentWarnings(remoteIssues, localIssues, true)
+			showAgentWarnings(remoteIssues, localIssues, true)
+		}
 
 		deploymentConfig.Provider = theproject.Bundler.Identifier
 		deploymentConfig.Language = theproject.Bundler.Language
@@ -243,6 +245,7 @@ var cloudDeployCmd = &cobra.Command{
 		// check for a deploymentId flag and if so we can append it to the deployment url
 		deploymentId, _ := cmd.Flags().GetString("deploymentId")
 		if deploymentId != "" {
+			logger.Debug("deploymentId flag provided: %s", deploymentId)
 			deploymentId = "/" + deploymentId
 		}
 
@@ -363,6 +366,7 @@ var cloudDeployCmd = &cobra.Command{
 
 		action = func() {
 			// send the zip file to the upload endpoint provided
+			logger.Trace("uploading to %s", startResponse.Data.Url)
 			req, err := http.NewRequest("PUT", startResponse.Data.Url, of)
 			if err != nil {
 				errsystem.New(errsystem.ErrUploadProject, err,
@@ -411,19 +415,21 @@ var cloudDeployCmd = &cobra.Command{
 
 		tui.ShowSpinner("Deploying ...", action)
 
-		body := tui.Body("· Track your project at\n  " + tui.Link("%s/projects/%s", appUrl, theproject.ProjectId))
-		var body2 string
+		if tui.HasTTY {
+			body := tui.Body("· Track your project at\n  " + tui.Link("%s/projects/%s", appUrl, theproject.ProjectId))
+			var body2 string
 
-		if len(theproject.Agents) == 1 {
-			body2 = "\n\n"
-			if webhookToken != "" {
-				body2 += tui.Body("· Run ") + tui.Command("agent apikey "+theproject.Agents[0].ID) + tui.Body("\n  to fetch the API key for this webhook")
-				body2 += "\n\n"
+			if len(theproject.Agents) == 1 {
+				body2 = "\n\n"
+				if webhookToken != "" {
+					body2 += tui.Body("· Run ") + tui.Command("agent apikey "+theproject.Agents[0].ID) + tui.Body("\n  to fetch the API key for this webhook")
+					body2 += "\n\n"
+				}
+				body2 += tui.Body(fmt.Sprintf("· Send %s webhook request to\n  ", theproject.Agents[0].Name) + tui.Link("%s/run/%s", apiUrl, theproject.Agents[0].ID))
 			}
-			body2 += tui.Body(fmt.Sprintf("· Send %s webhook request to\n  ", theproject.Agents[0].Name) + tui.Link("%s/run/%s", apiUrl, theproject.Agents[0].ID))
-		}
 
-		tui.ShowBanner("Your project was deployed successfully!", body+body2, true)
+			tui.ShowBanner("Your project was deployed successfully!", body+body2, true)
+		}
 	},
 }
 

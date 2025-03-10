@@ -58,7 +58,6 @@ var devRunCmd = &cobra.Command{
 		}
 
 		build := func() {
-			fmt.Println(tui.Text(fmt.Sprintf("🔨 Building project...")))
 			started := time.Now()
 			tui.ShowSpinner("Building project ...", func() {
 				if err := bundler.Bundle(bundler.BundleContext{
