@@ -118,3 +118,12 @@ func EnsureLoggedIn() (string, string) {
 	}
 	return apikey, userId
 }
+
+func EnsureLoggedInWithOnlyAPIKey() string {
+	apikey := viper.GetString("auth.api_key")
+	if apikey == "" {
+		ShowLogin()
+		os.Exit(1)
+	}
+	return apikey
+}
