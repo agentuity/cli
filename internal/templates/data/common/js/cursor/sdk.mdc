@@ -30,7 +30,8 @@ The `AgentRequest` interface provides methods for accessing request data:
 - `request.metadata(key, defaultValue)`: Gets metadata associated with the request
 - `request.data.json`: Gets the payload as a JSON object
 - `request.data.text`: Gets the payload as a string
-- `request.data.buffer`: Gets the payload as an ArrayBuffer
+- `request.data.buffer`: Gets the payload as a Buffer
+- `request.data.binary`: Gets the payload as a Uint8Array<ArrayBuffer>
 - `request.data.object<T>`: Gets the payload as a typed object
 
 ### AgentResponse
