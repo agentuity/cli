@@ -29,7 +29,8 @@ The `AgentRequest` interface provides methods for accessing request data:
 - `request.metadata(key, defaultValue)`: Gets metadata associated with the request
 - `request.data.json`: Gets the payload as a JSON object
 - `request.data.text`: Gets the payload as a string
-- `request.binary()`: Gets the payload as an ArrayBuffer
+- `request.data.buffer`: Gets the payload as an ArrayBuffer
+- `request.data.object<T>`: Gets the payload as a typed object
 
 ### AgentResponse
 
@@ -59,7 +60,7 @@ The `AgentContext` interface provides access to various capabilities:
 Access through `context.kv`:
 
 - `context.kv.get(name, key)`: Retrieves a value
-- `context.kv.set(name, key, value, ttl)`: Stores a value
+- `context.kv.set(name, key, value, params)`: Stores a value with optional params (KeyValueStorageSetParams)
 - `context.kv.delete(name, key)`: Deletes a value
 
 ### Vector Storage
