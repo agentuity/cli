@@ -82,7 +82,7 @@ var (
 		Code:    "CLI-0020",
 		Message: "Failed to authenticate with otel server",
 	}
-	ErrInstallTemplate = errorType{
+	ErrInstallDependencies = errorType{
 		Code:    "CLI-0021",
 		Message: "Failed to install dependencies",
 	}

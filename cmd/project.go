@@ -403,7 +403,7 @@ var projectNewCmd = &cobra.Command{
 		tui.ShowSpinner("checking dependencies ...", func() {
 			if !provider.Matches(tmplContext) {
 				if err := provider.Install(tmplContext); err != nil {
-					errsystem.New(errsystem.ErrInstallTemplate, err, errsystem.WithContextMessage("Failed to install dependencies")).ShowErrorAndExit()
+					errsystem.New(errsystem.ErrInstallDependencies, err, errsystem.WithContextMessage("Failed to install dependencies")).ShowErrorAndExit()
 				}
 			}
 		})
