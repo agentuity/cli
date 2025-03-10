@@ -132,7 +132,6 @@ func NewLiveDevConnection(logger logger.Logger, websocketId string, websocketUrl
 		errsystem.New(errsystem.ErrAuthenticateOtelServer, nil, errsystem.WithUserMessage("Failed to get otel server url"))
 	}
 
-	// Start reading messages
 	return &self, nil
 }
 

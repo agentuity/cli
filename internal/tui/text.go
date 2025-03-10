@@ -36,10 +36,6 @@ func Secondary(text string) string {
 	return lipgloss.NewStyle().Foreground(secondaryStyleColor).Render(text)
 }
 
-func Tertiary(text string) string {
-	return commandStyle.Render(text)
-}
-
 func Muted(text string) string {
 	return lipgloss.NewStyle().Foreground(mutedStyleColor).Render(text)
 }
@@ -84,6 +80,11 @@ func PadRight(str string, length int, pad string) string {
 
 func Command(cmd string, args ...string) string {
 	cmdline := "agentuity " + strings.Join(append([]string{cmd}, args...), " ")
+	return commandStyle.Render(cmdline)
+}
+
+func Highlight(cmd string, args ...string) string {
+	cmdline := strings.Join(append([]string{cmd}, args...), " ")
 	return commandStyle.Render(cmdline)
 }
 
