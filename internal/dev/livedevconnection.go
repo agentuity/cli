@@ -1,68 +1,94 @@
 package dev
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
-	"regexp"
 
 	"github.com/agentuity/cli/internal/errsystem"
+	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/go-common/logger"
 	"github.com/gorilla/websocket"
-	"github.com/nxadm/tail"
 )
 
 type LiveDevConnection struct {
-	sdkEventsFile string
-	WebSocketId   string
-	sdkEventsTail *tail.Tail
-	conn          *websocket.Conn
-	logQueue      chan []byte
-	onMessage     func(message []byte) error
-	OtelToken     string
-	OtelUrl       string
+	WebSocketId string
+	conn        *websocket.Conn
+	OtelToken   string
+	OtelUrl     string
+	Project     project.ProjectContext
+	Done        chan struct{}
 }
 
-var looksLikeJson = regexp.MustCompile(`^\{.*\}$`)
-var looksLikeJSONArray = regexp.MustCompile(`^\[.*\]$`)
-
-func decodeEvent(event string) ([]map[string]any, error) {
-	if looksLikeJson.MatchString(event) {
-		var payload map[string]any
-		if err := json.Unmarshal([]byte(event), &payload); err != nil {
-			return nil, err
-		}
-		return []map[string]any{payload}, nil
-	}
-	if looksLikeJSONArray.MatchString(event) {
-		var payload []map[string]any
-		if err := json.Unmarshal([]byte(event), &payload); err != nil {
-			return nil, err
-		}
-		return payload, nil
-	}
-	return nil, fmt.Errorf("event does not look like a JSON object or array")
+type OutputPayload struct {
+	ContentType string `json:"contentType"`
+	Payload     string `json:"payload"`
+	Trigger     string `json:"trigger"`
 }
 
-func (c *LiveDevConnection) SetOnMessage(onMessage func(message []byte) error) {
-	c.onMessage = onMessage
-}
-
-func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketId string, websocketUrl string, apiKey string) (*LiveDevConnection, error) {
-	t, err := tail.TailFile(sdkEventsFile, tail.Config{Follow: true, ReOpen: true, Logger: tail.DiscardingLogger})
-	if err != nil {
+func isOutputPayload(message []byte) (*OutputPayload, error) {
+	var op OutputPayload
+	if err := json.Unmarshal(message, &op); err != nil {
 		return nil, err
 	}
+	return &op, nil
+}
 
+func (c *LiveDevConnection) StartReadingMessages(logger logger.Logger) {
+	go func() {
+		defer close(c.Done)
+		for {
+			_, m, err := c.conn.ReadMessage()
+			if err != nil {
+				logger.Error("failed to read message: %s", err)
+				return
+			}
+			logger.Trace("recv: %s", string(m))
+
+			var message Message
+			if err := json.Unmarshal(m, &message); err != nil {
+				logger.Error("failed to unmarshal agent message: %s", err)
+				return
+			}
+
+			if message.Type == "input" {
+				var inputMsg InputMessage
+				if err := json.Unmarshal(m, &inputMsg); err != nil {
+					logger.Error("failed to unmarshal agent message: %s", err)
+					return
+				}
+				processInputMessage(logger, c, m)
+			}
+			if message.Type == "getAgents" {
+				agents := make([]Agent, 0)
+				for _, agent := range c.Project.Project.Agents {
+					agents = append(agents, Agent{
+						Name:        agent.Name,
+						ID:          agent.ID,
+						Description: agent.Description,
+					})
+				}
+				logger.Trace("sending agents: %+v", agents)
+
+				agentsMessage := NewAgentsMessage(c.WebSocketId, AgentsPayload{
+					Agents: agents,
+				})
+
+				c.SendMessage(logger, agentsMessage)
+			}
+		}
+	}()
+}
+
+func NewLiveDevConnection(logger logger.Logger, websocketId string, websocketUrl string, apiKey string, theproject project.ProjectContext) (*LiveDevConnection, error) {
 	self := LiveDevConnection{
-		sdkEventsFile: sdkEventsFile,
-		WebSocketId:   websocketId,
-		sdkEventsTail: t,
-		logQueue:      make(chan []byte, 100),
+		WebSocketId: websocketId,
+		Project:     theproject,
+		Done:        make(chan struct{}),
 	}
 	u, err := url.Parse(websocketUrl)
 	if err != nil {
@@ -106,84 +132,12 @@ func NewLiveDevConnection(logger logger.Logger, sdkEventsFile string, websocketI
 		errsystem.New(errsystem.ErrAuthenticateOtelServer, nil, errsystem.WithUserMessage("Failed to get otel server url"))
 	}
 
-	// writer
-	go func() {
-		for {
-			select {
-			case jsonLogMessage := <-self.logQueue:
-				// TODO: this is a hack to get the log message to the server
-				// we should probably use a specific JSON logger for this
-				payload := make(map[string]any)
-				if err := json.Unmarshal(jsonLogMessage, &payload); err != nil {
-					logger.Error("failed to unmarshal log message: %s", err)
-					continue
-				}
-				if err := self.SendMessage(payload, "log"); err != nil {
-					logger.Error("failed to send log message: %s", err)
-					continue
-				}
-			case line := <-self.sdkEventsTail.Lines:
-				evts, err := decodeEvent(line.Text)
-				if err != nil {
-					logger.Error("failed to decode event: %s", err)
-					continue
-				}
-				for _, evt := range evts {
-					if command, ok := evt["command"].(string); ok {
-						if command == "event" {
-							command = "session_event"
-						}
-						if err := self.SendMessage(evt, command); err != nil {
-							logger.Error("failed to send event: %s", err)
-							continue
-						}
-					}
-				}
-
-			}
-		}
-	}()
-
-	// reader
-	go func() {
-		for {
-			_, message, err := self.conn.ReadMessage()
-			if err != nil {
-				if errors.Is(err, websocket.ErrCloseSent) || errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
-					logger.Trace("connection closed")
-					return
-				}
-				logger.Fatal("failed to read message: %s", err)
-				return
-			}
-			logger.Debug("recv: %s", message)
-			if self.onMessage == nil {
-				logger.Trace("no onMessage handler set, skipping message")
-				continue
-			}
-
-			if err := self.onMessage(message); err != nil {
-				logger.Trace("failed to handle message: %s", err)
-			}
-		}
-	}()
-
 	return &self, nil
 }
 
-type Message struct {
-	ID      string         `json:"id"`
-	Type    string         `json:"type"`
-	Payload map[string]any `json:"payload"`
-}
-
-func (c *LiveDevConnection) SendMessage(payload map[string]any, messageType string) error {
-	msg := Message{
-		ID:      c.WebSocketId,
-		Type:    messageType,
-		Payload: payload,
-	}
-
+// Update SendMessage to accept the MessageType interface
+func (c *LiveDevConnection) SendMessage(logger logger.Logger, msg Message) error {
+	logger.Trace("sending message: %+v", msg)
 	buf, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -195,19 +149,142 @@ func (c *LiveDevConnection) SendMessage(payload map[string]any, messageType stri
 	return nil
 }
 
-// implements io.Writer to send logs
-func (c *LiveDevConnection) Write(jsonLogMessage []byte) (int, error) {
-	c.logQueue <- jsonLogMessage
-	return len(jsonLogMessage), nil
-}
-
 func (c *LiveDevConnection) Close() error {
 	if err := c.conn.Close(); err != nil {
 		return err
 	}
-	return c.sdkEventsTail.Stop()
+	return nil
 }
 
 func (c *LiveDevConnection) WebURL(appUrl string) string {
 	return fmt.Sprintf("%s/live/%s", appUrl, c.WebSocketId)
+}
+
+type Message struct {
+	ID      string         `json:"id"`
+	Type    string         `json:"type"`
+	Payload map[string]any `json:"payload"`
+}
+
+// messages send by server to CLI
+type InputMessage struct {
+	ID      string `json:"id"`
+	Type    string `json:"type"`
+	From    string `json:"from"`
+	Payload struct {
+		SessionID   string `json:"sessionId"`
+		Trigger     string `json:"trigger"`
+		AgentID     string `json:"agentId"`
+		ContentType string `json:"contentType"`
+		Payload     string `json:"payload"`
+	} `json:"payload"`
+}
+
+// messages send by CLI to the server
+func NewOutputMessage(id string, payload struct {
+	ContentType string `json:"contentType"`
+	Payload     string `json:"payload"`
+	Trigger     string `json:"trigger"`
+}) Message {
+	payloadMap := map[string]any{
+		"contentType": payload.ContentType,
+		"payload":     payload.Payload,
+		"trigger":     payload.Trigger,
+	}
+	return Message{
+		ID:      id,
+		Type:    "output",
+		Payload: payloadMap,
+	}
+
+}
+
+type Agent struct {
+	Name        string `json:"name"`
+	ID          string `json:"id"`
+	Description string `json:"description"`
+}
+
+type AgentsPayload struct {
+	Agents []Agent `json:"agents"`
+}
+
+func NewAgentsMessage(id string, payload AgentsPayload) Message {
+	payloadMap := map[string]any{
+		"agents": payload.Agents,
+	}
+
+	return Message{
+		ID:      id,
+		Type:    "agents",
+		Payload: payloadMap,
+	}
+}
+
+func processInputMessage(logger logger.Logger, c *LiveDevConnection, m []byte) {
+	var inputMsg InputMessage
+	if err := json.Unmarshal(m, &inputMsg); err != nil {
+		logger.Error("failed to unmarshal agent message: %s", err)
+		return
+	}
+
+	// Decode base64 payload this wont work for images I think
+	decodedPayload, err := base64.StdEncoding.DecodeString(inputMsg.Payload.Payload)
+	if err != nil {
+		logger.Error("failed to decode payload: %s", err)
+		return
+	}
+
+	c.Project.Logger.Debug("input message: %+v", inputMsg)
+
+	if c.Project.Project.Development == nil {
+		logger.Error("development is not enabled for this project")
+		return
+	}
+
+	url := fmt.Sprintf("http://localhost:%d/%s", c.Project.Project.Development.Port, inputMsg.Payload.AgentID)
+
+	// make a json object with the payload
+	payload := map[string]any{
+		"contentType": inputMsg.Payload.ContentType,
+		"payload":     decodedPayload,
+		"trigger":     "manual",
+	}
+
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		logger.Error("failed to marshal payload: %s", err)
+		return
+	}
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		logger.Error("failed to post to agent: %s", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logger.Error("failed to read response body: %s", err)
+		return
+	}
+
+	logger.Debug("response: %s", string(body))
+
+	output, err := isOutputPayload(body)
+	if err != nil {
+		logger.Error("failed to check if response is output payload: %s", err)
+		return
+	}
+
+	outputMessage := NewOutputMessage(inputMsg.ID, OutputPayload{
+		ContentType: output.ContentType,
+		Payload:     output.Payload,
+		Trigger:     output.Trigger,
+	})
+
+	c.SendMessage(logger, outputMessage)
+
+	return
 }
