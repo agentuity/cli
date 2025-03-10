@@ -394,7 +394,7 @@ var cloudDeployCmd = &cobra.Command{
 						errsystem.WithContextMessage("Error updating deployment status to failed")).ShowErrorAndExit()
 				}
 				errsystem.New(errsystem.ErrUploadProject, nil,
-					errsystem.WithContextMessage(fmt.Sprintf("Unexpected response: %s", string(buf))),
+					errsystem.WithContextMessage(fmt.Sprintf("Unexpected response (status %d): %s", resp.StatusCode, string(buf))),
 					errsystem.WithUserMessage("Unexpected response from API for deployment")).ShowErrorAndExit()
 			}
 			resp.Body.Close()

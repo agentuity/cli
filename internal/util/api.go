@@ -85,21 +85,30 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 	return nil
 }
 
-func TransformUrl(url string) string {
+var testInside bool
+
+func TransformUrl(urlString string) string {
 	// NOTE: these urls are special cases for local development inside a container
-	if strings.Contains(url, "api.agentuity.dev") || strings.Contains(url, "localhost:") {
-		if sys.Exists("/.dockerenv") || sys.Exists("/proc/1/cgroup") {
-			if strings.HasPrefix(url, "https://api.agentuity.dev") {
-				return "http://host.docker.internal:3012"
+	if strings.Contains(urlString, "api.agentuity.dev") || strings.Contains(urlString, "localhost:") {
+		if sys.Exists("/.dockerenv") || sys.Exists("/proc/1/cgroup") || testInside {
+			if strings.HasPrefix(urlString, "https://api.agentuity.dev") {
+				u, _ := url.Parse(urlString)
+				u.Scheme = "http"
+				u.Host = "host.docker.internal:3012"
+				return u.String()
 			}
 			port := regexp.MustCompile(`:(\d+)`)
-			if port.MatchString(url) {
-				return "http://host.docker.internal:" + port.FindString(url)
+			host := "host.docker.internal:3000"
+			if port.MatchString(urlString) {
+				host = "host.docker.internal:" + port.FindStringSubmatch(urlString)[1]
 			}
-			return "http://host.docker.internal:3000"
+			u, _ := url.Parse(urlString)
+			u.Scheme = "http"
+			u.Host = host
+			return u.String()
 		}
 	}
-	return url
+	return urlString
 }
 
 func GetURLs(logger logger.Logger) (string, string) {

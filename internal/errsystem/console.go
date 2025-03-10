@@ -117,6 +117,9 @@ func (e *errSystem) ShowErrorAndExit() {
 	}
 	if !tui.HasTTY {
 		fmt.Println(body.String())
+		for k, v := range e.attributes {
+			fmt.Printf("%s: %v\n", k, v)
+		}
 		os.Exit(1)
 	}
 	tui.ShowBanner(tui.Warning("☹ Error Detected"), body.String(), false)
