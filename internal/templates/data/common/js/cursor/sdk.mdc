@@ -26,8 +26,9 @@ type AgentHandler = (
 The `AgentRequest` interface provides methods for accessing request data:
 
 - `request.trigger`: Gets the trigger type of the request
-- `request.data.contentType`: Gets the content type of the request payload
 - `request.metadata(key, defaultValue)`: Gets metadata associated with the request
+- `request.get(key, defaultValue)`: Gets the metadata value of the request
+- `request.data.contentType`: Gets the content type of the request payload
 - `request.data.json`: Gets the payload as a JSON object
 - `request.data.text`: Gets the payload as a string
 - `request.data.buffer`: Gets the payload as a Buffer
