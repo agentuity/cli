@@ -66,6 +66,10 @@ func init() {
 	rootCmd.PersistentFlags().MarkHidden("websocket-url")
 	viper.BindPFlag("overrides.websocket_url", rootCmd.PersistentFlags().Lookup("websocket-url"))
 
+	rootCmd.PersistentFlags().String("api-key", "", "The API key to use for authentication")
+	rootCmd.PersistentFlags().MarkHidden("api-key")
+	viper.BindPFlag("auth.api_key", rootCmd.PersistentFlags().Lookup("api-key"))
+
 	viper.SetDefault("overrides.app_url", "https://app.agentuity.com")
 	viper.SetDefault("overrides.api_url", "https://api.agentuity.com")
 
