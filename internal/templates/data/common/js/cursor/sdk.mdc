@@ -42,7 +42,7 @@ The `AgentResponse` interface provides methods for creating responses:
 - `response.binary(data, metadata)`: Creates a binary response
 - `response.html(data, metadata)`: Creates an HTML response
 - `response.empty(metadata)`: Creates an empty response
-- `response.handoff(agent, payload, contentType, metadata)`: Redirects to another agent
+- `response.handoff(agent, args?)`: Redirects to another agent within the same project
 
 ### AgentContext
 
