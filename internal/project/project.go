@@ -428,7 +428,13 @@ func EnsureProject(cmd *cobra.Command) ProjectContext {
 	logger := env.NewLogger(cmd)
 	dir := ResolveProjectDir(logger, cmd)
 	apiUrl, appUrl := util.GetURLs(logger)
-	token, _ := util.EnsureLoggedIn()
+	var token string
+	// if the --api-key flag is used, we only need to verify the api key
+	if cmd.Flags().Changed("api-key") {
+		token = util.EnsureLoggedInWithOnlyAPIKey()
+	} else {
+		token, _ = util.EnsureLoggedIn()
+	}
 	p := LoadProject(logger, dir, apiUrl, appUrl, token)
 	if Version != "" && Version != "dev" && p.Project.Version != "" {
 		v := semver.MustParse(Version)

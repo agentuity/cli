@@ -13,6 +13,7 @@ require (
 	github.com/charmbracelet/huh/spinner v0.0.0-20250207133237-2eba4f31bf81
 	github.com/charmbracelet/lipgloss v1.0.0
 	github.com/evanw/esbuild v0.25.0
+	github.com/fsnotify/fsnotify v1.7.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/marcozac/go-jsonc v0.1.1
@@ -42,7 +43,6 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
-	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/getsentry/sentry-go v0.27.0 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect

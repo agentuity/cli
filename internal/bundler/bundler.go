@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
@@ -51,7 +52,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		if err != nil {
 			return fmt.Errorf("failed to install dependencies: %w. %s", err, string(out))
 		}
-		ctx.Logger.Debug("installed dependencies: %s", string(out))
+		ctx.Logger.Debug("installed dependencies: %s", strings.TrimSpace(string(out)))
 	}
 
 	var entryPoints []string
@@ -160,7 +161,7 @@ func bundlePython(ctx BundleContext, dir string, outdir string, theproject *proj
 		if err != nil {
 			return fmt.Errorf("failed to install dependencies: %w. %s", err, string(out))
 		}
-		ctx.Logger.Debug("installed dependencies: %s", string(out))
+		ctx.Logger.Debug("installed dependencies: %s", strings.TrimSpace(string(out)))
 	}
 
 	config := map[string]any{
