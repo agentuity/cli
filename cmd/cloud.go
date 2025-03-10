@@ -387,7 +387,7 @@ var cloudDeployCmd = &cobra.Command{
 				errsystem.New(errsystem.ErrUploadProject, err,
 					errsystem.WithContextMessage("Error deploying project")).ShowErrorAndExit()
 			}
-			if resp.StatusCode != http.StatusOK {
+			if resp.StatusCode > 299 {
 				buf, _ := io.ReadAll(resp.Body)
 				if err := updateDeploymentStatus(logger, apiUrl, token, startResponse.Data.DeploymentId, "failed"); err != nil {
 					errsystem.New(errsystem.ErrApiRequest, err,
