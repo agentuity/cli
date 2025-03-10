@@ -64,3 +64,6 @@ errors:
 
   - code: CLI-0020
     message: Failed to authenticate with otel server
+
+  - code: CLI-0021
+    message: Failed to install dependencies

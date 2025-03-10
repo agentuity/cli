@@ -389,17 +389,27 @@ var projectNewCmd = &cobra.Command{
 
 		var projectData *project.ProjectData
 
+		tmplContext := templates.TemplateContext{
+			Context:          context.Background(),
+			Logger:           logger,
+			Name:             name,
+			Description:      description,
+			ProjectDir:       projectDir,
+			AgentName:        agentName,
+			AgentDescription: agentDescription,
+			TemplateName:     templateName,
+		}
+
+		tui.ShowSpinner("checking dependencies ...", func() {
+			if !provider.Matches(tmplContext) {
+				if err := provider.Install(tmplContext); err != nil {
+					errsystem.New(errsystem.ErrInstallTemplate, err, errsystem.WithContextMessage("Failed to install dependencies")).ShowErrorAndExit()
+				}
+			}
+		})
+
 		tui.ShowSpinner("creating project ...", func() {
-			rules, err := provider.NewProject(templates.TemplateContext{
-				Context:          context.Background(),
-				Logger:           logger,
-				Name:             name,
-				Description:      description,
-				ProjectDir:       projectDir,
-				AgentName:        agentName,
-				AgentDescription: agentDescription,
-				TemplateName:     templateName,
-			})
+			rules, err := provider.NewProject(tmplContext)
 			if err != nil {
 				errsystem.New(errsystem.ErrCreateProject, err, errsystem.WithContextMessage("Failed to create project")).ShowErrorAndExit()
 			}
