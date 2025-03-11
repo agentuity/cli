@@ -13,5 +13,5 @@ export default async function Agent(
     model: 'gpt-4o',
   });
 	const message = completion.choices[0]?.message;
-	return resp.text(message.content ?? 'Something went wrong');
+	return resp.text(message?.content ?? 'Something went wrong');
 }
