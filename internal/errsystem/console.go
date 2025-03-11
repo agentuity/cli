@@ -10,10 +10,12 @@ import (
 	"os/user"
 	"runtime"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/agentuity/cli/internal/tui"
+	"github.com/agentuity/cli/internal/util"
 	"github.com/mattn/go-isatty"
 )
 
@@ -101,6 +103,14 @@ func (e *errSystem) ShowErrorAndExit() {
 		body.WriteString(e.message + "\n\n")
 	} else {
 		body.WriteString(e.code.Message + "\n\n")
+	}
+	// if this is an API error, add the error details to the attributes
+	if err, ok := e.err.(*util.APIError); ok {
+		e.attributes["api_error"] = err.Error()
+		e.attributes["api_error_url"] = err.URL
+		e.attributes["api_error_method"] = err.Method
+		e.attributes["api_error_status"] = strconv.Itoa(err.Status)
+		e.attributes["api_error_body"] = err.Body
 	}
 	var detail []string
 	if e.err != nil {

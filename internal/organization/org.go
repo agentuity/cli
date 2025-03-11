@@ -1,10 +1,9 @@
 package organization
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
 
+	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
 )
 
@@ -23,30 +22,11 @@ type listOrganizationsResult struct {
 	Message string         `json:"message"`
 }
 
-func ListOrganizations(logger logger.Logger, apiUrl string, token string) ([]Organization, error) {
+func ListOrganizations(logger logger.Logger, baseUrl string, token string) ([]Organization, error) {
 	var result listOrganizationsResult
+	client := util.NewAPIClient(logger, baseUrl, token)
 
-	req, err := http.NewRequest("GET", apiUrl+listPath, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusUnauthorized {
-			return nil, fmt.Errorf("unauthorized")
-		}
-		return nil, fmt.Errorf("http error: %s", resp.Status)
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := client.Do("GET", listPath, nil, &result); err != nil {
 		return nil, err
 	}
 

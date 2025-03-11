@@ -25,6 +25,27 @@ type APIClient struct {
 	logger  logger.Logger
 }
 
+type APIError struct {
+	URL      string `json:"url"`
+	Method   string `json:"method"`
+	Status   int    `json:"status"`
+	Body     string `json:"body"`
+	TheError error  `json:"error"`
+}
+
+func (e *APIError) Error() string {
+	return e.TheError.Error()
+}
+
+func NewAPIError(url, method string, status int, body string, err error) *APIError {
+	return &APIError{
+		URL:      url,
+		Method:   method,
+		Status:   status,
+		Body:     body,
+		TheError: err,
+	}
+}
 func NewAPIClient(logger logger.Logger, baseURL, token string) *APIClient {
 	return &APIClient{
 		logger:  logger,
@@ -34,10 +55,10 @@ func NewAPIClient(logger logger.Logger, baseURL, token string) *APIClient {
 	}
 }
 
-func (c *APIClient) Do(method, path string, payload interface{}, response interface{}) error {
+func (c *APIClient) Do(method, path string, payload interface{}, response interface{}) *APIError {
 	u, err := url.Parse(c.baseURL)
 	if err != nil {
-		return fmt.Errorf("error parsing base url: %w", err)
+		return NewAPIError(c.baseURL, method, 0, "", fmt.Errorf("error parsing base url: %w", err))
 	}
 	u.Path = path
 
@@ -45,15 +66,14 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 	if payload != nil {
 		body, err = json.Marshal(payload)
 		if err != nil {
-			return fmt.Errorf("error marshalling payload: %w", err)
+			return NewAPIError(c.baseURL, method, 0, "", fmt.Errorf("error marshalling payload: %w", err))
 		}
 	}
-
-	c.logger.Debug("request: %s %s", method, u.String())
+	c.logger.Trace("sending request: %s %s", method, u.String())
 
 	req, err := http.NewRequest(method, u.String(), bytes.NewBuffer(body))
 	if err != nil {
-		return fmt.Errorf("error creating request: %w", err)
+		return NewAPIError(c.baseURL, method, 0, "", fmt.Errorf("error creating request: %w", err))
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if c.token != "" {
@@ -62,24 +82,24 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("error sending request: %w", err)
+		return NewAPIError(c.baseURL, method, 0, "", fmt.Errorf("error sending request: %w", err))
 	}
 	defer resp.Body.Close()
 	c.logger.Debug("response status: %s", resp.Status)
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("error reading response body: %w", err)
+		return NewAPIError(c.baseURL, method, 0, "", fmt.Errorf("error reading response body: %w", err))
 	}
 	c.logger.Debug("response body: %s", string(respBody))
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted && response == nil {
-		return fmt.Errorf("request failed with status (%s)", resp.Status)
+		return NewAPIError(c.baseURL, method, resp.StatusCode, string(respBody), fmt.Errorf("request failed with status (%s)", resp.Status))
 	}
 
 	if response != nil {
 		if err := json.NewDecoder(bytes.NewReader(respBody)).Decode(response); err != nil {
-			return fmt.Errorf("error decoding response: %w", err)
+			return NewAPIError(c.baseURL, method, resp.StatusCode, string(respBody), fmt.Errorf("error JSON decoding response: %w", err))
 		}
 	}
 	return nil

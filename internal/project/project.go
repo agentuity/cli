@@ -1,11 +1,8 @@
 package project
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -70,33 +67,13 @@ func InitProject(logger logger.Logger, args InitProjectArgs) (*ProjectData, erro
 		"agent":             map[string]string{"name": args.AgentName, "description": args.AgentDescription},
 	}
 
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", args.BaseURL+initPath, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+args.Token)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to initialize project: %s", resp.Status)
-	}
+	client := util.NewAPIClient(logger, args.BaseURL, args.Token)
 
 	var result initProjectResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := client.Do("POST", initPath, payload, &result); err != nil {
 		return nil, err
 	}
+
 	return &result.Data, nil
 }
 
@@ -268,7 +245,7 @@ func ProjectWithNameExists(logger logger.Logger, baseUrl string, token string, n
 
 	var resp Response[bool]
 	if err := client.Do("GET", fmt.Sprintf("/cli/project/exists/%s", url.PathEscape(name)), nil, &resp); err != nil {
-		return false, fmt.Errorf("error validating project name: %s", err)
+		return false, fmt.Errorf("error validating project name: %w", err)
 	}
 	return resp.Data, nil
 }
@@ -284,7 +261,7 @@ func ListProjects(logger logger.Logger, baseUrl string, token string) ([]Project
 
 	var resp Response[[]ProjectListData]
 	if err := client.Do("GET", "/cli/project", nil, &resp); err != nil {
-		return nil, fmt.Errorf("error listing projects: %s", err)
+		return nil, fmt.Errorf("error listing projects: %w", err)
 	}
 	return resp.Data, nil
 }
@@ -297,7 +274,7 @@ func DeleteProjects(logger logger.Logger, baseUrl string, token string, ids []st
 		"ids": ids,
 	}
 	if err := client.Do("DELETE", "/cli/project", payload, &resp); err != nil {
-		return nil, fmt.Errorf("error deleting projects: %s", err)
+		return nil, fmt.Errorf("error deleting projects: %w", err)
 	}
 	if !resp.Success {
 		return nil, errors.New(resp.Message)
@@ -310,7 +287,7 @@ func (p *Project) GetProject(logger logger.Logger, baseUrl string, token string)
 
 	var projectResponse ProjectResponse
 	if err := client.Do("GET", fmt.Sprintf("/cli/project/%s", p.ProjectId), nil, &projectResponse); err != nil {
-		return nil, fmt.Errorf("error getting project env: %s", err)
+		return nil, fmt.Errorf("error getting project env: %w", err)
 	}
 	if !projectResponse.Success {
 		return nil, errors.New(projectResponse.Message)
@@ -325,7 +302,7 @@ func (p *Project) SetProjectEnv(logger logger.Logger, baseUrl string, token stri
 		"env":     env,
 		"secrets": secrets,
 	}, &projectResponse); err != nil {
-		return nil, fmt.Errorf("error setting project env: %s", err)
+		return nil, fmt.Errorf("error setting project env: %w", err)
 	}
 	if !projectResponse.Success {
 		return nil, errors.New(projectResponse.Message)
@@ -340,7 +317,7 @@ func (p *Project) DeleteProjectEnv(logger logger.Logger, baseUrl string, token s
 		"env":     env,
 		"secrets": secrets,
 	}, &projectResponse); err != nil {
-		return fmt.Errorf("error deleting project env: %s", err)
+		return fmt.Errorf("error deleting project env: %w", err)
 	}
 	if !projectResponse.Success {
 		return errors.New(projectResponse.Message)
