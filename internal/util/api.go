@@ -38,6 +38,9 @@ func (e *APIError) Error() string {
 }
 
 func NewAPIError(url, method string, status int, body string, err error) *APIError {
+	if err == nil {
+		panic("NewAPIError called with nil error")
+	}
 	return &APIError{
 		URL:      url,
 		Method:   method,
