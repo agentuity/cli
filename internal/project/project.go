@@ -287,6 +287,9 @@ func (p *Project) GetProject(logger logger.Logger, baseUrl string, token string)
 
 	var projectResponse ProjectResponse
 	if err := client.Do("GET", fmt.Sprintf("/cli/project/%s", p.ProjectId), nil, &projectResponse); err != nil {
+		if err.Status == 404 || err.Status == 403 || err.Status == 401 {
+			return nil, fmt.Errorf("The project with ID '%s' does not exist under the current logged in organization. Please check your logged in organization and try again.", p.ProjectId)
+		}
 		return nil, fmt.Errorf("error getting project env: %w", err)
 	}
 	if !projectResponse.Success {
