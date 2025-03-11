@@ -37,6 +37,10 @@ func ShowBanner(title string, body string, clearScreen bool) {
 	fmt.Println(banner)
 }
 
+func BannerBodyStyle() lipgloss.Style {
+	return bannerBodyStyle
+}
+
 func TitleColor() lipgloss.AdaptiveColor {
 	return bannerTitleColor
 }

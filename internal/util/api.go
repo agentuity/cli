@@ -46,6 +46,7 @@ func NewAPIError(url, method string, status int, body string, err error) *APIErr
 		TheError: err,
 	}
 }
+
 func NewAPIClient(logger logger.Logger, baseURL, token string) *APIClient {
 	return &APIClient{
 		logger:  logger,
@@ -53,6 +54,18 @@ func NewAPIClient(logger logger.Logger, baseURL, token string) *APIClient {
 		token:   token,
 		client:  http.DefaultClient,
 	}
+}
+
+type APIResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Error   struct {
+		Issues []struct {
+			Code    string   `json:"code"`
+			Message string   `json:"message"`
+			Path    []string `json:"path"`
+		} `json:"issues"`
+	} `json:"error"`
 }
 
 func (c *APIClient) Do(method, path string, payload interface{}, response interface{}) *APIError {
@@ -91,7 +104,30 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 	if err != nil {
 		return NewAPIError(c.baseURL, method, 0, "", fmt.Errorf("error reading response body: %w", err))
 	}
+
 	c.logger.Debug("response body: %s", string(respBody))
+	if resp.StatusCode > 299 {
+		var apiResponse APIResponse
+		if err := json.Unmarshal(respBody, &apiResponse); err != nil {
+			return NewAPIError(c.baseURL, method, resp.StatusCode, string(respBody), fmt.Errorf("error unmarshalling response: %w", err))
+		}
+		if !apiResponse.Success {
+			if len(apiResponse.Error.Issues) > 0 {
+				var errs []string
+				for _, issue := range apiResponse.Error.Issues {
+					msg := fmt.Sprintf("%s (%s)", issue.Message, issue.Code)
+					if issue.Path != nil {
+						msg = msg + " " + strings.Join(issue.Path, ".")
+					}
+					errs = append(errs, msg)
+				}
+				return NewAPIError(c.baseURL, method, resp.StatusCode, string(respBody), fmt.Errorf("%s", strings.Join(errs, ". ")))
+			}
+			if apiResponse.Message != "" {
+				return NewAPIError(c.baseURL, method, resp.StatusCode, string(respBody), fmt.Errorf("%s", apiResponse.Message))
+			}
+		}
+	}
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted && response == nil {
 		return NewAPIError(c.baseURL, method, resp.StatusCode, string(respBody), fmt.Errorf("request failed with status (%s)", resp.Status))
