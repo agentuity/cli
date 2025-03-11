@@ -16,6 +16,7 @@ import (
 
 	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/cli/internal/util"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-isatty"
 )
 
@@ -116,11 +117,13 @@ func (e *errSystem) ShowErrorAndExit() {
 	if e.err != nil {
 		errmsg := e.err.Error()
 		errmsg = strings.ReplaceAll(errmsg, "\n", ". ")
-		detail = append(detail, tui.PadRight("Error:", 10, " ")+tui.MaxWidth(errmsg, 65))
+		color := lipgloss.AdaptiveColor{Light: "#000000", Dark: "#FFFFFF"}
+		style := tui.BannerBodyStyle().Width(65).AlignHorizontal(lipgloss.Left).Foreground(color)
+		detail = append(detail, tui.Bold(tui.PadRight("Error:", 10, " "))+style.Render(errmsg+"\n"))
 	}
-	detail = append(detail, tui.PadRight("Code:", 10, " ")+e.code.Code)
-	detail = append(detail, tui.PadRight("ID:", 10, " ")+e.id)
-	detail = append(detail, tui.PadRight("Help:", 10, " ")+tui.Link(baseDocURL, e.code.Code))
+	detail = append(detail, tui.Bold(tui.PadRight("Code:", 10, " "))+e.code.Code)
+	detail = append(detail, tui.Bold(tui.PadRight("ID:", 10, " "))+e.id)
+	detail = append(detail, tui.Bold(tui.PadRight("Help:", 10, " "))+tui.Link(baseDocURL, e.code.Code))
 	crashReportFile := e.writeCrashReportFile(stackTrace)
 	for _, d := range detail {
 		body.WriteString(tui.Muted(d) + "\n")

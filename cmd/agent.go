@@ -95,6 +95,9 @@ func getAgentInfoFlow(logger logger.Logger, remoteAgents []agent.Agent, name str
 			help = "The name can be changed at any time and helps identify the Agent"
 		}
 		name = tui.InputWithValidation(logger, prompt, help, 255, func(name string) error {
+			if name == "" {
+				return fmt.Errorf("Agent name cannot be empty")
+			}
 			for _, agent := range remoteAgents {
 				if strings.EqualFold(agent.Name, name) {
 					return fmt.Errorf("Agent already exists with the name: %s", name)
