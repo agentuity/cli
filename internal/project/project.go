@@ -245,6 +245,9 @@ func ProjectWithNameExists(logger logger.Logger, baseUrl string, token string, n
 
 	var resp Response[bool]
 	if err := client.Do("GET", fmt.Sprintf("/cli/project/exists/%s", url.PathEscape(name)), nil, &resp); err != nil {
+		if err.Status == 409 {
+			return true, nil
+		}
 		return false, fmt.Errorf("error validating project name: %w", err)
 	}
 	return resp.Data, nil
