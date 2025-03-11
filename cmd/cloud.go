@@ -368,6 +368,7 @@ var cloudDeployCmd = &cobra.Command{
 			url := util.TransformUrl(startResponse.Data.Url)
 			// send the zip file to the upload endpoint provided
 			logger.Trace("uploading to %s", url)
+			// NOTE: we don't use the apiclient here because we're not going to our api
 			req, err := http.NewRequest("PUT", url, of)
 			if err != nil {
 				errsystem.New(errsystem.ErrUploadProject, err,
