@@ -180,10 +180,10 @@ var cloudDeployCmd = &cobra.Command{
 				if isAgentuityEnv.MatchString(ev.Key) {
 					continue
 				}
-				if projectData.Env != nil && projectData.Env[ev.Key] == ev.Val {
+				if projectData != nil && projectData.Env != nil && projectData.Env[ev.Key] == ev.Val {
 					continue
 				}
-				if projectData.Secrets != nil && projectData.Secrets[ev.Key] == ev.Val {
+				if projectData != nil && projectData.Secrets != nil && projectData.Secrets[ev.Key] == ev.Val {
 					continue
 				}
 				foundkeys = append(foundkeys, ev.Key)
