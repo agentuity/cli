@@ -62,6 +62,9 @@ new_project:
     - action: copy_dir
       from: "common/cursor"
       to: ".cursor/rules"
+    - action: copy_dir
+      from: "common/py/cursor"
+      to: ".cursor/rules"
     - action: create_file
       filename: "server.py"
       from: "common/py/boot.py"
