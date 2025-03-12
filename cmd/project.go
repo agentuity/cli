@@ -581,14 +581,29 @@ var projectDeleteCmd = &cobra.Command{
 	},
 }
 
+var projectImportCmd = &cobra.Command{
+	Use:   "import",
+	Short: "Import a project",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		logger := env.NewLogger(cmd)
+		context := project.EnsureProject(cmd)
+		ShowNewProjectImport(logger, context.APIURL, context.Token, "", context.Project, context.Dir, true)
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(projectCmd)
 	rootCmd.AddCommand(projectNewCmd)
 	projectCmd.AddCommand(projectNewCmd)
 	projectCmd.AddCommand(projectListCmd)
 	projectCmd.AddCommand(projectDeleteCmd)
+	projectCmd.AddCommand(projectImportCmd)
 
-	projectNewCmd.Flags().StringP("dir", "d", "", "The directory to create the project in")
+	for _, cmd := range []*cobra.Command{projectNewCmd, projectImportCmd} {
+		cmd.Flags().StringP("dir", "d", "", "The directory for the project")
+	}
+
 	projectNewCmd.Flags().StringP("provider", "p", "", "The provider template to use for the project")
 	projectNewCmd.Flags().StringP("template", "t", "", "The template to use for the project")
 }

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -64,15 +63,18 @@ type startRequest struct {
 	Resources *Resources   `json:"resources,omitempty"`
 }
 
-func ShowNewProjectImport(logger logger.Logger, apiUrl, apikey, projectId string, project *project.Project, dir string) {
-	var title string
+func ShowNewProjectImport(logger logger.Logger, apiUrl, apikey, projectId string, project *project.Project, dir string, isImport bool) {
+	title := "Import Project"
 	var message string
-	if projectId == "" {
-		title = "Import Project from Template"
-		message = "This project appears to be a new project from a template. By continuing, this project will be added to your organization."
+	if isImport {
+		message = "Importing this project will update the project and agent identifiers in the project and add the project to your organization."
 	} else {
-		title = "Import Project"
-		message = fmt.Sprintf("A project with the id %s was not found in your organization. By continuing, this project will be added to your organization.", projectId)
+		if projectId == "" {
+			title = "Import Project from Template"
+			message = "This project appears to be a new project from a template. By continuing, this project will be added to your organization."
+		} else {
+			message = fmt.Sprintf("A project with the id %s was not found in your organization. By continuing, this project will be added to your organization.", projectId)
+		}
 	}
 	tui.ShowBanner(title, message, false)
 	tui.WaitForAnyKey()
@@ -159,7 +161,7 @@ var cloudDeployCmd = &cobra.Command{
 			if theproject != nil {
 				projectId = theproject.ProjectId
 			}
-			ShowNewProjectImport(logger, apiUrl, token, projectId, theproject, dir)
+			ShowNewProjectImport(logger, apiUrl, token, projectId, theproject, dir, false)
 		}
 
 		// check to see if we have any env vars that are not in the project
@@ -463,7 +465,6 @@ var cloudDeployCmd = &cobra.Command{
 
 			// tell the api that we've completed the upload for the deployment
 			if err := updateDeploymentStatusCompleted(logger, apiUrl, token, startResponse.Data.DeploymentId); err != nil {
-				fmt.Println("error:", err, reflect.TypeOf(err))
 				errsystem.New(errsystem.ErrApiRequest, err,
 					errsystem.WithContextMessage("Error updating deployment status to completed")).ShowErrorAndExit()
 			}
