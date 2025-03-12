@@ -13,6 +13,18 @@ import (
 	"github.com/agentuity/cli/internal/util"
 )
 
+func localizePath(path string) string {
+	p, err := filepath.Localize(path)
+	if err != nil {
+		panic("Could not localize path: " + path)
+	}
+	return p
+}
+
+func embeddedPath(path string) string {
+	return strings.ReplaceAll(path, "\\", "/")
+}
+
 type Step interface {
 	Run(ctx TemplateContext) error
 }
@@ -48,7 +60,7 @@ var _ Step = (*DeleteFileActionStep)(nil)
 
 func (s *DeleteFileActionStep) Run(ctx TemplateContext) error {
 	for _, file := range s.Files {
-		filename := filepath.Join(ctx.ProjectDir, filepath.FromSlash(file))
+		filename := filepath.Join(ctx.ProjectDir, localizePath(file))
 		if !util.Exists(filename) {
 			ctx.Logger.Debug("file %s does not exist", filename)
 			continue
@@ -182,7 +194,7 @@ type AppendFileStep struct {
 var _ Step = (*AppendFileStep)(nil)
 
 func (s *AppendFileStep) Run(ctx TemplateContext) error {
-	filename := filepath.Join(ctx.ProjectDir, filepath.FromSlash(s.Filename))
+	filename := filepath.Join(ctx.ProjectDir, localizePath(s.Filename))
 	if !util.Exists(filename) {
 		return fmt.Errorf("%s does not exist", filename)
 	}
@@ -210,7 +222,7 @@ type CreateFileAction struct {
 var _ Step = (*CreateFileAction)(nil)
 
 func (s *CreateFileAction) Run(ctx TemplateContext) error {
-	filename := filepath.Join(ctx.ProjectDir, filepath.FromSlash(s.Filename))
+	filename := filepath.Join(ctx.ProjectDir, localizePath(s.Filename))
 	dir := filepath.Dir(filename)
 	if !util.Exists(dir) {
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -220,7 +232,7 @@ func (s *CreateFileAction) Run(ctx TemplateContext) error {
 	ctx.Logger.Debug("Creating file: %s", filename)
 	var output []byte
 	if s.Template != "" {
-		fr, err := getEmbeddedFile(s.Template)
+		fr, err := getEmbeddedFile(embeddedPath(s.Template))
 		if err != nil {
 			return fmt.Errorf("failed to get embedded file: %s", err)
 		}
@@ -241,7 +253,7 @@ func (s *CreateFileAction) Run(ctx TemplateContext) error {
 	} else if s.Content != "" {
 		output = []byte(s.Content) // just use the content as is
 	} else if s.From != "" {
-		from, err := getEmbeddedFile(s.From)
+		from, err := getEmbeddedFile(embeddedPath(s.From))
 		if err != nil {
 			return fmt.Errorf("failed to get embedded file: %s", err)
 		}
@@ -268,7 +280,7 @@ type CopyFileAction struct {
 var _ Step = (*CopyFileAction)(nil)
 
 func (s *CopyFileAction) Run(ctx TemplateContext) error {
-	from, err := getEmbeddedFile(s.From)
+	from, err := getEmbeddedFile(embeddedPath(s.From))
 	if err != nil {
 		return fmt.Errorf("failed to get embedded file: %s", err)
 	}
@@ -276,7 +288,7 @@ func (s *CopyFileAction) Run(ctx TemplateContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to read embedded file: %s", err)
 	}
-	to := filepath.Join(ctx.ProjectDir, filepath.FromSlash(s.To))
+	to := filepath.Join(ctx.ProjectDir, localizePath(s.To))
 	dir := filepath.Dir(to)
 	if !util.Exists(dir) {
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -298,11 +310,12 @@ type CopyDirAction struct {
 var _ Step = (*CopyDirAction)(nil)
 
 func (s *CopyDirAction) Run(ctx TemplateContext) error {
-	from, err := getEmbeddedDir(s.From)
+	filename := embeddedPath(s.From)
+	from, err := getEmbeddedDir(filename)
 	if err != nil {
 		return fmt.Errorf("failed to get embedded file: %s", err)
 	}
-	dir := filepath.Join(ctx.ProjectDir, filepath.FromSlash(s.To))
+	dir := filepath.Join(ctx.ProjectDir, localizePath(s.To))
 	if !util.Exists(dir) {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("failed to create directory: %s", err)
@@ -310,7 +323,7 @@ func (s *CopyDirAction) Run(ctx TemplateContext) error {
 		ctx.Logger.Debug("Created directory: %s", dir)
 	}
 	for _, file := range from {
-		name := filepath.Join(s.From, file.Name())
+		name := embeddedPath(filepath.Join(s.From, file.Name()))
 		r, err := getEmbeddedFile(name)
 		if err != nil {
 			return fmt.Errorf("failed to get embedded file: %s", err)
@@ -319,7 +332,7 @@ func (s *CopyDirAction) Run(ctx TemplateContext) error {
 		if err != nil {
 			return fmt.Errorf("failed to read embedded file: %s", err)
 		}
-		to := filepath.Join(dir, file.Name())
+		to := filepath.Join(dir, localizePath(file.Name()))
 		if err := os.WriteFile(to, buf, 0644); err != nil {
 			return fmt.Errorf("failed to write file: %s", err)
 		}
