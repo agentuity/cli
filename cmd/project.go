@@ -19,6 +19,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var projectCmd = &cobra.Command{
@@ -201,6 +202,7 @@ var docStyle = lipgloss.NewStyle().Margin(1, 2)
 type listItemProvider struct {
 	title, desc, id string
 	object          any
+	selected        bool
 }
 
 func (i listItemProvider) Title() string       { return i.title }
@@ -243,10 +245,15 @@ func (m *projectSelectionModel) View() string {
 
 func showItemSelector(title string, items []list.Item) list.Item {
 
+	selectedIndex := -1
+
 	for i, item := range items {
 		var p = item.(listItemProvider)
 		p.desc = lipgloss.NewStyle().SetString(p.desc).Width(60).AlignHorizontal(lipgloss.Left).Render()
 		items[i] = p
+		if p.selected {
+			selectedIndex = i
+		}
 	}
 
 	delegate := list.NewDefaultDelegate()
@@ -255,6 +262,10 @@ func showItemSelector(title string, items []list.Item) list.Item {
 	m := projectSelectionModel{list: list.New(items, delegate, 0, 0)}
 	m.list.Title = title
 	m.list.Styles.Title = lipgloss.NewStyle().Foreground(tui.TitleColor())
+
+	if selectedIndex != -1 {
+		m.list.Select(selectedIndex)
+	}
 
 	p := tea.NewProgram(&m, tea.WithAltScreen())
 
@@ -337,6 +348,17 @@ var projectNewCmd = &cobra.Command{
 			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("No templates returned from load templates")).ShowErrorAndExit()
 		}
 
+		var selectProvider string
+		var selectTemplate string
+
+		// check for preferences in config
+		if providerArg == "" {
+			selectProvider = viper.GetString("preferences.provider")
+		}
+		if templateArg == "" {
+			selectTemplate = viper.GetString("preferences.template")
+		}
+
 		if providerArg != "" {
 			providerName = providerArg
 			var found bool
@@ -368,10 +390,11 @@ var projectNewCmd = &cobra.Command{
 
 			for _, tmpls := range tmpls {
 				items = append(items, listItemProvider{
-					id:     tmpls.Identifier,
-					title:  tmpls.Name,
-					desc:   tmpls.Description,
-					object: &tmpls,
+					id:       tmpls.Identifier,
+					title:    tmpls.Name,
+					desc:     tmpls.Description,
+					object:   &tmpls,
+					selected: selectProvider == tmpls.Identifier,
 				})
 			}
 
@@ -391,10 +414,11 @@ var projectNewCmd = &cobra.Command{
 			var tmplTemplates []list.Item
 			for _, t := range templates {
 				tmplTemplates = append(tmplTemplates, listItemProvider{
-					id:     t.Name,
-					title:  t.Name,
-					desc:   t.Description,
-					object: &t,
+					id:       t.Name,
+					title:    t.Name,
+					desc:     t.Description,
+					object:   &t,
+					selected: t.Name == selectTemplate,
 				})
 			}
 			templateId := showItemSelector("Select a project template", tmplTemplates)
@@ -455,6 +479,10 @@ var projectNewCmd = &cobra.Command{
 				EnableWebhookAuth: authType != "none",
 			})
 
+			// remember our choices
+			viper.Set("preferences.provider", provider.Identifier)
+			viper.Set("preferences.template", templateName)
+			viper.WriteConfig()
 		})
 
 		var para []string
