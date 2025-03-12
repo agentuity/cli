@@ -24,6 +24,11 @@ const (
 
 var Version string
 
+var (
+	ErrProjectNotFound         = errors.New("project not found")
+	ErrProjectMissingProjectId = errors.New("missing project_id value")
+)
+
 type initProjectResult struct {
 	Success bool        `json:"success"`
 	Data    ProjectData `json:"data"`
@@ -147,7 +152,7 @@ func (p *Project) Load(dir string) error {
 		return err
 	}
 	if p.ProjectId == "" {
-		return fmt.Errorf("missing project_id value")
+		return ErrProjectMissingProjectId
 	}
 	if p.Bundler == nil {
 		return fmt.Errorf("missing bundler value, please run `agentuity new` to create a new project")
@@ -245,8 +250,11 @@ func ProjectWithNameExists(logger logger.Logger, baseUrl string, token string, n
 
 	var resp Response[bool]
 	if err := client.Do("GET", fmt.Sprintf("/cli/project/exists/%s", url.PathEscape(name)), nil, &resp); err != nil {
-		if err.Status == 409 {
-			return true, nil
+		var apiErr *util.APIError
+		if errors.As(err, &apiErr) {
+			if apiErr.Status == 409 {
+				return true, nil
+			}
 		}
 		return false, fmt.Errorf("error validating project name: %w", err)
 	}
@@ -286,12 +294,18 @@ func DeleteProjects(logger logger.Logger, baseUrl string, token string, ids []st
 }
 
 func (p *Project) GetProject(logger logger.Logger, baseUrl string, token string) (*ProjectData, error) {
+	if p.ProjectId == "" {
+		return nil, ErrProjectNotFound
+	}
 	client := util.NewAPIClient(logger, baseUrl, token)
 
 	var projectResponse ProjectResponse
 	if err := client.Do("GET", fmt.Sprintf("/cli/project/%s", p.ProjectId), nil, &projectResponse); err != nil {
-		if err.Status == 404 || err.Status == 403 || err.Status == 401 {
-			return nil, fmt.Errorf("The project with ID '%s' does not exist under the current logged in organization. Please check your logged in organization and try again.", p.ProjectId)
+		var apiErr *util.APIError
+		if errors.As(err, &apiErr) {
+			if apiErr.Status == 404 {
+				return nil, ErrProjectNotFound
+			}
 		}
 		return nil, fmt.Errorf("error getting project env: %w", err)
 	}
@@ -329,6 +343,44 @@ func (p *Project) DeleteProjectEnv(logger logger.Logger, baseUrl string, token s
 		return errors.New(projectResponse.Message)
 	}
 	return nil
+}
+
+type ProjectImportRequest struct {
+	Name              string        `json:"name"`
+	Description       string        `json:"description"`
+	Provider          string        `json:"provider"`
+	OrgId             string        `json:"orgId"`
+	Agents            []AgentConfig `json:"agents"`
+	EnableWebhookAuth bool          `json:"enableWebhookAuth"`
+}
+
+type ProjectImportResponse struct {
+	ID          string        `json:"id"`
+	Agents      []AgentConfig `json:"agents"`
+	APIKey      string        `json:"apiKey"`
+	IOAuthToken string        `json:"ioAuthToken"`
+}
+
+func (p *Project) Import(logger logger.Logger, baseUrl string, token string, orgId string, enableWebhookAuth bool) (*ProjectImportResponse, error) {
+	client := util.NewAPIClient(logger, baseUrl, token)
+
+	var resp Response[ProjectImportResponse]
+	var req ProjectImportRequest
+	req.Name = p.Name
+	req.Description = p.Description
+	req.OrgId = orgId
+	req.Agents = p.Agents
+	req.Provider = p.Bundler.Identifier
+	req.EnableWebhookAuth = enableWebhookAuth
+
+	if err := client.Do("POST", "/cli/project/import", req, &resp); err != nil {
+		return nil, fmt.Errorf("error importing project: %w", err)
+	}
+
+	p.ProjectId = resp.Data.ID
+	p.Agents = resp.Data.Agents
+
+	return &resp.Data, nil
 }
 
 type Bundler struct {
@@ -383,17 +435,29 @@ func (c *DeploymentConfig) Write(logger logger.Logger, dir string) (CleanupFunc,
 }
 
 type ProjectContext struct {
-	Logger  logger.Logger
-	Project *Project
-	Dir     string
-	APIURL  string
-	APPURL  string
-	Token   string
+	Logger     logger.Logger
+	Project    *Project
+	Dir        string
+	APIURL     string
+	APPURL     string
+	Token      string
+	NewProject bool
 }
 
 func LoadProject(logger logger.Logger, dir string, apiUrl string, appUrl string, token string) ProjectContext {
 	theproject := NewProject()
 	if err := theproject.Load(dir); err != nil {
+		if err == ErrProjectMissingProjectId {
+			return ProjectContext{
+				Logger:     logger,
+				Dir:        dir,
+				Project:    theproject,
+				APIURL:     apiUrl,
+				APPURL:     appUrl,
+				Token:      token,
+				NewProject: true,
+			}
+		}
 		errsystem.New(errsystem.ErrInvalidConfiguration, err,
 			errsystem.WithContextMessage("Error loading project from disk")).ShowErrorAndExit()
 	}
@@ -419,7 +483,7 @@ func EnsureProject(cmd *cobra.Command) ProjectContext {
 		token, _ = util.EnsureLoggedIn()
 	}
 	p := LoadProject(logger, dir, apiUrl, appUrl, token)
-	if Version != "" && Version != "dev" && p.Project.Version != "" {
+	if !p.NewProject && Version != "" && Version != "dev" && p.Project.Version != "" {
 		v := semver.MustParse(Version)
 		c, err := semver.NewConstraint(p.Project.Version)
 		if err != nil {

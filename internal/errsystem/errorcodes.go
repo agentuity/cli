@@ -86,4 +86,8 @@ var (
 		Code:    "CLI-0021",
 		Message: "Failed to install dependencies",
 	}
+	ErrImportingProject = errorType{
+		Code:    "CLI-0022",
+		Message: "Error importing project",
+	}
 )

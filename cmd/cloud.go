@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -63,6 +64,44 @@ type startRequest struct {
 	Resources *Resources   `json:"resources,omitempty"`
 }
 
+func ShowNewProjectImport(logger logger.Logger, apiUrl, apikey, projectId string, project *project.Project, dir string) {
+	var title string
+	var message string
+	if projectId == "" {
+		title = "Import Project from Template"
+		message = "This project appears to be a new project from a template. By continuing, this project will be added to your organization."
+	} else {
+		title = "Import Project"
+		message = fmt.Sprintf("A project with the id %s was not found in your organization. By continuing, this project will be added to your organization.", projectId)
+	}
+	tui.ShowBanner(title, message, false)
+	tui.WaitForAnyKey()
+	tui.ClearScreen()
+	orgId := promptForOrganization(logger, apiUrl, apikey)
+	name, description := promptForProjectDetail(logger, apiUrl, apikey, project.Name, project.Description)
+	project.Name = name
+	project.Description = description
+	var createWebhookAuth bool
+	auth := getAgentAuthType(logger)
+	if auth == "bearer" {
+		createWebhookAuth = true
+	}
+	tui.ClearScreen()
+	tui.ShowSpinner("Importing project ...", func() {
+		result, err := project.Import(logger, apiUrl, apikey, orgId, createWebhookAuth)
+		if err != nil {
+			errsystem.New(errsystem.ErrImportingProject, err,
+				errsystem.WithContextMessage("Error importing project")).ShowErrorAndExit()
+		}
+		if err := project.Save(dir); err != nil {
+			errsystem.New(errsystem.ErrSaveProject, err,
+				errsystem.WithContextMessage("Error saving project after import")).ShowErrorAndExit()
+		}
+		saveEnv(dir, result.APIKey)
+	})
+	tui.ShowSuccess("Project imported successfully")
+}
+
 var cloudDeployCmd = &cobra.Command{
 	Use:   "deploy",
 	Short: "Deploy project to the cloud",
@@ -76,12 +115,17 @@ var cloudDeployCmd = &cobra.Command{
 		appUrl := context.APPURL
 		token := context.Token
 
-		keys, state := reconcileAgentList(logger, apiUrl, token, context)
+		var keys []string
+		var state map[string]agentListState
 
-		if len(keys) == 0 {
-			tui.ShowWarning("no Agents found")
-			tui.ShowBanner("Create a new Agent", tui.Text("Use the ")+tui.Command("agent new")+tui.Text(" command to create a new Agent"), false)
-			os.Exit(1)
+		if !context.NewProject {
+			keys, state = reconcileAgentList(logger, apiUrl, token, context)
+
+			if len(keys) == 0 {
+				tui.ShowWarning("no Agents found")
+				tui.ShowBanner("Create a new Agent", tui.Text("Use the ")+tui.Command("agent new")+tui.Text(" command to create a new Agent"), false)
+				os.Exit(1)
+			}
 		}
 
 		deploymentConfig := project.NewDeploymentConfig()
@@ -91,16 +135,32 @@ var cloudDeployCmd = &cobra.Command{
 		var le []env.EnvLine
 		var envFile *deployer.EnvFile
 		var projectData *project.ProjectData
+		var projectExists bool
+		var action func()
 
-		action := func() {
-			var err error
-			projectData, err = theproject.GetProject(logger, apiUrl, token)
-			if err != nil {
-				errsystem.New(errsystem.ErrApiRequest, err,
-					errsystem.WithContextMessage("Error listing project environment")).ShowErrorAndExit()
+		if !context.NewProject {
+			action = func() {
+				var err error
+				projectData, err = theproject.GetProject(logger, apiUrl, token)
+				if err != nil {
+					if err == project.ErrProjectNotFound {
+						return
+					}
+					errsystem.New(errsystem.ErrApiRequest, err,
+						errsystem.WithContextMessage("Error listing project environment")).ShowErrorAndExit()
+				}
+				projectExists = true
 			}
+			tui.ShowSpinner("", action)
 		}
-		tui.ShowSpinner("", action)
+
+		if !projectExists {
+			var projectId string
+			if theproject != nil {
+				projectId = theproject.ProjectId
+			}
+			ShowNewProjectImport(logger, apiUrl, token, projectId, theproject, dir)
+		}
 
 		// check to see if we have any env vars that are not in the project
 		envfilename := filepath.Join(dir, ".env")
@@ -403,6 +463,7 @@ var cloudDeployCmd = &cobra.Command{
 
 			// tell the api that we've completed the upload for the deployment
 			if err := updateDeploymentStatusCompleted(logger, apiUrl, token, startResponse.Data.DeploymentId); err != nil {
+				fmt.Println("error:", err, reflect.TypeOf(err))
 				errsystem.New(errsystem.ErrApiRequest, err,
 					errsystem.WithContextMessage("Error updating deployment status to completed")).ShowErrorAndExit()
 			}
