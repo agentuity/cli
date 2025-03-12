@@ -135,12 +135,23 @@ var agentCreateCmd = &cobra.Command{
 		apikey := theproject.Token
 		apiUrl, _ := getURLs(logger)
 
-		remoteAgents, err := getAgentList(logger, apiUrl, apikey, theproject)
+		var remoteAgents []agent.Agent
+
+		if theproject.NewProject {
+			var projectId string
+			if theproject.Project != nil {
+				projectId = theproject.Project.ProjectId
+			}
+			ShowNewProjectImport(logger, apiUrl, apikey, projectId, theproject.Project, theproject.Dir, false)
+		} else {
+			initScreenWithLogo()
+		}
+
+		var err error
+		remoteAgents, err = getAgentList(logger, apiUrl, apikey, theproject)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent list")).ShowErrorAndExit()
 		}
-
-		initScreenWithLogo()
 
 		var name string
 		var description string
