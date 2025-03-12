@@ -29,6 +29,27 @@ var projectCmd = &cobra.Command{
 	},
 }
 
+func saveEnv(dir string, apikey string) {
+	filename := filepath.Join(dir, ".env")
+	envLines, err := env.ParseEnvFile(filename)
+	if err != nil {
+		errsystem.New(errsystem.ErrReadConfigurationFile, err, errsystem.WithContextMessage("Failed to parse .env file")).ShowErrorAndExit()
+	}
+	var found bool
+	for i, envLine := range envLines {
+		if envLine.Key == "AGENTUITY_API_KEY" {
+			envLines[i].Val = apikey
+			found = true
+		}
+	}
+	if !found {
+		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_API_KEY", Val: apikey})
+	}
+	if err := env.WriteEnvFile(filename, envLines); err != nil {
+		errsystem.New(errsystem.ErrWriteConfigurationFile, err, errsystem.WithContextMessage("Failed to write .env file")).ShowErrorAndExit()
+	}
+}
+
 type InitProjectArgs struct {
 	BaseURL           string
 	Dir               string
@@ -105,25 +126,46 @@ func initProject(logger logger.Logger, args InitProjectArgs) *project.ProjectDat
 	if err := proj.Save(args.Dir); err != nil {
 		errsystem.New(errsystem.ErrSaveProject, err, errsystem.WithContextMessage("Failed to save project to disk")).ShowErrorAndExit()
 	}
-	filename := filepath.Join(args.Dir, ".env")
-	envLines, err := env.ParseEnvFile(filename)
-	if err != nil {
-		errsystem.New(errsystem.ErrReadConfigurationFile, err, errsystem.WithContextMessage("Failed to parse .env file")).ShowErrorAndExit()
-	}
-	var found bool
-	for i, envLine := range envLines {
-		if envLine.Key == "AGENTUITY_API_KEY" {
-			envLines[i].Val = result.APIKey
-			found = true
+
+	saveEnv(args.Dir, result.APIKey)
+
+	return result
+}
+
+func promptForProjectDetail(logger logger.Logger, apiUrl, apikey string, name string, description string) (string, string) {
+	var nameOK bool
+	if name != "" {
+		if exists, err := project.ProjectWithNameExists(logger, apiUrl, apikey, name); err != nil {
+			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to check if project name exists")).ShowErrorAndExit()
+		} else if exists {
+			tui.ShowWarning("project %s already exists in this organization. please choose another name", name)
+		} else {
+			nameOK = true
 		}
 	}
-	if !found {
-		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_API_KEY", Val: result.APIKey})
+	if !nameOK {
+		name = tui.InputWithValidation(logger, "What should we name the project?", "The name of the project must be unique within the organization", 255, func(name string) error {
+			for _, invalid := range invalidProjectNames {
+				if s, ok := invalid.(string); ok {
+					if name == s {
+						return fmt.Errorf("%s is not a valid project name", name)
+					}
+				}
+			}
+			if exists, err := project.ProjectWithNameExists(logger, apiUrl, apikey, name); err != nil {
+				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to check if project name exists")).ShowErrorAndExit()
+			} else if exists {
+				return fmt.Errorf("project %s already exists in this organization. please choose another name", name)
+			}
+			return nil
+		})
 	}
-	if err := env.WriteEnvFile(filename, envLines); err != nil {
-		errsystem.New(errsystem.ErrWriteConfigurationFile, err, errsystem.WithContextMessage("Failed to write .env file")).ShowErrorAndExit()
+
+	if description == "" {
+		description = tui.Input(logger, "How should we describe what the "+name+" project does?", "The description of the project is optional but helpful")
 	}
-	return result
+
+	return name, description
 }
 
 func promptForOrganization(logger logger.Logger, apiUrl string, token string) string {
@@ -251,32 +293,18 @@ var projectNewCmd = &cobra.Command{
 
 		if len(args) > 0 {
 			name = args[0]
-			if exists, err := project.ProjectWithNameExists(logger, apiUrl, apikey, name); err != nil {
-				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to check if project name exists")).ShowErrorAndExit()
-			} else if exists {
-				logger.Fatal("project %s already exists in this organization. please choose another name", name)
-			}
-		} else {
-			name = tui.InputWithValidation(logger, "What should we name the project?", "The name of the project must be unique within the organization", 255, func(name string) error {
-				for _, invalid := range invalidProjectNames {
-					if s, ok := invalid.(string); ok {
-						if name == s {
-							return fmt.Errorf("%s is not a valid project name", name)
-						}
-					}
-				}
-				if exists, err := project.ProjectWithNameExists(logger, apiUrl, apikey, name); err != nil {
-					errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to check if project name exists")).ShowErrorAndExit()
-				} else if exists {
-					return fmt.Errorf("project %s already exists in this organization. please choose another name", name)
-				}
-				return nil
-			})
+		}
+		if len(args) > 1 {
+			description = args[1]
+		}
+		if len(args) > 2 {
+			agentName = args[2]
+		}
+		if len(args) > 3 {
+			agentDescription = args[3]
 		}
 
-		if description == "" {
-			description = tui.Input(logger, "How should we describe what the "+name+" project does?", "The description of the project is optional but helpful")
-		}
+		name, description = promptForProjectDetail(logger, apiUrl, apikey, name, description)
 
 		projectDir := filepath.Join(cwd, util.SafeFilename(name))
 		dir, _ := cmd.Flags().GetString("dir")
@@ -553,14 +581,29 @@ var projectDeleteCmd = &cobra.Command{
 	},
 }
 
+var projectImportCmd = &cobra.Command{
+	Use:   "import",
+	Short: "Import a project",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		logger := env.NewLogger(cmd)
+		context := project.EnsureProject(cmd)
+		ShowNewProjectImport(logger, context.APIURL, context.Token, "", context.Project, context.Dir, true)
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(projectCmd)
 	rootCmd.AddCommand(projectNewCmd)
 	projectCmd.AddCommand(projectNewCmd)
 	projectCmd.AddCommand(projectListCmd)
 	projectCmd.AddCommand(projectDeleteCmd)
+	projectCmd.AddCommand(projectImportCmd)
 
-	projectNewCmd.Flags().StringP("dir", "d", "", "The directory to create the project in")
+	for _, cmd := range []*cobra.Command{projectNewCmd, projectImportCmd} {
+		cmd.Flags().StringP("dir", "d", "", "The directory for the project")
+	}
+
 	projectNewCmd.Flags().StringP("provider", "p", "", "The provider template to use for the project")
 	projectNewCmd.Flags().StringP("template", "t", "", "The template to use for the project")
 }

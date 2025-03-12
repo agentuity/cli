@@ -84,6 +84,14 @@ var agentDeleteCmd = &cobra.Command{
 	},
 }
 
+func getAgentAuthType(logger logger.Logger) string {
+	auth := tui.Select(logger, "Select your Agent's authentication method", "How do you want to secure the Agent?", []tui.Option{
+		{Text: tui.PadRight("API Key", 10, " ") + tui.Muted("Bearer Token"), ID: "bearer"},
+		{Text: tui.PadRight("None", 10, " ") + tui.Muted("No Authentication Required"), ID: "none"},
+	})
+	return auth
+}
+
 func getAgentInfoFlow(logger logger.Logger, remoteAgents []agent.Agent, name string, description string) (string, string, string) {
 	if name == "" {
 		var prompt, help string
@@ -111,10 +119,7 @@ func getAgentInfoFlow(logger logger.Logger, remoteAgents []agent.Agent, name str
 		description = tui.Input(logger, "How should we describe what the "+name+" Agent does?", "The description of the Agent is optional but helpful for understanding the role of the Agent")
 	}
 
-	auth := tui.Select(logger, "Select your Agent's authentication method", "How do you want to secure the Agent?", []tui.Option{
-		{Text: tui.PadRight("API Key", 10, " ") + tui.Muted("Bearer Token"), ID: "bearer"},
-		{Text: tui.PadRight("None", 10, " ") + tui.Muted("No Authentication Required"), ID: "none"},
-	})
+	auth := getAgentAuthType(logger)
 
 	return name, description, auth
 }
@@ -130,12 +135,23 @@ var agentCreateCmd = &cobra.Command{
 		apikey := theproject.Token
 		apiUrl, _ := getURLs(logger)
 
-		remoteAgents, err := getAgentList(logger, apiUrl, apikey, theproject)
+		var remoteAgents []agent.Agent
+
+		if theproject.NewProject {
+			var projectId string
+			if theproject.Project != nil {
+				projectId = theproject.Project.ProjectId
+			}
+			ShowNewProjectImport(logger, apiUrl, apikey, projectId, theproject.Project, theproject.Dir, false)
+		} else {
+			initScreenWithLogo()
+		}
+
+		var err error
+		remoteAgents, err = getAgentList(logger, apiUrl, apikey, theproject)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent list")).ShowErrorAndExit()
 		}
-
-		initScreenWithLogo()
 
 		var name string
 		var description string
@@ -442,7 +458,7 @@ var agentGetApiKeyCmd = &cobra.Command{
 					break
 				}
 			} else {
-				if tui.HasTTY {
+				if !tui.HasTTY {
 					logger.Fatal("No TTY detected, please specify an Agent name or id")
 				}
 				var options []tui.Option

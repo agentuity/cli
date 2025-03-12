@@ -2,6 +2,7 @@ package errsystem
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -105,21 +106,24 @@ func (e *errSystem) ShowErrorAndExit() {
 	} else {
 		body.WriteString(e.code.Message + "\n\n")
 	}
-	// if this is an API error, add the error details to the attributes
-	if err, ok := e.err.(*util.APIError); ok && err != nil {
-		e.attributes["api_error"] = err.Error()
-		e.attributes["api_error_url"] = err.URL
-		e.attributes["api_error_method"] = err.Method
-		e.attributes["api_error_status"] = strconv.Itoa(err.Status)
-		e.attributes["api_error_body"] = err.Body
-	}
 	var detail []string
 	if e.err != nil {
+		var apiError *util.APIError
+		// if this is an API error, add the error details to the attributes
+		if errors.As(e.err, &apiError) && apiError != nil {
+			e.attributes["api_error"] = apiError.Error()
+			e.attributes["api_error_url"] = apiError.URL
+			e.attributes["api_error_method"] = apiError.Method
+			e.attributes["api_error_status"] = strconv.Itoa(apiError.Status)
+			e.attributes["api_error_body"] = apiError.Body
+		}
 		errmsg := e.err.Error()
-		errmsg = strings.ReplaceAll(errmsg, "\n", ". ")
-		color := lipgloss.AdaptiveColor{Light: "#000000", Dark: "#FFFFFF"}
-		style := tui.BannerBodyStyle().Width(65).AlignHorizontal(lipgloss.Left).Foreground(color)
-		detail = append(detail, tui.Bold(tui.PadRight("Error:", 10, " "))+style.Render(errmsg+"\n"))
+		if errmsg != "" {
+			errmsg = strings.ReplaceAll(errmsg, "\n", ". ")
+			color := lipgloss.AdaptiveColor{Light: "#000000", Dark: "#FFFFFF"}
+			style := tui.BannerBodyStyle().Width(65).AlignHorizontal(lipgloss.Left).Foreground(color)
+			detail = append(detail, tui.Bold(tui.PadRight("Error:", 10, " "))+style.Render(errmsg+"\n"))
+		}
 	}
 	detail = append(detail, tui.Bold(tui.PadRight("Code:", 10, " "))+e.code.Code)
 	detail = append(detail, tui.Bold(tui.PadRight("ID:", 10, " "))+e.id)

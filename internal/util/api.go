@@ -26,21 +26,21 @@ type APIClient struct {
 }
 
 type APIError struct {
-	URL      string `json:"url"`
-	Method   string `json:"method"`
-	Status   int    `json:"status"`
-	Body     string `json:"body"`
-	TheError error  `json:"error"`
+	URL      string
+	Method   string
+	Status   int
+	Body     string
+	TheError error
 }
 
 func (e *APIError) Error() string {
+	if e == nil || e.TheError == nil {
+		return ""
+	}
 	return e.TheError.Error()
 }
 
 func NewAPIError(url, method string, status int, body string, err error) *APIError {
-	if err == nil {
-		panic("NewAPIError called with nil error")
-	}
 	return &APIError{
 		URL:      url,
 		Method:   method,
@@ -71,7 +71,7 @@ type APIResponse struct {
 	} `json:"error"`
 }
 
-func (c *APIClient) Do(method, path string, payload interface{}, response interface{}) *APIError {
+func (c *APIClient) Do(method, path string, payload interface{}, response interface{}) error {
 	u, err := url.Parse(c.baseURL)
 	if err != nil {
 		return NewAPIError(c.baseURL, method, 0, "", fmt.Errorf("error parsing base url: %w", err))
@@ -82,14 +82,14 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 	if payload != nil {
 		body, err = json.Marshal(payload)
 		if err != nil {
-			return NewAPIError(c.baseURL, method, 0, "", fmt.Errorf("error marshalling payload: %w", err))
+			return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error marshalling payload: %w", err))
 		}
 	}
 	c.logger.Trace("sending request: %s %s", method, u.String())
 
 	req, err := http.NewRequest(method, u.String(), bytes.NewBuffer(body))
 	if err != nil {
-		return NewAPIError(c.baseURL, method, 0, "", fmt.Errorf("error creating request: %w", err))
+		return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error creating request: %w", err))
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if c.token != "" {
@@ -98,21 +98,21 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return NewAPIError(c.baseURL, method, 0, "", fmt.Errorf("error sending request: %w", err))
+		return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error sending request: %w", err))
 	}
 	defer resp.Body.Close()
 	c.logger.Debug("response status: %s", resp.Status)
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return NewAPIError(c.baseURL, method, 0, "", fmt.Errorf("error reading response body: %w", err))
+		return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error reading response body: %w", err))
 	}
 
-	c.logger.Debug("response body: %s", string(respBody))
-	if resp.StatusCode > 299 {
+	c.logger.Debug("response body: %s, content-type: %s", string(respBody), resp.Header.Get("content-type"))
+	if resp.StatusCode > 299 && strings.Contains(resp.Header.Get("content-type"), "application/json") {
 		var apiResponse APIResponse
 		if err := json.Unmarshal(respBody, &apiResponse); err != nil {
-			return NewAPIError(c.baseURL, method, resp.StatusCode, string(respBody), fmt.Errorf("error unmarshalling response: %w", err))
+			return NewAPIError(u.String(), method, resp.StatusCode, string(respBody), fmt.Errorf("error unmarshalling response: %w", err))
 		}
 		if !apiResponse.Success {
 			if len(apiResponse.Error.Issues) > 0 {
@@ -124,21 +124,21 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 					}
 					errs = append(errs, msg)
 				}
-				return NewAPIError(c.baseURL, method, resp.StatusCode, string(respBody), fmt.Errorf("%s", strings.Join(errs, ". ")))
+				return NewAPIError(u.String(), method, resp.StatusCode, string(respBody), fmt.Errorf("%s", strings.Join(errs, ". ")))
 			}
 			if apiResponse.Message != "" {
-				return NewAPIError(c.baseURL, method, resp.StatusCode, string(respBody), fmt.Errorf("%s", apiResponse.Message))
+				return NewAPIError(u.String(), method, resp.StatusCode, string(respBody), fmt.Errorf("%s", apiResponse.Message))
 			}
 		}
 	}
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted && response == nil {
-		return NewAPIError(c.baseURL, method, resp.StatusCode, string(respBody), fmt.Errorf("request failed with status (%s)", resp.Status))
+	if resp.StatusCode > 299 {
+		return NewAPIError(u.String(), method, resp.StatusCode, string(respBody), fmt.Errorf("request failed with status (%s)", resp.Status))
 	}
 
 	if response != nil {
-		if err := json.NewDecoder(bytes.NewReader(respBody)).Decode(response); err != nil {
-			return NewAPIError(c.baseURL, method, resp.StatusCode, string(respBody), fmt.Errorf("error JSON decoding response: %w", err))
+		if err := json.Unmarshal(respBody, &response); err != nil {
+			return NewAPIError(u.String(), method, resp.StatusCode, string(respBody), fmt.Errorf("error JSON decoding response: %w", err))
 		}
 	}
 	return nil

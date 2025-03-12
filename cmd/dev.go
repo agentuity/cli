@@ -34,11 +34,20 @@ var devRunCmd = &cobra.Command{
 		apiKey, _ := util.EnsureLoggedIn()
 		theproject := project.EnsureProject(cmd)
 
+		if theproject.NewProject {
+			var projectId string
+			if theproject.Project.ProjectId != "" {
+				projectId = theproject.Project.ProjectId
+			}
+			ShowNewProjectImport(log, theproject.APIURL, apiKey, projectId, theproject.Project, dir, false)
+		}
+
 		// get project from api
 		project, err := theproject.Project.GetProject(log, theproject.APIURL, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to get project: %s", err))).ShowErrorAndExit()
 		}
+
 		orgId := project.OrgId
 
 		// need to fixs this!!!!!!!
