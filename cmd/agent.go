@@ -447,7 +447,7 @@ var agentGetApiKeyCmd = &cobra.Command{
 					break
 				}
 			} else {
-				if tui.HasTTY {
+				if !tui.HasTTY {
 					logger.Fatal("No TTY detected, please specify an Agent name or id")
 				}
 				var options []tui.Option
