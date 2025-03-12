@@ -48,7 +48,7 @@ var _ Step = (*DeleteFileActionStep)(nil)
 
 func (s *DeleteFileActionStep) Run(ctx TemplateContext) error {
 	for _, file := range s.Files {
-		filename := filepath.Join(ctx.ProjectDir, file)
+		filename := filepath.Join(ctx.ProjectDir, filepath.FromSlash(file))
 		if !util.Exists(filename) {
 			ctx.Logger.Debug("file %s does not exist", filename)
 			continue
@@ -182,7 +182,7 @@ type AppendFileStep struct {
 var _ Step = (*AppendFileStep)(nil)
 
 func (s *AppendFileStep) Run(ctx TemplateContext) error {
-	filename := filepath.Join(ctx.ProjectDir, s.Filename)
+	filename := filepath.Join(ctx.ProjectDir, filepath.FromSlash(s.Filename))
 	if !util.Exists(filename) {
 		return fmt.Errorf("%s does not exist", filename)
 	}
@@ -210,7 +210,7 @@ type CreateFileAction struct {
 var _ Step = (*CreateFileAction)(nil)
 
 func (s *CreateFileAction) Run(ctx TemplateContext) error {
-	filename := filepath.Join(ctx.ProjectDir, s.Filename)
+	filename := filepath.Join(ctx.ProjectDir, filepath.FromSlash(s.Filename))
 	dir := filepath.Dir(filename)
 	if !util.Exists(dir) {
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -276,7 +276,7 @@ func (s *CopyFileAction) Run(ctx TemplateContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to read embedded file: %s", err)
 	}
-	to := filepath.Join(ctx.ProjectDir, s.To)
+	to := filepath.Join(ctx.ProjectDir, filepath.FromSlash(s.To))
 	dir := filepath.Dir(to)
 	if !util.Exists(dir) {
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -302,7 +302,7 @@ func (s *CopyDirAction) Run(ctx TemplateContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to get embedded file: %s", err)
 	}
-	dir := filepath.Join(ctx.ProjectDir, s.To)
+	dir := filepath.Join(ctx.ProjectDir, filepath.FromSlash(s.To))
 	if !util.Exists(dir) {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("failed to create directory: %s", err)
