@@ -31,7 +31,6 @@ func MultiSelect(logger logger.Logger, title string, description string, items [
 		Title(title).
 		Description(description + "\n").
 		Value(&selected).
-		WithHeight(100).
 		Run(); err != nil {
 		logger.Fatal("%s", err)
 	}
