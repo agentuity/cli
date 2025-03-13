@@ -1,5 +1,7 @@
 # Changelog
 
+All notable changes to this project will be documented in this file.
+
 ## [v0.0.59] - 2025-03-13
 
 ### Changed
