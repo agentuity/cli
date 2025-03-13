@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	"github.com/agentuity/go-common/slice"
 	"github.com/charmbracelet/lipgloss/tree"
 	"github.com/spf13/cobra"
 )
@@ -51,7 +53,7 @@ var agentDeleteCmd = &cobra.Command{
 			}
 		}
 
-		selected := tui.MultiSelect(logger, "Select one or more Agents to delete", "Toggle selection by pressing the spacebar\nPress enter to confirm\n", options)
+		selected := tui.MultiSelect(logger, "Select one or more Agents to delete from Agentuity Cloud", "Toggle selection by pressing the spacebar\nPress enter to confirm\n", options)
 
 		if len(selected) == 0 {
 			tui.ShowWarning("no Agents selected")
@@ -59,6 +61,7 @@ var agentDeleteCmd = &cobra.Command{
 		}
 
 		var deleted []string
+		var maybedelete []string
 
 		action := func() {
 			var err error
@@ -68,18 +71,62 @@ var agentDeleteCmd = &cobra.Command{
 			}
 			for _, key := range keys {
 				agent := state[key]
-				if util.Exists(agent.Filename) {
-					os.Remove(agent.Filename)
+				if slices.Contains(deleted, agent.Agent.ID) && util.Exists(agent.Filename) {
+					maybedelete = append(maybedelete, agent.Filename)
 				}
+			}
+			var agents []project.AgentConfig
+			for _, agent := range theproject.Project.Agents {
+				if !slice.Contains(deleted, agent.ID) {
+					agents = append(agents, agent)
+				}
+			}
+			theproject.Project.Agents = agents
+			if err := theproject.Project.Save(theproject.Dir); err != nil {
+				errsystem.New(errsystem.ErrSaveProject, err, errsystem.WithContextMessage("saving project after agent delete")).ShowErrorAndExit()
 			}
 		}
 
-		if !tui.Ask(logger, tui.Paragraph("Are you sure you want to delete the selected Agents?", "This action cannot be undone."), true) {
+		if !tui.Ask(logger, tui.Paragraph("Are you sure you want to delete the selected Agents from Agentuity Cloud?", "This action cannot be undone."), true) {
 			tui.ShowWarning("cancelled")
 			return
 		}
 
 		tui.ShowSpinner("Deleting Agents ...", action)
+
+		var filedeletes []string
+
+		if len(maybedelete) > 0 {
+			filetext := util.Pluralize(len(maybedelete), "source file", "source files")
+			var opts []tui.Option
+			for _, f := range maybedelete {
+				rel, _ := filepath.Rel(theproject.Dir, f)
+				opts = append(opts, tui.Option{
+					ID:       f,
+					Text:     rel,
+					Selected: true,
+				})
+			}
+			filedeletes = tui.MultiSelect(logger, fmt.Sprintf("Would you like to delete the %s?", filetext), "Press spacebar to toggle file selection. Press enter to continue.", opts)
+		}
+
+		if len(filedeletes) > 0 {
+			ad := filepath.Join(theproject.Dir, ".agentuity", "backup")
+			if !util.Exists(ad) {
+				os.MkdirAll(ad, 0755)
+			}
+			for _, f := range filedeletes {
+				fd := filepath.Dir(f)
+				util.CopyDir(fd, filepath.Join(ad, filepath.Base(fd))) // make a backup
+				os.Remove(f)
+				files, _ := util.ListDir(fd)
+				if len(files) == 0 {
+					os.Remove(fd)
+				}
+			}
+			tui.ShowSuccess("A backup was made temporarily in %s", ad)
+		}
+
 		tui.ShowSuccess("%s deleted successfully", util.Pluralize(len(deleted), "Agent", "Agents"))
 	},
 }
