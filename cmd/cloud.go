@@ -254,12 +254,10 @@ var cloudDeployCmd = &cobra.Command{
 			errsystem.New(errsystem.ErrDeployProject, err).ShowErrorAndExit()
 		}
 
-		cleanup, err := deploymentConfig.Write(logger, dir)
-		if err != nil {
+		if err := deploymentConfig.Write(logger, dir); err != nil {
 			errsystem.New(errsystem.ErrWriteConfigurationFile, err,
 				errsystem.WithContextMessage("Error writing deployment config to disk")).ShowErrorAndExit()
 		}
-		defer cleanup()
 
 		var startResponse startResponse
 		var startRequest startRequest
