@@ -115,6 +115,7 @@ var cloudDeployCmd = &cobra.Command{
 		dir := context.Dir
 		apiUrl := context.APIURL
 		appUrl := context.APPURL
+		transportUrl := context.TransportURL
 		token := context.Token
 
 		var keys []string
@@ -487,7 +488,7 @@ var cloudDeployCmd = &cobra.Command{
 					body2 += tui.Body("· Run ") + tui.Command("agent apikey "+theproject.Agents[0].ID) + tui.Body("\n  to fetch the API key for this webhook")
 					body2 += "\n\n"
 				}
-				body2 += tui.Body(fmt.Sprintf("· Send %s webhook request to\n  ", theproject.Agents[0].Name) + tui.Link("%s/run/%s", apiUrl, theproject.Agents[0].ID))
+				body2 += tui.Body(fmt.Sprintf("· Send %s webhook request to\n  ", theproject.Agents[0].Name) + tui.Link("%s/%s", transportUrl, strings.TrimLeft(theproject.Agents[0].ID, "agent_")))
 			}
 
 			tui.ShowBanner("Your project was deployed successfully!", body+body2, true)

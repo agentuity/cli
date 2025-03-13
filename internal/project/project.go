@@ -430,46 +430,49 @@ func (c *DeploymentConfig) Write(logger logger.Logger, dir string) error {
 }
 
 type ProjectContext struct {
-	Logger     logger.Logger
-	Project    *Project
-	Dir        string
-	APIURL     string
-	APPURL     string
-	Token      string
-	NewProject bool
+	Logger       logger.Logger
+	Project      *Project
+	Dir          string
+	APIURL       string
+	APPURL       string
+	TransportURL string
+	Token        string
+	NewProject   bool
 }
 
-func LoadProject(logger logger.Logger, dir string, apiUrl string, appUrl string, token string) ProjectContext {
+func LoadProject(logger logger.Logger, dir string, apiUrl string, appUrl string, transportUrl, token string) ProjectContext {
 	theproject := NewProject()
 	if err := theproject.Load(dir); err != nil {
 		if err == ErrProjectMissingProjectId {
 			return ProjectContext{
-				Logger:     logger,
-				Dir:        dir,
-				Project:    theproject,
-				APIURL:     apiUrl,
-				APPURL:     appUrl,
-				Token:      token,
-				NewProject: true,
+				Logger:       logger,
+				Dir:          dir,
+				Project:      theproject,
+				APIURL:       apiUrl,
+				APPURL:       appUrl,
+				TransportURL: transportUrl,
+				Token:        token,
+				NewProject:   true,
 			}
 		}
 		errsystem.New(errsystem.ErrInvalidConfiguration, err,
 			errsystem.WithContextMessage("Error loading project from disk")).ShowErrorAndExit()
 	}
 	return ProjectContext{
-		Logger:  logger,
-		Project: theproject,
-		Dir:     dir,
-		APIURL:  apiUrl,
-		APPURL:  appUrl,
-		Token:   token,
+		Logger:       logger,
+		Project:      theproject,
+		Dir:          dir,
+		APIURL:       apiUrl,
+		APPURL:       appUrl,
+		TransportURL: transportUrl,
+		Token:        token,
 	}
 }
 
 func EnsureProject(cmd *cobra.Command) ProjectContext {
 	logger := env.NewLogger(cmd)
 	dir := ResolveProjectDir(logger, cmd)
-	apiUrl, appUrl := util.GetURLs(logger)
+	apiUrl, appUrl, transportUrl := util.GetURLs(logger)
 	var token string
 	// if the --api-key flag is used, we only need to verify the api key
 	if cmd.Flags().Changed("api-key") {
@@ -477,7 +480,7 @@ func EnsureProject(cmd *cobra.Command) ProjectContext {
 	} else {
 		token, _ = util.EnsureLoggedIn()
 	}
-	p := LoadProject(logger, dir, apiUrl, appUrl, token)
+	p := LoadProject(logger, dir, apiUrl, appUrl, transportUrl, token)
 	if !p.NewProject && Version != "" && Version != "dev" && p.Project.Version != "" {
 		v := semver.MustParse(Version)
 		c, err := semver.NewConstraint(p.Project.Version)

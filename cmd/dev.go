@@ -28,7 +28,7 @@ var devRunCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		log := env.NewLogger(cmd)
 		dir := project.ResolveProjectDir(log, cmd)
-		_, appUrl := getURLs(log)
+		_, appUrl, _ := util.GetURLs(log)
 		websocketUrl := viper.GetString("overrides.websocket_url")
 		websocketId, _ := cmd.Flags().GetString("websocket-id")
 		apiKey, _ := util.EnsureLoggedIn()
