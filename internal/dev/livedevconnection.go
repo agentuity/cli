@@ -290,7 +290,7 @@ func processInputMessage(logger logger.Logger, c *LiveDevConnection, m []byte) {
 		Trigger:     output.Trigger,
 	})
 
-	c.SendMessage(logger, outputMessage)
-
-	return
+	if err := c.SendMessage(logger, outputMessage); err != nil {
+		logger.Error("failed to send output message: %s", err)
+	}
 }
