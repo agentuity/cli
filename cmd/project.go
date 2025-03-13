@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -455,6 +456,12 @@ var projectNewCmd = &cobra.Command{
 		tui.ShowSpinner("checking dependencies ...", func() {
 			if !provider.Matches(tmplContext) {
 				if err := provider.Install(tmplContext); err != nil {
+					var requirementsErr *templates.ErrRequirementsNotMet
+					if errors.As(err, &requirementsErr) {
+						tui.CancelSpinner()
+						tui.ShowBanner("Missing Requirement", requirementsErr.Message, false)
+						os.Exit(1)
+					}
 					errsystem.New(errsystem.ErrInstallDependencies, err, errsystem.WithContextMessage("Failed to install dependencies")).ShowErrorAndExit()
 				}
 			}

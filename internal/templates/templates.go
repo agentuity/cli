@@ -13,6 +13,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type ErrRequirementsNotMet struct {
+	Message string
+}
+
+func (e *ErrRequirementsNotMet) Error() string {
+	return e.Message
+}
+
 type Requirement struct {
 	Command    string   `yaml:"command"`
 	Args       []string `yaml:"args"`
@@ -95,9 +103,9 @@ func (r *Requirement) TryInstall(ctx TemplateContext) error {
 		}
 	}
 	if r.URL != "" {
-		return fmt.Errorf("missing %s. install from %s", r.Command, r.URL)
+		return &ErrRequirementsNotMet{fmt.Sprintf("Required dependency %s is missing and cannot automatically be installed. You can find installation instructions from %s", r.Command, r.URL)}
 	}
-	return fmt.Errorf("missing %s. install it manually before continuing", r.Command)
+	return &ErrRequirementsNotMet{fmt.Sprintf("Required dependency %s is missing and cannot automatically be installed. Install it manually before continuing", r.Command)}
 }
 
 func (r *Requirement) Matches(ctx TemplateContext) bool {
