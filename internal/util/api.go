@@ -184,7 +184,7 @@ func GetURLs(logger logger.Logger) (string, string, string) {
 	if apiUrl == "https://api.agentuity.com" && transportUrl != "https://agentuity.api" {
 		logger.Debug("switching transport url to production since the api url is production")
 		transportUrl = "https://agentuity.ai"
-	} else if apiUrl == "https://api.agentuity.dev" && appUrl == "https://agentuity.ai" {
+	} else if apiUrl == "https://api.agentuity.dev" && transportUrl == "https://agentuity.ai" {
 		logger.Debug("switching transport url to dev since the api url is dev")
 		transportUrl = "http://localhost:3939"
 	}
