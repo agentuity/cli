@@ -412,26 +412,21 @@ func NewDeploymentConfig() *DeploymentConfig {
 	return &DeploymentConfig{}
 }
 
-type CleanupFunc func()
-
-func (c *DeploymentConfig) Write(logger logger.Logger, dir string) (CleanupFunc, error) {
-	fn := filepath.Join(dir, "agentuity-deployment.yaml")
-	cleanup := func() {
-		os.Remove(fn)
-	}
+func (c *DeploymentConfig) Write(logger logger.Logger, dir string) error {
+	fn := filepath.Join(dir, ".agentuity", ".manifest.yaml")
 	of, err := os.Create(fn)
 	if err != nil {
-		return cleanup, err
+		return err
 	}
 	defer of.Close()
 	enc := yaml.NewEncoder(of)
 	enc.SetIndent(2)
 	err = enc.Encode(c)
 	if err != nil {
-		return cleanup, err
+		return err
 	}
 	logger.Debug("deployment config written to %s", fn)
-	return cleanup, nil
+	return nil
 }
 
 type ProjectContext struct {
