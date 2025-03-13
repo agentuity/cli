@@ -21,7 +21,9 @@ func CreateRunProjectCmd(log logger.Logger, theproject project.ProjectContext, l
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_URL=%s", theproject.APIURL))
 	projectServerCmd.Env = append(projectServerCmd.Env, "AGENTUITY_SDK_DEV_MODE=true")
 	projectServerCmd.Env = append(projectServerCmd.Env, "AGENTUITY_ENV=development")
-	projectServerCmd.Env = append(projectServerCmd.Env, "NODE_ENV=development")
+	if theproject.Project.Bundler.Language == "javascript" {
+		projectServerCmd.Env = append(projectServerCmd.Env, "NODE_ENV=development")
+	}
 	projectServerCmd.Stdout = os.Stdout
 	projectServerCmd.Stderr = os.Stderr
 	projectServerCmd.Stdin = os.Stdin
