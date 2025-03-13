@@ -97,6 +97,7 @@ func initConfig() {
 			}
 		}
 		cfgFile = filepath.Join(dir, "config.yaml")
+		cfgFile = getProfile()
 		viper.SetConfigFile(cfgFile)
 	}
 
