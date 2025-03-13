@@ -137,7 +137,7 @@ func getURLs(logger logger.Logger) (string, string) {
 	if apiUrl == "https://api.agentuity.com" && appUrl != "https://app.agentuity.com" {
 		logger.Debug("switching app url to production since the api url is production")
 		appUrl = "https://app.agentuity.com"
-	} else if apiUrl == "https://api.agentuity.div" && appUrl == "https://app.agentuity.com" {
+	} else if apiUrl == "https://api.agentuity.dev" && appUrl == "https://app.agentuity.com" {
 		logger.Debug("switching app url to dev since the api url is dev")
 		appUrl = "http://localhost:3000"
 	}
