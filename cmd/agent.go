@@ -469,7 +469,7 @@ var agentListCmd = &cobra.Command{
 var agentGetApiKeyCmd = &cobra.Command{
 	Use:     "apikey [agent_name]",
 	Short:   "Get the API key for an agent",
-	Args:    cobra.ExactArgs(1),
+	Args:    cobra.MaximumNArgs(1),
 	Aliases: []string{"key"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
