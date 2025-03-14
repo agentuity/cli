@@ -469,7 +469,7 @@ var agentListCmd = &cobra.Command{
 var agentGetApiKeyCmd = &cobra.Command{
 	Use:     "apikey [agent_name]",
 	Short:   "Get the API key for an agent",
-	Args:    cobra.MaximumNArgs(1),
+	Args:    cobra.ExactArgs(1),
 	Aliases: []string{"key"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
@@ -538,12 +538,14 @@ var agentGetApiKeyCmd = &cobra.Command{
 				return
 			}
 		}
-		if agentID != "" {
+		if apikey != "" {
 			fmt.Println()
 			tui.ShowLock("Agent %s API key: %s", theagent.Agent.Name, apikey)
 			tip := fmt.Sprintf(`$(agentuity agent apikey %s)`, agentID)
 			tui.ShowBanner("Developer Pro Tip", tui.Paragraph("Fetch your Agent's API key into a shell command dynamically:", tip), false)
 			return
+		} else {
+			tui.ShowWarning("No API key found for Agent %s (%s)", theagent.Agent.Name, theagent.Agent.ID)
 		}
 		os.Exit(1) // no key
 	},

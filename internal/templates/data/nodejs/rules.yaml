@@ -17,6 +17,7 @@ development:
       - "src/**"
   command: node
   args:
+    - --env-file=.env
     - .agentuity/index.js
 deployment:
   resources:
