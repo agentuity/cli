@@ -38,7 +38,7 @@ var agentDeleteCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		theproject := project.EnsureProject(cmd)
-		apiUrl, _ := getURLs(logger)
+		apiUrl, _, _ := util.GetURLs(logger)
 
 		keys, state := reconcileAgentList(logger, apiUrl, theproject.Token, theproject)
 
@@ -180,7 +180,7 @@ var agentCreateCmd = &cobra.Command{
 		logger := env.NewLogger(cmd)
 		theproject := project.EnsureProject(cmd)
 		apikey := theproject.Token
-		apiUrl, _ := getURLs(logger)
+		apiUrl, _, _ := util.GetURLs(logger)
 
 		var remoteAgents []agent.Agent
 
@@ -441,7 +441,7 @@ var agentListCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		project := project.EnsureProject(cmd)
-		apiUrl, _ := getURLs(logger)
+		apiUrl, _, _ := util.GetURLs(logger)
 
 		// perform the reconcilation
 		keys, state := reconcileAgentList(logger, apiUrl, project.Token, project)
@@ -474,7 +474,7 @@ var agentGetApiKeyCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		project := project.EnsureProject(cmd)
-		apiUrl, _ := getURLs(logger)
+		apiUrl, _, _ := util.GetURLs(logger)
 
 		// perform the reconcilation
 		keys, state := reconcileAgentList(logger, apiUrl, project.Token, project)

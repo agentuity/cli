@@ -27,7 +27,7 @@ var authLoginCmd = &cobra.Command{
 	Short: "Login to the Agentuity Platform",
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apiUrl, appUrl := getURLs(logger)
+		apiUrl, appUrl, _ := util.GetURLs(logger)
 		var otp string
 		loginaction := func() {
 			var err error
@@ -95,7 +95,7 @@ var authWhoamiCmd = &cobra.Command{
 	Short: "Print the current logged in user details",
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apiUrl, _ := getURLs(logger)
+		apiUrl, _, _ := util.GetURLs(logger)
 		apiKey, userId := util.EnsureLoggedIn()
 		user, err := auth.GetUser(logger, apiUrl, apiKey)
 		if err != nil {

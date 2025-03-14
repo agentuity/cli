@@ -170,9 +170,10 @@ func TransformUrl(urlString string) string {
 	return urlString
 }
 
-func GetURLs(logger logger.Logger) (string, string) {
+func GetURLs(logger logger.Logger) (string, string, string) {
 	appUrl := viper.GetString("overrides.app_url")
 	apiUrl := viper.GetString("overrides.api_url")
+	transportUrl := viper.GetString("overrides.transport_url")
 	if apiUrl == "https://api.agentuity.com" && appUrl != "https://app.agentuity.com" {
 		logger.Debug("switching app url to production since the api url is production")
 		appUrl = "https://app.agentuity.com"
@@ -180,7 +181,14 @@ func GetURLs(logger logger.Logger) (string, string) {
 		logger.Debug("switching app url to dev since the api url is dev")
 		appUrl = "http://localhost:3000"
 	}
-	return TransformUrl(apiUrl), TransformUrl(appUrl)
+	if apiUrl == "https://api.agentuity.com" && transportUrl != "https://agentuity.api" {
+		logger.Debug("switching transport url to production since the api url is production")
+		transportUrl = "https://agentuity.ai"
+	} else if apiUrl == "https://api.agentuity.dev" && transportUrl == "https://agentuity.ai" {
+		logger.Debug("switching transport url to dev since the api url is dev")
+		transportUrl = "http://localhost:3939"
+	}
+	return TransformUrl(apiUrl), TransformUrl(appUrl), TransformUrl(transportUrl)
 }
 
 func ShowLogin() {
