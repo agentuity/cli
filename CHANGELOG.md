@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.60] - 2025-03-13
+
+### Added
+- Add support for new transport domain (agentuity.ai) ([#89](https://github.com/agentuity/cli/pull/89))
+- Add profile switching for local development ([#89](https://github.com/agentuity/cli/pull/89))
+
+### Fixed
+- Improve agent deletion logic with backup functionality ([#90](https://github.com/agentuity/cli/pull/90))
+- Correct .dev domain references ([#91](https://github.com/agentuity/cli/pull/91), [#92](https://github.com/agentuity/cli/pull/92))
+
 ## [v0.0.59] - 2025-03-13
 
 ### Changed
