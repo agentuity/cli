@@ -18,9 +18,11 @@ import (
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/cli/internal/util"
+	"github.com/agentuity/go-common/crypto"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -43,6 +45,7 @@ type startResponse struct {
 		DeploymentId string  `json:"deploymentId"`
 		Url          string  `json:"url"`
 		Created      []Agent `json:"created,omitempty"`
+		OrgSecret    *string `json:"org_secret,omitempty"`
 	}
 	Message *string `json:"message,omitempty"`
 }
@@ -325,6 +328,21 @@ var cloudDeployCmd = &cobra.Command{
 				errsystem.WithContextMessage("Unknown API error starting deployment")).ShowErrorAndExit()
 		}
 
+		var orgSecret string
+
+		if startResponse.Data.OrgSecret == nil {
+			orgSecret = os.Getenv("AGENTUITY_ORG_SECRET")
+			if orgSecret == "" {
+				orgSecret = viper.GetString("org_secret")
+				if orgSecret == "" {
+					errsystem.New(errsystem.ErrDeployProject, fmt.Errorf("no org secret found"),
+						errsystem.WithContextMessage("No org secret found")).ShowErrorAndExit()
+				}
+			}
+		} else {
+			orgSecret = *startResponse.Data.OrgSecret
+		}
+
 		var saveProject bool
 
 		// remove any agents that were deleted from the project
@@ -414,14 +432,30 @@ var cloudDeployCmd = &cobra.Command{
 
 		tui.ShowSpinner("Packaging ...", zipaction)
 
-		of, err := os.Open(tmpfile.Name())
+		dof, err := os.Open(tmpfile.Name())
 		if err != nil {
 			errsystem.New(errsystem.ErrOpenFile, err,
 				errsystem.WithContextMessage("Error opening deployment zip file")).ShowErrorAndExit()
 		}
+		defer dof.Close()
+
+		of, err := os.CreateTemp("", "agentuity-deploy-*.zip")
+		if err != nil {
+			errsystem.New(errsystem.ErrCreateTemporaryFile, err,
+				errsystem.WithContextMessage("Error creating temp file")).ShowErrorAndExit()
+		}
+		defer os.Remove(of.Name())
 		defer of.Close()
 
-		fi, _ := os.Stat(tmpfile.Name())
+		if err := crypto.EncryptStream(dof, of, orgSecret); err != nil {
+			errsystem.New(errsystem.ErrEncryptingDeploymentZipFile, err,
+				errsystem.WithContextMessage("Error encrypting deployment zip file")).ShowErrorAndExit()
+		}
+		of.Close()
+		dof.Close()
+		os.Remove(tmpfile.Name()) // remove the unencrypted zip file
+
+		fi, _ := os.Stat(of.Name())
 		started := time.Now()
 		var webhookToken string
 

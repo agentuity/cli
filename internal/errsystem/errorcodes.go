@@ -90,4 +90,8 @@ var (
 		Code:    "CLI-0022",
 		Message: "Error importing project",
 	}
+	ErrEncryptingDeploymentZipFile = errorType{
+		Code:    "CLI-0023",
+		Message: "Error encrypting deployment zip file",
+	}
 )
