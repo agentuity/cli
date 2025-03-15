@@ -25,7 +25,7 @@ func generateEnvWarning(envkey string) string {
 	return fmt.Sprintf(`if (process.env.AGENTUITY_ENVIRONMENT === 'development') {
 	  console.warn('\nYou have not set the environment variable %[1]s in your project .env file.\n');
 	 } else {
-	  console.warn('\nYou have not set the environment variable %[1]s in your project environment variables. Use "agentuity env set %[1]s" to set it.\n');
+	  console.warn('\nYou have not set the environment variable %[1]s in your project. Use "agentuity env set %[1]s" to set it and redeploy your project.\n');
 	 }
 	 process.exit(1);`, envkey)
 }
