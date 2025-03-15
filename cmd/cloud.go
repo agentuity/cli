@@ -45,7 +45,7 @@ type startResponse struct {
 		DeploymentId string  `json:"deploymentId"`
 		Url          string  `json:"url"`
 		Created      []Agent `json:"created,omitempty"`
-		OrgSecret    *string `json:"org_secret,omitempty"`
+		OrgSecret    *string `json:"orgSecret,omitempty"`
 	}
 	Message *string `json:"message,omitempty"`
 }
@@ -333,7 +333,7 @@ var cloudDeployCmd = &cobra.Command{
 		if startResponse.Data.OrgSecret == nil {
 			orgSecret = os.Getenv("AGENTUITY_ORG_SECRET")
 			if orgSecret == "" {
-				orgSecret = viper.GetString("org_secret")
+				orgSecret = viper.GetString("org.secret")
 				if orgSecret == "" {
 					errsystem.New(errsystem.ErrDeployProject, fmt.Errorf("no org secret found"),
 						errsystem.WithContextMessage("No org secret found")).ShowErrorAndExit()
