@@ -70,3 +70,6 @@ errors:
 
   - code: CLI-0022
     message: Error importing project
+
+  - code: CLI-0023
+    message: Error encrypting deployment zip file

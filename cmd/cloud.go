@@ -18,9 +18,11 @@ import (
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/cli/internal/util"
+	"github.com/agentuity/go-common/crypto"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -43,6 +45,7 @@ type startResponse struct {
 		DeploymentId string  `json:"deploymentId"`
 		Url          string  `json:"url"`
 		Created      []Agent `json:"created,omitempty"`
+		OrgSecret    *string `json:"orgSecret,omitempty"`
 	}
 	Message *string `json:"message,omitempty"`
 }
@@ -325,6 +328,21 @@ var cloudDeployCmd = &cobra.Command{
 				errsystem.WithContextMessage("Unknown API error starting deployment")).ShowErrorAndExit()
 		}
 
+		var orgSecret string
+
+		if startResponse.Data.OrgSecret == nil {
+			orgSecret = os.Getenv("AGENTUITY_ORG_SECRET")
+			if orgSecret == "" {
+				orgSecret = viper.GetString("org.secret")
+				if orgSecret == "" {
+					errsystem.New(errsystem.ErrDeployProject, fmt.Errorf("no org secret found"),
+						errsystem.WithContextMessage("No org secret found")).ShowErrorAndExit()
+				}
+			}
+		} else {
+			orgSecret = *startResponse.Data.OrgSecret
+		}
+
 		var saveProject bool
 
 		// remove any agents that were deleted from the project
@@ -414,14 +432,39 @@ var cloudDeployCmd = &cobra.Command{
 
 		tui.ShowSpinner("Packaging ...", zipaction)
 
-		of, err := os.Open(tmpfile.Name())
+		dof, err := os.Open(tmpfile.Name())
 		if err != nil {
 			errsystem.New(errsystem.ErrOpenFile, err,
 				errsystem.WithContextMessage("Error opening deployment zip file")).ShowErrorAndExit()
 		}
-		defer of.Close()
+		defer dof.Close()
 
-		fi, _ := os.Stat(tmpfile.Name())
+		ef, err := os.CreateTemp("", "agentuity-deploy-*.zip")
+		if err != nil {
+			errsystem.New(errsystem.ErrCreateTemporaryFile, err,
+				errsystem.WithContextMessage("Error creating temp file")).ShowErrorAndExit()
+		}
+		defer os.Remove(ef.Name())
+		defer ef.Close()
+
+		if err := crypto.EncryptStream(dof, ef, orgSecret); err != nil {
+			errsystem.New(errsystem.ErrEncryptingDeploymentZipFile, err,
+				errsystem.WithContextMessage("Error encrypting deployment zip file")).ShowErrorAndExit()
+		}
+		dof.Close()
+		os.Remove(tmpfile.Name()) // remove the unencrypted zip file
+		ef, err = os.Open(ef.Name())
+		if err != nil {
+			errsystem.New(errsystem.ErrOpenFile, err,
+				errsystem.WithContextMessage("Error opening encrypted deployment zip file")).ShowErrorAndExit()
+		}
+		defer ef.Close()
+
+		fi, err := ef.Stat()
+		if err != nil {
+			errsystem.New(errsystem.ErrEncryptingDeploymentZipFile, err,
+				errsystem.WithContextMessage("Error getting file stats after encryption")).ShowErrorAndExit()
+		}
 		started := time.Now()
 		var webhookToken string
 
@@ -430,7 +473,7 @@ var cloudDeployCmd = &cobra.Command{
 			// send the zip file to the upload endpoint provided
 			logger.Trace("uploading to %s", url)
 			// NOTE: we don't use the apiclient here because we're not going to our api
-			req, err := http.NewRequest("PUT", url, of)
+			req, err := http.NewRequest("PUT", url, ef)
 			if err != nil {
 				errsystem.New(errsystem.ErrUploadProject, err,
 					errsystem.WithContextMessage("Error creating PUT request")).ShowErrorAndExit()
