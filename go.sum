@@ -2,8 +2,8 @@ github.com/MakeNowJust/heredoc v1.0.0 h1:cXCdzVdstXyiTqTvfqk9SDHpKNjxuom+DOlyEeQ
 github.com/MakeNowJust/heredoc v1.0.0/go.mod h1:mG5amYoWBHf8vpLOuehzbGGw0EHxpZZ6lCpQ4fNJ8LE=
 github.com/Masterminds/semver v1.5.0 h1:H65muMkzWKEuNDnfl9d70GUjFniHKHRbFPGBuZ3QEww=
 github.com/Masterminds/semver v1.5.0/go.mod h1:MB6lktGJrhw8PrUyiEoblNEGEQ+RzHPF078ddwwvV3Y=
-github.com/agentuity/go-common v1.0.13 h1:07sFX1r/qKwxGEenkzP/N5a3ZtGwj4jU5BrjZmzpwk4=
-github.com/agentuity/go-common v1.0.13/go.mod h1:f/x+hc8/7a4f0iHfI7vuPgxuU+arJq2HjhIe2kWhbVg=
+github.com/agentuity/go-common v1.0.15 h1:kJf7drURrjM0a6jAytEMn50T9gOMJk6UDMwKOSAXNwQ=
+github.com/agentuity/go-common v1.0.15/go.mod h1:f/x+hc8/7a4f0iHfI7vuPgxuU+arJq2HjhIe2kWhbVg=
 github.com/atotto/clipboard v0.1.4 h1:EH0zSVneZPSuFR11BlR9YppQTVDbh5+16AmcJi4g1z4=
 github.com/atotto/clipboard v0.1.4/go.mod h1:ZY9tmq7sm5xIbd9bOK4onWV4S6X0u6GY7Vn0Yu86PYI=
 github.com/aymanbagabas/go-osc52/v2 v2.0.1 h1:HwpRHbFMcZLEVr42D4p7XBqjyuxQH5SMiErDT4WkJ2k=

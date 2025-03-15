@@ -453,7 +453,6 @@ var cloudDeployCmd = &cobra.Command{
 		}
 		dof.Close()
 		os.Remove(tmpfile.Name()) // remove the unencrypted zip file
-		// re-open the encrypted zip file
 		ef, err = os.Open(ef.Name())
 		if err != nil {
 			errsystem.New(errsystem.ErrOpenFile, err,
@@ -461,7 +460,11 @@ var cloudDeployCmd = &cobra.Command{
 		}
 		defer ef.Close()
 
-		fi, _ := os.Stat(ef.Name())
+		fi, err := ef.Stat()
+		if err != nil {
+			errsystem.New(errsystem.ErrEncryptingDeploymentZipFile, err,
+				errsystem.WithContextMessage("Error getting file stats after encryption")).ShowErrorAndExit()
+		}
 		started := time.Now()
 		var webhookToken string
 
