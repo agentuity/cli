@@ -439,23 +439,29 @@ var cloudDeployCmd = &cobra.Command{
 		}
 		defer dof.Close()
 
-		of, err := os.CreateTemp("", "agentuity-deploy-*.zip")
+		ef, err := os.CreateTemp("", "agentuity-deploy-*.zip")
 		if err != nil {
 			errsystem.New(errsystem.ErrCreateTemporaryFile, err,
 				errsystem.WithContextMessage("Error creating temp file")).ShowErrorAndExit()
 		}
-		defer os.Remove(of.Name())
-		defer of.Close()
+		defer os.Remove(ef.Name())
+		defer ef.Close()
 
-		if err := crypto.EncryptStream(dof, of, orgSecret); err != nil {
+		if err := crypto.EncryptStream(dof, ef, orgSecret); err != nil {
 			errsystem.New(errsystem.ErrEncryptingDeploymentZipFile, err,
 				errsystem.WithContextMessage("Error encrypting deployment zip file")).ShowErrorAndExit()
 		}
-		of.Close()
 		dof.Close()
 		os.Remove(tmpfile.Name()) // remove the unencrypted zip file
+		// re-open the encrypted zip file
+		ef, err = os.Open(ef.Name())
+		if err != nil {
+			errsystem.New(errsystem.ErrOpenFile, err,
+				errsystem.WithContextMessage("Error opening encrypted deployment zip file")).ShowErrorAndExit()
+		}
+		defer ef.Close()
 
-		fi, _ := os.Stat(of.Name())
+		fi, _ := os.Stat(ef.Name())
 		started := time.Now()
 		var webhookToken string
 
@@ -464,7 +470,7 @@ var cloudDeployCmd = &cobra.Command{
 			// send the zip file to the upload endpoint provided
 			logger.Trace("uploading to %s", url)
 			// NOTE: we don't use the apiclient here because we're not going to our api
-			req, err := http.NewRequest("PUT", url, of)
+			req, err := http.NewRequest("PUT", url, ef)
 			if err != nil {
 				errsystem.New(errsystem.ErrUploadProject, err,
 					errsystem.WithContextMessage("Error creating PUT request")).ShowErrorAndExit()
