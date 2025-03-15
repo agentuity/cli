@@ -18,6 +18,7 @@ development:
   command: node
   args:
     - --env-file=.env
+    - --no-deprecation
     - .agentuity/index.js
 deployment:
   resources:
@@ -65,7 +66,7 @@ new_project:
         - name: "prestart"
           value: "agentuity bundle"
         - name: "start"
-          value: "node --env-file .env .agentuity/index.js"
+          value: "node --env-file .env --no-deprecation .agentuity/index.js"
       main: "index.js"
       type: "module"
       name: "{{ .Name }}"

@@ -193,11 +193,11 @@ var cloudDeployCmd = &cobra.Command{
 				var title string
 				switch {
 				case len(foundkeys) < 3 && len(foundkeys) > 1:
-					title = fmt.Sprintf("The environment variables %s from .env are not in the project. Would you like to add it?", strings.Join(foundkeys, ", "))
+					title = fmt.Sprintf("The environment variables %s from .env are not been set in the project. Would you like to add it?", strings.Join(foundkeys, ", "))
 				case len(foundkeys) == 1:
-					title = fmt.Sprintf("The environment variable %s from .env is not in the project. Would you like to add it?", foundkeys[0])
+					title = fmt.Sprintf("The environment variable %s from .env has not been set in the project. Would you like to add it?", foundkeys[0])
 				default:
-					title = fmt.Sprintf("There are %d environment variables from .envthat are not in the project. Would you like to add them?", len(foundkeys))
+					title = fmt.Sprintf("There are %d environment variables from .env that are not set in the project. Would you like to add them?", len(foundkeys))
 				}
 				if !tui.Ask(logger, title, true) {
 					tui.ShowWarning("cancelled")
