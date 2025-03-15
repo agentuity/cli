@@ -21,6 +21,15 @@ type patchAction struct {
 	After  string
 }
 
+func generateEnvWarning(envkey string) string {
+	return fmt.Sprintf(`if (process.env.AGENTUITY_ENVIRONMENT === 'development') {
+	  console.warn('\nYou have not set the environment variable %[1]s in your project .env file.\n');
+	 } else {
+	  console.warn('\nYou have not set the environment variable %[1]s in your project environment variables. Use "agentuity env set %[1]s" to set it.\n');
+	 }
+	 process.exit(1);`, envkey)
+}
+
 func generateJSArgsPatch(index int, inject string) string {
 	return fmt.Sprintf(`const _newargs = [...(_args ?? [])];
 _newargs[%[1]d] = {..._newargs[%[1]d], %[2]s};
@@ -41,9 +50,11 @@ func generateGatewayEnvGuard(apikey string, apikeyval string, apibase string, pr
 		process.env.%[1]s = %[2]s;
 		process.env.%[3]s = url + '/sdk/gateway/%[4]s';
 		console.debug('Enabled Agentuity AI Gateway for %[4]s');
+	} else {
+	 %[5]s
 	}
 }
-`, apikey, apikeyval, apibase, provider)
+`, apikey, apikeyval, apibase, provider, generateEnvWarning(apikey))
 }
 
 var patches = map[string]patchModule{}
