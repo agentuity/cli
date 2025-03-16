@@ -469,6 +469,17 @@ var agentListCmd = &cobra.Command{
 var agentGetApiKeyCmd = &cobra.Command{
 	Use:     "apikey [agent_name]",
 	Short:   "Get the API key for an agent",
+	Long: `Get the API key for an agent by name or ID.
+
+Arguments:
+  [agent_name]  The name or ID of the agent to get the API key for
+
+If no agent name is provided, you will be prompted to select an agent.
+
+Examples:
+  agentuity agent apikey "My Agent"
+  agentuity agent apikey agent_ID
+  agentuity agent apikey`,
 	Args:    cobra.MaximumNArgs(1),
 	Aliases: []string{"key"},
 	Run: func(cmd *cobra.Command, args []string) {

@@ -29,6 +29,9 @@ import (
 var cloudCmd = &cobra.Command{
 	Use:   "cloud",
 	Short: "Cloud related commands",
+	Long: `Cloud related commands for deploying and managing your projects in the Agentuity Cloud.
+
+Use the subcommands to deploy and manage your cloud resources.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
@@ -110,6 +113,19 @@ func ShowNewProjectImport(logger logger.Logger, apiUrl, apikey, projectId string
 var cloudDeployCmd = &cobra.Command{
 	Use:   "deploy",
 	Short: "Deploy project to the cloud",
+	Long: `Deploy your project to the Agentuity Cloud.
+
+This command packages your project, uploads it to the Agentuity Cloud,
+and starts the deployment process. It will reconcile any differences
+between local and remote agents.
+
+Flags:
+  --dir    The directory containing the project to deploy
+
+Examples:
+  agentuity cloud deploy
+  agentuity deploy
+  agentuity cloud deploy --dir /path/to/project`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 		context := project.EnsureProject(cmd)
