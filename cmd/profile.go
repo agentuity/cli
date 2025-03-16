@@ -75,6 +75,9 @@ var profileCmd = &cobra.Command{
 	Use:    "profile",
 	Args:   cobra.NoArgs,
 	Short:  "Manage profiles",
+	Long: `Manage CLI configuration profiles.
+
+Use the subcommands to create and switch between different configuration profiles.`,
 	Hidden: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
@@ -85,6 +88,16 @@ var profileUseCmd = &cobra.Command{
 	Use:    "use [name]",
 	Args:   cobra.MaximumNArgs(1),
 	Short:  "Use a different profile",
+	Long: `Switch to a different configuration profile.
+
+Arguments:
+  [name]    The name of the profile to use
+
+If no name is provided, you will be prompted to select a profile.
+
+Examples:
+  agentuity profile use dev
+  agentuity profile use`,
 	Hidden: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
@@ -115,6 +128,13 @@ var profileCreateCmd = &cobra.Command{
 	Use:    "create",
 	Args:   cobra.NoArgs,
 	Short:  "Create a new empty profile",
+	Long: `Create a new empty configuration profile.
+
+This command creates a new configuration profile with a unique name.
+You will be prompted to enter a name for the profile.
+
+Examples:
+  agentuity profile create`,
 	Hidden: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)

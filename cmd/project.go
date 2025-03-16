@@ -26,6 +26,9 @@ import (
 var projectCmd = &cobra.Command{
 	Use:   "project",
 	Short: "Project related commands",
+	Long: `Project related commands for creating, listing, and managing projects.
+
+Use the subcommands to manage your projects.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
@@ -286,6 +289,23 @@ func showItemSelector(title string, items []list.Item) list.Item {
 var projectNewCmd = &cobra.Command{
 	Use:     "create [name] [description] [agent-name] [agent-description] [auth-type]",
 	Short:   "Create a new project",
+	Long: `Create a new project with the specified name, description, and initial agent.
+
+Arguments:
+  [name]                The name of the project (must be unique within the organization)
+  [description]         A description of what the project does
+  [agent-name]          The name of the initial agent
+  [agent-description]   A description of what the agent does
+  [auth-type]           The authentication type for the agent (bearer or none)
+
+Flags:
+  --dir        The directory for the project
+  --provider   The provider template to use for the project
+  --template   The template to use for the project
+
+Examples:
+  agentuity project create "My Project" "Project description" "My Agent" "Agent description" bearer
+  agentuity create --provider nodejs --template express`,
 	Aliases: []string{"new"},
 	Args:    cobra.MaximumNArgs(5),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -519,6 +539,13 @@ func showNoProjects() {
 var projectListCmd = &cobra.Command{
 	Use:     "list",
 	Short:   "List all projects",
+	Long: `List all projects in your organization.
+
+This command displays all projects in your organization, showing their IDs, names, and descriptions.
+
+Examples:
+  agentuity project list
+  agentuity project ls`,
 	Aliases: []string{"ls"},
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -559,6 +586,14 @@ var projectListCmd = &cobra.Command{
 var projectDeleteCmd = &cobra.Command{
 	Use:     "delete",
 	Short:   "Delete one or more projects",
+	Long: `Delete one or more projects from your organization.
+
+This command allows you to select and delete projects from your organization.
+It will prompt you to select which projects to delete and confirm the deletion.
+
+Examples:
+  agentuity project delete
+  agentuity project rm`,
 	Aliases: []string{"rm", "del"},
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -621,6 +656,17 @@ var projectDeleteCmd = &cobra.Command{
 var projectImportCmd = &cobra.Command{
 	Use:   "import",
 	Short: "Import a project",
+	Long: `Import an existing project into your organization.
+
+This command imports a project from the current directory into your organization.
+You will be prompted to select an organization and provide project details.
+
+Flags:
+  --dir    The directory containing the project to import
+
+Examples:
+  agentuity project import
+  agentuity project import --dir /path/to/project`,
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)

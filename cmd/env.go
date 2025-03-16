@@ -24,6 +24,9 @@ import (
 var envCmd = &cobra.Command{
 	Use:   "env",
 	Short: "Environment related commands",
+	Long: `Environment related commands for managing environment variables and secrets.
+
+Use the subcommands to set, get, list, and delete environment variables and secrets.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
@@ -93,6 +96,21 @@ var envSetCmd = &cobra.Command{
 	Use:     "set [key] [value]",
 	Aliases: []string{"add", "put"},
 	Short:   "Set environment variables",
+	Long: `Set environment variables or secrets for your project.
+
+Arguments:
+  [key]    The name of the environment variable
+  [value]  The value of the environment variable
+
+Flags:
+  --file      Path to a file containing environment variables to set
+  --secret    Force the value(s) to be treated as a secret
+  --force     Don't prompt for confirmation
+
+Examples:
+  agentuity env set API_KEY "my-api-key"
+  agentuity env set --secret TOKEN "secret-token"
+  agentuity env set --file .env`,
 	Run: func(cmd *cobra.Command, args []string) {
 		context := project.EnsureProject(cmd)
 		logger := context.Logger
@@ -255,6 +273,13 @@ var envSetCmd = &cobra.Command{
 var envGetCmd = &cobra.Command{
 	Use:   "get [key]",
 	Short: "Get an environment or secret value",
+	Long: `Get the value of an environment variable or secret.
+
+Arguments:
+  [key]    The name of the environment variable or secret to get
+
+Examples:
+  agentuity env get API_KEY`,
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		context := project.EnsureProject(cmd)
@@ -303,6 +328,13 @@ var envListCmd = &cobra.Command{
 	Aliases: []string{"ls", "show", "print"},
 	Args:    cobra.NoArgs,
 	Short:   "List all environment variables and secrets",
+	Long: `List all environment variables and secrets for your project.
+
+This command displays all environment variables and secrets set for your project.
+
+Examples:
+  agentuity env list
+  agentuity env ls`,
 	Run: func(cmd *cobra.Command, args []string) {
 		context := project.EnsureProject(cmd)
 		logger := context.Logger
@@ -342,6 +374,18 @@ var envDeleteCmd = &cobra.Command{
 	Aliases: []string{"rm", "del"},
 	Args:    cobra.MinimumNArgs(1),
 	Short:   "Delete one or more environment variables and secrets",
+	Long: `Delete one or more environment variables and secrets from your project.
+
+Arguments:
+  [key...]    One or more environment variable or secret names to delete
+
+Flags:
+  --force    Don't prompt for confirmation
+
+Examples:
+  agentuity env delete API_KEY
+  agentuity env delete API_KEY SECRET_TOKEN
+  agentuity env delete --force API_KEY`,
 	Run: func(cmd *cobra.Command, args []string) {
 		context := project.EnsureProject(cmd)
 		logger := context.Logger

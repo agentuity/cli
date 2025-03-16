@@ -17,6 +17,9 @@ import (
 var authCmd = &cobra.Command{
 	Use:   "auth",
 	Short: "Authentication and authorization related commands",
+	Long: `Authentication and authorization related commands for managing your Agentuity account.
+
+Use the subcommands to login, logout, and check your authentication status.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
@@ -25,6 +28,14 @@ var authCmd = &cobra.Command{
 var authLoginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "Login to the Agentuity Platform",
+	Long: `Login to the Agentuity Platform using a browser-based authentication flow.
+
+This command will generate a one-time password (OTP) and open a browser window
+where you can complete the authentication process.
+
+Examples:
+  agentuity login
+  agentuity auth login`,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		apiUrl, appUrl, _ := util.GetURLs(logger)
@@ -78,6 +89,13 @@ var authLoginCmd = &cobra.Command{
 var authLogoutCmd = &cobra.Command{
 	Use:   "logout",
 	Short: "Logout of the Agentuity Cloud Platform",
+	Long: `Logout of the Agentuity Cloud Platform.
+
+This command will remove your authentication credentials from the local configuration.
+
+Examples:
+  agentuity logout
+  agentuity auth logout`,
 	Run: func(cmd *cobra.Command, args []string) {
 		viper.Set("auth.api_key", "")
 		viper.Set("auth.user_id", "")
@@ -93,6 +111,13 @@ var authLogoutCmd = &cobra.Command{
 var authWhoamiCmd = &cobra.Command{
 	Use:   "whoami",
 	Short: "Print the current logged in user details",
+	Long: `Print the current logged in user details.
+
+This command displays information about the currently authenticated user,
+including name, organization, and IDs.
+
+Examples:
+  agentuity auth whoami`,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		apiUrl, _, _ := util.GetURLs(logger)

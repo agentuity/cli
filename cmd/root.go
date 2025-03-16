@@ -24,6 +24,12 @@ var cfgFile string
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use: "agentuity",
+	Long: `Agentuity CLI is a command-line tool for building, managing, and deploying AI agents.
+
+Use the various commands to create projects, manage agents, set environment variables,
+and deploy your agents to the Agentuity Cloud Platform.
+
+Run 'agentuity help <command>' for more information about a specific command.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if version, _ := cmd.Flags().GetBool("version"); version {
 			fmt.Println(Version)

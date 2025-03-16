@@ -25,6 +25,20 @@ var devRunCmd = &cobra.Command{
 	Aliases: []string{"dev"},
 	Args:    cobra.NoArgs,
 	Short:   "Run the development server",
+	Long: `Run the development server for local testing and development.
+
+This command starts a local development server that connects to the Agentuity Cloud
+for live development and testing of your agents. It watches for file changes and
+automatically rebuilds your project when changes are detected.
+
+Flags:
+  --dir            The directory to run the development server in
+  --websocket-id   The websocket room ID to use for the development agent
+
+Examples:
+  agentuity run
+  agentuity dev
+  agentuity run --dir /path/to/project`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log := env.NewLogger(cmd)
 		dir := project.ResolveProjectDir(log, cmd)
