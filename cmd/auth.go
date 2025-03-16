@@ -30,7 +30,7 @@ var authLoginCmd = &cobra.Command{
 	Short: "Login to the Agentuity Platform",
 	Long: `Login to the Agentuity Platform using a browser-based authentication flow.
 
-This command will generate a one-time password (OTP) and open a browser window
+This command will generate a one-time password (OTP) and print a link to a URL
 where you can complete the authentication process.
 
 Examples:
