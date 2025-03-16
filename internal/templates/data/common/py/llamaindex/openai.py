@@ -18,5 +18,5 @@ agent = AgentWorkflow.from_tools_or_functions(
 
 
 async def run(request: AgentRequest, response: AgentResponse, context: AgentContext):
-    result = await agent.run(request.text or "What is 1234 * 4567?")
+    result = await agent.run(request.data.text or "What is 1234 * 4567?")
     return response.text(str(result))
