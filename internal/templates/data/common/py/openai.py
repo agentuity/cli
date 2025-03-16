@@ -13,7 +13,7 @@ async def run(request: AgentRequest, response: AgentResponse, context: AgentCont
             },
             {
                 "role": "user",
-                "content": request.text or "Why is the sky blue?",
+                "content": request.data.text or "Why is the sky blue?",
             },
         ],
         model="gpt-4o",

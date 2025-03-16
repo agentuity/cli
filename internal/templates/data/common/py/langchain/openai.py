@@ -18,6 +18,6 @@ async def run(request: AgentRequest, response: AgentResponse, context: AgentCont
     )
     output_parser = StrOutputParser()
     chain = prompt | llm | output_parser
-    result = chain.invoke({"input": request.text})
+    result = chain.invoke({"input": request.data.text})
 
     return response.text(result)
