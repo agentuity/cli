@@ -116,6 +116,9 @@ func (e *errSystem) ShowErrorAndExit() {
 			e.attributes["api_error_method"] = apiError.Method
 			e.attributes["api_error_status"] = strconv.Itoa(apiError.Status)
 			e.attributes["api_error_body"] = apiError.Body
+			if apiError.TraceID != "" {
+				e.attributes["api_error_trace_id"] = apiError.TraceID
+			}
 		}
 		errmsg := e.err.Error()
 		if errmsg != "" {

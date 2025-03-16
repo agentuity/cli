@@ -31,6 +31,7 @@ type APIError struct {
 	Status   int
 	Body     string
 	TheError error
+	TraceID  string
 }
 
 func (e *APIError) Error() string {
@@ -40,13 +41,14 @@ func (e *APIError) Error() string {
 	return e.TheError.Error()
 }
 
-func NewAPIError(url, method string, status int, body string, err error) *APIError {
+func NewAPIError(url, method string, status int, body string, err error, traceID string) *APIError {
 	return &APIError{
 		URL:      url,
 		Method:   method,
 		Status:   status,
 		Body:     body,
 		TheError: err,
+		TraceID:  traceID,
 	}
 }
 
@@ -72,9 +74,11 @@ type APIResponse struct {
 }
 
 func (c *APIClient) Do(method, path string, payload interface{}, response interface{}) error {
+	var traceID string
+
 	u, err := url.Parse(c.baseURL)
 	if err != nil {
-		return NewAPIError(c.baseURL, method, 0, "", fmt.Errorf("error parsing base url: %w", err))
+		return NewAPIError(c.baseURL, method, 0, "", fmt.Errorf("error parsing base url: %w", err), traceID)
 	}
 	u.Path = path
 
@@ -82,14 +86,14 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 	if payload != nil {
 		body, err = json.Marshal(payload)
 		if err != nil {
-			return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error marshalling payload: %w", err))
+			return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error marshalling payload: %w", err), traceID)
 		}
 	}
 	c.logger.Trace("sending request: %s %s", method, u.String())
 
 	req, err := http.NewRequest(method, u.String(), bytes.NewBuffer(body))
 	if err != nil {
-		return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error creating request: %w", err))
+		return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error creating request: %w", err), traceID)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if c.token != "" {
@@ -98,21 +102,25 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error sending request: %w", err))
+		return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error sending request: %w", err), traceID)
 	}
 	defer resp.Body.Close()
 	c.logger.Debug("response status: %s", resp.Status)
 
+	if resp.Header != nil {
+		traceID = resp.Header.Get("traceparent")
+	}
+
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error reading response body: %w", err))
+		return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error reading response body: %w", err), traceID)
 	}
 
 	c.logger.Debug("response body: %s, content-type: %s", string(respBody), resp.Header.Get("content-type"))
 	if resp.StatusCode > 299 && strings.Contains(resp.Header.Get("content-type"), "application/json") {
 		var apiResponse APIResponse
 		if err := json.Unmarshal(respBody, &apiResponse); err != nil {
-			return NewAPIError(u.String(), method, resp.StatusCode, string(respBody), fmt.Errorf("error unmarshalling response: %w", err))
+			return NewAPIError(u.String(), method, resp.StatusCode, string(respBody), fmt.Errorf("error unmarshalling response: %w", err), traceID)
 		}
 		if !apiResponse.Success {
 			if len(apiResponse.Error.Issues) > 0 {
@@ -124,21 +132,21 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 					}
 					errs = append(errs, msg)
 				}
-				return NewAPIError(u.String(), method, resp.StatusCode, string(respBody), fmt.Errorf("%s", strings.Join(errs, ". ")))
+				return NewAPIError(u.String(), method, resp.StatusCode, string(respBody), fmt.Errorf("%s", strings.Join(errs, ". ")), traceID)
 			}
 			if apiResponse.Message != "" {
-				return NewAPIError(u.String(), method, resp.StatusCode, string(respBody), fmt.Errorf("%s", apiResponse.Message))
+				return NewAPIError(u.String(), method, resp.StatusCode, string(respBody), fmt.Errorf("%s", apiResponse.Message), traceID)
 			}
 		}
 	}
 
 	if resp.StatusCode > 299 {
-		return NewAPIError(u.String(), method, resp.StatusCode, string(respBody), fmt.Errorf("request failed with status (%s)", resp.Status))
+		return NewAPIError(u.String(), method, resp.StatusCode, string(respBody), fmt.Errorf("request failed with status (%s)", resp.Status), traceID)
 	}
 
 	if response != nil {
 		if err := json.Unmarshal(respBody, &response); err != nil {
-			return NewAPIError(u.String(), method, resp.StatusCode, string(respBody), fmt.Errorf("error JSON decoding response: %w", err))
+			return NewAPIError(u.String(), method, resp.StatusCode, string(respBody), fmt.Errorf("error JSON decoding response: %w", err), traceID)
 		}
 	}
 	return nil
