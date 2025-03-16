@@ -12,7 +12,6 @@ if (!process.env.AGENTUITY_URL) {
 	} else {
 		console.warn("\x1b[31m[WARN] Recommend running `agentuity dev` to run your project locally instead of npm start.\x1b[0m");
 	}
-	console.log(process.env);
 }
 
 runner(true, import.meta.dirname).catch((err) => {
