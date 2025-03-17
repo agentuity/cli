@@ -4,16 +4,16 @@
 <br />
 </div>
 
-# 🤖 Python UV Agent Project
+# 🤖 Python Agent Project
 
-Welcome to your Agentuity Python UV Agent project! This README provides essential information to help you get started with developing, testing, and deploying your AI agents.
+Welcome to your Agentuity Python Agent project! This README provides essential information to help you get started with developing, testing, and deploying your AI agents.
 
 ## 📋 Prerequisites
 
 Before you begin, ensure you have the following installed:
 
 - **Python**: Version 3.10 or higher
-- **UV**: Latest version
+- **UV**: Version 0.5.25 or higher ([Documentation](https://docs.astral.sh/uv/))
 
 ## 🚀 Getting Started
 
