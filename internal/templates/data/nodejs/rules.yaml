@@ -82,6 +82,9 @@ new_project:
     - action: create_file
       filename: ".gitignore"
       from: "data/nodejs/gitignore"
+    - action: create_file
+      filename: "README.md"
+      from: "common/js/nodejs-readme.md"
     - action: copy_dir
       from: "common/js/cursor"
       to: ".cursor/rules"
