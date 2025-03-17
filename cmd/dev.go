@@ -13,9 +13,8 @@ import (
 	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
+	cstr "github.com/agentuity/go-common/string"
 	csys "github.com/agentuity/go-common/sys"
-	"github.com/google/uuid"
-	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -45,7 +44,7 @@ Examples:
 		_, appUrl, _ := util.GetURLs(log)
 		websocketUrl := viper.GetString("overrides.websocket_url")
 		websocketId, _ := cmd.Flags().GetString("websocket-id")
-		apiKey, _ := util.EnsureLoggedIn()
+		apiKey, userId := util.EnsureLoggedIn()
 		theproject := project.EnsureProject(cmd)
 
 		if theproject.NewProject {
@@ -56,7 +55,6 @@ Examples:
 			ShowNewProjectImport(context.Background(), log, theproject.APIURL, apiKey, projectId, theproject.Project, dir, false)
 		}
 
-		// get project from api
 		project, err := theproject.Project.GetProject(context.Background(), log, theproject.APIURL, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to get project: %s", err))).ShowErrorAndExit()
@@ -64,9 +62,8 @@ Examples:
 
 		orgId := project.OrgId
 
-		// need to fixs this!!!!!!!
 		if websocketId == "" {
-			websocketId = uuid.New().String()[:6]
+			websocketId = cstr.NewHash(orgId, userId)
 		}
 
 		liveDevConnection, err := dev.NewLiveDevConnection(log, websocketId, websocketUrl, apiKey, theproject)
@@ -117,10 +114,6 @@ Examples:
 
 		// Display local interaction instructions
 		displayLocalInstructions(theproject.Project.Development.Port, theproject.Project.Agents, devUrl)
-
-		if err := browser.OpenURL(devUrl); err != nil {
-			log.Fatal("failed to open browser: %s", err)
-		}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		go func() {

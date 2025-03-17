@@ -18,12 +18,16 @@ import (
 )
 
 type LiveDevConnection struct {
-	WebSocketId string
-	conn        *websocket.Conn
-	OtelToken   string
-	OtelUrl     string
-	Project     project.ProjectContext
-	Done        chan struct{}
+	WebSocketId  string
+	conn         *websocket.Conn
+	OtelToken    string
+	OtelUrl      string
+	Project      project.ProjectContext
+	Done         chan struct{}
+	apiKey       string
+	websocketUrl string
+	maxRetries   int
+	retryCount   int
 }
 
 type OutputPayload struct {
@@ -48,11 +52,34 @@ func (c *LiveDevConnection) StartReadingMessages(logger logger.Logger) {
 			if err != nil {
 				if errors.Is(err, websocket.ErrCloseSent) || errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
 					logger.Debug("connection closed")
+					if c.retryCount < c.maxRetries {
+						logger.Info("attempting to reconnect, retry %d of %d", c.retryCount+1, c.maxRetries)
+						if err := c.reconnect(logger); err != nil {
+							logger.Error("failed to reconnect: %s", err)
+							c.retryCount++
+							continue
+						}
+						c.retryCount = 0
+						continue
+					}
 					return
 				}
 				logger.Error("failed to read message: %s", err)
+				if c.retryCount < c.maxRetries {
+					logger.Info("attempting to reconnect, retry %d of %d", c.retryCount+1, c.maxRetries)
+					if err := c.reconnect(logger); err != nil {
+						logger.Error("failed to reconnect: %s", err)
+						c.retryCount++
+						continue
+					}
+					c.retryCount = 0
+					continue
+				}
 				return
 			}
+			// Reset retry count on successful message
+			c.retryCount = 0
+
 			logger.Trace("recv: %s", string(m))
 
 			var message Message
@@ -81,7 +108,9 @@ func (c *LiveDevConnection) StartReadingMessages(logger logger.Logger) {
 				logger.Trace("sending agents: %+v", agents)
 
 				agentsMessage := NewAgentsMessage(c.WebSocketId, AgentsPayload{
-					Agents: agents,
+					ProjectID:   c.Project.Project.ProjectId,
+					ProjectName: c.Project.Project.Name,
+					Agents:      agents,
 				})
 
 				c.SendMessage(logger, agentsMessage)
@@ -90,11 +119,67 @@ func (c *LiveDevConnection) StartReadingMessages(logger logger.Logger) {
 	}()
 }
 
+func (c *LiveDevConnection) reconnect(logger logger.Logger) error {
+	// Close existing connection if it exists
+	if c.conn != nil {
+		_ = c.conn.Close()
+	}
+
+	u, err := url.Parse(c.websocketUrl)
+	if err != nil {
+		return fmt.Errorf("failed to parse url: %s", err)
+	}
+	u.Path = fmt.Sprintf("/websocket/devmode/%s", c.WebSocketId)
+	u.RawQuery = url.Values{
+		"from": []string{"cli"},
+	}.Encode()
+
+	if u.Scheme == "http" {
+		u.Scheme = "ws"
+	} else if u.Scheme == "https" {
+		u.Scheme = "wss"
+	}
+
+	urlString := u.String()
+	headers := http.Header{}
+	headers.Set("Authorization", fmt.Sprintf("Bearer %s", c.apiKey))
+
+	// connect to the websocket
+	logger.Trace("reconnecting to %s", urlString)
+	var httpResponse *http.Response
+	c.conn, httpResponse, err = websocket.DefaultDialer.Dial(urlString, headers)
+	if err != nil {
+		if httpResponse != nil {
+			if httpResponse.StatusCode == 401 {
+				logger.Error("invalid api key")
+			}
+		}
+		return fmt.Errorf("failed to dial: %s", err)
+	}
+
+	// get the otel token and url from the headers
+	c.OtelToken = httpResponse.Header.Get("X-AGENTUITY-OTLP-BEARER-TOKEN")
+	if c.OtelToken == "" {
+		return errsystem.New(errsystem.ErrAuthenticateOtelServer, nil, errsystem.WithUserMessage("Failed to authenticate with otel server"))
+	}
+	c.OtelUrl = httpResponse.Header.Get("X-AGENTUITY-OTLP-URL")
+	if c.OtelUrl == "" {
+		return errsystem.New(errsystem.ErrAuthenticateOtelServer, nil, errsystem.WithUserMessage("Failed to get otel server url"))
+	}
+
+	logger.Info("successfully reconnected")
+	return nil
+}
+
 func NewLiveDevConnection(logger logger.Logger, websocketId string, websocketUrl string, apiKey string, theproject project.ProjectContext) (*LiveDevConnection, error) {
 	self := LiveDevConnection{
-		WebSocketId: websocketId,
-		Project:     theproject,
-		Done:        make(chan struct{}),
+		WebSocketId:  websocketId,
+		Project:      theproject,
+		Done:         make(chan struct{}),
+		apiKey:       apiKey,
+		websocketUrl: websocketUrl,
+		maxRetries:   5,
+		retryCount:   0,
 	}
 	u, err := url.Parse(websocketUrl)
 	if err != nil {
@@ -212,12 +297,16 @@ type Agent struct {
 }
 
 type AgentsPayload struct {
-	Agents []Agent `json:"agents"`
+	Agents      []Agent `json:"agents"`
+	ProjectID   string  `json:"projectId"`
+	ProjectName string  `json:"projectName"`
 }
 
 func NewAgentsMessage(id string, payload AgentsPayload) Message {
 	payloadMap := map[string]any{
-		"agents": payload.Agents,
+		"agents":      payload.Agents,
+		"projectId":   payload.ProjectID,
+		"projectName": payload.ProjectName,
 	}
 
 	return Message{
