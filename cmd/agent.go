@@ -1,12 +1,15 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
+	"syscall"
 
 	"github.com/agentuity/cli/internal/agent"
 	"github.com/agentuity/cli/internal/errsystem"
@@ -65,7 +68,7 @@ var agentDeleteCmd = &cobra.Command{
 
 		action := func() {
 			var err error
-			deleted, err = agent.DeleteAgents(logger, apiUrl, theproject.Token, theproject.Project.ProjectId, selected)
+			deleted, err = agent.DeleteAgents(context.Background(), logger, apiUrl, theproject.Token, theproject.Project.ProjectId, selected)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to delete agents")).ShowErrorAndExit()
 			}
@@ -177,6 +180,8 @@ var agentCreateCmd = &cobra.Command{
 	Aliases: []string{"new"},
 	Args:    cobra.MaximumNArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
 		logger := env.NewLogger(cmd)
 		theproject := project.EnsureProject(cmd)
 		apikey := theproject.Token
@@ -189,7 +194,7 @@ var agentCreateCmd = &cobra.Command{
 			if theproject.Project != nil {
 				projectId = theproject.Project.ProjectId
 			}
-			ShowNewProjectImport(logger, apiUrl, apikey, projectId, theproject.Project, theproject.Dir, false)
+			ShowNewProjectImport(ctx, logger, apiUrl, apikey, projectId, theproject.Project, theproject.Dir, false)
 		} else {
 			initScreenWithLogo()
 		}
@@ -215,7 +220,7 @@ var agentCreateCmd = &cobra.Command{
 		name, description, authType = getAgentInfoFlow(logger, remoteAgents, name, description)
 
 		action := func() {
-			agentID, err := agent.CreateAgent(logger, apiUrl, apikey, theproject.Project.ProjectId, name, description, authType)
+			agentID, err := agent.CreateAgent(context.Background(), logger, apiUrl, apikey, theproject.Project.ProjectId, name, description, authType)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to create Agent")).ShowErrorAndExit()
 			}
@@ -262,7 +267,7 @@ func getAgentList(logger logger.Logger, apiUrl string, apikey string, project pr
 	var remoteAgents []agent.Agent
 	var err error
 	action := func() {
-		remoteAgents, err = agent.ListAgents(logger, apiUrl, apikey, project.Project.ProjectId)
+		remoteAgents, err = agent.ListAgents(context.Background(), logger, apiUrl, apikey, project.Project.ProjectId)
 	}
 	tui.ShowSpinner("Fetching Agents ...", action)
 	return remoteAgents, err
@@ -467,8 +472,8 @@ var agentListCmd = &cobra.Command{
 }
 
 var agentGetApiKeyCmd = &cobra.Command{
-	Use:     "apikey [agent_name]",
-	Short:   "Get the API key for an agent",
+	Use:   "apikey [agent_name]",
+	Short: "Get the API key for an agent",
 	Long: `Get the API key for an agent by name or ID.
 
 Arguments:
@@ -539,7 +544,7 @@ Examples:
 			tui.ShowWarning("Agent not found")
 			return
 		}
-		apikey, err := agent.GetApiKey(logger, apiUrl, project.Token, theagent.Agent.ID)
+		apikey, err := agent.GetApiKey(context.Background(), logger, apiUrl, project.Token, theagent.Agent.ID)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent API key")).ShowErrorAndExit()
 		}

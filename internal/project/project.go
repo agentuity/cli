@@ -1,6 +1,7 @@
 package project
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -61,7 +62,7 @@ type InitProjectArgs struct {
 
 // InitProject will create a new project in the organization.
 // It will return the API key and project ID if the project is initialized successfully.
-func InitProject(logger logger.Logger, args InitProjectArgs) (*ProjectData, error) {
+func InitProject(ctx context.Context, logger logger.Logger, args InitProjectArgs) (*ProjectData, error) {
 
 	payload := map[string]any{
 		"organization_id":   args.OrgId,
@@ -72,7 +73,7 @@ func InitProject(logger logger.Logger, args InitProjectArgs) (*ProjectData, erro
 		"agent":             map[string]string{"name": args.AgentName, "description": args.AgentDescription},
 	}
 
-	client := util.NewAPIClient(logger, args.BaseURL, args.Token)
+	client := util.NewAPIClient(ctx, logger, args.BaseURL, args.Token)
 
 	var result initProjectResult
 	if err := client.Do("POST", initPath, payload, &result); err != nil {
@@ -245,8 +246,8 @@ type Response[T any] struct {
 
 type ProjectResponse = Response[ProjectData]
 
-func ProjectWithNameExists(logger logger.Logger, baseUrl string, token string, name string) (bool, error) {
-	client := util.NewAPIClient(logger, baseUrl, token)
+func ProjectWithNameExists(ctx context.Context, logger logger.Logger, baseUrl string, token string, name string) (bool, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var resp Response[bool]
 	if err := client.Do("GET", fmt.Sprintf("/cli/project/exists/%s", url.PathEscape(name)), nil, &resp); err != nil {
@@ -267,8 +268,8 @@ type ProjectListData struct {
 	Description string `json:"description"`
 }
 
-func ListProjects(logger logger.Logger, baseUrl string, token string) ([]ProjectListData, error) {
-	client := util.NewAPIClient(logger, baseUrl, token)
+func ListProjects(ctx context.Context, logger logger.Logger, baseUrl string, token string) ([]ProjectListData, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var resp Response[[]ProjectListData]
 	if err := client.Do("GET", "/cli/project", nil, &resp); err != nil {
@@ -277,8 +278,8 @@ func ListProjects(logger logger.Logger, baseUrl string, token string) ([]Project
 	return resp.Data, nil
 }
 
-func DeleteProjects(logger logger.Logger, baseUrl string, token string, ids []string) ([]string, error) {
-	client := util.NewAPIClient(logger, baseUrl, token)
+func DeleteProjects(ctx context.Context, logger logger.Logger, baseUrl string, token string, ids []string) ([]string, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var resp Response[[]string]
 	var payload = map[string]any{
@@ -293,11 +294,11 @@ func DeleteProjects(logger logger.Logger, baseUrl string, token string, ids []st
 	return resp.Data, nil
 }
 
-func (p *Project) GetProject(logger logger.Logger, baseUrl string, token string) (*ProjectData, error) {
+func (p *Project) GetProject(ctx context.Context, logger logger.Logger, baseUrl string, token string) (*ProjectData, error) {
 	if p.ProjectId == "" {
 		return nil, ErrProjectNotFound
 	}
-	client := util.NewAPIClient(logger, baseUrl, token)
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var projectResponse ProjectResponse
 	if err := client.Do("GET", fmt.Sprintf("/cli/project/%s", p.ProjectId), nil, &projectResponse); err != nil {
@@ -315,8 +316,8 @@ func (p *Project) GetProject(logger logger.Logger, baseUrl string, token string)
 	return &projectResponse.Data, nil
 }
 
-func (p *Project) SetProjectEnv(logger logger.Logger, baseUrl string, token string, env map[string]string, secrets map[string]string) (*ProjectData, error) {
-	client := util.NewAPIClient(logger, baseUrl, token)
+func (p *Project) SetProjectEnv(ctx context.Context, logger logger.Logger, baseUrl string, token string, env map[string]string, secrets map[string]string) (*ProjectData, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 	var projectResponse ProjectResponse
 	if err := client.Do("PUT", fmt.Sprintf("/cli/project/%s/env", p.ProjectId), map[string]any{
 		"env":     env,
@@ -330,8 +331,8 @@ func (p *Project) SetProjectEnv(logger logger.Logger, baseUrl string, token stri
 	return &projectResponse.Data, nil
 }
 
-func (p *Project) DeleteProjectEnv(logger logger.Logger, baseUrl string, token string, env []string, secrets []string) error {
-	client := util.NewAPIClient(logger, baseUrl, token)
+func (p *Project) DeleteProjectEnv(ctx context.Context, logger logger.Logger, baseUrl string, token string, env []string, secrets []string) error {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 	var projectResponse ProjectResponse
 	if err := client.Do("DELETE", fmt.Sprintf("/cli/project/%s/env", p.ProjectId), map[string]any{
 		"env":     env,
@@ -361,8 +362,8 @@ type ProjectImportResponse struct {
 	IOAuthToken string        `json:"ioAuthToken"`
 }
 
-func (p *Project) Import(logger logger.Logger, baseUrl string, token string, orgId string, enableWebhookAuth bool) (*ProjectImportResponse, error) {
-	client := util.NewAPIClient(logger, baseUrl, token)
+func (p *Project) Import(ctx context.Context, logger logger.Logger, baseUrl string, token string, orgId string, enableWebhookAuth bool) (*ProjectImportResponse, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var resp Response[ProjectImportResponse]
 	var req ProjectImportRequest

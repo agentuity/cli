@@ -2,6 +2,7 @@ package util
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -18,7 +20,13 @@ import (
 	"github.com/spf13/viper"
 )
 
+var (
+	Version = "dev"
+	Commit  = "unknown"
+)
+
 type APIClient struct {
+	ctx     context.Context
 	baseURL string
 	token   string
 	client  *http.Client
@@ -52,8 +60,9 @@ func NewAPIError(url, method string, status int, body string, err error, traceID
 	}
 }
 
-func NewAPIClient(logger logger.Logger, baseURL, token string) *APIClient {
+func NewAPIClient(ctx context.Context, logger logger.Logger, baseURL, token string) *APIClient {
 	return &APIClient{
+		ctx:     ctx,
 		logger:  logger,
 		baseURL: baseURL,
 		token:   token,
@@ -91,10 +100,19 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 	}
 	c.logger.Trace("sending request: %s %s", method, u.String())
 
-	req, err := http.NewRequest(method, u.String(), bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(c.ctx, method, u.String(), bytes.NewBuffer(body))
 	if err != nil {
 		return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error creating request: %w", err), traceID)
 	}
+	gitSHA := Commit
+	if info, ok := debug.ReadBuildInfo(); ok {
+		for _, setting := range info.Settings {
+			if setting.Key == "vcs.revision" {
+				gitSHA = setting.Value
+			}
+		}
+	}
+	req.Header.Set("User-Agent", "Agentuity CLI/"+Version+" ("+gitSHA+")")
 	req.Header.Set("Content-Type", "application/json")
 	if c.token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.token)

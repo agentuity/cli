@@ -53,11 +53,11 @@ Examples:
 			if theproject.Project.ProjectId != "" {
 				projectId = theproject.Project.ProjectId
 			}
-			ShowNewProjectImport(log, theproject.APIURL, apiKey, projectId, theproject.Project, dir, false)
+			ShowNewProjectImport(context.Background(), log, theproject.APIURL, apiKey, projectId, theproject.Project, dir, false)
 		}
 
 		// get project from api
-		project, err := theproject.Project.GetProject(log, theproject.APIURL, apiKey)
+		project, err := theproject.Project.GetProject(context.Background(), log, theproject.APIURL, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to get project: %s", err))).ShowErrorAndExit()
 		}

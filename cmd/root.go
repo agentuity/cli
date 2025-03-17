@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"log"
@@ -139,5 +140,14 @@ func createPromptHelper() deployer.PromptHelpers {
 		PrintWarning:  tui.ShowWarning,
 		Ask:           tui.Ask,
 		PromptForEnv:  promptForEnv,
+	}
+}
+
+func isCancelled(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		return true
+	default:
+		return false
 	}
 }
