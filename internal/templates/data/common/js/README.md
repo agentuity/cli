@@ -99,7 +99,7 @@ For comprehensive documentation on the Agentuity JavaScript SDK, visit:
 If you encounter any issues:
 
 1. Check the [documentation](https://agentuity.dev/SDKs/javascript)
-2. Run `agentuity doctor` to diagnose common problems
+2. Join our [Discord community](https://discord.com/invite/vtn3hgUfuc) for support
 3. Contact the Agentuity support team
 
 ## 📝 License
