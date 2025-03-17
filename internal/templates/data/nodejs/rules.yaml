@@ -17,6 +17,8 @@ development:
       - "src/**"
   command: node
   args:
+    - --env-file=.env
+    - --no-deprecation
     - .agentuity/index.js
 deployment:
   resources:
@@ -64,7 +66,7 @@ new_project:
         - name: "prestart"
           value: "agentuity bundle"
         - name: "start"
-          value: "node --env-file .env .agentuity/index.js"
+          value: "node --env-file .env --no-deprecation .agentuity/index.js"
       main: "index.js"
       type: "module"
       name: "{{ .Name }}"
@@ -80,9 +82,12 @@ new_project:
     - action: create_file
       filename: ".gitignore"
       from: "data/nodejs/gitignore"
+    - action: create_file
+      filename: "README.md"
+      from: "common/js/nodejs-readme.md"
     - action: copy_dir
       from: "common/js/cursor"
-      to: ".cursorrules"
+      to: ".cursor/rules"
     - action: copy_dir
       from: "common/cursor"
-      to: ".cursorrules"
+      to: ".cursor/rules"

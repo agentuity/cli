@@ -1,0 +1,34 @@
+---
+description: Guidelines for writing Agentuity AI Agents in Python
+globs: "agents/**/*.py"
+alwaysApply: true
+---
+
+# AI Agent File
+
+- Prefer using the `agentuity agent create` command to create a new Agent
+- Prefer importing types from the `agentuity` package
+- The file should define an async function named `run`
+- All code should follow Python best practices and type hints
+- Use the provided logger from the `AgentContext` interface such as `context.logger.info("my message: %s", "hello")`
+
+## Example Agent File
+
+```python
+from agentuity import AgentRequest, AgentResponse, AgentContext
+
+async def run(request: AgentRequest, response: AgentResponse, context: AgentContext):
+    return response.json({"hello": "world"})
+```
+
+### AgentRequest
+
+The AgentRequest class provides a set of helper methods and properties which can be used for working with data that has been passed to the Agent.
+
+### AgentResponse
+
+The AgentResponse class provides a set of helper methods for responding with different data formats from the Agent.
+
+### AgentContext
+
+The AgentContext has information specific to the incoming Agent request and a set of helper methods for accessing services like KeyValue storage and Vector storage.

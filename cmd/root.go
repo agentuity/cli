@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"log"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/agentuity/cli/internal/deployer"
 	"github.com/agentuity/cli/internal/tui"
-	"github.com/agentuity/go-common/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -25,6 +25,12 @@ var cfgFile string
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use: "agentuity",
+	Long: `Agentuity CLI is a command-line tool for building, managing, and deploying AI agents.
+
+Use the various commands to create projects, manage agents, set environment variables,
+and deploy your agents to the Agentuity Cloud Platform.
+
+Run 'agentuity help <command>' for more information about a specific command.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if version, _ := cmd.Flags().GetBool("version"); version {
 			fmt.Println(Version)
@@ -66,12 +72,17 @@ func init() {
 	rootCmd.PersistentFlags().MarkHidden("websocket-url")
 	viper.BindPFlag("overrides.websocket_url", rootCmd.PersistentFlags().Lookup("websocket-url"))
 
+	rootCmd.PersistentFlags().String("transport-url", "https://agentuity.ai", "The base url of the Agentuity Transport API")
+	rootCmd.PersistentFlags().MarkHidden("transport-url")
+	viper.BindPFlag("overrides.transport_url", rootCmd.PersistentFlags().Lookup("transport-url"))
+
 	rootCmd.PersistentFlags().String("api-key", "", "The API key to use for authentication")
 	rootCmd.PersistentFlags().MarkHidden("api-key")
 	viper.BindPFlag("auth.api_key", rootCmd.PersistentFlags().Lookup("api-key"))
 
 	viper.SetDefault("overrides.app_url", "https://app.agentuity.com")
 	viper.SetDefault("overrides.api_url", "https://api.agentuity.com")
+	viper.SetDefault("overrides.transport_url", "https://agentuity.ai")
 
 	cobra.OnInitialize(initConfig)
 }
@@ -93,6 +104,7 @@ func initConfig() {
 			}
 		}
 		cfgFile = filepath.Join(dir, "config.yaml")
+		cfgFile = getProfile()
 		viper.SetConfigFile(cfgFile)
 	}
 
@@ -131,15 +143,11 @@ func createPromptHelper() deployer.PromptHelpers {
 	}
 }
 
-func getURLs(logger logger.Logger) (string, string) {
-	appUrl := viper.GetString("overrides.app_url")
-	apiUrl := viper.GetString("overrides.api_url")
-	if apiUrl == "https://api.agentuity.com" && appUrl != "https://app.agentuity.com" {
-		logger.Debug("switching app url to production since the api url is production")
-		appUrl = "https://app.agentuity.com"
-	} else if apiUrl == "https://api.agentuity.div" && appUrl == "https://app.agentuity.com" {
-		logger.Debug("switching app url to dev since the api url is dev")
-		appUrl = "http://localhost:3000"
+func isCancelled(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		return true
+	default:
+		return false
 	}
-	return apiUrl, appUrl
 }

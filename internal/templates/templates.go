@@ -13,6 +13,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type ErrRequirementsNotMet struct {
+	Message string
+}
+
+func (e *ErrRequirementsNotMet) Error() string {
+	return e.Message
+}
+
 type Requirement struct {
 	Command    string   `yaml:"command"`
 	Args       []string `yaml:"args"`
@@ -72,6 +80,16 @@ func (r *Requirement) installBrew(brew string, formula string) error {
 }
 
 func (r *Requirement) TryInstall(ctx TemplateContext) error {
+	if r.Selfupdate != nil {
+		if cmd, ok := r.hasCommand(r.Selfupdate.Command); ok {
+			ctx.Logger.Debug("self-upgrading %s", r.Command)
+			c := exec.Command(cmd, r.Selfupdate.Args...)
+			c.Stdin = os.Stdin
+			c.Stdout = io.Discard
+			c.Stderr = io.Discard
+			return c.Run()
+		}
+	}
 	if runtime.GOOS == "darwin" && r.Brew != "" {
 		ctx.Logger.Debug("checking for brew")
 		if brew, ok := r.hasCommand("brew"); ok {
@@ -84,20 +102,10 @@ func (r *Requirement) TryInstall(ctx TemplateContext) error {
 			return r.installBrew(brew, r.Brew)
 		}
 	}
-	if r.Selfupdate != nil {
-		if cmd, ok := r.hasCommand(r.Selfupdate.Command); ok {
-			ctx.Logger.Debug("self-upgrading %s", r.Command)
-			c := exec.Command(cmd, r.Selfupdate.Args...)
-			c.Stdin = os.Stdin
-			c.Stdout = io.Discard
-			c.Stderr = os.Stderr
-			return c.Run()
-		}
-	}
 	if r.URL != "" {
-		return fmt.Errorf("missing %s. install from %s", r.Command, r.URL)
+		return &ErrRequirementsNotMet{fmt.Sprintf("Required dependency %s is missing and cannot automatically be installed. You can find installation instructions from %s", r.Command, r.URL)}
 	}
-	return fmt.Errorf("missing %s. install it manually before continuing", r.Command)
+	return &ErrRequirementsNotMet{fmt.Sprintf("Required dependency %s is missing and cannot automatically be installed. Install it manually before continuing", r.Command)}
 }
 
 func (r *Requirement) Matches(ctx TemplateContext) bool {

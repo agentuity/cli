@@ -89,7 +89,6 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 	defines["process.env.AGENTUITY_BUNDLER_RUNTIME"] = fmt.Sprintf("'%s'", theproject.Bundler.Runtime)
 	if ctx.Production {
 		defines["process.env.AGENTUITY_SDK_DEV_MODE"] = `"false"`
-		defines["process.env.AGENTUITY_ENVIRONMENT"] = fmt.Sprintf("'%s'", "production")
 		defines["process.env.NODE_ENV"] = fmt.Sprintf("'%s'", "production")
 	} else {
 		if val, ok := os.LookupEnv("AGENTUITY_ENVIRONMENT"); ok {

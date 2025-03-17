@@ -1,12 +1,15 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
@@ -24,6 +27,9 @@ import (
 var envCmd = &cobra.Command{
 	Use:   "env",
 	Short: "Environment related commands",
+	Long: `Environment related commands for managing environment variables and secrets.
+
+Use the subcommands to set, get, list, and delete environment variables and secrets.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
@@ -93,7 +99,25 @@ var envSetCmd = &cobra.Command{
 	Use:     "set [key] [value]",
 	Aliases: []string{"add", "put"},
 	Short:   "Set environment variables",
+	Long: `Set environment variables or secrets for your project.
+
+Arguments:
+  [key]    The name of the environment variable
+  [value]  The value of the environment variable
+
+Flags:
+  --file      Path to a file containing environment variables to set
+  --secret    Force the value(s) to be treated as a secret
+  --force     Don't prompt for confirmation
+
+Examples:
+  agentuity env set API_KEY "my-api-key"
+  agentuity env set --secret TOKEN "secret-token"
+  agentuity env set --file .env`,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+
 		context := project.EnsureProject(cmd)
 		logger := context.Logger
 		dir := context.Dir
@@ -229,7 +253,7 @@ var envSetCmd = &cobra.Command{
 			for k := range envs {
 				delete(secrets, k)
 			}
-			_, err := theproject.SetProjectEnv(logger, apiUrl, apiKey, envs, secrets)
+			_, err := theproject.SetProjectEnv(ctx, logger, apiUrl, apiKey, envs, secrets)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithUserMessage("Failed to save project settings")).ShowErrorAndExit()
 			}
@@ -255,15 +279,25 @@ var envSetCmd = &cobra.Command{
 var envGetCmd = &cobra.Command{
 	Use:   "get [key]",
 	Short: "Get an environment or secret value",
-	Args:  cobra.MaximumNArgs(1),
+	Long: `Get the value of an environment variable or secret.
+
+Arguments:
+  [key]    The name of the environment variable or secret to get
+
+Examples:
+  agentuity env get API_KEY`,
+	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+
 		context := project.EnsureProject(cmd)
 		logger := context.Logger
 		theproject := context.Project
 		apiUrl := context.APIURL
 		apiKey := context.Token
 
-		projectData, err := theproject.GetProject(logger, apiUrl, apiKey)
+		projectData, err := theproject.GetProject(ctx, logger, apiUrl, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}
@@ -303,14 +337,24 @@ var envListCmd = &cobra.Command{
 	Aliases: []string{"ls", "show", "print"},
 	Args:    cobra.NoArgs,
 	Short:   "List all environment variables and secrets",
+	Long: `List all environment variables and secrets for your project.
+
+This command displays all environment variables and secrets set for your project.
+
+Examples:
+  agentuity env list
+  agentuity env ls`,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+
 		context := project.EnsureProject(cmd)
 		logger := context.Logger
 		theproject := context.Project
 		apiUrl := context.APIURL
 		apiKey := context.Token
 
-		projectData, err := theproject.GetProject(logger, apiUrl, apiKey)
+		projectData, err := theproject.GetProject(ctx, logger, apiUrl, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}
@@ -342,14 +386,29 @@ var envDeleteCmd = &cobra.Command{
 	Aliases: []string{"rm", "del"},
 	Args:    cobra.MinimumNArgs(1),
 	Short:   "Delete one or more environment variables and secrets",
+	Long: `Delete one or more environment variables and secrets from your project.
+
+Arguments:
+  [key...]    One or more environment variable or secret names to delete
+
+Flags:
+  --force    Don't prompt for confirmation
+
+Examples:
+  agentuity env delete API_KEY
+  agentuity env delete API_KEY SECRET_TOKEN
+  agentuity env delete --force API_KEY`,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+
 		context := project.EnsureProject(cmd)
 		logger := context.Logger
 		theproject := context.Project
 		apiUrl := context.APIURL
 		apiKey := context.Token
 
-		projectData, err := theproject.GetProject(logger, apiUrl, apiKey)
+		projectData, err := theproject.GetProject(ctx, logger, apiUrl, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}
@@ -431,7 +490,7 @@ var envDeleteCmd = &cobra.Command{
 					return
 				}
 			}
-			err := theproject.DeleteProjectEnv(logger, apiUrl, apiKey, envsToDelete, secretsToDelete)
+			err := theproject.DeleteProjectEnv(ctx, logger, apiUrl, apiKey, envsToDelete, secretsToDelete)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 			}

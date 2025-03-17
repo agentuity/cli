@@ -2,17 +2,19 @@ package bundler
 
 import "fmt"
 
-func generateVercelAIProvider(name string) string {
+func generateVercelAIProvider(name string, envkey string) string {
 	return generateJSArgsPatch(0, "") + fmt.Sprintf(`const opts = {...(_args[0] ?? {}) };
 if (!opts.baseURL) {
 	const apikey = process.env.AGENTUITY_API_KEY;
 	const url = process.env.AGENTUITY_URL;
 	if (url && apikey) {
 		opts.apiKey = apikey;
-		opts.baseURL = url + '/sdk/gateway/%s';
+		opts.baseURL = url + '/sdk/gateway/%[1]s';
 		_args[0] = opts;
+	} else {
+	  %[2]s
 	}
-}`, name)
+}`, name, generateEnvWarning(envkey))
 }
 
 func createVercelAIProviderPatch(module string, createFn string, envkey string, provider string) patchModule {
@@ -21,7 +23,7 @@ func createVercelAIProviderPatch(module string, createFn string, envkey string, 
 		Functions: map[string]patchAction{
 			createFn: {
 				Before: generateEnvGuard(envkey,
-					generateVercelAIProvider(provider),
+					generateVercelAIProvider(provider, envkey),
 				),
 			},
 		},

@@ -1,0 +1,98 @@
+---
+description: Agentuity Python SDK API Reference
+globs: "agents/**/*.py"
+---
+
+# Agentuity Python SDK
+
+The Agentuity Python SDK provides a powerful framework for building AI agents in Python. This cursor rules file helps you navigate the SDK's core interfaces and methods.
+
+## Core Interfaces
+
+### Agent Handler
+
+The main handler function for an agent:
+
+```python
+async def run(
+    request: AgentRequest,
+    response: AgentResponse,
+    context: AgentContext
+) -> Any:
+    # Agent implementation
+    pass
+```
+
+### AgentRequest
+
+The `AgentRequest` class provides methods for accessing request data:
+
+- `request.trigger`: Gets the trigger type of the request
+- `request.metadata`: Gets metadata associated with the request
+- `request.get(key, default)`: Gets a value from the metadata
+- `request.data.contentType`: Gets the content type of the request payload
+- `request.data.json`: Gets the payload as a JSON object
+- `request.data.text`: Gets the payload as a string
+- `request.data.binary`: Gets the payload as bytes
+
+### AgentResponse
+
+The `AgentResponse` class provides methods for creating responses:
+
+- `response.json(data, metadata)`: Creates a JSON response
+- `response.text(data, metadata)`: Creates a text response
+- `response.binary(data, content_type, metadata)`: Creates a binary response
+- `response.html(data, metadata)`: Creates an HTML response
+- `response.empty(metadata)`: Creates an empty response
+- `response.handoff(params, args, metadata)`: Redirects to another agent
+- Media-specific methods: `pdf()`, `png()`, `jpeg()`, `gif()`, `mp3()`, `mp4()`, etc.
+
+### AgentContext
+
+The `AgentContext` class provides access to various capabilities:
+
+- `context.logger`: Logging functionality
+- `context.kv`: Key-Value storage
+- `context.vector`: Vector storage
+- `context.get_agent(agent_id_or_name)`: Gets a handle to a remote agent
+- `context.tracer`: OpenTelemetry tracing
+- Environment properties: `sdkVersion`, `devmode`, `orgId`, `projectId`, etc.
+
+## Storage APIs
+
+### Key-Value Storage
+
+Access through `context.kv`:
+
+- `await context.kv.get(name, key)`: Retrieves a value
+- `await context.kv.set(name, key, value, params)`: Stores a value with optional params
+- `await context.kv.delete(name, key)`: Deletes a value
+
+### Vector Storage
+
+Access through `context.vector`:
+
+- `await context.vector.upsert(name, *documents)`: Inserts or updates vectors
+- `await context.vector.search(name, params)`: Searches for vectors
+- `await context.vector.delete(name, *ids)`: Deletes vectors
+
+## Logging
+
+Access through `context.logger`:
+
+- `context.logger.debug(message, *args, **kwargs)`: Logs a debug message
+- `context.logger.info(message, *args, **kwargs)`: Logs an informational message
+- `context.logger.warn(message, *args, **kwargs)`: Logs a warning message
+- `context.logger.error(message, *args, **kwargs)`: Logs an error message
+- `context.logger.child(**kwargs)`: Creates a child logger with additional context
+
+## Best Practices
+
+- Use type hints for better IDE support
+- Import types from `agentuity`
+- Use structured error handling with try/except blocks
+- Leverage the provided logger for consistent logging
+- Use the storage APIs for persisting data
+- Consider agent communication for complex workflows
+
+For complete documentation, visit: https://agentuity.dev/SDKs/python/api-reference

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -25,8 +26,8 @@ type OTPStartResponse struct {
 	} `json:"data"`
 }
 
-func GenerateLoginOTP(logger logger.Logger, baseUrl string) (string, error) {
-	client := util.NewAPIClient(logger, baseUrl, "")
+func GenerateLoginOTP(ctx context.Context, logger logger.Logger, baseUrl string) (string, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, "")
 
 	var resp OTPStartResponse
 	if err := client.Do("GET", "/cli/auth/start", nil, &resp); err != nil {
@@ -48,8 +49,8 @@ type OTPCompleteResponse struct {
 	} `json:"data,omitempty"`
 }
 
-func PollForLoginCompletion(logger logger.Logger, baseUrl string, otp string) (*LoginResult, error) {
-	client := util.NewAPIClient(logger, baseUrl, "")
+func PollForLoginCompletion(ctx context.Context, logger logger.Logger, baseUrl string, otp string) (*LoginResult, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, "")
 	body := map[string]string{"otp": otp}
 	started := time.Now()
 	for time.Since(started) < time.Minute {
@@ -61,7 +62,11 @@ func PollForLoginCompletion(logger logger.Logger, baseUrl string, otp string) (*
 			return nil, fmt.Errorf("%s", resp.Message)
 		}
 		if resp.Data == nil {
-			time.Sleep(time.Second * 2)
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(time.Second * 2):
+			}
 			continue
 		}
 		return &LoginResult{
@@ -86,8 +91,8 @@ type UserResponse struct {
 	Data    *User  `json:"data"`
 }
 
-func GetUser(logger logger.Logger, baseUrl string, apiKey string) (*User, error) {
-	client := util.NewAPIClient(logger, baseUrl, apiKey)
+func GetUser(ctx context.Context, logger logger.Logger, baseUrl string, apiKey string) (*User, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, apiKey)
 
 	var resp UserResponse
 	if err := client.Do("GET", "/cli/auth/user", nil, &resp); err != nil {

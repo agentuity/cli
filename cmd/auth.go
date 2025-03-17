@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/agentuity/cli/internal/auth"
@@ -17,6 +20,9 @@ import (
 var authCmd = &cobra.Command{
 	Use:   "auth",
 	Short: "Authentication and authorization related commands",
+	Long: `Authentication and authorization related commands for managing your Agentuity account.
+
+Use the subcommands to login, logout, and check your authentication status.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
@@ -25,14 +31,27 @@ var authCmd = &cobra.Command{
 var authLoginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "Login to the Agentuity Platform",
+	Long: `Login to the Agentuity Platform using a browser-based authentication flow.
+
+This command will generate a one-time password (OTP) and print a link to a URL
+where you can complete the authentication process.
+
+Examples:
+  agentuity login
+  agentuity auth login`,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apiUrl, appUrl := getURLs(logger)
+		apiUrl, appUrl, _ := util.GetURLs(logger)
 		var otp string
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
 		loginaction := func() {
 			var err error
-			otp, err = auth.GenerateLoginOTP(logger, apiUrl)
+			otp, err = auth.GenerateLoginOTP(ctx, logger, apiUrl)
 			if err != nil {
+				if isCancelled(ctx) {
+					os.Exit(1)
+				}
 				errsystem.New(errsystem.ErrAuthenticateUser, err,
 					errsystem.WithContextMessage("Failed to generate login OTP")).ShowErrorAndExit()
 			}
@@ -51,8 +70,11 @@ var authLoginCmd = &cobra.Command{
 		tui.ShowBanner("Login to Agentuity", body, false)
 
 		tui.ShowSpinner("Waiting for login to complete...", func() {
-			authResult, err := auth.PollForLoginCompletion(logger, apiUrl, otp)
+			authResult, err := auth.PollForLoginCompletion(ctx, logger, apiUrl, otp)
 			if err != nil {
+				if isCancelled(ctx) {
+					os.Exit(1)
+				}
 				if errors.Is(err, auth.ErrLoginTimeout) {
 					tui.ShowWarning("Login timed out. Please try again.")
 					os.Exit(1)
@@ -78,6 +100,13 @@ var authLoginCmd = &cobra.Command{
 var authLogoutCmd = &cobra.Command{
 	Use:   "logout",
 	Short: "Logout of the Agentuity Cloud Platform",
+	Long: `Logout of the Agentuity Cloud Platform.
+
+This command will remove your authentication credentials from the local configuration.
+
+Examples:
+  agentuity logout
+  agentuity auth logout`,
 	Run: func(cmd *cobra.Command, args []string) {
 		viper.Set("auth.api_key", "")
 		viper.Set("auth.user_id", "")
@@ -93,11 +122,18 @@ var authLogoutCmd = &cobra.Command{
 var authWhoamiCmd = &cobra.Command{
 	Use:   "whoami",
 	Short: "Print the current logged in user details",
+	Long: `Print the current logged in user details.
+
+This command displays information about the currently authenticated user,
+including name, organization, and IDs.
+
+Examples:
+  agentuity auth whoami`,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apiUrl, _ := getURLs(logger)
+		apiUrl, _, _ := util.GetURLs(logger)
 		apiKey, userId := util.EnsureLoggedIn()
-		user, err := auth.GetUser(logger, apiUrl, apiKey)
+		user, err := auth.GetUser(context.Background(), logger, apiUrl, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrAuthenticateUser, err,
 				errsystem.WithContextMessage("Failed to get user")).ShowErrorAndExit()

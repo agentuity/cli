@@ -61,10 +61,16 @@ new_project:
         - "hello.py"
     - action: copy_dir
       from: "common/cursor"
-      to: ".cursorrules"
+      to: ".cursor/rules"
+    - action: copy_dir
+      from: "common/py/cursor"
+      to: ".cursor/rules"
     - action: create_file
       filename: "server.py"
       from: "common/py/boot.py"
     - action: create_file
       filename: ".gitignore"
       from: "data/common/py/gitignore"
+    - action: create_file
+      filename: "README.md"
+      from: "common/py/python-uv-readme.md"

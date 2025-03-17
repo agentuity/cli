@@ -10,7 +10,7 @@ async def run(request: AgentRequest, response: AgentResponse, context: AgentCont
         messages=[
             {
                 "role": "user",
-                "content": request.text or "Hello, Claude",
+                "content": request.data.text or "Hello, Claude",
             }
         ],
         model="claude-3-5-sonnet-latest",

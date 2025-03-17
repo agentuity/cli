@@ -25,20 +25,43 @@ var devRunCmd = &cobra.Command{
 	Aliases: []string{"dev"},
 	Args:    cobra.NoArgs,
 	Short:   "Run the development server",
+	Long: `Run the development server for local testing and development.
+
+This command starts a local development server that connects to the Agentuity Cloud
+for live development and testing of your agents. It watches for file changes and
+automatically rebuilds your project when changes are detected.
+
+Flags:
+  --dir            The directory to run the development server in
+  --websocket-id   The websocket room ID to use for the development agent
+
+Examples:
+  agentuity run
+  agentuity dev
+  agentuity run --dir /path/to/project`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log := env.NewLogger(cmd)
 		dir := project.ResolveProjectDir(log, cmd)
-		_, appUrl := getURLs(log)
+		_, appUrl, _ := util.GetURLs(log)
 		websocketUrl := viper.GetString("overrides.websocket_url")
 		websocketId, _ := cmd.Flags().GetString("websocket-id")
 		apiKey, userId := util.EnsureLoggedIn()
 		theproject := project.EnsureProject(cmd)
 
+		if theproject.NewProject {
+			var projectId string
+			if theproject.Project.ProjectId != "" {
+				projectId = theproject.Project.ProjectId
+			}
+			ShowNewProjectImport(context.Background(), log, theproject.APIURL, apiKey, projectId, theproject.Project, dir, false)
+		}
+
 		// get project from api
-		project, err := theproject.Project.GetProject(log, theproject.APIURL, apiKey)
+		project, err := theproject.Project.GetProject(context.Background(), log, theproject.APIURL, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to get project: %s", err))).ShowErrorAndExit()
 		}
+
 		orgId := project.OrgId
 
 		if websocketId == "" {

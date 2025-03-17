@@ -1,11 +1,9 @@
 package project
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -26,6 +24,11 @@ const (
 )
 
 var Version string
+
+var (
+	ErrProjectNotFound         = errors.New("project not found")
+	ErrProjectMissingProjectId = errors.New("missing project_id value")
+)
 
 type initProjectResult struct {
 	Success bool        `json:"success"`
@@ -59,7 +62,7 @@ type InitProjectArgs struct {
 
 // InitProject will create a new project in the organization.
 // It will return the API key and project ID if the project is initialized successfully.
-func InitProject(logger logger.Logger, args InitProjectArgs) (*ProjectData, error) {
+func InitProject(ctx context.Context, logger logger.Logger, args InitProjectArgs) (*ProjectData, error) {
 
 	payload := map[string]any{
 		"organization_id":   args.OrgId,
@@ -70,33 +73,13 @@ func InitProject(logger logger.Logger, args InitProjectArgs) (*ProjectData, erro
 		"agent":             map[string]string{"name": args.AgentName, "description": args.AgentDescription},
 	}
 
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", args.BaseURL+initPath, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+args.Token)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to initialize project: %s", resp.Status)
-	}
+	client := util.NewAPIClient(ctx, logger, args.BaseURL, args.Token)
 
 	var result initProjectResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := client.Do("POST", initPath, payload, &result); err != nil {
 		return nil, err
 	}
+
 	return &result.Data, nil
 }
 
@@ -170,7 +153,7 @@ func (p *Project) Load(dir string) error {
 		return err
 	}
 	if p.ProjectId == "" {
-		return fmt.Errorf("missing project_id value")
+		return ErrProjectMissingProjectId
 	}
 	if p.Bundler == nil {
 		return fmt.Errorf("missing bundler value, please run `agentuity new` to create a new project")
@@ -263,12 +246,18 @@ type Response[T any] struct {
 
 type ProjectResponse = Response[ProjectData]
 
-func ProjectWithNameExists(logger logger.Logger, baseUrl string, token string, name string) (bool, error) {
-	client := util.NewAPIClient(logger, baseUrl, token)
+func ProjectWithNameExists(ctx context.Context, logger logger.Logger, baseUrl string, token string, name string) (bool, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var resp Response[bool]
 	if err := client.Do("GET", fmt.Sprintf("/cli/project/exists/%s", url.PathEscape(name)), nil, &resp); err != nil {
-		return false, fmt.Errorf("error validating project name: %s", err)
+		var apiErr *util.APIError
+		if errors.As(err, &apiErr) {
+			if apiErr.Status == 409 {
+				return true, nil
+			}
+		}
+		return false, fmt.Errorf("error validating project name: %w", err)
 	}
 	return resp.Data, nil
 }
@@ -279,25 +268,25 @@ type ProjectListData struct {
 	Description string `json:"description"`
 }
 
-func ListProjects(logger logger.Logger, baseUrl string, token string) ([]ProjectListData, error) {
-	client := util.NewAPIClient(logger, baseUrl, token)
+func ListProjects(ctx context.Context, logger logger.Logger, baseUrl string, token string) ([]ProjectListData, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var resp Response[[]ProjectListData]
 	if err := client.Do("GET", "/cli/project", nil, &resp); err != nil {
-		return nil, fmt.Errorf("error listing projects: %s", err)
+		return nil, fmt.Errorf("error listing projects: %w", err)
 	}
 	return resp.Data, nil
 }
 
-func DeleteProjects(logger logger.Logger, baseUrl string, token string, ids []string) ([]string, error) {
-	client := util.NewAPIClient(logger, baseUrl, token)
+func DeleteProjects(ctx context.Context, logger logger.Logger, baseUrl string, token string, ids []string) ([]string, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var resp Response[[]string]
 	var payload = map[string]any{
 		"ids": ids,
 	}
 	if err := client.Do("DELETE", "/cli/project", payload, &resp); err != nil {
-		return nil, fmt.Errorf("error deleting projects: %s", err)
+		return nil, fmt.Errorf("error deleting projects: %w", err)
 	}
 	if !resp.Success {
 		return nil, errors.New(resp.Message)
@@ -305,12 +294,21 @@ func DeleteProjects(logger logger.Logger, baseUrl string, token string, ids []st
 	return resp.Data, nil
 }
 
-func (p *Project) GetProject(logger logger.Logger, baseUrl string, token string) (*ProjectData, error) {
-	client := util.NewAPIClient(logger, baseUrl, token)
+func (p *Project) GetProject(ctx context.Context, logger logger.Logger, baseUrl string, token string) (*ProjectData, error) {
+	if p.ProjectId == "" {
+		return nil, ErrProjectNotFound
+	}
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var projectResponse ProjectResponse
 	if err := client.Do("GET", fmt.Sprintf("/cli/project/%s", p.ProjectId), nil, &projectResponse); err != nil {
-		return nil, fmt.Errorf("error getting project env: %s", err)
+		var apiErr *util.APIError
+		if errors.As(err, &apiErr) {
+			if apiErr.Status == 404 {
+				return nil, ErrProjectNotFound
+			}
+		}
+		return nil, fmt.Errorf("error getting project env: %w", err)
 	}
 	if !projectResponse.Success {
 		return nil, errors.New(projectResponse.Message)
@@ -318,14 +316,14 @@ func (p *Project) GetProject(logger logger.Logger, baseUrl string, token string)
 	return &projectResponse.Data, nil
 }
 
-func (p *Project) SetProjectEnv(logger logger.Logger, baseUrl string, token string, env map[string]string, secrets map[string]string) (*ProjectData, error) {
-	client := util.NewAPIClient(logger, baseUrl, token)
+func (p *Project) SetProjectEnv(ctx context.Context, logger logger.Logger, baseUrl string, token string, env map[string]string, secrets map[string]string) (*ProjectData, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 	var projectResponse ProjectResponse
 	if err := client.Do("PUT", fmt.Sprintf("/cli/project/%s/env", p.ProjectId), map[string]any{
 		"env":     env,
 		"secrets": secrets,
 	}, &projectResponse); err != nil {
-		return nil, fmt.Errorf("error setting project env: %s", err)
+		return nil, fmt.Errorf("error setting project env: %w", err)
 	}
 	if !projectResponse.Success {
 		return nil, errors.New(projectResponse.Message)
@@ -333,19 +331,57 @@ func (p *Project) SetProjectEnv(logger logger.Logger, baseUrl string, token stri
 	return &projectResponse.Data, nil
 }
 
-func (p *Project) DeleteProjectEnv(logger logger.Logger, baseUrl string, token string, env []string, secrets []string) error {
-	client := util.NewAPIClient(logger, baseUrl, token)
+func (p *Project) DeleteProjectEnv(ctx context.Context, logger logger.Logger, baseUrl string, token string, env []string, secrets []string) error {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 	var projectResponse ProjectResponse
 	if err := client.Do("DELETE", fmt.Sprintf("/cli/project/%s/env", p.ProjectId), map[string]any{
 		"env":     env,
 		"secrets": secrets,
 	}, &projectResponse); err != nil {
-		return fmt.Errorf("error deleting project env: %s", err)
+		return fmt.Errorf("error deleting project env: %w", err)
 	}
 	if !projectResponse.Success {
 		return errors.New(projectResponse.Message)
 	}
 	return nil
+}
+
+type ProjectImportRequest struct {
+	Name              string        `json:"name"`
+	Description       string        `json:"description"`
+	Provider          string        `json:"provider"`
+	OrgId             string        `json:"orgId"`
+	Agents            []AgentConfig `json:"agents"`
+	EnableWebhookAuth bool          `json:"enableWebhookAuth"`
+}
+
+type ProjectImportResponse struct {
+	ID          string        `json:"id"`
+	Agents      []AgentConfig `json:"agents"`
+	APIKey      string        `json:"apiKey"`
+	IOAuthToken string        `json:"ioAuthToken"`
+}
+
+func (p *Project) Import(ctx context.Context, logger logger.Logger, baseUrl string, token string, orgId string, enableWebhookAuth bool) (*ProjectImportResponse, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
+
+	var resp Response[ProjectImportResponse]
+	var req ProjectImportRequest
+	req.Name = p.Name
+	req.Description = p.Description
+	req.OrgId = orgId
+	req.Agents = p.Agents
+	req.Provider = p.Bundler.Identifier
+	req.EnableWebhookAuth = enableWebhookAuth
+
+	if err := client.Do("POST", "/cli/project/import", req, &resp); err != nil {
+		return nil, fmt.Errorf("error importing project: %w", err)
+	}
+
+	p.ProjectId = resp.Data.ID
+	p.Agents = resp.Data.Agents
+
+	return &resp.Data, nil
 }
 
 type Bundler struct {
@@ -377,57 +413,67 @@ func NewDeploymentConfig() *DeploymentConfig {
 	return &DeploymentConfig{}
 }
 
-type CleanupFunc func()
-
-func (c *DeploymentConfig) Write(logger logger.Logger, dir string) (CleanupFunc, error) {
-	fn := filepath.Join(dir, "agentuity-deployment.yaml")
-	cleanup := func() {
-		os.Remove(fn)
-	}
+func (c *DeploymentConfig) Write(logger logger.Logger, dir string) error {
+	fn := filepath.Join(dir, ".agentuity", ".manifest.yaml")
 	of, err := os.Create(fn)
 	if err != nil {
-		return cleanup, err
+		return err
 	}
 	defer of.Close()
 	enc := yaml.NewEncoder(of)
 	enc.SetIndent(2)
 	err = enc.Encode(c)
 	if err != nil {
-		return cleanup, err
+		return err
 	}
 	logger.Debug("deployment config written to %s", fn)
-	return cleanup, nil
+	return nil
 }
 
 type ProjectContext struct {
-	Logger  logger.Logger
-	Project *Project
-	Dir     string
-	APIURL  string
-	APPURL  string
-	Token   string
+	Logger       logger.Logger
+	Project      *Project
+	Dir          string
+	APIURL       string
+	APPURL       string
+	TransportURL string
+	Token        string
+	NewProject   bool
 }
 
-func LoadProject(logger logger.Logger, dir string, apiUrl string, appUrl string, token string) ProjectContext {
+func LoadProject(logger logger.Logger, dir string, apiUrl string, appUrl string, transportUrl, token string) ProjectContext {
 	theproject := NewProject()
 	if err := theproject.Load(dir); err != nil {
+		if err == ErrProjectMissingProjectId {
+			return ProjectContext{
+				Logger:       logger,
+				Dir:          dir,
+				Project:      theproject,
+				APIURL:       apiUrl,
+				APPURL:       appUrl,
+				TransportURL: transportUrl,
+				Token:        token,
+				NewProject:   true,
+			}
+		}
 		errsystem.New(errsystem.ErrInvalidConfiguration, err,
 			errsystem.WithContextMessage("Error loading project from disk")).ShowErrorAndExit()
 	}
 	return ProjectContext{
-		Logger:  logger,
-		Project: theproject,
-		Dir:     dir,
-		APIURL:  apiUrl,
-		APPURL:  appUrl,
-		Token:   token,
+		Logger:       logger,
+		Project:      theproject,
+		Dir:          dir,
+		APIURL:       apiUrl,
+		APPURL:       appUrl,
+		TransportURL: transportUrl,
+		Token:        token,
 	}
 }
 
 func EnsureProject(cmd *cobra.Command) ProjectContext {
 	logger := env.NewLogger(cmd)
 	dir := ResolveProjectDir(logger, cmd)
-	apiUrl, appUrl := util.GetURLs(logger)
+	apiUrl, appUrl, transportUrl := util.GetURLs(logger)
 	var token string
 	// if the --api-key flag is used, we only need to verify the api key
 	if cmd.Flags().Changed("api-key") {
@@ -435,8 +481,8 @@ func EnsureProject(cmd *cobra.Command) ProjectContext {
 	} else {
 		token, _ = util.EnsureLoggedIn()
 	}
-	p := LoadProject(logger, dir, apiUrl, appUrl, token)
-	if Version != "" && Version != "dev" && p.Project.Version != "" {
+	p := LoadProject(logger, dir, apiUrl, appUrl, transportUrl, token)
+	if !p.NewProject && Version != "" && Version != "dev" && p.Project.Version != "" {
 		v := semver.MustParse(Version)
 		c, err := semver.NewConstraint(p.Project.Version)
 		if err != nil {

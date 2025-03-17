@@ -2,10 +2,13 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sort"
+	"syscall"
 
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/organization"
@@ -19,14 +22,39 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var projectCmd = &cobra.Command{
 	Use:   "project",
 	Short: "Project related commands",
+	Long: `Project related commands for creating, listing, and managing projects.
+
+Use the subcommands to manage your projects.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
+}
+
+func saveEnv(dir string, apikey string) {
+	filename := filepath.Join(dir, ".env")
+	envLines, err := env.ParseEnvFile(filename)
+	if err != nil {
+		errsystem.New(errsystem.ErrReadConfigurationFile, err, errsystem.WithContextMessage("Failed to parse .env file")).ShowErrorAndExit()
+	}
+	var found bool
+	for i, envLine := range envLines {
+		if envLine.Key == "AGENTUITY_API_KEY" {
+			envLines[i].Val = apikey
+			found = true
+		}
+	}
+	if !found {
+		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_API_KEY", Val: apikey})
+	}
+	if err := env.WriteEnvFile(filename, envLines); err != nil {
+		errsystem.New(errsystem.ErrWriteConfigurationFile, err, errsystem.WithContextMessage("Failed to write .env file")).ShowErrorAndExit()
+	}
 }
 
 type InitProjectArgs struct {
@@ -42,9 +70,9 @@ type InitProjectArgs struct {
 	AgentDescription  string
 }
 
-func initProject(logger logger.Logger, args InitProjectArgs) *project.ProjectData {
+func initProject(ctx context.Context, logger logger.Logger, args InitProjectArgs) *project.ProjectData {
 
-	result, err := project.InitProject(logger, project.InitProjectArgs{
+	result, err := project.InitProject(ctx, logger, project.InitProjectArgs{
 		BaseURL:           args.BaseURL,
 		Token:             args.Token,
 		OrgId:             args.OrgId,
@@ -105,29 +133,50 @@ func initProject(logger logger.Logger, args InitProjectArgs) *project.ProjectDat
 	if err := proj.Save(args.Dir); err != nil {
 		errsystem.New(errsystem.ErrSaveProject, err, errsystem.WithContextMessage("Failed to save project to disk")).ShowErrorAndExit()
 	}
-	filename := filepath.Join(args.Dir, ".env")
-	envLines, err := env.ParseEnvFile(filename)
-	if err != nil {
-		errsystem.New(errsystem.ErrReadConfigurationFile, err, errsystem.WithContextMessage("Failed to parse .env file")).ShowErrorAndExit()
-	}
-	var found bool
-	for i, envLine := range envLines {
-		if envLine.Key == "AGENTUITY_API_KEY" {
-			envLines[i].Val = result.APIKey
-			found = true
-		}
-	}
-	if !found {
-		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_API_KEY", Val: result.APIKey})
-	}
-	if err := env.WriteEnvFile(filename, envLines); err != nil {
-		errsystem.New(errsystem.ErrWriteConfigurationFile, err, errsystem.WithContextMessage("Failed to write .env file")).ShowErrorAndExit()
-	}
+
+	saveEnv(args.Dir, result.APIKey)
+
 	return result
 }
 
-func promptForOrganization(logger logger.Logger, apiUrl string, token string) string {
-	orgs, err := organization.ListOrganizations(logger, apiUrl, token)
+func promptForProjectDetail(ctx context.Context, logger logger.Logger, apiUrl, apikey string, name string, description string) (string, string) {
+	var nameOK bool
+	if name != "" {
+		if exists, err := project.ProjectWithNameExists(ctx, logger, apiUrl, apikey, name); err != nil {
+			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to check if project name exists")).ShowErrorAndExit()
+		} else if exists {
+			tui.ShowWarning("project %s already exists in this organization. please choose another name", name)
+		} else {
+			nameOK = true
+		}
+	}
+	if !nameOK {
+		name = tui.InputWithValidation(logger, "What should we name the project?", "The name of the project must be unique within the organization", 255, func(name string) error {
+			for _, invalid := range invalidProjectNames {
+				if s, ok := invalid.(string); ok {
+					if name == s {
+						return fmt.Errorf("%s is not a valid project name", name)
+					}
+				}
+			}
+			if exists, err := project.ProjectWithNameExists(ctx, logger, apiUrl, apikey, name); err != nil {
+				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to check if project name exists")).ShowErrorAndExit()
+			} else if exists {
+				return fmt.Errorf("project %s already exists in this organization. please choose another name", name)
+			}
+			return nil
+		})
+	}
+
+	if description == "" {
+		description = tui.Input(logger, "How should we describe what the "+name+" project does?", "The description of the project is optional but helpful")
+	}
+
+	return name, description
+}
+
+func promptForOrganization(ctx context.Context, logger logger.Logger, apiUrl string, token string) string {
+	orgs, err := organization.ListOrganizations(ctx, logger, apiUrl, token)
 	if err != nil {
 		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list organizations")).ShowErrorAndExit()
 	}
@@ -159,6 +208,7 @@ var docStyle = lipgloss.NewStyle().Margin(1, 2)
 type listItemProvider struct {
 	title, desc, id string
 	object          any
+	selected        bool
 }
 
 func (i listItemProvider) Title() string       { return i.title }
@@ -201,10 +251,15 @@ func (m *projectSelectionModel) View() string {
 
 func showItemSelector(title string, items []list.Item) list.Item {
 
+	selectedIndex := -1
+
 	for i, item := range items {
 		var p = item.(listItemProvider)
 		p.desc = lipgloss.NewStyle().SetString(p.desc).Width(60).AlignHorizontal(lipgloss.Left).Render()
 		items[i] = p
+		if p.selected {
+			selectedIndex = i
+		}
 	}
 
 	delegate := list.NewDefaultDelegate()
@@ -213,6 +268,10 @@ func showItemSelector(title string, items []list.Item) list.Item {
 	m := projectSelectionModel{list: list.New(items, delegate, 0, 0)}
 	m.list.Title = title
 	m.list.Styles.Title = lipgloss.NewStyle().Foreground(tui.TitleColor())
+
+	if selectedIndex != -1 {
+		m.list.Select(selectedIndex)
+	}
 
 	p := tea.NewProgram(&m, tea.WithAltScreen())
 
@@ -230,14 +289,34 @@ func showItemSelector(title string, items []list.Item) list.Item {
 }
 
 var projectNewCmd = &cobra.Command{
-	Use:     "create [name] [description] [agent-name] [agent-description] [auth-type]",
-	Short:   "Create a new project",
+	Use:   "create [name] [description] [agent-name] [agent-description] [auth-type]",
+	Short: "Create a new project",
+	Long: `Create a new project with the specified name, description, and initial agent.
+
+Arguments:
+  [name]                The name of the project (must be unique within the organization)
+  [description]         A description of what the project does
+  [agent-name]          The name of the initial agent
+  [agent-description]   A description of what the agent does
+  [auth-type]           The authentication type for the agent (bearer or none)
+
+Flags:
+  --dir        The directory for the project
+  --provider   The provider template to use for the project
+  --template   The template to use for the project
+
+Examples:
+  agentuity project create "My Project" "Project description" "My Agent" "Agent description" bearer
+  agentuity create --provider nodejs --template express`,
 	Aliases: []string{"new"},
 	Args:    cobra.MaximumNArgs(5),
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn()
-		apiUrl, appUrl := getURLs(logger)
+		apiUrl, appUrl, _ := util.GetURLs(logger)
+
 		initScreenWithLogo()
 
 		cwd, err := os.Getwd()
@@ -245,38 +324,24 @@ var projectNewCmd = &cobra.Command{
 			errsystem.New(errsystem.ErrListFilesAndDirectories, err, errsystem.WithContextMessage("Failed to get current working directory")).ShowErrorAndExit()
 		}
 
-		orgId := promptForOrganization(logger, apiUrl, apikey)
+		orgId := promptForOrganization(ctx, logger, apiUrl, apikey)
 
 		var name, description, agentName, agentDescription, authType string
 
 		if len(args) > 0 {
 			name = args[0]
-			if exists, err := project.ProjectWithNameExists(logger, apiUrl, apikey, name); err != nil {
-				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to check if project name exists")).ShowErrorAndExit()
-			} else if exists {
-				logger.Fatal("project %s already exists in this organization. please choose another name", name)
-			}
-		} else {
-			name = tui.InputWithValidation(logger, "What should we name the project?", "The name of the project must be unique within the organization", 255, func(name string) error {
-				for _, invalid := range invalidProjectNames {
-					if s, ok := invalid.(string); ok {
-						if name == s {
-							return fmt.Errorf("%s is not a valid project name", name)
-						}
-					}
-				}
-				if exists, err := project.ProjectWithNameExists(logger, apiUrl, apikey, name); err != nil {
-					errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to check if project name exists")).ShowErrorAndExit()
-				} else if exists {
-					return fmt.Errorf("project %s already exists in this organization. please choose another name", name)
-				}
-				return nil
-			})
+		}
+		if len(args) > 1 {
+			description = args[1]
+		}
+		if len(args) > 2 {
+			agentName = args[2]
+		}
+		if len(args) > 3 {
+			agentDescription = args[3]
 		}
 
-		if description == "" {
-			description = tui.Input(logger, "How should we describe what the "+name+" project does?", "The description of the project is optional but helpful")
-		}
+		name, description = promptForProjectDetail(ctx, logger, apiUrl, apikey, name, description)
 
 		projectDir := filepath.Join(cwd, util.SafeFilename(name))
 		dir, _ := cmd.Flags().GetString("dir")
@@ -307,6 +372,17 @@ var projectNewCmd = &cobra.Command{
 
 		if len(tmpls) == 0 {
 			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("No templates returned from load templates")).ShowErrorAndExit()
+		}
+
+		var selectProvider string
+		var selectTemplate string
+
+		// check for preferences in config
+		if providerArg == "" {
+			selectProvider = viper.GetString("preferences.provider")
+		}
+		if templateArg == "" {
+			selectTemplate = viper.GetString("preferences.template")
 		}
 
 		if providerArg != "" {
@@ -340,10 +416,11 @@ var projectNewCmd = &cobra.Command{
 
 			for _, tmpls := range tmpls {
 				items = append(items, listItemProvider{
-					id:     tmpls.Identifier,
-					title:  tmpls.Name,
-					desc:   tmpls.Description,
-					object: &tmpls,
+					id:       tmpls.Identifier,
+					title:    tmpls.Name,
+					desc:     tmpls.Description,
+					object:   &tmpls,
+					selected: selectProvider == tmpls.Identifier,
 				})
 			}
 
@@ -363,10 +440,11 @@ var projectNewCmd = &cobra.Command{
 			var tmplTemplates []list.Item
 			for _, t := range templates {
 				tmplTemplates = append(tmplTemplates, listItemProvider{
-					id:     t.Name,
-					title:  t.Name,
-					desc:   t.Description,
-					object: &t,
+					id:       t.Name,
+					title:    t.Name,
+					desc:     t.Description,
+					object:   &t,
+					selected: t.Name == selectTemplate,
 				})
 			}
 			templateId := showItemSelector("Select a project template", tmplTemplates)
@@ -403,6 +481,12 @@ var projectNewCmd = &cobra.Command{
 		tui.ShowSpinner("checking dependencies ...", func() {
 			if !provider.Matches(tmplContext) {
 				if err := provider.Install(tmplContext); err != nil {
+					var requirementsErr *templates.ErrRequirementsNotMet
+					if errors.As(err, &requirementsErr) {
+						tui.CancelSpinner()
+						tui.ShowBanner("Missing Requirement", requirementsErr.Message, false)
+						os.Exit(1)
+					}
 					errsystem.New(errsystem.ErrInstallDependencies, err, errsystem.WithContextMessage("Failed to install dependencies")).ShowErrorAndExit()
 				}
 			}
@@ -414,7 +498,7 @@ var projectNewCmd = &cobra.Command{
 				errsystem.New(errsystem.ErrCreateProject, err, errsystem.WithContextMessage("Failed to create project")).ShowErrorAndExit()
 			}
 
-			projectData = initProject(logger, InitProjectArgs{
+			projectData = initProject(ctx, logger, InitProjectArgs{
 				BaseURL:           apiUrl,
 				Dir:               projectDir,
 				Token:             apikey,
@@ -427,6 +511,10 @@ var projectNewCmd = &cobra.Command{
 				EnableWebhookAuth: authType != "none",
 			})
 
+			// remember our choices
+			viper.Set("preferences.provider", provider.Identifier)
+			viper.Set("preferences.template", templateName)
+			viper.WriteConfig()
 		})
 
 		var para []string
@@ -453,18 +541,28 @@ func showNoProjects() {
 }
 
 var projectListCmd = &cobra.Command{
-	Use:     "list",
-	Short:   "List all projects",
+	Use:   "list",
+	Short: "List all projects",
+	Long: `List all projects in your organization.
+
+This command displays all projects in your organization, showing their IDs, names, and descriptions.
+
+Examples:
+  agentuity project list
+  agentuity project ls`,
 	Aliases: []string{"ls"},
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn()
-		apiUrl, _ := getURLs(logger)
+		apiUrl, _, _ := util.GetURLs(logger)
+
 		var projects []project.ProjectListData
 		action := func() {
 			var err error
-			projects, err = project.ListProjects(logger, apiUrl, apikey)
+			projects, err = project.ListProjects(ctx, logger, apiUrl, apikey)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list projects")).ShowErrorAndExit()
 			}
@@ -492,18 +590,28 @@ var projectListCmd = &cobra.Command{
 }
 
 var projectDeleteCmd = &cobra.Command{
-	Use:     "delete",
-	Short:   "Delete one or more projects",
+	Use:   "delete",
+	Short: "Delete one or more projects",
+	Long: `Delete one or more projects from your organization.
+
+This command allows you to select and delete projects from your organization.
+It will prompt you to select which projects to delete and confirm the deletion.
+
+Examples:
+  agentuity project delete
+  agentuity project rm`,
 	Aliases: []string{"rm", "del"},
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn()
-		apiUrl, _ := getURLs(logger)
+		apiUrl, _, _ := util.GetURLs(logger)
 		var projects []project.ProjectListData
 		action := func() {
 			var err error
-			projects, err = project.ListProjects(logger, apiUrl, apikey)
+			projects, err = project.ListProjects(ctx, logger, apiUrl, apikey)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list projects")).ShowErrorAndExit()
 			}
@@ -542,7 +650,7 @@ var projectDeleteCmd = &cobra.Command{
 
 		action = func() {
 			var err error
-			deleted, err = project.DeleteProjects(logger, apiUrl, apikey, selected)
+			deleted, err = project.DeleteProjects(ctx, logger, apiUrl, apikey, selected)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to delete projects")).ShowErrorAndExit()
 			}
@@ -553,14 +661,42 @@ var projectDeleteCmd = &cobra.Command{
 	},
 }
 
+var projectImportCmd = &cobra.Command{
+	Use:   "import",
+	Short: "Import a project",
+	Long: `Import an existing project into your organization.
+
+This command imports a project from the current directory into your organization.
+You will be prompted to select an organization and provide project details.
+
+Flags:
+  --dir    The directory containing the project to import
+
+Examples:
+  agentuity project import
+  agentuity project import --dir /path/to/project`,
+	Args: cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		logger := env.NewLogger(cmd)
+		context := project.EnsureProject(cmd)
+		ShowNewProjectImport(ctx, logger, context.APIURL, context.Token, "", context.Project, context.Dir, true)
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(projectCmd)
 	rootCmd.AddCommand(projectNewCmd)
 	projectCmd.AddCommand(projectNewCmd)
 	projectCmd.AddCommand(projectListCmd)
 	projectCmd.AddCommand(projectDeleteCmd)
+	projectCmd.AddCommand(projectImportCmd)
 
-	projectNewCmd.Flags().StringP("dir", "d", "", "The directory to create the project in")
+	for _, cmd := range []*cobra.Command{projectNewCmd, projectImportCmd} {
+		cmd.Flags().StringP("dir", "d", "", "The directory for the project")
+	}
+
 	projectNewCmd.Flags().StringP("provider", "p", "", "The provider template to use for the project")
 	projectNewCmd.Flags().StringP("template", "t", "", "The template to use for the project")
 }

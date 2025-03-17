@@ -1,11 +1,15 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
+	"syscall"
 
 	"github.com/agentuity/cli/internal/agent"
 	"github.com/agentuity/cli/internal/errsystem"
@@ -15,6 +19,7 @@ import (
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	"github.com/agentuity/go-common/slice"
 	"github.com/charmbracelet/lipgloss/tree"
 	"github.com/spf13/cobra"
 )
@@ -36,7 +41,7 @@ var agentDeleteCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		theproject := project.EnsureProject(cmd)
-		apiUrl, _ := getURLs(logger)
+		apiUrl, _, _ := util.GetURLs(logger)
 
 		keys, state := reconcileAgentList(logger, apiUrl, theproject.Token, theproject)
 
@@ -51,7 +56,7 @@ var agentDeleteCmd = &cobra.Command{
 			}
 		}
 
-		selected := tui.MultiSelect(logger, "Select one or more Agents to delete", "Toggle selection by pressing the spacebar\nPress enter to confirm\n", options)
+		selected := tui.MultiSelect(logger, "Select one or more Agents to delete from Agentuity Cloud", "Toggle selection by pressing the spacebar\nPress enter to confirm\n", options)
 
 		if len(selected) == 0 {
 			tui.ShowWarning("no Agents selected")
@@ -59,29 +64,82 @@ var agentDeleteCmd = &cobra.Command{
 		}
 
 		var deleted []string
+		var maybedelete []string
 
 		action := func() {
 			var err error
-			deleted, err = agent.DeleteAgents(logger, apiUrl, theproject.Token, theproject.Project.ProjectId, selected)
+			deleted, err = agent.DeleteAgents(context.Background(), logger, apiUrl, theproject.Token, theproject.Project.ProjectId, selected)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to delete agents")).ShowErrorAndExit()
 			}
 			for _, key := range keys {
 				agent := state[key]
-				if util.Exists(agent.Filename) {
-					os.Remove(agent.Filename)
+				if slices.Contains(deleted, agent.Agent.ID) && util.Exists(agent.Filename) {
+					maybedelete = append(maybedelete, agent.Filename)
 				}
+			}
+			var agents []project.AgentConfig
+			for _, agent := range theproject.Project.Agents {
+				if !slice.Contains(deleted, agent.ID) {
+					agents = append(agents, agent)
+				}
+			}
+			theproject.Project.Agents = agents
+			if err := theproject.Project.Save(theproject.Dir); err != nil {
+				errsystem.New(errsystem.ErrSaveProject, err, errsystem.WithContextMessage("saving project after agent delete")).ShowErrorAndExit()
 			}
 		}
 
-		if !tui.Ask(logger, tui.Paragraph("Are you sure you want to delete the selected Agents?", "This action cannot be undone."), true) {
+		if !tui.Ask(logger, tui.Paragraph("Are you sure you want to delete the selected Agents from Agentuity Cloud?", "This action cannot be undone."), true) {
 			tui.ShowWarning("cancelled")
 			return
 		}
 
 		tui.ShowSpinner("Deleting Agents ...", action)
+
+		var filedeletes []string
+
+		if len(maybedelete) > 0 {
+			filetext := util.Pluralize(len(maybedelete), "source file", "source files")
+			var opts []tui.Option
+			for _, f := range maybedelete {
+				rel, _ := filepath.Rel(theproject.Dir, f)
+				opts = append(opts, tui.Option{
+					ID:       f,
+					Text:     rel,
+					Selected: true,
+				})
+			}
+			filedeletes = tui.MultiSelect(logger, fmt.Sprintf("Would you like to delete the %s?", filetext), "Press spacebar to toggle file selection. Press enter to continue.", opts)
+		}
+
+		if len(filedeletes) > 0 {
+			ad := filepath.Join(theproject.Dir, ".agentuity", "backup")
+			if !util.Exists(ad) {
+				os.MkdirAll(ad, 0755)
+			}
+			for _, f := range filedeletes {
+				fd := filepath.Dir(f)
+				util.CopyDir(fd, filepath.Join(ad, filepath.Base(fd))) // make a backup
+				os.Remove(f)
+				files, _ := util.ListDir(fd)
+				if len(files) == 0 {
+					os.Remove(fd)
+				}
+			}
+			tui.ShowSuccess("A backup was made temporarily in %s", ad)
+		}
+
 		tui.ShowSuccess("%s deleted successfully", util.Pluralize(len(deleted), "Agent", "Agents"))
 	},
+}
+
+func getAgentAuthType(logger logger.Logger) string {
+	auth := tui.Select(logger, "Select your Agent's authentication method", "How do you want to secure the Agent?", []tui.Option{
+		{Text: tui.PadRight("API Key", 10, " ") + tui.Muted("Bearer Token"), ID: "bearer"},
+		{Text: tui.PadRight("None", 10, " ") + tui.Muted("No Authentication Required"), ID: "none"},
+	})
+	return auth
 }
 
 func getAgentInfoFlow(logger logger.Logger, remoteAgents []agent.Agent, name string, description string) (string, string, string) {
@@ -95,6 +153,9 @@ func getAgentInfoFlow(logger logger.Logger, remoteAgents []agent.Agent, name str
 			help = "The name can be changed at any time and helps identify the Agent"
 		}
 		name = tui.InputWithValidation(logger, prompt, help, 255, func(name string) error {
+			if name == "" {
+				return fmt.Errorf("Agent name cannot be empty")
+			}
 			for _, agent := range remoteAgents {
 				if strings.EqualFold(agent.Name, name) {
 					return fmt.Errorf("Agent already exists with the name: %s", name)
@@ -108,10 +169,7 @@ func getAgentInfoFlow(logger logger.Logger, remoteAgents []agent.Agent, name str
 		description = tui.Input(logger, "How should we describe what the "+name+" Agent does?", "The description of the Agent is optional but helpful for understanding the role of the Agent")
 	}
 
-	auth := tui.Select(logger, "Select your Agent's authentication method", "How do you want to secure the Agent?", []tui.Option{
-		{Text: tui.PadRight("API Key", 10, " ") + tui.Muted("Bearer Token"), ID: "bearer"},
-		{Text: tui.PadRight("None", 10, " ") + tui.Muted("No Authentication Required"), ID: "none"},
-	})
+	auth := getAgentAuthType(logger)
 
 	return name, description, auth
 }
@@ -122,17 +180,30 @@ var agentCreateCmd = &cobra.Command{
 	Aliases: []string{"new"},
 	Args:    cobra.MaximumNArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
 		logger := env.NewLogger(cmd)
 		theproject := project.EnsureProject(cmd)
 		apikey := theproject.Token
-		apiUrl, _ := getURLs(logger)
+		apiUrl, _, _ := util.GetURLs(logger)
 
-		remoteAgents, err := getAgentList(logger, apiUrl, apikey, theproject)
+		var remoteAgents []agent.Agent
+
+		if theproject.NewProject {
+			var projectId string
+			if theproject.Project != nil {
+				projectId = theproject.Project.ProjectId
+			}
+			ShowNewProjectImport(ctx, logger, apiUrl, apikey, projectId, theproject.Project, theproject.Dir, false)
+		} else {
+			initScreenWithLogo()
+		}
+
+		var err error
+		remoteAgents, err = getAgentList(logger, apiUrl, apikey, theproject)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent list")).ShowErrorAndExit()
 		}
-
-		initScreenWithLogo()
 
 		var name string
 		var description string
@@ -149,7 +220,7 @@ var agentCreateCmd = &cobra.Command{
 		name, description, authType = getAgentInfoFlow(logger, remoteAgents, name, description)
 
 		action := func() {
-			agentID, err := agent.CreateAgent(logger, apiUrl, apikey, theproject.Project.ProjectId, name, description, authType)
+			agentID, err := agent.CreateAgent(context.Background(), logger, apiUrl, apikey, theproject.Project.ProjectId, name, description, authType)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to create Agent")).ShowErrorAndExit()
 			}
@@ -196,7 +267,7 @@ func getAgentList(logger logger.Logger, apiUrl string, apikey string, project pr
 	var remoteAgents []agent.Agent
 	var err error
 	action := func() {
-		remoteAgents, err = agent.ListAgents(logger, apiUrl, apikey, project.Project.ProjectId)
+		remoteAgents, err = agent.ListAgents(context.Background(), logger, apiUrl, apikey, project.Project.ProjectId)
 	}
 	tui.ShowSpinner("Fetching Agents ...", action)
 	return remoteAgents, err
@@ -375,7 +446,7 @@ var agentListCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		project := project.EnsureProject(cmd)
-		apiUrl, _ := getURLs(logger)
+		apiUrl, _, _ := util.GetURLs(logger)
 
 		// perform the reconcilation
 		keys, state := reconcileAgentList(logger, apiUrl, project.Token, project)
@@ -401,14 +472,25 @@ var agentListCmd = &cobra.Command{
 }
 
 var agentGetApiKeyCmd = &cobra.Command{
-	Use:     "apikey [agent_name]",
-	Short:   "Get the API key for an agent",
+	Use:   "apikey [agent_name]",
+	Short: "Get the API key for an agent",
+	Long: `Get the API key for an agent by name or ID.
+
+Arguments:
+  [agent_name]  The name or ID of the agent to get the API key for
+
+If no agent name is provided, you will be prompted to select an agent.
+
+Examples:
+  agentuity agent apikey "My Agent"
+  agentuity agent apikey agent_ID
+  agentuity agent apikey`,
 	Args:    cobra.MaximumNArgs(1),
 	Aliases: []string{"key"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		project := project.EnsureProject(cmd)
-		apiUrl, _ := getURLs(logger)
+		apiUrl, _, _ := util.GetURLs(logger)
 
 		// perform the reconcilation
 		keys, state := reconcileAgentList(logger, apiUrl, project.Token, project)
@@ -439,7 +521,7 @@ var agentGetApiKeyCmd = &cobra.Command{
 					break
 				}
 			} else {
-				if tui.HasTTY {
+				if !tui.HasTTY {
 					logger.Fatal("No TTY detected, please specify an Agent name or id")
 				}
 				var options []tui.Option
@@ -462,7 +544,7 @@ var agentGetApiKeyCmd = &cobra.Command{
 			tui.ShowWarning("Agent not found")
 			return
 		}
-		apikey, err := agent.GetApiKey(logger, apiUrl, project.Token, theagent.Agent.ID)
+		apikey, err := agent.GetApiKey(context.Background(), logger, apiUrl, project.Token, theagent.Agent.ID)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent API key")).ShowErrorAndExit()
 		}
@@ -472,12 +554,14 @@ var agentGetApiKeyCmd = &cobra.Command{
 				return
 			}
 		}
-		if agentID != "" {
+		if apikey != "" {
 			fmt.Println()
 			tui.ShowLock("Agent %s API key: %s", theagent.Agent.Name, apikey)
 			tip := fmt.Sprintf(`$(agentuity agent apikey %s)`, agentID)
 			tui.ShowBanner("Developer Pro Tip", tui.Paragraph("Fetch your Agent's API key into a shell command dynamically:", tip), false)
 			return
+		} else {
+			tui.ShowWarning("No API key found for Agent %s (%s)", theagent.Agent.Name, theagent.Agent.ID)
 		}
 		os.Exit(1) // no key
 	},

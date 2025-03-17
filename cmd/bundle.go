@@ -13,8 +13,20 @@ import (
 )
 
 var bundleCmd = &cobra.Command{
-	Use:     "bundle",
-	Short:   "Run the build bundle process",
+	Use:   "bundle",
+	Short: "Run the build bundle process",
+	Long: `Run the build bundle process to prepare your project for deployment.
+
+This command bundles your project code and dependencies for deployment. You generally should not need to call this command directly as it is automatically called when you run the project.
+
+Flags:
+  --production    Bundle for production deployment
+  --install       Install dependencies before bundling
+  --deploy        Deploy after bundling
+
+Examples:
+  agentuity bundle --production
+  agentuity bundle --install --deploy`,
 	Args:    cobra.NoArgs,
 	Aliases: []string{"build"},
 	Hidden:  true,

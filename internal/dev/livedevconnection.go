@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 
@@ -44,6 +46,10 @@ func (c *LiveDevConnection) StartReadingMessages(logger logger.Logger) {
 		for {
 			_, m, err := c.conn.ReadMessage()
 			if err != nil {
+				if errors.Is(err, websocket.ErrCloseSent) || errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
+					logger.Debug("connection closed")
+					return
+				}
 				logger.Error("failed to read message: %s", err)
 				return
 			}
@@ -284,7 +290,7 @@ func processInputMessage(logger logger.Logger, c *LiveDevConnection, m []byte) {
 		Trigger:     output.Trigger,
 	})
 
-	c.SendMessage(logger, outputMessage)
-
-	return
+	if err := c.SendMessage(logger, outputMessage); err != nil {
+		logger.Error("failed to send output message: %s", err)
+	}
 }
