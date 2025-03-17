@@ -71,3 +71,6 @@ new_project:
     - action: create_file
       filename: ".gitignore"
       from: "data/common/py/gitignore"
+    - action: create_file
+      filename: "README.md"
+      from: "common/py/python-uv-readme.md"
