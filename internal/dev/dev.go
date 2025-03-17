@@ -9,7 +9,7 @@ import (
 	"github.com/agentuity/go-common/logger"
 )
 
-func CreateRunProjectCmd(log logger.Logger, theproject project.ProjectContext, liveDevConnection *LiveDevConnection, dir string, orgId string) (*exec.Cmd, error) {
+func CreateRunProjectCmd(log logger.Logger, theproject project.ProjectContext, liveDevConnection *Websocket, dir string, orgId string) (*exec.Cmd, error) {
 	// set the vars
 	projectServerCmd := exec.Command(theproject.Project.Development.Command, theproject.Project.Development.Args...)
 	projectServerCmd.Env = os.Environ()

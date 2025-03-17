@@ -66,13 +66,13 @@ Examples:
 			websocketId = cstr.NewHash(orgId, userId)
 		}
 
-		liveDevConnection, err := dev.NewLiveDevConnection(log, websocketId, websocketUrl, apiKey, theproject)
+		websocketConn, err := dev.NewWebsocket(log, websocketId, websocketUrl, apiKey, theproject)
 		if err != nil {
 			log.Fatal("failed to create live dev connection: %s", err)
 		}
-		defer liveDevConnection.Close()
+		defer websocketConn.Close()
 
-		projectServerCmd, err := dev.CreateRunProjectCmd(log, theproject, liveDevConnection, dir, orgId)
+		projectServerCmd, err := dev.CreateRunProjectCmd(log, theproject, websocketConn, dir, orgId)
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 		}
@@ -109,8 +109,8 @@ Examples:
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start project: %s", err))).ShowErrorAndExit()
 		}
 
-		liveDevConnection.StartReadingMessages(log)
-		devUrl := liveDevConnection.WebURL(appUrl)
+		websocketConn.StartReadingMessages(log)
+		devUrl := websocketConn.WebURL(appUrl)
 
 		// Display local interaction instructions
 		displayLocalInstructions(theproject.Project.Development.Port, theproject.Project.Agents, devUrl)
@@ -122,7 +122,7 @@ Examples:
 		}()
 
 		select {
-		case <-liveDevConnection.Done:
+		case <-websocketConn.Done:
 			log.Info("live dev connection closed, shutting down")
 			projectServerCmd.Process.Signal(syscall.SIGTERM)
 			// Give it a chance to shutdown gracefully
@@ -132,12 +132,12 @@ Examples:
 			watcher.Close(log)
 		case <-ctx.Done():
 			log.Info("context done, shutting down")
-			liveDevConnection.Close()
+			websocketConn.Close()
 			watcher.Close(log)
 		case <-csys.CreateShutdownChannel():
 			log.Info("shutdown signal received, shutting down")
 			projectServerCmd.Process.Kill()
-			liveDevConnection.Close()
+			websocketConn.Close()
 			watcher.Close(log)
 		}
 	},
