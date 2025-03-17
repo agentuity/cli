@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -23,8 +24,8 @@ type Response[T any] struct {
 type ListResponse = Response[[]Agent]
 
 // ListAgents will list all the Agents in the project which are deployed
-func ListAgents(logger logger.Logger, baseUrl string, token string, projectId string) ([]Agent, error) {
-	client := util.NewAPIClient(logger, baseUrl, token)
+func ListAgents(ctx context.Context, logger logger.Logger, baseUrl string, token string, projectId string) ([]Agent, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var resp ListResponse
 	if err := client.Do("GET", fmt.Sprintf("/cli/agent/%s", url.PathEscape(projectId)), nil, &resp); err != nil {
@@ -37,8 +38,8 @@ func ListAgents(logger logger.Logger, baseUrl string, token string, projectId st
 }
 
 // CreateAgent will create a new agent in the project
-func CreateAgent(logger logger.Logger, baseUrl string, token string, projectId string, name string, description string, authType string) (string, error) {
-	client := util.NewAPIClient(logger, baseUrl, token)
+func CreateAgent(ctx context.Context, logger logger.Logger, baseUrl string, token string, projectId string, name string, description string, authType string) (string, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var resp Response[string]
 	if err := client.Do("POST", fmt.Sprintf("/cli/agent/%s", url.PathEscape(projectId)), map[string]any{"name": name, "description": description, "auth_type": authType}, &resp); err != nil {
@@ -51,8 +52,8 @@ func CreateAgent(logger logger.Logger, baseUrl string, token string, projectId s
 }
 
 // DeleteAgent will delete one or more Agents from the project
-func DeleteAgents(logger logger.Logger, baseUrl string, token string, projectId string, agentIds []string) ([]string, error) {
-	client := util.NewAPIClient(logger, baseUrl, token)
+func DeleteAgents(ctx context.Context, logger logger.Logger, baseUrl string, token string, projectId string, agentIds []string) ([]string, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var resp Response[[]string]
 	if err := client.Do("DELETE", "/cli/agent", map[string]any{"ids": agentIds}, &resp); err != nil {
@@ -69,8 +70,8 @@ type AgentAPIKey struct {
 	Config map[string]any `json:"config"`
 }
 
-func GetApiKey(logger logger.Logger, baseUrl string, token string, agentId string) (string, error) {
-	client := util.NewAPIClient(logger, baseUrl, token)
+func GetApiKey(ctx context.Context, logger logger.Logger, baseUrl string, token string, agentId string) (string, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var resp Response[*AgentAPIKey]
 	if err := client.Do("GET", fmt.Sprintf("/cli/agent/%s/io/source/webhook", url.PathEscape(agentId)), nil, &resp); err != nil {

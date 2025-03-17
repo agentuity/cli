@@ -6,9 +6,11 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/agentuity/cli/internal/agent"
@@ -69,7 +71,7 @@ type startRequest struct {
 	Resources *Resources   `json:"resources,omitempty"`
 }
 
-func ShowNewProjectImport(logger logger.Logger, apiUrl, apikey, projectId string, project *project.Project, dir string, isImport bool) {
+func ShowNewProjectImport(ctx context.Context, logger logger.Logger, apiUrl, apikey, projectId string, project *project.Project, dir string, isImport bool) {
 	title := "Import Project"
 	var message string
 	if isImport {
@@ -85,8 +87,8 @@ func ShowNewProjectImport(logger logger.Logger, apiUrl, apikey, projectId string
 	tui.ShowBanner(title, message, false)
 	tui.WaitForAnyKey()
 	tui.ClearScreen()
-	orgId := promptForOrganization(logger, apiUrl, apikey)
-	name, description := promptForProjectDetail(logger, apiUrl, apikey, project.Name, project.Description)
+	orgId := promptForOrganization(ctx, logger, apiUrl, apikey)
+	name, description := promptForProjectDetail(ctx, logger, apiUrl, apikey, project.Name, project.Description)
 	project.Name = name
 	project.Description = description
 	var createWebhookAuth bool
@@ -96,8 +98,11 @@ func ShowNewProjectImport(logger logger.Logger, apiUrl, apikey, projectId string
 	}
 	tui.ClearScreen()
 	tui.ShowSpinner("Importing project ...", func() {
-		result, err := project.Import(logger, apiUrl, apikey, orgId, createWebhookAuth)
+		result, err := project.Import(ctx, logger, apiUrl, apikey, orgId, createWebhookAuth)
 		if err != nil {
+			if isCancelled(ctx) {
+				os.Exit(1)
+			}
 			errsystem.New(errsystem.ErrImportingProject, err,
 				errsystem.WithContextMessage("Error importing project")).ShowErrorAndExit()
 		}
@@ -127,7 +132,7 @@ Examples:
   agentuity deploy
   agentuity cloud deploy --dir /path/to/project`,
 	Run: func(cmd *cobra.Command, args []string) {
-		ctx := context.Background()
+		parentCtx := context.Background()
 		context := project.EnsureProject(cmd)
 		logger := context.Logger
 		theproject := context.Project
@@ -136,6 +141,9 @@ Examples:
 		appUrl := context.APPURL
 		transportUrl := context.TransportURL
 		token := context.Token
+
+		ctx, cancel := signal.NotifyContext(parentCtx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
 
 		var keys []string
 		var state map[string]agentListState
@@ -152,7 +160,7 @@ Examples:
 
 		deploymentConfig := project.NewDeploymentConfig()
 
-		client := util.NewAPIClient(logger, apiUrl, token)
+		client := util.NewAPIClient(ctx, logger, apiUrl, token)
 		var err error
 		var le []env.EnvLine
 		var envFile *deployer.EnvFile
@@ -163,10 +171,13 @@ Examples:
 		if !context.NewProject {
 			action = func() {
 				var err error
-				projectData, err = theproject.GetProject(logger, apiUrl, token)
+				projectData, err = theproject.GetProject(ctx, logger, apiUrl, token)
 				if err != nil {
 					if err == project.ErrProjectNotFound {
 						return
+					}
+					if isCancelled(ctx) {
+						os.Exit(1)
 					}
 					errsystem.New(errsystem.ErrApiRequest, err,
 						errsystem.WithContextMessage("Error listing project environment")).ShowErrorAndExit()
@@ -181,7 +192,7 @@ Examples:
 			if theproject != nil {
 				projectId = theproject.ProjectId
 			}
-			ShowNewProjectImport(logger, apiUrl, token, projectId, theproject, dir, false)
+			ShowNewProjectImport(ctx, logger, apiUrl, token, projectId, theproject, dir, false)
 		}
 
 		// check to see if we have any env vars that are not in the project
@@ -223,8 +234,11 @@ Examples:
 					return
 				}
 				envs, secrets := loadEnvFile(le, false)
-				pd, err := theproject.SetProjectEnv(logger, apiUrl, token, envs, secrets)
+				pd, err := theproject.SetProjectEnv(ctx, logger, apiUrl, token, envs, secrets)
 				if err != nil {
+					if isCancelled(ctx) {
+						os.Exit(1)
+					}
 					errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
 						errsystem.WithContextMessage("Failed to set project environment variables")).ShowErrorAndExit()
 				}
@@ -527,7 +541,7 @@ Examples:
 					errsystem.WithContextMessage("Error updating deployment status to completed")).ShowErrorAndExit()
 			}
 			if len(theproject.Agents) == 1 {
-				webhookToken, err = agent.GetApiKey(logger, apiUrl, token, theproject.Agents[0].ID)
+				webhookToken, err = agent.GetApiKey(ctx, logger, apiUrl, token, theproject.Agents[0].ID)
 				if err != nil {
 					errsystem.New(errsystem.ErrApiRequest, err,
 						errsystem.WithContextMessage("Error getting Agent API key")).ShowErrorAndExit()
@@ -556,13 +570,13 @@ Examples:
 }
 
 func updateDeploymentStatus(logger logger.Logger, apiUrl, token, deploymentId, status string) error {
-	client := util.NewAPIClient(logger, apiUrl, token)
+	client := util.NewAPIClient(context.Background(), logger, apiUrl, token)
 	payload := map[string]string{"state": status}
 	return client.Do("PUT", fmt.Sprintf("/cli/deploy/upload/%s", deploymentId), payload, nil)
 }
 
 func updateDeploymentStatusCompleted(logger logger.Logger, apiUrl, token, deploymentId string) error {
-	client := util.NewAPIClient(logger, apiUrl, token)
+	client := util.NewAPIClient(context.Background(), logger, apiUrl, token)
 	payload := map[string]any{"state": "completed"}
 	return client.Do("PUT", fmt.Sprintf("/cli/deploy/upload/%s", deploymentId), payload, nil)
 }

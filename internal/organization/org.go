@@ -1,6 +1,7 @@
 package organization
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/agentuity/cli/internal/util"
@@ -22,9 +23,9 @@ type listOrganizationsResult struct {
 	Message string         `json:"message"`
 }
 
-func ListOrganizations(logger logger.Logger, baseUrl string, token string) ([]Organization, error) {
+func ListOrganizations(ctx context.Context, logger logger.Logger, baseUrl string, token string) ([]Organization, error) {
 	var result listOrganizationsResult
-	client := util.NewAPIClient(logger, baseUrl, token)
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	if err := client.Do("GET", listPath, nil, &result); err != nil {
 		return nil, err

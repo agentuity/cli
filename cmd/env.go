@@ -1,12 +1,15 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
@@ -112,6 +115,9 @@ Examples:
   agentuity env set --secret TOKEN "secret-token"
   agentuity env set --file .env`,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+
 		context := project.EnsureProject(cmd)
 		logger := context.Logger
 		dir := context.Dir
@@ -247,7 +253,7 @@ Examples:
 			for k := range envs {
 				delete(secrets, k)
 			}
-			_, err := theproject.SetProjectEnv(logger, apiUrl, apiKey, envs, secrets)
+			_, err := theproject.SetProjectEnv(ctx, logger, apiUrl, apiKey, envs, secrets)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithUserMessage("Failed to save project settings")).ShowErrorAndExit()
 			}
@@ -280,15 +286,18 @@ Arguments:
 
 Examples:
   agentuity env get API_KEY`,
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+
 		context := project.EnsureProject(cmd)
 		logger := context.Logger
 		theproject := context.Project
 		apiUrl := context.APIURL
 		apiKey := context.Token
 
-		projectData, err := theproject.GetProject(logger, apiUrl, apiKey)
+		projectData, err := theproject.GetProject(ctx, logger, apiUrl, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}
@@ -336,13 +345,16 @@ Examples:
   agentuity env list
   agentuity env ls`,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+
 		context := project.EnsureProject(cmd)
 		logger := context.Logger
 		theproject := context.Project
 		apiUrl := context.APIURL
 		apiKey := context.Token
 
-		projectData, err := theproject.GetProject(logger, apiUrl, apiKey)
+		projectData, err := theproject.GetProject(ctx, logger, apiUrl, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}
@@ -387,13 +399,16 @@ Examples:
   agentuity env delete API_KEY SECRET_TOKEN
   agentuity env delete --force API_KEY`,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+
 		context := project.EnsureProject(cmd)
 		logger := context.Logger
 		theproject := context.Project
 		apiUrl := context.APIURL
 		apiKey := context.Token
 
-		projectData, err := theproject.GetProject(logger, apiUrl, apiKey)
+		projectData, err := theproject.GetProject(ctx, logger, apiUrl, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}
@@ -475,7 +490,7 @@ Examples:
 					return
 				}
 			}
-			err := theproject.DeleteProjectEnv(logger, apiUrl, apiKey, envsToDelete, secretsToDelete)
+			err := theproject.DeleteProjectEnv(ctx, logger, apiUrl, apiKey, envsToDelete, secretsToDelete)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 			}

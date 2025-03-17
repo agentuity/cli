@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/agentuity/cli/internal/auth"
@@ -40,10 +43,15 @@ Examples:
 		logger := env.NewLogger(cmd)
 		apiUrl, appUrl, _ := util.GetURLs(logger)
 		var otp string
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
 		loginaction := func() {
 			var err error
-			otp, err = auth.GenerateLoginOTP(logger, apiUrl)
+			otp, err = auth.GenerateLoginOTP(ctx, logger, apiUrl)
 			if err != nil {
+				if isCancelled(ctx) {
+					os.Exit(1)
+				}
 				errsystem.New(errsystem.ErrAuthenticateUser, err,
 					errsystem.WithContextMessage("Failed to generate login OTP")).ShowErrorAndExit()
 			}
@@ -62,8 +70,11 @@ Examples:
 		tui.ShowBanner("Login to Agentuity", body, false)
 
 		tui.ShowSpinner("Waiting for login to complete...", func() {
-			authResult, err := auth.PollForLoginCompletion(logger, apiUrl, otp)
+			authResult, err := auth.PollForLoginCompletion(ctx, logger, apiUrl, otp)
 			if err != nil {
+				if isCancelled(ctx) {
+					os.Exit(1)
+				}
 				if errors.Is(err, auth.ErrLoginTimeout) {
 					tui.ShowWarning("Login timed out. Please try again.")
 					os.Exit(1)
@@ -122,7 +133,7 @@ Examples:
 		logger := env.NewLogger(cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 		apiKey, userId := util.EnsureLoggedIn()
-		user, err := auth.GetUser(logger, apiUrl, apiKey)
+		user, err := auth.GetUser(context.Background(), logger, apiUrl, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrAuthenticateUser, err,
 				errsystem.WithContextMessage("Failed to get user")).ShowErrorAndExit()

@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sort"
+	"syscall"
 
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/organization"
@@ -68,9 +70,9 @@ type InitProjectArgs struct {
 	AgentDescription  string
 }
 
-func initProject(logger logger.Logger, args InitProjectArgs) *project.ProjectData {
+func initProject(ctx context.Context, logger logger.Logger, args InitProjectArgs) *project.ProjectData {
 
-	result, err := project.InitProject(logger, project.InitProjectArgs{
+	result, err := project.InitProject(ctx, logger, project.InitProjectArgs{
 		BaseURL:           args.BaseURL,
 		Token:             args.Token,
 		OrgId:             args.OrgId,
@@ -137,10 +139,10 @@ func initProject(logger logger.Logger, args InitProjectArgs) *project.ProjectDat
 	return result
 }
 
-func promptForProjectDetail(logger logger.Logger, apiUrl, apikey string, name string, description string) (string, string) {
+func promptForProjectDetail(ctx context.Context, logger logger.Logger, apiUrl, apikey string, name string, description string) (string, string) {
 	var nameOK bool
 	if name != "" {
-		if exists, err := project.ProjectWithNameExists(logger, apiUrl, apikey, name); err != nil {
+		if exists, err := project.ProjectWithNameExists(ctx, logger, apiUrl, apikey, name); err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to check if project name exists")).ShowErrorAndExit()
 		} else if exists {
 			tui.ShowWarning("project %s already exists in this organization. please choose another name", name)
@@ -157,7 +159,7 @@ func promptForProjectDetail(logger logger.Logger, apiUrl, apikey string, name st
 					}
 				}
 			}
-			if exists, err := project.ProjectWithNameExists(logger, apiUrl, apikey, name); err != nil {
+			if exists, err := project.ProjectWithNameExists(ctx, logger, apiUrl, apikey, name); err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to check if project name exists")).ShowErrorAndExit()
 			} else if exists {
 				return fmt.Errorf("project %s already exists in this organization. please choose another name", name)
@@ -173,8 +175,8 @@ func promptForProjectDetail(logger logger.Logger, apiUrl, apikey string, name st
 	return name, description
 }
 
-func promptForOrganization(logger logger.Logger, apiUrl string, token string) string {
-	orgs, err := organization.ListOrganizations(logger, apiUrl, token)
+func promptForOrganization(ctx context.Context, logger logger.Logger, apiUrl string, token string) string {
+	orgs, err := organization.ListOrganizations(ctx, logger, apiUrl, token)
 	if err != nil {
 		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list organizations")).ShowErrorAndExit()
 	}
@@ -287,8 +289,8 @@ func showItemSelector(title string, items []list.Item) list.Item {
 }
 
 var projectNewCmd = &cobra.Command{
-	Use:     "create [name] [description] [agent-name] [agent-description] [auth-type]",
-	Short:   "Create a new project",
+	Use:   "create [name] [description] [agent-name] [agent-description] [auth-type]",
+	Short: "Create a new project",
 	Long: `Create a new project with the specified name, description, and initial agent.
 
 Arguments:
@@ -309,6 +311,8 @@ Examples:
 	Aliases: []string{"new"},
 	Args:    cobra.MaximumNArgs(5),
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn()
 		apiUrl, appUrl, _ := util.GetURLs(logger)
@@ -320,7 +324,7 @@ Examples:
 			errsystem.New(errsystem.ErrListFilesAndDirectories, err, errsystem.WithContextMessage("Failed to get current working directory")).ShowErrorAndExit()
 		}
 
-		orgId := promptForOrganization(logger, apiUrl, apikey)
+		orgId := promptForOrganization(ctx, logger, apiUrl, apikey)
 
 		var name, description, agentName, agentDescription, authType string
 
@@ -337,7 +341,7 @@ Examples:
 			agentDescription = args[3]
 		}
 
-		name, description = promptForProjectDetail(logger, apiUrl, apikey, name, description)
+		name, description = promptForProjectDetail(ctx, logger, apiUrl, apikey, name, description)
 
 		projectDir := filepath.Join(cwd, util.SafeFilename(name))
 		dir, _ := cmd.Flags().GetString("dir")
@@ -494,7 +498,7 @@ Examples:
 				errsystem.New(errsystem.ErrCreateProject, err, errsystem.WithContextMessage("Failed to create project")).ShowErrorAndExit()
 			}
 
-			projectData = initProject(logger, InitProjectArgs{
+			projectData = initProject(ctx, logger, InitProjectArgs{
 				BaseURL:           apiUrl,
 				Dir:               projectDir,
 				Token:             apikey,
@@ -537,8 +541,8 @@ func showNoProjects() {
 }
 
 var projectListCmd = &cobra.Command{
-	Use:     "list",
-	Short:   "List all projects",
+	Use:   "list",
+	Short: "List all projects",
 	Long: `List all projects in your organization.
 
 This command displays all projects in your organization, showing their IDs, names, and descriptions.
@@ -549,6 +553,8 @@ Examples:
 	Aliases: []string{"ls"},
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn()
 		apiUrl, _, _ := util.GetURLs(logger)
@@ -556,7 +562,7 @@ Examples:
 		var projects []project.ProjectListData
 		action := func() {
 			var err error
-			projects, err = project.ListProjects(logger, apiUrl, apikey)
+			projects, err = project.ListProjects(ctx, logger, apiUrl, apikey)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list projects")).ShowErrorAndExit()
 			}
@@ -584,8 +590,8 @@ Examples:
 }
 
 var projectDeleteCmd = &cobra.Command{
-	Use:     "delete",
-	Short:   "Delete one or more projects",
+	Use:   "delete",
+	Short: "Delete one or more projects",
 	Long: `Delete one or more projects from your organization.
 
 This command allows you to select and delete projects from your organization.
@@ -597,13 +603,15 @@ Examples:
 	Aliases: []string{"rm", "del"},
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn()
 		apiUrl, _, _ := util.GetURLs(logger)
 		var projects []project.ProjectListData
 		action := func() {
 			var err error
-			projects, err = project.ListProjects(logger, apiUrl, apikey)
+			projects, err = project.ListProjects(ctx, logger, apiUrl, apikey)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list projects")).ShowErrorAndExit()
 			}
@@ -642,7 +650,7 @@ Examples:
 
 		action = func() {
 			var err error
-			deleted, err = project.DeleteProjects(logger, apiUrl, apikey, selected)
+			deleted, err = project.DeleteProjects(ctx, logger, apiUrl, apikey, selected)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to delete projects")).ShowErrorAndExit()
 			}
@@ -667,11 +675,13 @@ Flags:
 Examples:
   agentuity project import
   agentuity project import --dir /path/to/project`,
-	Args:  cobra.NoArgs,
+	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
 		logger := env.NewLogger(cmd)
 		context := project.EnsureProject(cmd)
-		ShowNewProjectImport(logger, context.APIURL, context.Token, "", context.Project, context.Dir, true)
+		ShowNewProjectImport(ctx, logger, context.APIURL, context.Token, "", context.Project, context.Dir, true)
 	},
 }
 
