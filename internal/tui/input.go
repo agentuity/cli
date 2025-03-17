@@ -1,8 +1,11 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/agentuity/go-common/logger"
 	"github.com/charmbracelet/huh"
@@ -68,7 +71,21 @@ func WaitForAnyKey() {
 }
 
 func WaitForAnyKeyMessage(message string) {
+	if !HasTTY {
+		return
+	}
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+	ch := make(chan struct{}, 1)
+	go func() {
+		buf := make([]byte, 1)
+		os.Stdin.Read(buf)
+		ch <- struct{}{}
+	}()
 	fmt.Print(Secondary(message))
-	buf := make([]byte, 1)
-	os.Stdin.Read(buf)
+	select {
+	case <-ctx.Done():
+		return
+	case <-ch:
+	}
 }

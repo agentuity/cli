@@ -72,9 +72,9 @@ func selectProfile(logger logger.Logger) string {
 }
 
 var profileCmd = &cobra.Command{
-	Use:    "profile",
-	Args:   cobra.NoArgs,
-	Short:  "Manage profiles",
+	Use:   "profile",
+	Args:  cobra.NoArgs,
+	Short: "Manage profiles",
 	Long: `Manage CLI configuration profiles.
 
 Use the subcommands to create and switch between different configuration profiles.`,
@@ -85,9 +85,9 @@ Use the subcommands to create and switch between different configuration profile
 }
 
 var profileUseCmd = &cobra.Command{
-	Use:    "use [name]",
-	Args:   cobra.MaximumNArgs(1),
-	Short:  "Use a different profile",
+	Use:   "use [name]",
+	Args:  cobra.MaximumNArgs(1),
+	Short: "Use a different profile",
 	Long: `Switch to a different configuration profile.
 
 Arguments:
@@ -125,9 +125,9 @@ Examples:
 }
 
 var profileCreateCmd = &cobra.Command{
-	Use:    "create",
-	Args:   cobra.NoArgs,
-	Short:  "Create a new empty profile",
+	Use:   "create",
+	Args:  cobra.NoArgs,
+	Short: "Create a new empty profile",
 	Long: `Create a new empty configuration profile.
 
 This command creates a new configuration profile with a unique name.
