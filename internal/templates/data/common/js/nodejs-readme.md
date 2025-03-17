@@ -4,7 +4,7 @@
 <br />
 </div>
 
-# NodeJS Agent Project
+# 🤖 NodeJS Agent Project
 
 Welcome to your Agentuity NodeJS Agent project! This README provides essential information to help you get started with developing, testing, and deploying your AI agents.
 
