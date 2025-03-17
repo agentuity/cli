@@ -81,7 +81,9 @@ func (c *LiveDevConnection) StartReadingMessages(logger logger.Logger) {
 				logger.Trace("sending agents: %+v", agents)
 
 				agentsMessage := NewAgentsMessage(c.WebSocketId, AgentsPayload{
-					Agents: agents,
+					ProjectID:   c.Project.Project.ProjectId,
+					ProjectName: c.Project.Project.Name,
+					Agents:      agents,
 				})
 
 				c.SendMessage(logger, agentsMessage)
@@ -212,12 +214,16 @@ type Agent struct {
 }
 
 type AgentsPayload struct {
-	Agents []Agent `json:"agents"`
+	Agents      []Agent `json:"agents"`
+	ProjectID   string  `json:"projectId"`
+	ProjectName string  `json:"projectName"`
 }
 
 func NewAgentsMessage(id string, payload AgentsPayload) Message {
 	payloadMap := map[string]any{
-		"agents": payload.Agents,
+		"agents":      payload.Agents,
+		"projectId":   payload.ProjectID,
+		"projectName": payload.ProjectName,
 	}
 
 	return Message{

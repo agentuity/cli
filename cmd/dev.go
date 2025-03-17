@@ -15,7 +15,6 @@ import (
 	"github.com/agentuity/go-common/env"
 	cstr "github.com/agentuity/go-common/string"
 	csys "github.com/agentuity/go-common/sys"
-	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -56,7 +55,6 @@ Examples:
 			ShowNewProjectImport(context.Background(), log, theproject.APIURL, apiKey, projectId, theproject.Project, dir, false)
 		}
 
-		// get project from api
 		project, err := theproject.Project.GetProject(context.Background(), log, theproject.APIURL, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to get project: %s", err))).ShowErrorAndExit()
@@ -116,10 +114,6 @@ Examples:
 
 		// Display local interaction instructions
 		displayLocalInstructions(theproject.Project.Development.Port, theproject.Project.Agents, devUrl)
-
-		if err := browser.OpenURL(devUrl); err != nil {
-			log.Fatal("failed to open browser: %s", err)
-		}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		go func() {
