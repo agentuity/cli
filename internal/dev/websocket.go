@@ -2,7 +2,6 @@ package dev
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,7 +31,7 @@ type Websocket struct {
 
 type OutputPayload struct {
 	ContentType string `json:"contentType"`
-	Payload     string `json:"payload"`
+	Payload     []byte `json:"payload"`
 	Trigger     string `json:"trigger"`
 }
 
@@ -267,14 +266,14 @@ type InputMessage struct {
 		Trigger     string `json:"trigger"`
 		AgentID     string `json:"agentId"`
 		ContentType string `json:"contentType"`
-		Payload     string `json:"payload"`
+		Payload     []byte `json:"payload"`
 	} `json:"payload"`
 }
 
 // messages send by CLI to the server
 func NewOutputMessage(id string, payload struct {
 	ContentType string `json:"contentType"`
-	Payload     string `json:"payload"`
+	Payload     []byte `json:"payload"`
 	Trigger     string `json:"trigger"`
 }) Message {
 	payloadMap := map[string]any{
@@ -323,13 +322,6 @@ func processInputMessage(logger logger.Logger, c *Websocket, m []byte) {
 		return
 	}
 
-	// Decode base64 payload this wont work for images I think
-	decodedPayload, err := base64.StdEncoding.DecodeString(inputMsg.Payload.Payload)
-	if err != nil {
-		logger.Error("failed to decode payload: %s", err)
-		return
-	}
-
 	c.Project.Logger.Debug("input message: %+v", inputMsg)
 
 	if c.Project.Project.Development == nil {
@@ -342,7 +334,7 @@ func processInputMessage(logger logger.Logger, c *Websocket, m []byte) {
 	// make a json object with the payload
 	payload := map[string]any{
 		"contentType": inputMsg.Payload.ContentType,
-		"payload":     decodedPayload,
+		"payload":     inputMsg.Payload.Payload,
 		"trigger":     "manual",
 	}
 
