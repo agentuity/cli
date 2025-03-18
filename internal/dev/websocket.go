@@ -17,7 +17,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type LiveDevConnection struct {
+type Websocket struct {
 	WebSocketId  string
 	conn         *websocket.Conn
 	OtelToken    string
@@ -44,7 +44,7 @@ func isOutputPayload(message []byte) (*OutputPayload, error) {
 	return &op, nil
 }
 
-func (c *LiveDevConnection) StartReadingMessages(logger logger.Logger) {
+func (c *Websocket) StartReadingMessages(logger logger.Logger) {
 	go func() {
 		defer close(c.Done)
 		for {
@@ -119,7 +119,7 @@ func (c *LiveDevConnection) StartReadingMessages(logger logger.Logger) {
 	}()
 }
 
-func (c *LiveDevConnection) reconnect(logger logger.Logger) error {
+func (c *Websocket) reconnect(logger logger.Logger) error {
 	// Close existing connection if it exists
 	if c.conn != nil {
 		_ = c.conn.Close()
@@ -171,8 +171,8 @@ func (c *LiveDevConnection) reconnect(logger logger.Logger) error {
 	return nil
 }
 
-func NewLiveDevConnection(logger logger.Logger, websocketId string, websocketUrl string, apiKey string, theproject project.ProjectContext) (*LiveDevConnection, error) {
-	self := LiveDevConnection{
+func NewWebsocket(logger logger.Logger, websocketId string, websocketUrl string, apiKey string, theproject project.ProjectContext) (*Websocket, error) {
+	self := Websocket{
 		WebSocketId:  websocketId,
 		Project:      theproject,
 		Done:         make(chan struct{}),
@@ -227,7 +227,7 @@ func NewLiveDevConnection(logger logger.Logger, websocketId string, websocketUrl
 }
 
 // Update SendMessage to accept the MessageType interface
-func (c *LiveDevConnection) SendMessage(logger logger.Logger, msg Message) error {
+func (c *Websocket) SendMessage(logger logger.Logger, msg Message) error {
 	logger.Trace("sending message: %+v", msg)
 	buf, err := json.Marshal(msg)
 	if err != nil {
@@ -240,15 +240,15 @@ func (c *LiveDevConnection) SendMessage(logger logger.Logger, msg Message) error
 	return nil
 }
 
-func (c *LiveDevConnection) Close() error {
+func (c *Websocket) Close() error {
 	if err := c.conn.Close(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *LiveDevConnection) WebURL(appUrl string) string {
-	return fmt.Sprintf("%s/live/%s", appUrl, c.WebSocketId)
+func (c *Websocket) WebURL(appUrl string) string {
+	return fmt.Sprintf("%s/devmode/%s", appUrl, c.WebSocketId)
 }
 
 type Message struct {
@@ -316,7 +316,7 @@ func NewAgentsMessage(id string, payload AgentsPayload) Message {
 	}
 }
 
-func processInputMessage(logger logger.Logger, c *LiveDevConnection, m []byte) {
+func processInputMessage(logger logger.Logger, c *Websocket, m []byte) {
 	var inputMsg InputMessage
 	if err := json.Unmarshal(m, &inputMsg); err != nil {
 		logger.Error("failed to unmarshal agent message: %s", err)
