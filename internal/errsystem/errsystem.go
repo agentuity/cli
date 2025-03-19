@@ -3,7 +3,10 @@ package errsystem
 //go:generate go run ../../tools/generate_error_codes.go
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"os"
 
 	"github.com/agentuity/cli/internal/util"
 	"github.com/google/uuid"
@@ -28,6 +31,16 @@ type option func(*errSystem)
 
 // New creates a new error.
 func New(code errorType, err error, opts ...option) *errSystem {
+	// if we get a context canceled error, we want to exit the program
+	// instead of showing the error message since this is likely a user
+	// interruption
+	if errors.Is(err, context.Canceled) {
+		os.Exit(1)
+	}
+	var apiErr *util.APIError
+	if errors.As(err, &apiErr) && apiErr != nil && errors.Is(apiErr.TheError, context.Canceled) {
+		os.Exit(1)
+	}
 	res := &errSystem{
 		id:         uuid.New().String(),
 		err:        err,
