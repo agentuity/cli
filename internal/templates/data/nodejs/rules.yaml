@@ -47,7 +47,7 @@ new_project:
     - command: npm
       args:
         - install
-        - "@agentuity/sdk"
+        - "@agentuity/sdk@latest"
         - ai
         - "@ai-sdk/openai"
     - command: npm
