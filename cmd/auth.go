@@ -139,6 +139,10 @@ Examples:
 				errsystem.WithContextMessage("Failed to get user")).ShowErrorAndExit()
 		}
 		if user == nil {
+			viper.Set("auth.api_key", "")
+			viper.Set("auth.user_id", "")
+			viper.Set("auth.expires", time.Now().UnixMilli())
+			viper.WriteConfig()
 			util.ShowLogin()
 			os.Exit(1)
 		}
