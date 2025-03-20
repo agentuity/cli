@@ -199,6 +199,8 @@ var agentCreateCmd = &cobra.Command{
 			initScreenWithLogo()
 		}
 
+		checkForUpgrade(ctx)
+
 		var err error
 		remoteAgents, err = getAgentList(logger, apiUrl, apikey, theproject)
 		if err != nil {

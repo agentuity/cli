@@ -7,8 +7,10 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/agentuity/cli/internal/deployer"
+	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -149,5 +151,23 @@ func isCancelled(ctx context.Context) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func checkForUpgrade(ctx context.Context) {
+	v := viper.GetInt64("preferences.last_update_check")
+	var check bool
+	if v == 0 {
+		check = true
+	} else {
+		n := time.Unix(v, 0)
+		if time.Since(n) >= 24*time.Hour {
+			check = true
+		}
+	}
+	if check {
+		viper.Set("preferences.last_update_check", time.Now().Unix())
+		viper.WriteConfig()
+		util.CheckLatestRelease(ctx)
 	}
 }
