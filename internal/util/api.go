@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/go-common/logger"
 	"github.com/agentuity/go-common/sys"
+	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/viper"
 )
 

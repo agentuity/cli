@@ -13,11 +13,11 @@ import (
 
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
-	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
 	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/sys"
+	"github.com/agentuity/go-common/tui"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/spf13/cobra"

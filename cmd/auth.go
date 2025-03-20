@@ -10,9 +10,9 @@ import (
 
 	"github.com/agentuity/cli/internal/auth"
 	"github.com/agentuity/cli/internal/errsystem"
-	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
+	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

@@ -10,11 +10,11 @@ import (
 	"github.com/agentuity/cli/internal/dev"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
-	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	cstr "github.com/agentuity/go-common/string"
 	csys "github.com/agentuity/go-common/sys"
+	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/cli/internal/util"
+	"github.com/agentuity/go-common/tui"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-isatty"
 )
