@@ -78,11 +78,15 @@ func PollForLoginCompletion(ctx context.Context, logger logger.Logger, baseUrl s
 	return nil, ErrLoginTimeout
 }
 
+type Organization struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type User struct {
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
-	OrgId     string `json:"orgId"`
-	OrgName   string `json:"name"`
+	FirstName     string         `json:"firstName"`
+	LastName      string         `json:"lastName"`
+	Organizations []Organization `json:"organizations"`
 }
 
 type UserResponse struct {
