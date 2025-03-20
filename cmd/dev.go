@@ -48,6 +48,7 @@ Examples:
 		websocketId, _ := cmd.Flags().GetString("websocket-id")
 		apiKey, userId := util.EnsureLoggedIn()
 		theproject := project.EnsureProject(cmd)
+		isDeliberateRestart := false
 
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
@@ -96,8 +97,8 @@ Examples:
 					errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to bundle project: %s", err))).ShowErrorAndExit()
 				}
 			})
-			fmt.Println(tui.Text(fmt.Sprintf("✨ Built in %s", time.Since(started).Round(time.Millisecond))))
 
+			fmt.Println(tui.Text(fmt.Sprintf("✨ Built in %s", time.Since(started).Round(time.Millisecond))))
 		}
 
 		// Initial build
@@ -106,6 +107,10 @@ Examples:
 		// Watch for changes
 		watcher, err := dev.NewWatcher(log, dir, theproject.Project.Development.Watch.Files, func(path string) {
 			build()
+			isDeliberateRestart = true
+			log.Info("killing project server")
+			projectServerCmd.Process.Signal(syscall.SIGTERM)
+			projectServerCmd.Process.Kill()
 		})
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start watcher: %s", err))).ShowErrorAndExit()
@@ -123,8 +128,27 @@ Examples:
 		displayLocalInstructions(theproject.Project.Development.Port, theproject.Project.Agents, devUrl)
 
 		go func() {
-			defer cancel()
-			projectServerCmd.Wait()
+			for {
+				defer cancel()
+				projectServerCmd.Wait()
+				log.Info("project server exited")
+				log.Info("isDeliberateRestart: %t", isDeliberateRestart)
+				if !isDeliberateRestart {
+					return
+				}
+
+				// If it was a deliberate restart, start the new process here
+				if isDeliberateRestart {
+					isDeliberateRestart = false
+					projectServerCmd, err = dev.CreateRunProjectCmd(log, theproject, websocketConn, dir, orgId)
+					if err != nil {
+						errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
+					}
+					if err := projectServerCmd.Start(); err != nil {
+						errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start project: %s", err))).ShowErrorAndExit()
+					}
+				}
+			}
 		}()
 
 		select {
