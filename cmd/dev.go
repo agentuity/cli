@@ -108,8 +108,7 @@ Examples:
 			build()
 			isDeliberateRestart = true
 			log.Debug("killing project server")
-			projectServerCmd.Process.Signal(syscall.SIGTERM)
-			projectServerCmd.Process.Kill()
+			dev.KillProjectServer(projectServerCmd)
 		})
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start watcher: %s", err))).ShowErrorAndExit()
@@ -153,11 +152,7 @@ Examples:
 		select {
 		case <-websocketConn.Done:
 			log.Info("live dev connection closed, shutting down")
-			projectServerCmd.Process.Signal(syscall.SIGTERM)
-			// Give it a chance to shutdown gracefully
-			time.Sleep(time.Second)
-			projectServerCmd.Process.Kill()
-			projectServerCmd.Process.Wait()
+			dev.KillProjectServer(projectServerCmd)
 			watcher.Close(log)
 		case <-ctx.Done():
 			log.Info("context done, shutting down")
@@ -165,7 +160,7 @@ Examples:
 			watcher.Close(log)
 		case <-csys.CreateShutdownChannel():
 			log.Info("shutdown signal received, shutting down")
-			projectServerCmd.Process.Kill()
+			dev.KillProjectServer(projectServerCmd)
 			websocketConn.Close()
 			watcher.Close(log)
 		}
