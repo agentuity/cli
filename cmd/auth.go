@@ -45,7 +45,6 @@ Examples:
 		var otp string
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
-		checkForUpgrade(ctx)
 		loginaction := func() {
 			var err error
 			otp, err = auth.GenerateLoginOTP(ctx, logger, apiUrl)
@@ -95,6 +94,7 @@ Examples:
 		tui.ClearScreen()
 		initScreenWithLogo()
 		tui.ShowSuccess("Welcome to Agentuity! You are now logged in")
+		checkForUpgrade(ctx)
 	},
 }
 
