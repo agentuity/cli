@@ -4,10 +4,27 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"syscall"
+	"time"
 
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/go-common/logger"
 )
+
+func KillProjectServer(projectServerCmd *exec.Cmd) {
+	projectServerCmd.Process.Signal(syscall.SIGTERM)
+	ch := make(chan struct{})
+	go func() {
+		projectServerCmd.Wait()
+		ch <- struct{}{}
+	}()
+	select {
+	case <-ch:
+		break
+	case <-time.After(time.Second * 10):
+		projectServerCmd.Process.Kill()
+	}
+}
 
 func CreateRunProjectCmd(log logger.Logger, theproject project.ProjectContext, liveDevConnection *Websocket, dir string, orgId string) (*exec.Cmd, error) {
 	// set the vars
