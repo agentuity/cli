@@ -61,7 +61,7 @@ Examples:
 			if deploymentId != "" {
 				args = append(args, "--deploymentId", deploymentId)
 			}
-			flags := []string{"log-level", "api-url", "api-key"}
+			flags := []string{"log-level", "api-url", "api-key", "dir"}
 			for _, flag := range flags {
 				if cmd.Flags().Changed(flag) {
 					val, _ := cmd.Flags().GetString(flag)
