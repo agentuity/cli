@@ -143,7 +143,7 @@ func (e *errSystem) ShowErrorAndExit() {
 		os.Exit(1)
 	}
 	tui.ShowBanner(tui.Warning("☹ Error Detected"), body.String(), false)
-	if isatty.IsTerminal(os.Stdout.Fd()) {
+	if isatty.IsTerminal(os.Stdout.Fd()) && Version != "dev" {
 		tui.WaitForAnyKeyMessage(" Press any key to upload the error report\n to the Agentuity team or press Ctrl+C to cancel ...")
 		fmt.Println()
 		action := func() {
