@@ -138,11 +138,16 @@ Examples:
 			errsystem.New(errsystem.ErrAuthenticateUser, err,
 				errsystem.WithContextMessage("Failed to get user")).ShowErrorAndExit()
 		}
+		var orgs []string
+		orgs = append(orgs, tui.Bold(tui.Muted("You are a member of the following organizations:")))
+		for _, org := range user.Organizations {
+			orgs = append(orgs, tui.PadRight("Organization:", 15, " ")+" "+tui.Bold(tui.PadRight(org.Name, 31, " "))+" "+tui.Muted(org.Id))
+		}
 		body := tui.Paragraph(
 			tui.PadRight("Name:", 15, " ")+" "+tui.Bold(tui.PadRight(user.FirstName+" "+user.LastName, 30, " "))+" "+tui.Muted(userId),
-			tui.PadRight("Organization:", 15, " ")+" "+tui.Bold(tui.PadRight(user.OrgName, 31, " "))+" "+tui.Muted(user.OrgId),
+			orgs...,
 		)
-		tui.ShowBanner(tui.Muted("Currently logged in as"), body, false)
+		tui.ShowBanner(tui.Muted("Currently logged in as:"), body, false)
 	},
 }
 
