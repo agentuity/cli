@@ -324,6 +324,8 @@ Examples:
 			errsystem.New(errsystem.ErrListFilesAndDirectories, err, errsystem.WithContextMessage("Failed to get current working directory")).ShowErrorAndExit()
 		}
 
+		checkForUpgrade(ctx)
+
 		orgId := promptForOrganization(ctx, logger, apiUrl, apikey)
 
 		var name, description, agentName, agentDescription, authType string

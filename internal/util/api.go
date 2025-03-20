@@ -82,6 +82,18 @@ type APIResponse struct {
 	} `json:"error"`
 }
 
+func UserAgent() string {
+	gitSHA := Commit
+	if info, ok := debug.ReadBuildInfo(); ok {
+		for _, setting := range info.Settings {
+			if setting.Key == "vcs.revision" {
+				gitSHA = setting.Value
+			}
+		}
+	}
+	return "Agentuity CLI/" + Version + " (" + gitSHA + ")"
+}
+
 func (c *APIClient) Do(method, path string, payload interface{}, response interface{}) error {
 	var traceID string
 
@@ -104,15 +116,7 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 	if err != nil {
 		return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error creating request: %w", err), traceID)
 	}
-	gitSHA := Commit
-	if info, ok := debug.ReadBuildInfo(); ok {
-		for _, setting := range info.Settings {
-			if setting.Key == "vcs.revision" {
-				gitSHA = setting.Value
-			}
-		}
-	}
-	req.Header.Set("User-Agent", "Agentuity CLI/"+Version+" ("+gitSHA+")")
+	req.Header.Set("User-Agent", UserAgent())
 	req.Header.Set("Content-Type", "application/json")
 	if c.token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.token)

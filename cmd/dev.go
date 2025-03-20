@@ -3,6 +3,8 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
 	"syscall"
 	"time"
 
@@ -47,15 +49,20 @@ Examples:
 		apiKey, userId := util.EnsureLoggedIn()
 		theproject := project.EnsureProject(cmd)
 
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+
+		checkForUpgrade(ctx)
+
 		if theproject.NewProject {
 			var projectId string
 			if theproject.Project.ProjectId != "" {
 				projectId = theproject.Project.ProjectId
 			}
-			ShowNewProjectImport(context.Background(), log, theproject.APIURL, apiKey, projectId, theproject.Project, dir, false)
+			ShowNewProjectImport(ctx, log, theproject.APIURL, apiKey, projectId, theproject.Project, dir, false)
 		}
 
-		project, err := theproject.Project.GetProject(context.Background(), log, theproject.APIURL, apiKey)
+		project, err := theproject.Project.GetProject(ctx, log, theproject.APIURL, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to get project: %s", err))).ShowErrorAndExit()
 		}
@@ -115,7 +122,6 @@ Examples:
 		// Display local interaction instructions
 		displayLocalInstructions(theproject.Project.Development.Port, theproject.Project.Agents, devUrl)
 
-		ctx, cancel := context.WithCancel(context.Background())
 		go func() {
 			defer cancel()
 			projectServerCmd.Wait()

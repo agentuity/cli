@@ -145,6 +145,8 @@ Examples:
 		ctx, cancel := signal.NotifyContext(parentCtx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
+		checkForUpgrade(ctx)
+
 		var keys []string
 		var state map[string]agentListState
 
