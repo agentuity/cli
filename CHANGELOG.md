@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.72] - 2025-03-20
+
+### Added
+- Added deployment metadata and CI flag for GitHub actions ([#116](https://github.com/agentuity/cli/pull/116))
+
+### Fixed
+- Fixed bug in file watcher ([#114](https://github.com/agentuity/cli/pull/114))
+- Don't send error reports when using the dev version
+
 ## [v0.0.60] - 2025-03-13
 
 ### Added
