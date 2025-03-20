@@ -4,7 +4,7 @@ go 1.24
 
 require (
 	github.com/Masterminds/semver v1.5.0
-	github.com/agentuity/go-common v1.0.18
+	github.com/agentuity/go-common v1.0.19
 	github.com/bmatcuk/doublestar/v4 v4.8.1
 	github.com/charmbracelet/bubbles v0.20.0
 	github.com/charmbracelet/bubbletea v1.3.4
