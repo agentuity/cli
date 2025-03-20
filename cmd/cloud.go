@@ -67,8 +67,9 @@ type startAgent struct {
 }
 
 type startRequest struct {
-	Agents    []startAgent `json:"agents"`
-	Resources *Resources   `json:"resources,omitempty"`
+	Agents    []startAgent       `json:"agents"`
+	Resources *Resources         `json:"resources,omitempty"`
+	Metadata  *deployer.Metadata `json:"metadata,omitempty"`
 }
 
 func ShowNewProjectImport(ctx context.Context, logger logger.Logger, apiUrl, apikey, projectId string, project *project.Project, dir string, isImport bool) {
@@ -141,7 +142,7 @@ Examples:
 		appUrl := context.APPURL
 		transportUrl := context.TransportURL
 		token := context.Token
-
+		ci, _ := cmd.Flags().GetBool("ci")
 		ctx, cancel := signal.NotifyContext(parentCtx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
@@ -343,6 +344,27 @@ Examples:
 		if deploymentId != "" {
 			logger.Debug("deploymentId flag provided: %s", deploymentId)
 			deploymentId = "/" + deploymentId
+		}
+
+		gitInfo, err := deployer.GetGitInfo(dir)
+		if err != nil {
+			logger.Error("error getting git info: %s", err)
+		}
+		var originType string
+		if ci {
+			originType = "ci"
+		} else {
+			originType = "cli"
+		}
+
+		startRequest.Metadata = &deployer.Metadata{
+			Origin: deployer.MetadataOrigin{
+				Type: originType,
+				Data: map[string]interface{}{
+					"machine": deployer.GetMachineInfo(),
+					"git":     gitInfo,
+				},
+			},
 		}
 
 		// Start deployment
@@ -589,5 +611,7 @@ func init() {
 	cloudCmd.AddCommand(cloudDeployCmd)
 	cloudDeployCmd.Flags().StringP("dir", "d", ".", "The directory to the project to deploy")
 	cloudDeployCmd.Flags().String("deploymentId", "", "Used to track a specific deployment")
+	cloudDeployCmd.Flags().Bool("ci", false, "Used to track a specific CI job")
 	cloudDeployCmd.Flags().MarkHidden("deploymentId")
+	cloudDeployCmd.Flags().MarkHidden("ci")
 }

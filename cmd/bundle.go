@@ -36,6 +36,7 @@ Examples:
 		production, _ := cmd.Flags().GetBool("production")
 		install, _ := cmd.Flags().GetBool("install")
 		deploy, _ := cmd.Flags().GetBool("deploy")
+
 		if err := bundler.Bundle(bundler.BundleContext{
 			Context:    context.Background(),
 			Logger:     projectContext.Logger,
@@ -61,7 +62,7 @@ Examples:
 			if deploymentId != "" {
 				args = append(args, "--deploymentId", deploymentId)
 			}
-			flags := []string{"log-level", "api-url", "api-key", "dir"}
+			flags := []string{"log-level", "api-url", "api-key", "dir", "ci"}
 			for _, flag := range flags {
 				if cmd.Flags().Changed(flag) {
 					val, _ := cmd.Flags().GetString(flag)
@@ -97,4 +98,6 @@ func init() {
 	bundleCmd.Flags().Bool("deploy", false, "Whether to deploy after bundling")
 	bundleCmd.Flags().String("deploymentId", "", "Used to track a specific deployment")
 	bundleCmd.Flags().MarkHidden("deploymentId")
+	bundleCmd.Flags().Bool("ci", false, "Used to track a specific CI job")
+	bundleCmd.Flags().MarkHidden("ci")
 }
