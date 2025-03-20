@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/agentuity/cli/internal/util"
@@ -100,6 +101,12 @@ func GetUser(ctx context.Context, logger logger.Logger, baseUrl string, apiKey s
 
 	var resp UserResponse
 	if err := client.Do("GET", "/cli/auth/user", nil, &resp); err != nil {
+		var apiErr *util.APIError
+		if errors.As(err, &apiErr) {
+			if apiErr.Status == http.StatusUnauthorized {
+				return nil, nil
+			}
+		}
 		return nil, err
 	}
 	if !resp.Success {

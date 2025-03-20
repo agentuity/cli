@@ -138,6 +138,10 @@ Examples:
 			errsystem.New(errsystem.ErrAuthenticateUser, err,
 				errsystem.WithContextMessage("Failed to get user")).ShowErrorAndExit()
 		}
+		if user == nil {
+			util.ShowLogin()
+			os.Exit(1)
+		}
 		var orgs []string
 		orgs = append(orgs, tui.Bold(tui.Muted("You are a member of the following organizations:")))
 		for _, org := range user.Organizations {
