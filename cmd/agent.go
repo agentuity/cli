@@ -15,11 +15,11 @@ import (
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/templates"
-	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
 	"github.com/agentuity/go-common/slice"
+	"github.com/agentuity/go-common/tui"
 	"github.com/charmbracelet/lipgloss/tree"
 	"github.com/spf13/cobra"
 )

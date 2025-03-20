@@ -7,11 +7,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
 	"github.com/agentuity/go-common/sys"
+	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/cobra"
 )
 

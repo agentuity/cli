@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentuity/cli/internal/tui"
 	"github.com/agentuity/go-common/logger"
+	"github.com/agentuity/go-common/tui"
 	"github.com/pkg/browser"
 )
 

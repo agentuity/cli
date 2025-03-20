@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/agentuity/cli/internal/deployer"
-	"github.com/agentuity/cli/internal/tui"
+	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
