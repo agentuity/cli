@@ -97,7 +97,6 @@ Examples:
 					errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to bundle project: %s", err))).ShowErrorAndExit()
 				}
 			})
-
 			fmt.Println(tui.Text(fmt.Sprintf("✨ Built in %s", time.Since(started).Round(time.Millisecond))))
 		}
 
@@ -108,7 +107,7 @@ Examples:
 		watcher, err := dev.NewWatcher(log, dir, theproject.Project.Development.Watch.Files, func(path string) {
 			build()
 			isDeliberateRestart = true
-			log.Info("killing project server")
+			log.Debug("killing project server")
 			projectServerCmd.Process.Signal(syscall.SIGTERM)
 			projectServerCmd.Process.Kill()
 		})
@@ -131,8 +130,8 @@ Examples:
 			for {
 				defer cancel()
 				projectServerCmd.Wait()
-				log.Info("project server exited")
-				log.Info("isDeliberateRestart: %t", isDeliberateRestart)
+				log.Debug("project server exited")
+				log.Debug("isDeliberateRestart: %t", isDeliberateRestart)
 				if !isDeliberateRestart {
 					return
 				}
