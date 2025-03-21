@@ -16,6 +16,7 @@ development:
   command: uv
   args:
     - run
+    - --env-file .env
     - server.py
 deployment:
   resources:
