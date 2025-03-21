@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - place .env on another line to be safe
+
 ## [v0.0.71] - 2025-03-20
 
 ### Changed
