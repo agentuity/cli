@@ -4,6 +4,84 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [v0.0.71] - 2025-03-20
+
+### Changed
+- Pass on dir flag when doing bundle --deploy ([#115](https://github.com/agentuity/cli/pull/115))
+
+## [v0.0.70] - 2025-03-19
+
+### Added
+- Initial Implementation of Automatic Version checking ([#113](https://github.com/agentuity/cli/pull/113))
+
+## [v0.0.69] - 2025-03-19
+
+### Fixed
+- Handle auth failure better ([#112](https://github.com/agentuity/cli/pull/112))
+
+### Changed
+- Move internal/tui package to use go-common/tui package so we can reuse ([#111](https://github.com/agentuity/cli/pull/111))
+- Improve Project List View and Auth Whoami ([#110](https://github.com/agentuity/cli/pull/110))
+
+## [v0.0.68] - 2025-03-19
+
+### Fixed
+- Better handle user interruption errors ([#109](https://github.com/agentuity/cli/pull/109))
+
+## [v0.0.67] - 2025-03-19
+
+### Added
+- Force new project to always use the latest sdk ([#108](https://github.com/agentuity/cli/pull/108))
+
+### Fixed
+- DevMode: cleanup payload to make sure we keep it as []byte vs using string so we always transmit in base64 w/o recoding by accident ([#107](https://github.com/agentuity/cli/pull/107))
+
+## [v0.0.66] - 2025-03-17
+
+### Changed
+- Rename devmode ([#106](https://github.com/agentuity/cli/pull/106))
+- Dev Mode: deterministic room id ([#63](https://github.com/agentuity/cli/pull/63))
+
+## [v0.0.65] - 2025-03-17
+
+### Fixed
+- Be smarter on error message of JS when running node directly ([#105](https://github.com/agentuity/cli/pull/105))
+- Add environment variable checks to Python boot.py ([#103](https://github.com/agentuity/cli/pull/103))
+
+### Added
+- Added project id on for matt ([#104](https://github.com/agentuity/cli/pull/104))
+
+## [v0.0.64] - 2025-03-16
+
+### Added
+- Add README template for JavaScript projects ([#102](https://github.com/agentuity/cli/pull/102))
+
+## [v0.0.63] - 2025-03-16
+
+### Changed
+- Improve CTRL-C cancel, always send user-agent with version for API requests ([#101](https://github.com/agentuity/cli/pull/101))
+
+## [v0.0.62] - 2025-03-16
+
+### Fixed
+- Fix change in signature with request.text -> request.data.text ([#100](https://github.com/agentuity/cli/pull/100))
+
+### Added
+- Add Long property documentation to all CLI commands ([#99](https://github.com/agentuity/cli/pull/99))
+- Add traceparent in the error handling logic to aid in debugging issues ([#98](https://github.com/agentuity/cli/pull/98))
+
+## [v0.0.61] - 2025-03-15
+
+### Added
+- Add Org Level data encryption for agent source ([#97](https://github.com/agentuity/cli/pull/97))
+- Improve missing LLM environment variables ([#95](https://github.com/agentuity/cli/pull/95))
+
+### Fixed
+- Don't set AGENTUITY_ENVIRONMENT on the production bundle, let it get set by the infra ([#96](https://github.com/agentuity/cli/pull/96))
+- Fix issue with --env-file not getting picked up in node when running dev ([#94](https://github.com/agentuity/cli/pull/94))
+
+### Documentation
+- Update changelog for v0.0.60 ([#93](https://github.com/agentuity/cli/pull/93))
 
 ## [v0.0.72] - 2025-03-20
 
