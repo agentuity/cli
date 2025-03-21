@@ -61,8 +61,6 @@ func GetGitInfo(dir string) (*GitInfo, error) {
 		return info, nil
 	}
 
-	info.IsRepo = true
-
 	// Get remote URL
 	remote, err := repo.Remote("origin")
 	if err == nil {
@@ -74,6 +72,7 @@ func GetGitInfo(dir string) (*GitInfo, error) {
 	if err == nil {
 		info.Branch = head.Name().Short()
 		info.Commit = head.Hash().String()
+		info.IsRepo = true
 	}
 
 	return info, nil
