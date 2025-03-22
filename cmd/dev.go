@@ -42,12 +42,12 @@ Examples:
   agentuity run --dir /path/to/project`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log := env.NewLogger(cmd)
-		dir := project.ResolveProjectDir(log, cmd)
 		_, appUrl, _ := util.GetURLs(log)
 		websocketUrl := viper.GetString("overrides.websocket_url")
 		websocketId, _ := cmd.Flags().GetString("websocket-id")
 		apiKey, userId := util.EnsureLoggedIn()
 		theproject := project.EnsureProject(cmd)
+		dir := theproject.Dir
 		isDeliberateRestart := false
 
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)

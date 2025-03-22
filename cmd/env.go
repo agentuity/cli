@@ -245,17 +245,23 @@ Examples:
 		}
 
 		action := func() {
+			combined := make(map[string]string)
 			// make sure secrets are not in envs as duplicates since secrets take precedence
 			for k := range secrets {
 				delete(envs, k)
+				combined[k] = secrets[k]
 			}
 			// make sure envs are not in secrets as duplicates since envs take precedence
 			for k := range envs {
 				delete(secrets, k)
+				combined[k] = envs[k]
 			}
 			_, err := theproject.SetProjectEnv(ctx, logger, apiUrl, apiKey, envs, secrets)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithUserMessage("Failed to save project settings")).ShowErrorAndExit()
+			}
+			if err := project.SaveEnvValue(ctx, logger, dir, combined); err != nil {
+				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithUserMessage("Failed to save .env file")).ShowErrorAndExit()
 			}
 		}
 
@@ -494,6 +500,7 @@ Examples:
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 			}
+			project.RemoveEnvValues(ctx, logger, context.Dir, append(envsToDelete, secretsToDelete...)...)
 			switch {
 			case len(envsToDelete) > 0 && len(secretsToDelete) > 0:
 				tui.ShowSuccess("Environment variables and secrets deleted")
