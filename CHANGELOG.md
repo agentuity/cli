@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.0.1] - 2025-03-22
+
+### Added
+- MCP support with commands for installation, uninstallation, and running the MCP server [#121](https://github.com/agentuity/cli/pull/121)
+- Support for saving and managing environment variables in local .env files
+
+### Changed
+- Improved project directory resolution to support VS Code environment
+- Refactored authentication and logout logic for better code organization
+
+### Fixed
+- Fixed Git deployment metadata to correctly set the IsRepo flag only when a valid repository head is detected [#120](https://github.com/agentuity/cli/pull/120)
+
 ## [v0.0.73] - 2025-03-21
 
 ### Fixed
