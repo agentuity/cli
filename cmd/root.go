@@ -13,6 +13,7 @@ import (
 
 	"github.com/agentuity/cli/internal/deployer"
 	"github.com/agentuity/cli/internal/util"
+	"github.com/agentuity/go-common/logger"
 	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -156,7 +157,7 @@ func isCancelled(ctx context.Context) bool {
 	}
 }
 
-func checkForUpgrade(ctx context.Context) {
+func checkForUpgrade(ctx context.Context, logger logger.Logger) {
 	v := viper.GetInt64("preferences.last_update_check")
 	var check bool
 	if v == 0 {
@@ -170,7 +171,7 @@ func checkForUpgrade(ctx context.Context) {
 	if check {
 		viper.Set("preferences.last_update_check", time.Now().Unix())
 		viper.WriteConfig()
-		util.CheckLatestRelease(ctx)
+		util.CheckLatestRelease(ctx, logger)
 	}
 }
 

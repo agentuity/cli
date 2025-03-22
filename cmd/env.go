@@ -21,7 +21,6 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 var envCmd = &cobra.Command{
@@ -36,7 +35,7 @@ Use the subcommands to set, get, list, and delete environment variables and secr
 }
 
 var (
-	hasTTY          = term.IsTerminal(int(os.Stdout.Fd()))
+	hasTTY          = tui.HasTTY
 	looksLikeSecret = regexp.MustCompile(`(?i)KEY|SECRET|TOKEN|PASSWORD|sk_`)
 	isAgentuityEnv  = regexp.MustCompile(`(?i)AGENTUITY_`)
 )

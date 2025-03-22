@@ -30,12 +30,10 @@ func execCommand(ctx context.Context, dir string, command string, args ...string
 		return "", err
 	}
 	args = append([]string{command}, args...)
-	// args = append(args, "--log-level", "warn")
+	args = append(args, "--log-level", "warn")
 	cmd := exec.CommandContext(ctx, exe, args...)
 	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "AGENTUITY_MCP_SESSION=1")
 	output, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	return string(output), nil
+	return string(output), err
 }

@@ -90,7 +90,7 @@ var agentDeleteCmd = &cobra.Command{
 			}
 		}
 
-		if !tui.Ask(logger, tui.Paragraph("Are you sure you want to delete the selected Agents from Agentuity Cloud?", "This action cannot be undone."), true) {
+		if !tui.Ask(logger, "Are you sure you want to delete the selected Agents from Agentuity Cloud?", true) {
 			tui.ShowWarning("cancelled")
 			return
 		}
@@ -201,12 +201,12 @@ var agentCreateCmd = &cobra.Command{
 			if theproject.Project != nil {
 				projectId = theproject.Project.ProjectId
 			}
-			ShowNewProjectImport(ctx, logger, apiUrl, apikey, projectId, theproject.Project, theproject.Dir, false)
+			ShowNewProjectImport(ctx, logger, cmd, apiUrl, apikey, projectId, theproject.Project, theproject.Dir, false)
 		} else {
 			initScreenWithLogo()
 		}
 
-		checkForUpgrade(ctx)
+		checkForUpgrade(ctx, logger)
 
 		var err error
 		remoteAgents, err = getAgentList(logger, apiUrl, apikey, theproject)
@@ -590,4 +590,5 @@ func init() {
 	for _, cmd := range []*cobra.Command{agentListCmd, agentCreateCmd, agentDeleteCmd, agentGetApiKeyCmd} {
 		cmd.Flags().StringP("dir", "d", "", "The project directory")
 	}
+	agentListCmd.Flags().String("org-id", "", "The organization to create the project in on import")
 }

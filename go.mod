@@ -1,10 +1,10 @@
 module github.com/agentuity/cli
 
-go 1.24
+go 1.24.1
 
 require (
 	github.com/Masterminds/semver v1.5.0
-	github.com/agentuity/go-common v1.0.19
+	github.com/agentuity/go-common v1.0.24
 	github.com/agentuity/mcp-golang/v2 v2.0.2
 	github.com/bmatcuk/doublestar/v4 v4.8.1
 	github.com/charmbracelet/bubbles v0.20.0
@@ -24,7 +24,6 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/zijiren233/yaml-comment v0.2.2
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
-	golang.org/x/term v0.29.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/apimachinery v0.32.1
 )
@@ -55,6 +54,7 @@ require (
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	golang.org/x/crypto v0.35.0 // indirect
+	golang.org/x/term v0.29.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 )
 

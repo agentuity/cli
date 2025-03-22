@@ -7,14 +7,12 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"os/signal"
 	"runtime"
 	"strings"
-	"syscall"
 
 	"github.com/Masterminds/semver"
+	"github.com/agentuity/go-common/logger"
 	"github.com/agentuity/go-common/tui"
-	"golang.org/x/term"
 )
 
 // GetLatestRelease returns the latest release tag name from the GitHub API
@@ -46,7 +44,7 @@ func GetLatestRelease(ctx context.Context) (string, error) {
 	return release.TagName, nil
 }
 
-func CheckLatestRelease(ctx context.Context) error {
+func CheckLatestRelease(ctx context.Context, logger logger.Logger) error {
 	if Version == "dev" {
 		return nil
 	}
@@ -58,12 +56,12 @@ func CheckLatestRelease(ctx context.Context) error {
 	latestVersion := semver.MustParse(release)
 	currentVersion := semver.MustParse(Version)
 	if latestVersion.GreaterThan(currentVersion) {
-		showUpgradeNotice(release)
+		showUpgradeNotice(logger, release)
 	}
 	return nil
 }
 
-func showUpgradeNotice(version string) {
+func showUpgradeNotice(logger logger.Logger, version string) {
 	if runtime.GOOS == "darwin" {
 		exe, err := os.Executable()
 		if err != nil {
@@ -71,9 +69,9 @@ func showUpgradeNotice(version string) {
 		}
 		// if we are running from homebrew, we need to upgrade via homebrew
 		if tui.HasTTY && strings.Contains(exe, "/homebrew/Cellar/agentuity/") {
-			answer := ask(tui.Bold(fmt.Sprintf("Agentuity version %s is available. Would you like to upgrade? [Y/n] ", version)), "Y")
+			answer := tui.Ask(logger, tui.Bold(fmt.Sprintf("Agentuity version %s is available. Would you like to upgrade? [Y/n] ", version)), true)
 			fmt.Println()
-			if answer == "Y" || answer == "y" {
+			if answer {
 				action := func() {
 					exec.Command("brew", "update").Run()
 					exec.Command("brew", "upgrade", "agentuity").Run()
@@ -90,30 +88,4 @@ func showUpgradeNotice(version string) {
 		}
 	}
 	tui.ShowBanner("Agentuity Upgrade", fmt.Sprintf("Agentuity version %s is available. See %s for more information.", version, tui.Link("https://agentuity.dev/CLI/installation")), false)
-}
-
-func ask(message string, defaultValue string) string {
-	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
-	if err != nil {
-		return ""
-	}
-	defer term.Restore(int(os.Stdin.Fd()), oldState)
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
-	ch := make(chan string, 1)
-	go func() {
-		buf := make([]byte, 1)
-		os.Stdin.Read(buf)
-		ch <- string(buf)
-	}()
-	fmt.Print(message)
-	select {
-	case <-ctx.Done():
-		return ""
-	case answer := <-ch:
-		if answer == "\n" || answer == "\r" {
-			return defaultValue
-		}
-		return answer
-	}
 }

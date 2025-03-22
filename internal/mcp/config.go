@@ -36,6 +36,9 @@ type MCPClientConfig struct {
 	Command        string
 	Application    *MCPClientApplicationConfig
 	Transport      string
+	Config         *MCPConfig `json:"-"`
+	Detected       bool       `json:"-"` // if the agentuity mcp server is detected in the config file
+	Installed      bool       `json:"-"` // if this client is installed on this machine
 }
 
 type MCPServerConfig struct {
@@ -91,32 +94,26 @@ func loadConfig(path string) (*MCPConfig, error) {
 
 var mcpClientConfigs []MCPClientConfig
 
-// Install installs the agentuity tool for the given command and args.
-// It will install the tool for each MCP client config that is detected and not already installed.
-func Install(ctx context.Context, logger logger.Logger) error {
+// Detect detects the MCP clients that are installed and returns an array of MCP client names found.
+func Detect(all bool) ([]MCPClientConfig, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	executable, err := exec.LookPath(agentuityToolCommand)
-	if err != nil {
-		return fmt.Errorf("failed to find %s: %w", agentuityToolCommand, err)
-	}
-	if executable == "" {
-		return fmt.Errorf("failed to find %s", agentuityToolCommand)
-	}
+	var found []MCPClientConfig
 	for _, config := range mcpClientConfigs {
+		var exists bool
 		if config.Command != "" {
 			_, err := exec.LookPath(config.Command)
 			if err != nil {
-				if errors.Is(err, exec.ErrNotFound) {
-					continue
-				} else {
-					return err
+				if !errors.Is(err, exec.ErrNotFound) {
+					return nil, err
 				}
+			} else {
+				exists = true
 			}
 		}
-		if config.Application != nil {
+		if !exists && config.Application != nil {
 			var filepath string
 			switch runtime.GOOS {
 			case "darwin":
@@ -132,22 +129,58 @@ func Install(ctx context.Context, logger logger.Logger) error {
 					filepath = config.Application.Linux
 				}
 			}
-			if filepath == "" || !util.Exists(filepath) {
-				logger.Debug("application %s not found", config.Name)
-				continue
+			if util.Exists(filepath) {
+				exists = true
 			}
 		}
+		if !exists {
+			if all {
+				found = append(found, config)
+			}
+			continue
+		}
+		config.Installed = true
 		config.ConfigLocation = strings.Replace(config.ConfigLocation, "$HOME", home, 1)
 		var mcpconfig *MCPConfig
 		if util.Exists(config.ConfigLocation) {
-			logger.Debug("config already exists at %s, will load...", config.ConfigLocation)
 			mcpconfig, err = loadConfig(config.ConfigLocation)
 			if err != nil {
-				return err
+				return nil, err
 			}
-		} else {
-			logger.Debug("creating config for %s at %s", config.Name, config.ConfigLocation)
-			mcpconfig = &MCPConfig{
+			if _, ok := mcpconfig.MCPServers[agentuityToolName]; ok {
+				config.Detected = true
+			}
+			config.Config = mcpconfig
+		}
+		found = append(found, config)
+	}
+	return found, nil
+}
+
+// Install installs the agentuity tool for the given command and args.
+// It will install the tool for each MCP client config that is detected and not already installed.
+func Install(ctx context.Context, logger logger.Logger) error {
+	detected, err := Detect(false)
+	if err != nil {
+		return err
+	}
+	if len(detected) == 0 {
+		return nil
+	}
+	executable, err := exec.LookPath(agentuityToolCommand)
+	if err != nil {
+		return fmt.Errorf("failed to find %s: %w", agentuityToolCommand, err)
+	}
+	if executable == "" {
+		return fmt.Errorf("failed to find %s", agentuityToolCommand)
+	}
+	var installed int
+	for _, config := range detected {
+		if config.Detected {
+			continue
+		}
+		if config.Config == nil {
+			config.Config = &MCPConfig{
 				MCPServers: make(map[string]MCPServerConfig),
 				filename:   config.ConfigLocation,
 			}
@@ -160,10 +193,10 @@ func Install(ctx context.Context, logger logger.Logger) error {
 			}
 		}
 		if config.Transport == "" {
-			config.Transport = "cli"
+			config.Transport = "stdio"
 		}
-		if mcpconfig.AddIfNotExists(agentuityToolName, executable, append(agentuityToolArgs, "--"+config.Transport), agentuityToolEnv) {
-			if err := mcpconfig.Save(); err != nil {
+		if config.Config.AddIfNotExists(agentuityToolName, executable, append(agentuityToolArgs, "--"+config.Transport), agentuityToolEnv) {
+			if err := config.Config.Save(); err != nil {
 				return fmt.Errorf("failed to save config for %s: %w", config.Name, err)
 			}
 			logger.Debug("added %s config for %s at %s", agentuityToolName, config.Name, config.ConfigLocation)
@@ -172,6 +205,10 @@ func Install(ctx context.Context, logger logger.Logger) error {
 			logger.Debug("config for %s already exists at %s", agentuityToolName, config.ConfigLocation)
 			tui.ShowSuccess("Agentuity MCP server already installed for %s", config.Name)
 		}
+		installed++
+	}
+	if installed == 0 {
+		tui.ShowSuccess("All MCP clients are up-to-date")
 	}
 	return nil
 }
@@ -179,12 +216,19 @@ func Install(ctx context.Context, logger logger.Logger) error {
 // Uninstall uninstalls the agentuity tool for the given command and args.
 // It will uninstall the tool for each MCP client config that is detected and not already uninstalled.
 func Uninstall(ctx context.Context, logger logger.Logger) error {
+	detected, err := Detect(false)
+	if err != nil {
+		return err
+	}
+	if len(detected) == 0 {
+		return nil
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
 	}
-	var uninstalled bool
-	for _, config := range mcpClientConfigs {
+	var uninstalled int
+	for _, config := range detected {
 		config.ConfigLocation = strings.Replace(config.ConfigLocation, "$HOME", home, 1)
 		if util.Exists(config.ConfigLocation) {
 			mcpconfig, err := loadConfig(config.ConfigLocation)
@@ -201,11 +245,11 @@ func Uninstall(ctx context.Context, logger logger.Logger) error {
 			}
 			logger.Debug("removed %s config for %s at %s", agentuityToolName, config.Name, config.ConfigLocation)
 			tui.ShowSuccess("Uninstalled Agentuity MCP server for %s", config.Name)
-			uninstalled = true
+			uninstalled++
 		}
 	}
-	if !uninstalled {
-		tui.ShowWarning("No Agentuity MCP servers found")
+	if uninstalled == 0 {
+		tui.ShowWarning("Agentuity MCP server not installed for any clients")
 	}
 	return nil
 }
@@ -216,18 +260,24 @@ func init() {
 		Name:           "Cursor",
 		ConfigLocation: "$HOME/.cursor/mcp.json",
 		Command:        "cursor",
-		Transport:      "cli",
+		Transport:      "stdio",
+		Application: &MCPClientApplicationConfig{
+			MacOS: "/Applications/Cursor.app/Contents/MacOS/Cursor",
+		},
 	})
 	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
-		Name:           "Codeium",
+		Name:           "Windsurf",
 		ConfigLocation: "$HOME/.codeium/windsurf/mcp_config.json",
-		Command:        "codeium",
-		Transport:      "cli",
+		Command:        "windsurf",
+		Transport:      "stdio",
+		Application: &MCPClientApplicationConfig{
+			MacOS: "/Applications/Windsurf.app/Contents/MacOS/Electron",
+		},
 	})
 	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
 		Name:           "Claude Desktop",
 		ConfigLocation: filepath.Join(util.GetAppSupportDir("Claude"), "claude_desktop_config.json"),
-		Transport:      "cli",
+		Transport:      "stdio",
 		Application: &MCPClientApplicationConfig{
 			MacOS: "/Applications/Claude.app/Contents/MacOS/Claude",
 		},

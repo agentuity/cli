@@ -31,6 +31,9 @@ func init() {
 			}
 			result, err := execCommand(ctx, c.ProjectDir, "create", args.Name, args.Description, args.AgentName, args.AgentDescription, args.AuthType, "--dir", args.Directory, "--provider", args.Provider, "--template", args.Template)
 			if err != nil {
+				if len(result) > 0 {
+					return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(result)), err
+				}
 				return nil, err
 			}
 			return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(result)), nil

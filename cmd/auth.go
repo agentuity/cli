@@ -93,7 +93,7 @@ Examples:
 		tui.ClearScreen()
 		initScreenWithLogo()
 		tui.ShowSuccess("Welcome to Agentuity! You are now logged in")
-		checkForUpgrade(ctx)
+		checkForUpgrade(ctx, logger)
 	},
 }
 

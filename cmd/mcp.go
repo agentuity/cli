@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,6 +11,7 @@ import (
 	"github.com/agentuity/cli/internal/mcp"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/go-common/env"
+	"github.com/agentuity/go-common/tui"
 	mcp_golang "github.com/agentuity/mcp-golang/v2"
 	"github.com/agentuity/mcp-golang/v2/transport"
 	"github.com/agentuity/mcp-golang/v2/transport/stdio"
@@ -18,6 +20,7 @@ import (
 
 var mcpCmd = &cobra.Command{
 	Use:   "mcp",
+	Args:  cobra.NoArgs,
 	Short: "Manage MCP commands",
 	Long: `Manage MCP commands.
 
@@ -32,8 +35,10 @@ Examples:
 }
 
 var mcpInstallCmd = &cobra.Command{
-	Use:   "install",
-	Short: "Install the Agentuity CLI as an MCP server",
+	Use:     "install",
+	Args:    cobra.NoArgs,
+	Aliases: []string{"i", "add"},
+	Short:   "Install the Agentuity CLI as an MCP server",
 	Long: `Install the Agentuity CLI as an MCP server.
 
 Examples:
@@ -49,8 +54,10 @@ Examples:
 }
 
 var mcpUninstallCmd = &cobra.Command{
-	Use:   "uninstall",
-	Short: "Uninstall the Agentuity CLI as an MCP server",
+	Use:     "uninstall",
+	Args:    cobra.NoArgs,
+	Aliases: []string{"rm", "delete", "del", "remove"},
+	Short:   "Uninstall the Agentuity CLI as an MCP server",
 	Long: `Uninstall the Agentuity CLI as an MCP server.
 
 Examples:
@@ -65,25 +72,73 @@ Examples:
 	},
 }
 
+var mcpListCmd = &cobra.Command{
+	Use:     "list",
+	Args:    cobra.NoArgs,
+	Aliases: []string{"ls"},
+	Short:   "List the MCP server configurations",
+	Long: `List the MCP server configurations.
+
+Examples:
+  agentuity mcp list`,
+	Run: func(cmd *cobra.Command, args []string) {
+		logger := env.NewLogger(cmd)
+		detected, err := mcp.Detect(true)
+		if err != nil {
+			logger.Fatal("%s", err)
+		}
+		if len(detected) == 0 {
+			tui.ShowWarning("No MCP servers detected on this machine")
+			return
+		}
+		var needsInstall int
+		for _, config := range detected {
+			if config.Installed && config.Detected {
+				tui.ShowSuccess("%s %s", tui.Bold(tui.PadRight(config.Name, 20, " ")), tui.Muted("configured"))
+			} else if config.Installed {
+				tui.ShowError("%s %s", tui.Bold(tui.PadRight(config.Name, 20, " ")), tui.Muted("not configured"))
+				needsInstall++
+			} else {
+				tui.ShowWarning("%s %s", tui.Bold(tui.PadRight(config.Name, 20, " ")), tui.Muted("not installed"))
+			}
+		}
+		if needsInstall > 0 {
+			fmt.Println()
+			text := "client"
+			if needsInstall > 1 {
+				text = "clients"
+			}
+			tui.WaitForAnyKeyMessage(fmt.Sprintf("Press any key to install the Agentuity MCP server for the missing %s...", text))
+			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+			defer cancel()
+			if err := mcp.Install(ctx, logger); err != nil {
+				logger.Fatal("%s", err)
+			}
+		}
+	},
+}
+
 var mcpRunCmd = &cobra.Command{
-	Use:   "run",
-	Short: "Run the Agentuity MCP server",
+	Use:    "run",
+	Hidden: true,
+	Args:   cobra.NoArgs,
+	Short:  "Run the Agentuity MCP server",
 	Long: `Run the Agentuity MCP server.
 
 Examples:
   agentuity mcp run
-  agentuity mcp run --cli
+  agentuity mcp run --stdio
 	agentuity mcp run --sse`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cli, _ := cmd.Flags().GetBool("cli")
+		stdioTransport, _ := cmd.Flags().GetBool("stdio")
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		logger := env.NewLogger(cmd)
 		var t transport.Transport
-		if cli {
+		if stdioTransport {
 			t = stdio.NewStdioServerTransport()
 		} else {
-			logger.Fatal("SSE mode is not yet implemented")
+			logger.Fatal("SSE mode is not yet supported")
 		}
 		project := project.TryProject(cmd)
 		server := mcp_golang.NewServer(t)
@@ -120,8 +175,9 @@ func init() {
 	mcpCmd.AddCommand(mcpInstallCmd)
 	mcpCmd.AddCommand(mcpUninstallCmd)
 	mcpCmd.AddCommand(mcpRunCmd)
+	mcpCmd.AddCommand(mcpListCmd)
 
-	mcpRunCmd.Flags().Bool("cli", true, "Run the MCP server in CLI mode")
+	mcpRunCmd.Flags().Bool("stdio", true, "Run the MCP server in Stdio mode")
 	mcpRunCmd.Flags().Bool("sse", false, "Run the MCP server in SSE mode")
-	mcpRunCmd.MarkFlagsMutuallyExclusive("cli", "sse")
+	mcpRunCmd.MarkFlagsMutuallyExclusive("stdio", "sse")
 }

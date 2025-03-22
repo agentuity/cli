@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/agentuity/cli/internal/errsystem"
+	"github.com/agentuity/cli/internal/mcp"
 	"github.com/agentuity/cli/internal/organization"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/templates"
@@ -175,7 +176,7 @@ func promptForProjectDetail(ctx context.Context, logger logger.Logger, apiUrl, a
 	return name, description
 }
 
-func promptForOrganization(ctx context.Context, logger logger.Logger, apiUrl string, token string) string {
+func promptForOrganization(ctx context.Context, logger logger.Logger, cmd *cobra.Command, apiUrl string, token string) string {
 	orgs, err := organization.ListOrganizations(ctx, logger, apiUrl, token)
 	if err != nil {
 		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list organizations")).ShowErrorAndExit()
@@ -188,11 +189,26 @@ func promptForOrganization(ctx context.Context, logger logger.Logger, apiUrl str
 	if len(orgs) == 1 {
 		orgId = orgs[0].OrgId
 	} else {
-		var opts []tui.Option
-		for _, org := range orgs {
-			opts = append(opts, tui.Option{ID: org.OrgId, Text: org.Name})
+		prefOrgId, _ := cmd.Flags().GetString("org-id")
+		if prefOrgId == "" {
+			prefOrgId = viper.GetString("preferences.orgId")
 		}
-		orgId = tui.Select(logger, "What organization should we create the project in?", "", opts)
+		if tui.HasTTY {
+			var opts []tui.Option
+			for _, org := range orgs {
+				opts = append(opts, tui.Option{ID: org.OrgId, Text: org.Name, Selected: prefOrgId == org.OrgId})
+			}
+			orgId = tui.Select(logger, "What organization should we create the project in?", "", opts)
+			viper.Set("preferences.orgId", orgId)
+			viper.WriteConfig() // remember the preference
+		} else {
+			for _, org := range orgs {
+				if org.OrgId == prefOrgId {
+					return org.OrgId
+				}
+			}
+			logger.Fatal("no TTY and no organization preference found. re-run with --org-id")
+		}
 	}
 	return orgId
 }
@@ -324,9 +340,52 @@ Examples:
 			errsystem.New(errsystem.ErrListFilesAndDirectories, err, errsystem.WithContextMessage("Failed to get current working directory")).ShowErrorAndExit()
 		}
 
-		checkForUpgrade(ctx)
+		checkForUpgrade(ctx, logger)
 
-		orgId := promptForOrganization(ctx, logger, apiUrl, apikey)
+		if tui.HasTTY {
+			// handle MCP server installation
+			detected, err := mcp.Detect(true)
+			if err != nil {
+				logger.Fatal("%s", err)
+			}
+			if len(detected) > 0 {
+				var clients []string
+				for _, config := range detected {
+					if !config.Installed || config.Detected {
+						continue
+					}
+					clients = append(clients, config.Name)
+				}
+				if len(clients) > 0 {
+					fmt.Println()
+					fmt.Println(tui.Bold("The Agentuity tooling can be enhanced for the following:"))
+					fmt.Println()
+					for _, client := range clients {
+						tui.ShowSuccess("%s", tui.PadRight(client, 20, " "))
+					}
+					fmt.Println()
+					fmt.Println(tui.Muted("By installing, you will have enhanced AI capabilities."))
+					fmt.Println()
+					yesno := tui.Ask(logger, tui.Bold("Would you like to install?"), true)
+					fmt.Println()
+					if yesno {
+						fmt.Println()
+						if err := mcp.Install(ctx, logger); err != nil {
+							logger.Fatal("%s", err)
+						}
+					} else {
+						fmt.Println()
+						tui.ShowWarning("You can install the Agentuity tooling later by running: \n\n\t%s", tui.Command("mcp", "install"))
+					}
+					fmt.Println()
+					tui.WaitForAnyKeyMessage("Press any key to continue with project creation ...")
+					fmt.Println()
+					initScreenWithLogo() // re-clear the screen
+				}
+			}
+		}
+
+		orgId := promptForOrganization(ctx, logger, cmd, apiUrl, apikey)
 
 		var name, description, agentName, agentDescription, authType string
 
@@ -354,10 +413,13 @@ Examples:
 		}
 
 		if util.Exists(projectDir) {
-			if !tui.Ask(logger, tui.Paragraph(tui.Secondary("The directory ")+tui.Bold(projectDir)+tui.Secondary(" already exists."), "Delete and continue?"), true) {
+			fmt.Println(tui.Secondary("The directory ") + tui.Bold(projectDir) + tui.Secondary(" already exists."))
+			fmt.Println()
+			if !tui.Ask(logger, "Delete and continue?", true) {
 				return
 			}
 			os.RemoveAll(projectDir)
+			initScreenWithLogo()
 		}
 
 		var providerName string
@@ -645,7 +707,7 @@ Examples:
 			return
 		}
 
-		if !tui.Ask(logger, tui.Paragraph("Are you sure you want to delete the selected projects?", "This action cannot be undone."), true) {
+		if !tui.Ask(logger, "Are you sure you want to delete the selected projects?", true) {
 			tui.ShowWarning("cancelled")
 			return
 		}
@@ -685,7 +747,7 @@ Examples:
 		defer cancel()
 		logger := env.NewLogger(cmd)
 		context := project.EnsureProject(cmd)
-		ShowNewProjectImport(ctx, logger, context.APIURL, context.Token, "", context.Project, context.Dir, true)
+		ShowNewProjectImport(ctx, logger, cmd, context.APIURL, context.Token, "", context.Project, context.Dir, true)
 	},
 }
 
@@ -699,6 +761,7 @@ func init() {
 
 	for _, cmd := range []*cobra.Command{projectNewCmd, projectImportCmd} {
 		cmd.Flags().StringP("dir", "d", "", "The directory for the project")
+		cmd.Flags().String("org-id", "", "The organization to create the project in")
 	}
 
 	projectNewCmd.Flags().StringP("provider", "p", "", "The provider template to use for the project")

@@ -73,7 +73,7 @@ type startRequest struct {
 	Metadata  *deployer.Metadata `json:"metadata,omitempty"`
 }
 
-func ShowNewProjectImport(ctx context.Context, logger logger.Logger, apiUrl, apikey, projectId string, project *project.Project, dir string, isImport bool) {
+func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.Command, apiUrl, apikey, projectId string, project *project.Project, dir string, isImport bool) {
 	title := "Import Project"
 	var message string
 	if isImport {
@@ -89,7 +89,7 @@ func ShowNewProjectImport(ctx context.Context, logger logger.Logger, apiUrl, api
 	tui.ShowBanner(title, message, false)
 	tui.WaitForAnyKey()
 	tui.ClearScreen()
-	orgId := promptForOrganization(ctx, logger, apiUrl, apikey)
+	orgId := promptForOrganization(ctx, logger, cmd, apiUrl, apikey)
 	name, description := promptForProjectDetail(ctx, logger, apiUrl, apikey, project.Name, project.Description)
 	project.Name = name
 	project.Description = description
@@ -147,7 +147,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(parentCtx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		checkForUpgrade(ctx)
+		checkForUpgrade(ctx, logger)
 
 		var keys []string
 		var state map[string]agentListState
@@ -196,7 +196,7 @@ Examples:
 			if theproject != nil {
 				projectId = theproject.ProjectId
 			}
-			ShowNewProjectImport(ctx, logger, apiUrl, token, projectId, theproject, dir, false)
+			ShowNewProjectImport(ctx, logger, cmd, apiUrl, token, projectId, theproject, dir, false)
 		}
 
 		// check to see if we have any env vars that are not in the project
@@ -629,4 +629,5 @@ func init() {
 	cloudDeployCmd.Flags().MarkHidden("deploymentId")
 	cloudDeployCmd.Flags().MarkHidden("ci")
 	cloudDeployCmd.Flags().String("format", "text", "The output format to use for results which can be either 'text' or 'json'")
+	cloudDeployCmd.Flags().String("org-id", "", "The organization to create the project in")
 }
