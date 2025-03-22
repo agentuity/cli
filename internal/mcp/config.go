@@ -262,7 +262,8 @@ func init() {
 		Command:        "cursor",
 		Transport:      "stdio",
 		Application: &MCPClientApplicationConfig{
-			MacOS: "/Applications/Cursor.app/Contents/MacOS/Cursor",
+			MacOS:   "/Applications/Cursor.app/Contents/MacOS/Cursor",
+			Windows: filepath.Join(util.GetAppSupportDir("cursor"), "Cursor.exe"),
 		},
 	})
 	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
@@ -271,7 +272,8 @@ func init() {
 		Command:        "windsurf",
 		Transport:      "stdio",
 		Application: &MCPClientApplicationConfig{
-			MacOS: "/Applications/Windsurf.app/Contents/MacOS/Electron",
+			MacOS:   "/Applications/Windsurf.app/Contents/MacOS/Electron",
+			Windows: filepath.Join(util.GetAppSupportDir("Windsurf"), "Windsurf.exe"),
 		},
 	})
 	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
@@ -279,7 +281,8 @@ func init() {
 		ConfigLocation: filepath.Join(util.GetAppSupportDir("Claude"), "claude_desktop_config.json"),
 		Transport:      "stdio",
 		Application: &MCPClientApplicationConfig{
-			MacOS: "/Applications/Claude.app/Contents/MacOS/Claude",
+			MacOS:   "/Applications/Claude.app/Contents/MacOS/Claude",
+			Windows: filepath.Join(util.GetAppSupportDir("Claude Desktop"), "Claude Desktop.exe"),
 		},
 	})
 }
