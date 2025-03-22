@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	mcp_golang "github.com/metoro-io/mcp-golang"
+	mcp_golang "github.com/agentuity/mcp-golang/v2"
 )
 
 type HelloArguments struct {

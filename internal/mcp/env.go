@@ -9,7 +9,7 @@ import (
 
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/go-common/tui"
-	mcp_golang "github.com/metoro-io/mcp-golang"
+	mcp_golang "github.com/agentuity/mcp-golang/v2"
 )
 
 type EnvSetArguments struct {

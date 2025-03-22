@@ -134,7 +134,14 @@ var agentDeleteCmd = &cobra.Command{
 	},
 }
 
-func getAgentAuthType(logger logger.Logger) string {
+func getAgentAuthType(logger logger.Logger, authType string) string {
+	if authType != "" {
+		switch authType {
+		case "bearer", "none":
+			return authType
+		default:
+		}
+	}
 	auth := tui.Select(logger, "Select your Agent's authentication method", "How do you want to secure the Agent?", []tui.Option{
 		{Text: tui.PadRight("API Key", 10, " ") + tui.Muted("Bearer Token"), ID: "bearer"},
 		{Text: tui.PadRight("None", 10, " ") + tui.Muted("No Authentication Required"), ID: "none"},
@@ -142,7 +149,7 @@ func getAgentAuthType(logger logger.Logger) string {
 	return auth
 }
 
-func getAgentInfoFlow(logger logger.Logger, remoteAgents []agent.Agent, name string, description string) (string, string, string) {
+func getAgentInfoFlow(logger logger.Logger, remoteAgents []agent.Agent, name string, description string, authType string) (string, string, string) {
 	if name == "" {
 		var prompt, help string
 		if len(remoteAgents) > 0 {
@@ -169,7 +176,7 @@ func getAgentInfoFlow(logger logger.Logger, remoteAgents []agent.Agent, name str
 		description = tui.Input(logger, "How should we describe what the "+name+" Agent does?", "The description of the Agent is optional but helpful for understanding the role of the Agent")
 	}
 
-	auth := getAgentAuthType(logger)
+	auth := getAgentAuthType(logger, authType)
 
 	return name, description, auth
 }
@@ -219,7 +226,11 @@ var agentCreateCmd = &cobra.Command{
 			description = args[1]
 		}
 
-		name, description, authType = getAgentInfoFlow(logger, remoteAgents, name, description)
+		if len(args) > 2 {
+			authType = args[2]
+		}
+
+		name, description, authType = getAgentInfoFlow(logger, remoteAgents, name, description, authType)
 
 		action := func() {
 			agentID, err := agent.CreateAgent(context.Background(), logger, apiUrl, apikey, theproject.Project.ProjectId, name, description, authType)

@@ -507,9 +507,12 @@ func TryProject(cmd *cobra.Command) ProjectContext {
 	if cmd.Flags().Changed("api-key") {
 		token = util.EnsureLoggedInWithOnlyAPIKey()
 	} else {
-		token, _ = util.EnsureLoggedIn()
+		apikey, _, ok := util.TryLoggedIn()
+		if ok {
+			token = apikey
+		}
 	}
-	if dir == "" || !util.Exists(filepath.Join(dir, "agentuity.yaml")) {
+	if token == "" || dir == "" || !util.Exists(filepath.Join(dir, "agentuity.yaml")) {
 		return ProjectContext{
 			Logger:       logger,
 			Dir:          dir,

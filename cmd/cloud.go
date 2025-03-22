@@ -93,7 +93,7 @@ func ShowNewProjectImport(ctx context.Context, logger logger.Logger, apiUrl, api
 	project.Name = name
 	project.Description = description
 	var createWebhookAuth bool
-	auth := getAgentAuthType(logger)
+	auth := getAgentAuthType(logger, "")
 	if auth == "bearer" {
 		createWebhookAuth = true
 	}

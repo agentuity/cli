@@ -10,9 +10,9 @@ import (
 	"github.com/agentuity/cli/internal/mcp"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/go-common/env"
-	mcp_golang "github.com/metoro-io/mcp-golang"
-	"github.com/metoro-io/mcp-golang/transport"
-	"github.com/metoro-io/mcp-golang/transport/stdio"
+	mcp_golang "github.com/agentuity/mcp-golang/v2"
+	"github.com/agentuity/mcp-golang/v2/transport"
+	"github.com/agentuity/mcp-golang/v2/transport/stdio"
 	"github.com/spf13/cobra"
 )
 
@@ -79,14 +79,14 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		logger := env.NewLogger(cmd)
-		var transport transport.Transport
+		var t transport.Transport
 		if cli {
-			transport = stdio.NewStdioServerTransport()
+			t = stdio.NewStdioServerTransport()
 		} else {
 			logger.Fatal("SSE mode is not yet implemented")
 		}
 		project := project.TryProject(cmd)
-		server := mcp_golang.NewServer(transport)
+		server := mcp_golang.NewServer(t)
 		mcpContext := mcp.MCPContext{
 			Context:      ctx,
 			Logger:       logger,
@@ -104,7 +104,7 @@ Examples:
 		if err != nil {
 			logger.Fatal("%s", err)
 		}
-		if err := server.Serve(); err != nil {
+		if err := server.Serve(ctx); err != nil {
 			if errors.Is(err, context.Canceled) {
 				logger.Info("bye")
 				return

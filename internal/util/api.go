@@ -226,6 +226,22 @@ func ShowLogin() {
 	tui.ShowBanner("Login", tui.Text("Use ")+tui.Command("login")+tui.Text(" to login to Agentuity"), false)
 }
 
+func TryLoggedIn() (string, string, bool) {
+	apikey := viper.GetString("auth.api_key")
+	if apikey == "" {
+		return "", "", false
+	}
+	userId := viper.GetString("auth.user_id")
+	if userId == "" {
+		return "", "", false
+	}
+	expires := viper.GetInt64("auth.expires")
+	if expires < time.Now().UnixMilli() {
+		return "", "", false
+	}
+	return apikey, userId, true
+}
+
 func EnsureLoggedIn() (string, string) {
 	apikey := viper.GetString("auth.api_key")
 	if apikey == "" {

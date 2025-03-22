@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/agentuity/cli/internal/util"
@@ -23,10 +24,17 @@ const (
 var agentuityToolArgs = []string{"mcp", "run"}
 var agentuityToolEnv = map[string]string{}
 
+type MCPClientApplicationConfig struct {
+	MacOS   string
+	Windows string
+	Linux   string
+}
+
 type MCPClientConfig struct {
 	Name           string
 	ConfigLocation string
 	Command        string
+	Application    *MCPClientApplicationConfig
 	Transport      string
 }
 
@@ -98,12 +106,35 @@ func Install(ctx context.Context, logger logger.Logger) error {
 		return fmt.Errorf("failed to find %s", agentuityToolCommand)
 	}
 	for _, config := range mcpClientConfigs {
-		_, err := exec.LookPath(config.Command)
-		if err != nil {
-			if errors.Is(err, exec.ErrNotFound) {
+		if config.Command != "" {
+			_, err := exec.LookPath(config.Command)
+			if err != nil {
+				if errors.Is(err, exec.ErrNotFound) {
+					continue
+				} else {
+					return err
+				}
+			}
+		}
+		if config.Application != nil {
+			var filepath string
+			switch runtime.GOOS {
+			case "darwin":
+				if config.Application.MacOS != "" {
+					filepath = config.Application.MacOS
+				}
+			case "windows":
+				if config.Application.Windows != "" {
+					filepath = config.Application.Windows
+				}
+			case "linux":
+				if config.Application.Linux != "" {
+					filepath = config.Application.Linux
+				}
+			}
+			if filepath == "" || !util.Exists(filepath) {
+				logger.Debug("application %s not found", config.Name)
 				continue
-			} else {
-				return err
 			}
 		}
 		config.ConfigLocation = strings.Replace(config.ConfigLocation, "$HOME", home, 1)
@@ -192,5 +223,13 @@ func init() {
 		ConfigLocation: "$HOME/.codeium/windsurf/mcp_config.json",
 		Command:        "codeium",
 		Transport:      "cli",
+	})
+	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
+		Name:           "Claude Desktop",
+		ConfigLocation: filepath.Join(util.GetAppSupportDir("Claude"), "claude_desktop_config.json"),
+		Transport:      "cli",
+		Application: &MCPClientApplicationConfig{
+			MacOS: "/Applications/Claude.app/Contents/MacOS/Claude",
+		},
 	})
 }

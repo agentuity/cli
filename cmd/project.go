@@ -464,7 +464,7 @@ Examples:
 		}
 
 		if agentName == "" {
-			agentName, agentDescription, authType = getAgentInfoFlow(logger, nil, agentName, agentDescription)
+			agentName, agentDescription, authType = getAgentInfoFlow(logger, nil, agentName, agentDescription, authType)
 		}
 
 		var projectData *project.ProjectData

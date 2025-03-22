@@ -3,27 +3,11 @@ package mcp
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/agentuity/cli/internal/auth"
-	mcp_golang "github.com/metoro-io/mcp-golang"
+	mcp_golang "github.com/agentuity/mcp-golang/v2"
 	"github.com/spf13/viper"
 )
-
-func ensureLoggedIn(c MCPContext) *mcp_golang.ToolResponse {
-	if !c.LoggedIn {
-		return mcp_golang.NewToolResponse(mcp_golang.NewTextContent("You are not currently logged in or your session has expired. Please login again."))
-	}
-	return nil
-}
-
-func ensureProject(c MCPContext) *mcp_golang.ToolResponse {
-	if c.Project == nil {
-		cwd, _ := os.Getwd()
-		return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(fmt.Sprintf("You are not currently in a project directory (%s). Your current working directory is %s. Your environment variables are %v. Please navigate to an Agentuity project directory and try again.", c.ProjectDir, cwd, os.Environ())))
-	}
-	return nil
-}
 
 func init() {
 	register(func(c MCPContext) error {
