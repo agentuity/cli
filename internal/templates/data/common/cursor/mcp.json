@@ -1,0 +1,12 @@
+{
+	"mcpServers": {
+		"agentuity": {
+			"command": "{{ .AgentuityCommand }}",
+			"args": [
+				"mcp",
+				"run",
+				"--cli"
+			]
+		}
+	}
+}

@@ -94,6 +94,14 @@ new_project:
     - action: copy_dir
       from: "common/js/cursor"
       to: ".cursor/rules"
+      filter: "*.mdc"
     - action: copy_dir
       from: "common/cursor"
       to: ".cursor/rules"
+      filter: "*.mdc"
+    - action: create_file
+      filename: ".cursor/mcp.json"
+      template: "common/cursor/mcp.json"
+    - action: create_file
+      filename: ".editorconfig"
+      template: "common/editorconfig"

@@ -6,7 +6,9 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/agentuity/cli/internal/deployer"
@@ -170,4 +172,13 @@ func checkForUpgrade(ctx context.Context) {
 		viper.WriteConfig()
 		util.CheckLatestRelease(ctx)
 	}
+}
+
+func getAgentuityCommand() string {
+	exe, _ := os.Executable()
+	// if the executable is not agentuity, then we need to find it
+	if !strings.Contains(exe, "agentuity") {
+		exe, _ = exec.LookPath("agentuity")
+	}
+	return exe
 }

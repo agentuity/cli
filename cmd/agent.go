@@ -250,6 +250,7 @@ var agentCreateCmd = &cobra.Command{
 				Description:      description,
 				AgentDescription: description,
 				ProjectDir:       theproject.Dir,
+				AgentuityCommand: getAgentuityCommand(),
 			}); err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithAttributes(map[string]any{"name": name})).ShowErrorAndExit()
 			}

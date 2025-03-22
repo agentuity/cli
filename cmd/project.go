@@ -478,6 +478,7 @@ Examples:
 			AgentName:        agentName,
 			AgentDescription: agentDescription,
 			TemplateName:     templateName,
+			AgentuityCommand: getAgentuityCommand(),
 		}
 
 		tui.ShowSpinner("checking dependencies ...", func() {

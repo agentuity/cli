@@ -303,8 +303,9 @@ func (s *CopyFileAction) Run(ctx TemplateContext) error {
 }
 
 type CopyDirAction struct {
-	From string
-	To   string
+	From   string
+	To     string
+	Filter string
 }
 
 var _ Step = (*CopyDirAction)(nil)
@@ -323,6 +324,15 @@ func (s *CopyDirAction) Run(ctx TemplateContext) error {
 		ctx.Logger.Debug("Created directory: %s", dir)
 	}
 	for _, file := range from {
+		if s.Filter != "" {
+			matched, err := filepath.Match(s.Filter, file.Name())
+			if err != nil {
+				return fmt.Errorf("failed to match filter: %s", err)
+			}
+			if !matched {
+				continue
+			}
+		}
 		name := embeddedPath(filepath.Join(s.From, file.Name()))
 		r, err := getEmbeddedFile(name)
 		if err != nil {
@@ -468,13 +478,17 @@ func resolveStep(ctx TemplateContext, step any) (Step, bool) {
 			case "copy_dir":
 				var from string
 				var to string
+				var filter string
 				if val, ok := kv["from"].(string); ok {
 					from = ctx.Interpolate(val).(string)
 				}
 				if val, ok := kv["to"].(string); ok {
 					to = ctx.Interpolate(val).(string)
 				}
-				return &CopyDirAction{From: from, To: to}, true
+				if val, ok := kv["filter"].(string); ok {
+					filter = ctx.Interpolate(val).(string)
+				}
+				return &CopyDirAction{From: from, To: to, Filter: filter}, true
 			default:
 				panic(fmt.Sprintf("unknown step action: %s", action))
 			}
