@@ -594,7 +594,7 @@ Examples:
 					if len(theproject.Agents) == 1 {
 						body2 = "\n\n"
 						if webhookToken != "" {
-							body2 += tui.Body("· Run ") + tui.Command("agent apikey "+theproject.Agents[0].ID) + tui.Body("\n  to fetch the API key for this webhook")
+							body2 += tui.Body("· Run ") + tui.Command("agent apikey "+theproject.Agents[0].ID) + tui.Body("\n  to fetch the Webhook API key for this webhook")
 							body2 += "\n\n"
 						}
 						body2 += tui.Body(fmt.Sprintf("· Send %s webhook request to\n  ", theproject.Agents[0].Name) + tui.Link("%s/webhook/%s", transportUrl, strings.TrimLeft(theproject.Agents[0].ID, "agent_")))

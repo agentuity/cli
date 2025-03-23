@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/agentuity/cli/internal/auth"
@@ -146,6 +147,9 @@ Examples:
 			tui.PadRight("Name:", 15, " ")+" "+tui.Bold(tui.PadRight(user.FirstName+" "+user.LastName, 30, " "))+" "+tui.Muted(userId),
 			orgs...,
 		)
+		if strings.Contains(apiUrl, "agentuity.dev") {
+			body += "\n\n" + tui.Warning("Logged in to development, not production")
+		}
 		tui.ShowBanner(tui.Muted("Currently logged in as:"), body, false)
 	},
 }
