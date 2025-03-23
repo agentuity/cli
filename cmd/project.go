@@ -321,7 +321,7 @@ func projectGitFlow(ctx context.Context, logger logger.Logger) {
 		switch choice {
 		case "none":
 		case "action":
-			tui.ShowBanner("GitHub Action", tui.Secondary("✓ Added GitHub Action Workflow to your project. After you push your code, make sure you set your API Key from .env as the secret AGENTUITY_API_KEY in your GitHub configuration."), false)
+			tui.ShowBanner("GitHub Action", tui.Secondary(tui.Paragraph("✓ Added GitHub Action Workflow to your project.", "After you push your code, make sure you set your API Key from .env as the secret AGENTUITY_API_KEY in your GitHub configuration.")), false)
 		case "app":
 			tui.ShowBanner("GitHub App", tui.Secondary("After pushing your code to GitHub, visit the dashboard to connect your repository"), false)
 		}
