@@ -47,7 +47,7 @@ func init() {
 
 	register(func(c MCPContext) error {
 		return c.Server.RegisterTool("whoami", "this is a tool for validating the current user's authentication or logged in status for the agentuity cloud platform", func(ctx context.Context, args NoArguments) (*mcp_golang.ToolResponse, error) {
-			if resp := ensureLoggedIn(c); resp != nil {
+			if resp := ensureLoggedIn(&c); resp != nil {
 				return resp, nil
 			}
 

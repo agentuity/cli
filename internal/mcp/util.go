@@ -6,20 +6,28 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/agentuity/cli/internal/project"
 	mcp_golang "github.com/agentuity/mcp-golang/v2"
 )
 
-func ensureLoggedIn(c MCPContext) *mcp_golang.ToolResponse {
+func ensureLoggedIn(c *MCPContext) *mcp_golang.ToolResponse {
 	if !c.LoggedIn {
 		return mcp_golang.NewToolResponse(mcp_golang.NewTextContent("You are not currently logged in or your session has expired. Please login again."))
 	}
 	return nil
 }
 
-func ensureProject(c MCPContext) *mcp_golang.ToolResponse {
+func ensureProject(c *MCPContext) *mcp_golang.ToolResponse {
 	if c.Project == nil {
+		if c.ProjectDir != "" {
+			p := project.LoadProject(c.Logger, c.ProjectDir, c.APIURL, c.AppURL, c.TransportURL, c.AppURL)
+			if p.Project != nil {
+				c.Project = p.Project
+				return nil
+			}
+		}
 		cwd, _ := os.Getwd()
-		return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(fmt.Sprintf("You are not currently in a project directory (%s). Your current working directory is %s. Your environment variables are %v. Please navigate to a Agentuity project directory and try again.", c.ProjectDir, cwd, os.Environ())))
+		return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(fmt.Sprintf("You are not currently in a project directory (%s). Your current working directory is %s. Please navigate to a Agentuity project directory and try again or pass in the project directory", c.ProjectDir, cwd)))
 	}
 	return nil
 }
@@ -32,8 +40,13 @@ func execCommand(ctx context.Context, dir string, command string, args ...string
 	args = append([]string{command}, args...)
 	args = append(args, "--log-level", "warn")
 	cmd := exec.CommandContext(ctx, exe, args...)
-	cmd.Dir = dir
+	if dir != "" {
+		cmd.Dir = dir
+	}
 	cmd.Env = append(os.Environ(), "AGENTUITY_MCP_SESSION=1")
 	output, err := cmd.Output()
-	return string(output), err
+	if err != nil {
+		return "", fmt.Errorf("error executing command: %w. %s", err, string(output))
+	}
+	return string(output), nil
 }

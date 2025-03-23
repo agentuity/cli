@@ -151,6 +151,9 @@ func getAgentAuthType(logger logger.Logger, authType string) string {
 
 func getAgentInfoFlow(logger logger.Logger, remoteAgents []agent.Agent, name string, description string, authType string) (string, string, string) {
 	if name == "" {
+		if !tui.HasTTY {
+			logger.Fatal("No TTY detected, please specify an Agent name from the command line")
+		}
 		var prompt, help string
 		if len(remoteAgents) > 0 {
 			prompt = "What should we name the Agent?"
@@ -174,6 +177,10 @@ func getAgentInfoFlow(logger logger.Logger, remoteAgents []agent.Agent, name str
 
 	if description == "" {
 		description = tui.Input(logger, "How should we describe what the "+name+" Agent does?", "The description of the Agent is optional but helpful for understanding the role of the Agent")
+	}
+
+	if authType == "" && !tui.HasTTY {
+		logger.Fatal("No TTY detected, please specify an Agent authentication type from the command line")
 	}
 
 	auth := getAgentAuthType(logger, authType)
@@ -230,10 +237,30 @@ var agentCreateCmd = &cobra.Command{
 			authType = args[2]
 		}
 
+		force, _ := cmd.Flags().GetBool("force")
+
+		// if we have a force flag and a name passed in, delete the existing agent if found
+		if force && name != "" {
+			for _, a := range remoteAgents {
+				if strings.EqualFold(a.Name, name) {
+					if _, err := agent.DeleteAgents(ctx, logger, apiUrl, apikey, theproject.Project.ProjectId, []string{a.ID}); err != nil {
+						errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to delete existing Agent")).ShowErrorAndExit()
+					}
+					for i, ea := range theproject.Project.Agents {
+						if ea.ID == a.ID {
+							theproject.Project.Agents = append(theproject.Project.Agents[:i], theproject.Project.Agents[i+1:]...)
+							break
+						}
+					}
+					break
+				}
+			}
+		}
+
 		name, description, authType = getAgentInfoFlow(logger, remoteAgents, name, description, authType)
 
 		action := func() {
-			agentID, err := agent.CreateAgent(context.Background(), logger, apiUrl, apikey, theproject.Project.ProjectId, name, description, authType)
+			agentID, err := agent.CreateAgent(ctx, logger, apiUrl, apikey, theproject.Project.ProjectId, name, description, authType)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to create Agent")).ShowErrorAndExit()
 			}
@@ -591,4 +618,5 @@ func init() {
 		cmd.Flags().StringP("dir", "d", "", "The project directory")
 	}
 	agentListCmd.Flags().String("org-id", "", "The organization to create the project in on import")
+	agentCreateCmd.Flags().Bool("force", false, "Force the creation of the agent even if it already exists")
 }

@@ -412,11 +412,20 @@ Examples:
 			projectDir = tui.InputWithPlaceholder(logger, "What directory should the project be created in?", "The directory to create the project in", projectDir)
 		}
 
+		force, _ := cmd.Flags().GetBool("force")
+
 		if util.Exists(projectDir) {
-			fmt.Println(tui.Secondary("The directory ") + tui.Bold(projectDir) + tui.Secondary(" already exists."))
-			fmt.Println()
-			if !tui.Ask(logger, "Delete and continue?", true) {
-				return
+			if !force {
+				if tui.HasTTY {
+					fmt.Println(tui.Secondary("The directory ") + tui.Bold(projectDir) + tui.Secondary(" already exists."))
+					fmt.Println()
+					if !tui.Ask(logger, "Delete and continue?", true) {
+						return
+					}
+				} else {
+					logger.Fatal("The directory %s already exists. Use --force to overwrite.", projectDir)
+					os.Exit(1)
+				}
 			}
 			os.RemoveAll(projectDir)
 			initScreenWithLogo()
@@ -475,6 +484,10 @@ Examples:
 		}
 
 		if providerName == "" {
+			if !tui.HasTTY {
+				logger.Fatal("no provider provided and no TTY detected. Please select a provider using the --provider flag")
+				os.Exit(1)
+			}
 
 			var items []list.Item
 
@@ -496,6 +509,11 @@ Examples:
 		}
 
 		if templateName == "" {
+			if !tui.HasTTY {
+				logger.Fatal("no template provided and no TTY detected. Please select a template using the --template flag")
+				os.Exit(1)
+			}
+
 			templates, err := templates.LoadLanguageTemplates(provider.Identifier)
 			if err != nil {
 				errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from template provider")).ShowErrorAndExit()
@@ -526,6 +544,10 @@ Examples:
 		}
 
 		if agentName == "" {
+			if !tui.HasTTY {
+				logger.Fatal("no agent name provided and no TTY detected. Please provide an agent name using the arguments from the command line")
+				os.Exit(1)
+			}
 			agentName, agentDescription, authType = getAgentInfoFlow(logger, nil, agentName, agentDescription, authType)
 		}
 
@@ -766,4 +788,5 @@ func init() {
 
 	projectNewCmd.Flags().StringP("provider", "p", "", "The provider template to use for the project")
 	projectNewCmd.Flags().StringP("template", "t", "", "The template to use for the project")
+	projectNewCmd.Flags().Bool("force", false, "Force the project to be created even if the directory already exists")
 }
