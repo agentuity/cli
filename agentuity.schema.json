@@ -1,0 +1,169 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "https://agentuity.com/agentuity.schema.json",
+	"title": "Agentuity Project Schema",
+	"description": "The schema for an Agentuity project",
+	"type": "object",
+	"required": [
+		"version",
+		"project_id",
+		"name",
+		"development",
+		"deployment",
+		"bundler",
+		"agents"
+	],
+	"properties": {
+		"version": {
+			"type": "string",
+			"description": "The version semver range required to run this project"
+		},
+		"project_id": {
+			"type": "string",
+			"pattern": "^proj_[a-f0-9]{32}$",
+			"description": "The ID of the project which is automatically generated"
+		},
+		"name": {
+			"type": "string",
+			"description": "The name of the project which is editable"
+		},
+		"description": {
+			"type": "string",
+			"description": "The description of the project which is editable"
+		},
+		"development": {
+			"type": "object",
+			"required": ["port", "watch", "command", "args"],
+			"properties": {
+				"port": {
+					"type": "integer",
+					"description": "The port to run the development server on which can be overridden by setting the PORT environment variable"
+				},
+				"watch": {
+					"type": "object",
+					"required": ["enabled", "files"],
+					"properties": {
+						"enabled": {
+							"type": "boolean",
+							"description": "Whether to watch for changes and automatically restart the server"
+						},
+						"files": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							},
+							"description": "Rules for files to watch for changes"
+						}
+					}
+				},
+				"command": {
+					"type": "string",
+					"description": "The command to run the development server"
+				},
+				"args": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"description": "The arguments to pass to the development server"
+				}
+			}
+		},
+		"deployment": {
+			"type": "object",
+			"required": ["command", "args", "resources"],
+			"properties": {
+				"command": {
+					"type": "string",
+					"description": "The command to run in deployment"
+				},
+				"args": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"description": "The arguments to pass in deployment"
+				},
+				"resources": {
+					"type": "object",
+					"required": ["memory", "cpu", "disk"],
+					"properties": {
+						"memory": {
+							"type": "string",
+							"pattern": "^\\d+Mi$",
+							"description": "The memory requirements"
+						},
+						"cpu": {
+							"type": "string",
+							"pattern": "^\\d+M$",
+							"description": "The CPU requirements"
+						},
+						"disk": {
+							"type": "string",
+							"pattern": "^\\d+Mi$",
+							"description": "The disk size requirements"
+						}
+					}
+				}
+			}
+		},
+		"bundler": {
+			"type": "object",
+			"required": ["enabled", "identifier", "language", "runtime", "agents"],
+			"properties": {
+				"enabled": {
+					"type": "boolean",
+					"description": "Whether bundling is enabled"
+				},
+				"identifier": {
+					"type": "string",
+					"description": "The bundler identifier"
+				},
+				"language": {
+					"type": "string",
+					"description": "The programming language"
+				},
+				"runtime": {
+					"type": "string",
+					"description": "The runtime environment"
+				},
+				"agents": {
+					"type": "object",
+					"required": ["dir"],
+					"properties": {
+						"dir": {
+							"type": "string",
+							"description": "The directory containing agents"
+						}
+					}
+				},
+				"ignore": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"description": "Patterns to ignore during bundling"
+				}
+			}
+		},
+		"agents": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": ["id", "name"],
+				"properties": {
+					"id": {
+						"type": "string",
+						"pattern": "^agent_[a-f0-9]{32}$",
+						"description": "The ID of the Agent which is automatically generated"
+					},
+					"name": {
+						"type": "string",
+						"description": "The name of the Agent which is editable"
+					}
+				}
+			},
+			"description": "The agents that are part of this project"
+		}
+	}
+}
