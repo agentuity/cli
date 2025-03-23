@@ -119,7 +119,7 @@ Examples:
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start project: %s", err))).ShowErrorAndExit()
 		}
 
-		websocketConn.StartReadingMessages(log)
+		websocketConn.StartReadingMessages(ctx, log)
 		devUrl := websocketConn.WebURL(appUrl)
 
 		// Display local interaction instructions
