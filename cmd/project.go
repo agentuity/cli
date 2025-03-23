@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"sort"
@@ -305,6 +306,36 @@ func showItemSelector(title string, items []list.Item) list.Item {
 	return items[m.list.Index()]
 }
 
+func projectGitFlow(ctx context.Context, logger logger.Logger, projectData *project.ProjectData, format string) {
+	git, err := exec.LookPath("git")
+	if err != nil {
+		return
+	}
+	if tui.HasTTY {
+		opts := []tui.Option{
+			{ID: "action", Text: tui.PadRight("GitHub Action", 20, " ") + tui.Muted("Use GitHub Action Workflow to automatically deploy")},
+			{ID: "app", Text: tui.PadRight("GitHub App", 20, " ") + tui.Muted("Connect the Agentuity GitHub App to automatically deploy")},
+			{ID: "none", Text: tui.PadRight("None", 20, " ") + tui.Muted("I'm not using GitHub or will setup later"), Selected: true},
+		}
+		choice := tui.Select(logger, "Are you using GitHub for this project?", "You can always configure later in the dashboard", opts)
+		switch choice {
+		case "none":
+		case "action":
+		case "app":
+			body := tui.Paragraph(
+				"If you would like to automatically deploy your project when changes are pushed to the repository, you install the Agentuity GitHub App.",
+				"This will allow you to automatically deploy your project when changes are pushed to the repository.",
+				"Connect your GitHub account to the Agentuity dashboard to get started.",
+			)
+			tui.ShowBanner("GitHub App", body, false)
+		}
+	}
+	exec.CommandContext(ctx, git, "init").Run()
+	exec.CommandContext(ctx, git, "add", ".").Run()
+	exec.CommandContext(ctx, git, "commit", "-m", "[chore] Initial commit 🤖").Run()
+	exec.CommandContext(ctx, git, "branch", "-m", "main").Run()
+}
+
 var projectNewCmd = &cobra.Command{
 	Use:   "create [name] [description] [agent-name] [agent-description] [auth-type]",
 	Short: "Create a new project",
@@ -553,6 +584,8 @@ Examples:
 			agentName, agentDescription, authType = getAgentInfoFlow(logger, nil, agentName, agentDescription, authType)
 		}
 
+		format, _ := cmd.Flags().GetString("format")
+
 		var projectData *project.ProjectData
 
 		tmplContext := templates.TemplateContext{
@@ -604,13 +637,16 @@ Examples:
 			viper.Set("preferences.provider", provider.Identifier)
 			viper.Set("preferences.template", templateName)
 			viper.WriteConfig()
+
 		})
 
-		format, _ := cmd.Flags().GetString("format")
+		// run the git flow
+		projectGitFlow(ctx, logger, projectData, format)
 
 		if format == "json" {
 			json.NewEncoder(os.Stdout).Encode(projectData)
 		} else {
+
 			var para []string
 			para = append(para, tui.Secondary("1. Switch into the project directory at ")+tui.Directory(projectDir))
 			para = append(para, tui.Secondary("2. Run ")+tui.Command("run")+tui.Secondary(" to run the project locally in development mode"))
