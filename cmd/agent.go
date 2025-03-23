@@ -71,7 +71,7 @@ var agentDeleteCmd = &cobra.Command{
 				}
 			}
 
-			selected := tui.MultiSelect(logger, "Select one or more Agents to delete from Agentuity Cloud", "Toggle selection by pressing the spacebar\nPress enter to confirm\n", options)
+			selected = tui.MultiSelect(logger, "Select one or more Agents to delete from Agentuity Cloud", "Toggle selection by pressing the spacebar\nPress enter to confirm\n", options)
 
 			if len(selected) == 0 {
 				tui.ShowWarning("no Agents selected")

@@ -55,6 +55,10 @@ func CreateAgent(ctx context.Context, logger logger.Logger, baseUrl string, toke
 func DeleteAgents(ctx context.Context, logger logger.Logger, baseUrl string, token string, projectId string, agentIds []string) ([]string, error) {
 	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
+	if len(agentIds) == 0 {
+		return nil, fmt.Errorf("no agents to delete")
+	}
+
 	var resp Response[[]string]
 	if err := client.Do("DELETE", "/cli/agent", map[string]any{"ids": agentIds}, &resp); err != nil {
 		return nil, fmt.Errorf("error deleting Agents: %s", err)
