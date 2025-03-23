@@ -1,6 +1,6 @@
 ---
 description: Agentuity JavaScript SDK API Reference
-globs: "src/agents/**/*.{js,ts}"
+globs: "src/agents/**/*.ts"
 ---
 
 # Agentuity JavaScript SDK
