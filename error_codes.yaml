@@ -73,3 +73,6 @@ errors:
 
   - code: CLI-0023
     message: Error encrypting deployment zip file
+
+  - code: CLI-0024
+    message: Error adding GitHub Action Workflow to the project

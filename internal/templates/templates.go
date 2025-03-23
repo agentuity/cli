@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -182,6 +183,27 @@ func (t *Template) Install(ctx TemplateContext) error {
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+func (t *Template) AddGitHubAction(ctx TemplateContext) error {
+	name := "common/github/" + t.Identifier + ".yaml"
+	reader, err := getEmbeddedFile(name)
+	if err != nil {
+		return fmt.Errorf("failed to load embedded file for %s: %s", name, err)
+	}
+	if reader == nil {
+		return fmt.Errorf("template %s not found", name)
+	}
+	buf, err := io.ReadAll(reader)
+	outdir := filepath.Join(ctx.ProjectDir, ".github", "workflows")
+	if err := os.MkdirAll(outdir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %s", outdir, err)
+	}
+	outfile := filepath.Join(outdir, "agentuity.yaml")
+	if err := os.WriteFile(outfile, buf, 0644); err != nil {
+		return fmt.Errorf("failed to write file %s: %s", outfile, err)
 	}
 	return nil
 }

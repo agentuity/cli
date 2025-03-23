@@ -306,7 +306,7 @@ func showItemSelector(title string, items []list.Item) list.Item {
 	return items[m.list.Index()]
 }
 
-func projectGitFlow(ctx context.Context, logger logger.Logger) {
+func projectGitFlow(ctx context.Context, logger logger.Logger, provider *templates.Template, tmplContext templates.TemplateContext) {
 	git, err := exec.LookPath("git")
 	if err != nil {
 		return
@@ -321,10 +321,13 @@ func projectGitFlow(ctx context.Context, logger logger.Logger) {
 		switch choice {
 		case "none":
 		case "action":
+			if err := provider.AddGitHubAction(tmplContext); err != nil {
+				errsystem.New(errsystem.ErrAddingGithubActionWorkflowProject, err, errsystem.WithContextMessage("Failed to add GitHub Action Workflow to the project")).ShowErrorAndExit()
+			}
 			body := tui.Paragraph(
-				tui.Secondary("✓ Added GitHub Action Workflow to your project."),
-				tui.Secondary("After you push your code, make sure you set your API Key from .env as"),
-				tui.Secondary("a secret ")+tui.Warning("AGENTUITY_API_KEY")+tui.Secondary("in your GitHub configuration."),
+				tui.Secondary("✓ Added GitHub Action Workflow to the project."),
+				tui.Secondary("After you push your code, make sure you set your API Key from the .env file"),
+				tui.Secondary("as a secret ")+tui.Warning("AGENTUITY_API_KEY")+tui.Secondary(" in your GitHub repository."),
 			)
 			tui.ShowBanner("GitHub Action", body, false)
 		case "app":
@@ -642,7 +645,7 @@ Examples:
 		})
 
 		// run the git flow
-		projectGitFlow(ctx, logger)
+		projectGitFlow(ctx, logger, provider, tmplContext)
 
 		if format == "json" {
 			json.NewEncoder(os.Stdout).Encode(projectData)
