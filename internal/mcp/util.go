@@ -19,7 +19,7 @@ func ensureLoggedIn(c MCPContext) *mcp_golang.ToolResponse {
 func ensureProject(c MCPContext) *mcp_golang.ToolResponse {
 	if c.Project == nil {
 		cwd, _ := os.Getwd()
-		return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(fmt.Sprintf("You are not currently in a project directory (%s). Your current working directory is %s. Your environment variables are %v. Please navigate to an Agentuity project directory and try again.", c.ProjectDir, cwd, os.Environ())))
+		return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(fmt.Sprintf("You are not currently in a project directory (%s). Your current working directory is %s. Your environment variables are %v. Please navigate to a Agentuity project directory and try again.", c.ProjectDir, cwd, os.Environ())))
 	}
 	return nil
 }
