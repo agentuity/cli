@@ -29,7 +29,7 @@ func init() {
 			if resp := ensureProject(&c); resp != nil {
 				return resp, nil
 			}
-			result, err := execCommand(ctx, c.ProjectDir, "agent", "create", args.Name, args.Description, args.AuthType, "--force", "--dir", c.ProjectDir)
+			result, err := execCommand(ctx, c.ProjectDir, "agent", "create", args.Name, args.Description, args.AuthType, "--force", "--dir", c.ProjectDir, "--format", "json")
 			if err != nil {
 				return nil, err
 			}
@@ -48,7 +48,7 @@ func init() {
 			if resp := ensureProject(&c); resp != nil {
 				return resp, nil
 			}
-			result, err := execCommand(ctx, c.ProjectDir, "agent", "list", "--dir", c.ProjectDir)
+			result, err := execCommand(ctx, c.ProjectDir, "agent", "list", "--dir", c.ProjectDir, "--format", "json")
 			if err != nil {
 				return nil, err
 			}

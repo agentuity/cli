@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -320,6 +321,7 @@ Flags:
   --dir        The directory for the project
   --provider   The provider template to use for the project
   --template   The template to use for the project
+	--force      Force the creation of the project even if the directory already exists
 
 Examples:
   agentuity project create "My Project" "Project description" "My Agent" "Agent description" bearer
@@ -604,19 +606,25 @@ Examples:
 			viper.WriteConfig()
 		})
 
-		var para []string
-		para = append(para, tui.Secondary("1. Switch into the project directory at ")+tui.Directory(projectDir))
-		para = append(para, tui.Secondary("2. Run ")+tui.Command("run")+tui.Secondary(" to run the project locally in development mode"))
-		para = append(para, tui.Secondary("3. Run ")+tui.Command("deploy")+tui.Secondary(" to deploy the project to the Agentuity Agent Cloud"))
-		if authType != "none" {
-			para = append(para, tui.Secondary("4. Run ")+tui.Command("agent apikey")+tui.Secondary(" to fetch the Webhook API key for the agent"))
-		}
-		para = append(para, tui.Secondary("🏠 Access your project at ")+tui.Link("%s/projects/%s", appUrl, projectData.ProjectId))
+		format, _ := cmd.Flags().GetString("format")
 
-		tui.ShowBanner("You're ready to deploy your first Agent!",
-			tui.Paragraph("Next steps:", para...),
-			true,
-		)
+		if format == "json" {
+			json.NewEncoder(os.Stdout).Encode(projectData)
+		} else {
+			var para []string
+			para = append(para, tui.Secondary("1. Switch into the project directory at ")+tui.Directory(projectDir))
+			para = append(para, tui.Secondary("2. Run ")+tui.Command("run")+tui.Secondary(" to run the project locally in development mode"))
+			para = append(para, tui.Secondary("3. Run ")+tui.Command("deploy")+tui.Secondary(" to deploy the project to the Agentuity Agent Cloud"))
+			if authType != "none" {
+				para = append(para, tui.Secondary("4. Run ")+tui.Command("agent apikey")+tui.Secondary(" to fetch the Webhook API key for the agent"))
+			}
+			para = append(para, tui.Secondary("🏠 Access your project at ")+tui.Link("%s/projects/%s", appUrl, projectData.ProjectId))
+
+			tui.ShowBanner("You're ready to deploy your first Agent!",
+				tui.Paragraph("Next steps:", para...),
+				true,
+			)
+		}
 
 	},
 }
@@ -655,6 +663,11 @@ Examples:
 			}
 		}
 		tui.ShowSpinner("fetching projects ...", action)
+		format, _ := cmd.Flags().GetString("format")
+		if format == "json" {
+			json.NewEncoder(os.Stdout).Encode(projects)
+			return
+		}
 		if len(projects) == 0 {
 			showNoProjects()
 			return
@@ -784,6 +797,10 @@ func init() {
 	for _, cmd := range []*cobra.Command{projectNewCmd, projectImportCmd} {
 		cmd.Flags().StringP("dir", "d", "", "The directory for the project")
 		cmd.Flags().String("org-id", "", "The organization to create the project in")
+	}
+
+	for _, cmd := range []*cobra.Command{projectNewCmd, projectListCmd} {
+		cmd.Flags().String("format", "text", "The format to use for the output. Can be either 'text' or 'json'")
 	}
 
 	projectNewCmd.Flags().StringP("provider", "p", "", "The provider template to use for the project")

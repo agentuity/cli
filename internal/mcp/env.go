@@ -1,14 +1,11 @@
 package mcp
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/agentuity/cli/internal/project"
-	"github.com/agentuity/go-common/tui"
 	mcp_golang "github.com/agentuity/mcp-golang/v2"
 )
 
@@ -71,35 +68,8 @@ func init() {
 			if resp := ensureProject(&c); resp != nil {
 				return resp, nil
 			}
-			projectData, err := c.Project.GetProject(ctx, c.Logger, c.APIURL, c.APIKey)
-			if err != nil {
-				return nil, err
-			}
-
-			var output bytes.Buffer
-
-			for key, value := range projectData.Env {
-				if !tui.HasTTY {
-					io.WriteString(&output, fmt.Sprintf("%s=%s\n", key, value))
-				} else {
-					io.WriteString(&output, fmt.Sprintf("%s=%s\n", tui.Title(key), tui.Body(value)))
-				}
-			}
-			for key, value := range projectData.Secrets {
-				if !tui.HasTTY {
-					io.WriteString(&output, fmt.Sprintf("%s=%s\n", key, value))
-				} else {
-					io.WriteString(&output, fmt.Sprintf("%s=%s\n", tui.Title(key), tui.Muted(value)))
-				}
-			}
-			if len(projectData.Env) == 0 && len(projectData.Secrets) == 0 {
-				io.WriteString(&output, "No environment variables or secrets set for this project")
-				io.WriteString(&output, "\n")
-				io.WriteString(&output, fmt.Sprintf("You can set environment variables with %s", tui.Command("env", "set", "<key>", "<value>")))
-				io.WriteString(&output, "\n")
-			}
-
-			return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(output.String())), nil
+			output, err := execCommand(ctx, c.ProjectDir, "env", "list", "--format", "json")
+			return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(output)), err
 		})
 	})
 

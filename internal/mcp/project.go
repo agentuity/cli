@@ -32,7 +32,7 @@ func init() {
 			if resp := ensureLoggedIn(&c); resp != nil {
 				return resp, nil
 			}
-			cmdargs := []string{args.Name, args.Description, args.AgentName, args.AgentDescription, args.AuthType, "--dir", args.Directory, "--provider", args.Provider, "--template", args.Template, "--force"}
+			cmdargs := []string{args.Name, args.Description, args.AgentName, args.AgentDescription, args.AuthType, "--dir", args.Directory, "--provider", args.Provider, "--template", args.Template, "--force", "--format", "json"}
 			if args.OrganizationId != "" {
 				cmdargs = append(cmdargs, "--org-id", args.OrganizationId)
 			}
@@ -95,7 +95,7 @@ func init() {
 			if resp := ensureLoggedIn(&c); resp != nil {
 				return resp, nil
 			}
-			result, err := execCommand(ctx, "", "project", "list")
+			result, err := execCommand(ctx, "", "project", "list", "--format", "json")
 			if err != nil {
 				return nil, err
 			}

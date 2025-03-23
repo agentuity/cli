@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -306,9 +307,18 @@ Examples:
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}
+		format, _ := cmd.Flags().GetString("format")
+		var outkv map[string]string
+		if format == "json" {
+			outkv = make(map[string]string)
+		}
 		var found bool
 		for key, value := range projectData.Env {
 			if key == args[0] {
+				if format == "json" {
+					outkv[key] = value
+					continue
+				}
 				if !hasTTY {
 					fmt.Println(value)
 				} else {
@@ -321,6 +331,10 @@ Examples:
 		if !found {
 			for key, value := range projectData.Secrets {
 				if key == args[0] {
+					if format == "json" {
+						outkv[key] = value
+						continue
+					}
 					if !hasTTY {
 						fmt.Println(value)
 					} else {
@@ -330,6 +344,10 @@ Examples:
 					break
 				}
 			}
+		}
+		if format == "json" {
+			json.NewEncoder(os.Stdout).Encode(outkv)
+			return
 		}
 		if !found {
 			tui.ShowWarning("No environment variables or secrets set for this project named %s", args[0])
@@ -362,6 +380,16 @@ Examples:
 		projectData, err := theproject.GetProject(ctx, logger, apiUrl, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
+		}
+
+		format, _ := cmd.Flags().GetString("format")
+		if format == "json" {
+			kv := map[string]any{
+				"environment": projectData.Env,
+				"secrets":     projectData.Secrets,
+			}
+			json.NewEncoder(os.Stdout).Encode(kv)
+			return
 		}
 		for key, value := range projectData.Env {
 			if !hasTTY {
@@ -531,7 +559,12 @@ func init() {
 	envCmd.AddCommand(envDeleteCmd)
 
 	envDeleteCmd.Flags().Bool("force", !hasTTY, "Don't prompt for confirmation")
+
 	for _, cmd := range []*cobra.Command{envSetCmd, envListCmd, envGetCmd, envDeleteCmd} {
 		cmd.Flags().StringP("dir", "d", ".", "The directory to the project to deploy")
+	}
+
+	for _, cmd := range []*cobra.Command{envListCmd, envGetCmd} {
+		cmd.Flags().String("format", "text", "The format to use for the output. Can be either 'text' or 'json'")
 	}
 }
