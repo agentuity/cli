@@ -358,13 +358,13 @@ Examples:
 				}
 				if len(clients) > 0 {
 					fmt.Println()
-					fmt.Println(tui.Bold("The Agentuity tooling can be enhanced for the following:"))
+					fmt.Println(tui.Bold("Activate the Agentuity MCP to enhance the following tools:"))
 					fmt.Println()
 					for _, client := range clients {
 						tui.ShowSuccess("%s", tui.PadRight(client, 20, " "))
 					}
 					fmt.Println()
-					fmt.Println(tui.Muted("By installing, you will have enhanced AI capabilities."))
+					fmt.Println(tui.Muted("By installing, you will have advanced AI Agent capabilities."))
 					fmt.Println()
 					yesno := tui.Ask(logger, tui.Bold("Would you like to install?"), true)
 					fmt.Println()

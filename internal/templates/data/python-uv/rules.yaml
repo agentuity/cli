@@ -61,9 +61,6 @@ new_project:
     - action: delete_file
       files:
         - "hello.py"
-    - action: create_file
-      to: ".cursor/mcp.json"
-      template: "common/cursor/mcp.json"
     - action: copy_dir
       from: "common/cursor"
       to: ".cursor/rules"
