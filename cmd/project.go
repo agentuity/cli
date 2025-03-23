@@ -321,8 +321,9 @@ func projectGitFlow(ctx context.Context, logger logger.Logger) {
 		switch choice {
 		case "none":
 		case "action":
+			tui.ShowBanner("GitHub Action", tui.Secondary("✓ Added GitHub Action Workflow to your project"), false)
 		case "app":
-			tui.ShowBanner("GitHub App", "After pushing your code to GitHub, visit the dashboard to connect your repository", false)
+			tui.ShowBanner("GitHub App", tui.Secondary("After pushing your code to GitHub, visit the dashboard to connect your repository"), false)
 		}
 	}
 	exec.CommandContext(ctx, git, "init").Run()
