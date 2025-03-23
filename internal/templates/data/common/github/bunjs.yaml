@@ -1,0 +1,23 @@
+name: Deploy Agentuity Project
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      - name: Deploy Agentuity Project
+        uses: agentuity/deploy-action@v1
+        with:
+          api_key: ${{ secrets.AGENTUITY_API_KEY }}

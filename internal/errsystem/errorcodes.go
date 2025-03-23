@@ -94,4 +94,8 @@ var (
 		Code:    "CLI-0023",
 		Message: "Error encrypting deployment zip file",
 	}
+	ErrAddingGithubActionWorkflowProject = errorType{
+		Code:    "CLI-0024",
+		Message: "Error adding GitHub Action Workflow to the project",
+	}
 )

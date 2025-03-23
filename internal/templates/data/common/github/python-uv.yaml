@@ -1,0 +1,25 @@
+name: Deploy Agentuity Project
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Set up Python
+        run: uv python install
+        with:
+          python-version-file: "pyproject.toml"
+      - name: Deploy Agentuity Project
+        uses: agentuity/deploy-action@v1
+        with:
+          api_key: ${{ secrets.AGENTUITY_API_KEY }}

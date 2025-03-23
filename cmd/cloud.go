@@ -147,129 +147,131 @@ Examples:
 		ctx, cancel := signal.NotifyContext(parentCtx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		checkForUpgrade(ctx, logger)
-
-		var keys []string
-		var state map[string]agentListState
-
-		if !context.NewProject {
-			keys, state = reconcileAgentList(logger, apiUrl, token, context)
-
-			if len(keys) == 0 {
-				tui.ShowWarning("no Agents found")
-				tui.ShowBanner("Create a new Agent", tui.Text("Use the ")+tui.Command("agent new")+tui.Text(" command to create a new Agent"), false)
-				os.Exit(1)
-			}
-		}
-
 		deploymentConfig := project.NewDeploymentConfig()
-
 		client := util.NewAPIClient(ctx, logger, apiUrl, token)
-		var err error
-		var le []env.EnvLine
 		var envFile *deployer.EnvFile
 		var projectData *project.ProjectData
-		var projectExists bool
-		var action func()
+		var state map[string]agentListState
 
-		if !context.NewProject {
-			action = func() {
-				var err error
-				projectData, err = theproject.GetProject(ctx, logger, apiUrl, token)
+		if !ci {
+			checkForUpgrade(ctx, logger)
+
+			var keys []string
+
+			if !context.NewProject {
+				keys, state = reconcileAgentList(logger, apiUrl, token, context)
+
+				if len(keys) == 0 {
+					tui.ShowWarning("no Agents found")
+					tui.ShowBanner("Create a new Agent", tui.Text("Use the ")+tui.Command("agent new")+tui.Text(" command to create a new Agent"), false)
+					os.Exit(1)
+				}
+			}
+
+			var err error
+			var le []env.EnvLine
+			var projectExists bool
+			var action func()
+
+			if !context.NewProject {
+				action = func() {
+					var err error
+					projectData, err = theproject.GetProject(ctx, logger, apiUrl, token)
+					if err != nil {
+						if err == project.ErrProjectNotFound {
+							return
+						}
+						if isCancelled(ctx) {
+							os.Exit(1)
+						}
+						errsystem.New(errsystem.ErrApiRequest, err,
+							errsystem.WithContextMessage("Error listing project environment")).ShowErrorAndExit()
+					}
+					projectExists = true
+				}
+				tui.ShowSpinner("", action)
+			}
+
+			if !projectExists {
+				var projectId string
+				if theproject != nil {
+					projectId = theproject.ProjectId
+				}
+				ShowNewProjectImport(ctx, logger, cmd, apiUrl, token, projectId, theproject, dir, false)
+			}
+
+			// check to see if we have any env vars that are not in the project
+			envfilename := filepath.Join(dir, ".env")
+			if tui.HasTTY && util.Exists(envfilename) {
+
+				le, err = env.ParseEnvFile(envfilename)
 				if err != nil {
-					if err == project.ErrProjectNotFound {
+					errsystem.New(errsystem.ErrParseEnvironmentFile, err,
+						errsystem.WithContextMessage("Error parsing .env file")).ShowErrorAndExit()
+				}
+				envFile = &deployer.EnvFile{Filepath: envfilename, Env: le}
+
+				var foundkeys []string
+				for _, ev := range le {
+					if isAgentuityEnv.MatchString(ev.Key) {
+						continue
+					}
+					if projectData != nil && projectData.Env != nil && projectData.Env[ev.Key] == ev.Val {
+						continue
+					}
+					if projectData != nil && projectData.Secrets != nil && projectData.Secrets[ev.Key] == ev.Val {
+						continue
+					}
+					foundkeys = append(foundkeys, ev.Key)
+				}
+				if len(foundkeys) > 0 {
+					var title string
+					switch {
+					case len(foundkeys) < 3 && len(foundkeys) > 1:
+						title = fmt.Sprintf("The environment variables %s from .env are not been set in the project. Would you like to add it?", strings.Join(foundkeys, ", "))
+					case len(foundkeys) == 1:
+						title = fmt.Sprintf("The environment variable %s from .env has not been set in the project. Would you like to add it?", foundkeys[0])
+					default:
+						title = fmt.Sprintf("There are %d environment variables from .env that are not set in the project. Would you like to add them?", len(foundkeys))
+					}
+					if !tui.Ask(logger, title, true) {
+						tui.ShowWarning("cancelled")
 						return
 					}
-					if isCancelled(ctx) {
-						os.Exit(1)
+					envs, secrets := loadEnvFile(le, false)
+					pd, err := theproject.SetProjectEnv(ctx, logger, apiUrl, token, envs, secrets)
+					if err != nil {
+						if isCancelled(ctx) {
+							os.Exit(1)
+						}
+						errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
+							errsystem.WithContextMessage("Failed to set project environment variables")).ShowErrorAndExit()
 					}
-					errsystem.New(errsystem.ErrApiRequest, err,
-						errsystem.WithContextMessage("Error listing project environment")).ShowErrorAndExit()
+					projectData = pd // overwrite with the new version
+					switch {
+					case len(envs) > 0 && len(secrets) > 0:
+						tui.ShowSuccess("Environment variables and secrets added")
+					case len(envs) == 1:
+						tui.ShowSuccess("Environment variable added")
+					case len(envs) > 1:
+						tui.ShowSuccess("Environment variables added")
+					case len(secrets) == 1:
+						tui.ShowSuccess("Secret added")
+					case len(secrets) > 1:
+						tui.ShowSuccess("Secrets added")
+					}
 				}
-				projectExists = true
 			}
-			tui.ShowSpinner("", action)
-		}
 
-		if !projectExists {
-			var projectId string
-			if theproject != nil {
-				projectId = theproject.ProjectId
-			}
-			ShowNewProjectImport(ctx, logger, cmd, apiUrl, token, projectId, theproject, dir, false)
-		}
-
-		// check to see if we have any env vars that are not in the project
-		envfilename := filepath.Join(dir, ".env")
-		if tui.HasTTY && util.Exists(envfilename) {
-
-			le, err = env.ParseEnvFile(envfilename)
-			if err != nil {
-				errsystem.New(errsystem.ErrParseEnvironmentFile, err,
-					errsystem.WithContextMessage("Error parsing .env file")).ShowErrorAndExit()
-			}
-			envFile = &deployer.EnvFile{Filepath: envfilename, Env: le}
-
-			var foundkeys []string
-			for _, ev := range le {
-				if isAgentuityEnv.MatchString(ev.Key) {
-					continue
-				}
-				if projectData != nil && projectData.Env != nil && projectData.Env[ev.Key] == ev.Val {
-					continue
-				}
-				if projectData != nil && projectData.Secrets != nil && projectData.Secrets[ev.Key] == ev.Val {
-					continue
-				}
-				foundkeys = append(foundkeys, ev.Key)
-			}
-			if len(foundkeys) > 0 {
-				var title string
-				switch {
-				case len(foundkeys) < 3 && len(foundkeys) > 1:
-					title = fmt.Sprintf("The environment variables %s from .env are not been set in the project. Would you like to add it?", strings.Join(foundkeys, ", "))
-				case len(foundkeys) == 1:
-					title = fmt.Sprintf("The environment variable %s from .env has not been set in the project. Would you like to add it?", foundkeys[0])
-				default:
-					title = fmt.Sprintf("There are %d environment variables from .env that are not set in the project. Would you like to add them?", len(foundkeys))
-				}
-				if !tui.Ask(logger, title, true) {
-					tui.ShowWarning("cancelled")
-					return
-				}
-				envs, secrets := loadEnvFile(le, false)
-				pd, err := theproject.SetProjectEnv(ctx, logger, apiUrl, token, envs, secrets)
+			if tui.HasTTY {
+				_, localIssues, remoteIssues, err := buildAgentTree(keys, state, context)
 				if err != nil {
-					if isCancelled(ctx) {
-						os.Exit(1)
-					}
-					errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
-						errsystem.WithContextMessage("Failed to set project environment variables")).ShowErrorAndExit()
+					errsystem.New(errsystem.ErrInvalidConfiguration, err,
+						errsystem.WithContextMessage("Failed to build agent tree")).ShowErrorAndExit()
 				}
-				projectData = pd // overwrite with the new version
-				switch {
-				case len(envs) > 0 && len(secrets) > 0:
-					tui.ShowSuccess("Environment variables and secrets added")
-				case len(envs) == 1:
-					tui.ShowSuccess("Environment variable added")
-				case len(envs) > 1:
-					tui.ShowSuccess("Environment variables added")
-				case len(secrets) == 1:
-					tui.ShowSuccess("Secret added")
-				case len(secrets) > 1:
-					tui.ShowSuccess("Secrets added")
-				}
-			}
-		}
 
-		if tui.HasTTY {
-			_, localIssues, remoteIssues, err := buildAgentTree(keys, state, context)
-			if err != nil {
-				errsystem.New(errsystem.ErrInvalidConfiguration, err,
-					errsystem.WithContextMessage("Failed to build agent tree")).ShowErrorAndExit()
+				showAgentWarnings(remoteIssues, localIssues, true)
 			}
-
-			showAgentWarnings(remoteIssues, localIssues, true)
 		}
 
 		deploymentConfig.Provider = theproject.Bundler.Identifier
@@ -318,25 +320,27 @@ Examples:
 		}
 		hasLocalDeletes := make(map[string]bool)
 
-		for _, agent := range state {
-			if agent.FoundLocal && !agent.FoundRemote {
-				startRequest.Agents = append(startRequest.Agents, startAgent{
-					Agent: Agent{
-						ID:          "",
-						Name:        agent.Agent.Name,
-						Description: agent.Agent.Description,
-					},
-				})
-			} else if agent.FoundRemote && !agent.FoundLocal {
-				hasLocalDeletes[agent.Agent.ID] = true
-				startRequest.Agents = append(startRequest.Agents, startAgent{
-					Agent: Agent{
-						ID:          agent.Agent.ID,
-						Name:        agent.Agent.Name,
-						Description: agent.Agent.Description,
-					},
-					Remove: true,
-				})
+		if !ci {
+			for _, agent := range state {
+				if agent.FoundLocal && !agent.FoundRemote {
+					startRequest.Agents = append(startRequest.Agents, startAgent{
+						Agent: Agent{
+							ID:          "",
+							Name:        agent.Agent.Name,
+							Description: agent.Agent.Description,
+						},
+					})
+				} else if agent.FoundRemote && !agent.FoundLocal {
+					hasLocalDeletes[agent.Agent.ID] = true
+					startRequest.Agents = append(startRequest.Agents, startAgent{
+						Agent: Agent{
+							ID:          agent.Agent.ID,
+							Name:        agent.Agent.Name,
+							Description: agent.Agent.Description,
+						},
+						Remove: true,
+					})
+				}
 			}
 		}
 
@@ -523,7 +527,7 @@ Examples:
 		started := time.Now()
 		var webhookToken string
 
-		action = func() {
+		action := func() {
 			url := util.TransformUrl(startResponse.Data.Url)
 			// send the zip file to the upload endpoint provided
 			logger.Trace("uploading to %s", url)
@@ -597,7 +601,7 @@ Examples:
 							body2 += tui.Body("· Run ") + tui.Command("agent apikey "+theproject.Agents[0].ID) + tui.Body("\n  to fetch the Webhook API key for this webhook")
 							body2 += "\n\n"
 						}
-						body2 += tui.Body(fmt.Sprintf("· Send %s webhook request to\n  ", theproject.Agents[0].Name) + tui.Link("%s/webhook/%s", transportUrl, strings.TrimLeft(theproject.Agents[0].ID, "agent_")))
+						body2 += tui.Body(fmt.Sprintf("· Send %s webhook request to\n  ", theproject.Agents[0].Name) + tui.Link("%s/webhook/%s", transportUrl, strings.Replace(theproject.Agents[0].ID, "agent_", "", 1)))
 					}
 
 					tui.ShowBanner("Your project was deployed successfully!", body+body2, true)

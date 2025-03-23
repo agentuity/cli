@@ -306,7 +306,13 @@ func showItemSelector(title string, items []list.Item) list.Item {
 	return items[m.list.Index()]
 }
 
-func projectGitFlow(ctx context.Context, logger logger.Logger) {
+func gitCommand(ctx context.Context, projectDir string, git string, args ...string) error {
+	c := exec.CommandContext(ctx, git, args...)
+	c.Dir = projectDir
+	return c.Run()
+}
+
+func projectGitFlow(ctx context.Context, logger logger.Logger, provider *templates.Template, tmplContext templates.TemplateContext) {
 	git, err := exec.LookPath("git")
 	if err != nil {
 		return
@@ -321,15 +327,27 @@ func projectGitFlow(ctx context.Context, logger logger.Logger) {
 		switch choice {
 		case "none":
 		case "action":
-			tui.ShowBanner("GitHub Action", tui.Secondary("✓ Added GitHub Action Workflow to your project"), false)
+			if err := provider.AddGitHubAction(tmplContext); err != nil {
+				errsystem.New(errsystem.ErrAddingGithubActionWorkflowProject, err, errsystem.WithContextMessage("Failed to add GitHub Action Workflow to the project")).ShowErrorAndExit()
+			}
+			body := tui.Paragraph(
+				tui.Secondary("✓ Added GitHub Action Workflow to the project."),
+				tui.Secondary("Access the Project API Key from the dashboard in and set it as a secret"),
+				tui.Secondary("named ")+tui.Warning("AGENTUITY_API_KEY")+tui.Secondary(" in your GitHub repository."),
+			)
+			tui.ShowBanner("GitHub Action", body, false)
 		case "app":
-			tui.ShowBanner("GitHub App", tui.Secondary("After pushing your code to GitHub, visit the dashboard to connect your repository"), false)
+			body := tui.Paragraph(
+				tui.Secondary("After pushing your code to GitHub, visit the dashboard to connect"),
+				tui.Secondary("your repository to the GitHub App for automatic deployments."),
+			)
+			tui.ShowBanner("GitHub App", body, false)
 		}
 	}
-	exec.CommandContext(ctx, git, "init").Run()
-	exec.CommandContext(ctx, git, "add", ".").Run()
-	exec.CommandContext(ctx, git, "commit", "-m", "[chore] Initial commit 🤖").Run()
-	exec.CommandContext(ctx, git, "branch", "-m", "main").Run()
+	gitCommand(ctx, tmplContext.ProjectDir, git, "init")
+	gitCommand(ctx, tmplContext.ProjectDir, git, "add", ".")
+	gitCommand(ctx, tmplContext.ProjectDir, git, "commit", "-m", "[chore] Initial commit 🤖")
+	gitCommand(ctx, tmplContext.ProjectDir, git, "branch", "-m", "main")
 }
 
 var projectNewCmd = &cobra.Command{
@@ -637,7 +655,7 @@ Examples:
 		})
 
 		// run the git flow
-		projectGitFlow(ctx, logger)
+		projectGitFlow(ctx, logger, provider, tmplContext)
 
 		if format == "json" {
 			json.NewEncoder(os.Stdout).Encode(projectData)
