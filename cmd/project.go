@@ -332,12 +332,16 @@ func projectGitFlow(ctx context.Context, logger logger.Logger, provider *templat
 			}
 			body := tui.Paragraph(
 				tui.Secondary("✓ Added GitHub Action Workflow to the project."),
-				tui.Secondary("After you push your code, make sure you create an API Key from the dashboard and"),
-				tui.Secondary("set it as a secret named ")+tui.Warning("AGENTUITY_API_KEY")+tui.Secondary(" in your GitHub repository."),
+				tui.Secondary("Access the Project API Key from the dashboard in and set it as a secret"),
+				tui.Secondary("named ")+tui.Warning("AGENTUITY_API_KEY")+tui.Secondary(" in your GitHub repository."),
 			)
 			tui.ShowBanner("GitHub Action", body, false)
 		case "app":
-			tui.ShowBanner("GitHub App", tui.Secondary("After pushing your code to GitHub, visit the dashboard to connect your repository"), false)
+			body := tui.Paragraph(
+				tui.Secondary("After pushing your code to GitHub, visit the dashboard to connect"),
+				tui.Secondary("your repository to the GitHub App for automatic deployments."),
+			)
+			tui.ShowBanner("GitHub App", body, false)
 		}
 	}
 	gitCommand(ctx, tmplContext.ProjectDir, git, "init")
