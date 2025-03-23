@@ -306,7 +306,7 @@ func showItemSelector(title string, items []list.Item) list.Item {
 	return items[m.list.Index()]
 }
 
-func projectGitFlow(ctx context.Context, logger logger.Logger, projectData *project.ProjectData, format string) {
+func projectGitFlow(ctx context.Context, logger logger.Logger) {
 	git, err := exec.LookPath("git")
 	if err != nil {
 		return
@@ -322,12 +322,7 @@ func projectGitFlow(ctx context.Context, logger logger.Logger, projectData *proj
 		case "none":
 		case "action":
 		case "app":
-			body := tui.Paragraph(
-				"If you would like to automatically deploy your project when changes are pushed to the repository, you install the Agentuity GitHub App.",
-				"This will allow you to automatically deploy your project when changes are pushed to the repository.",
-				"Connect your GitHub account to the Agentuity dashboard to get started.",
-			)
-			tui.ShowBanner("GitHub App", body, false)
+			tui.ShowBanner("GitHub App", "After pushing your code to GitHub, visit the dashboard to connect your repository", false)
 		}
 	}
 	exec.CommandContext(ctx, git, "init").Run()
@@ -641,7 +636,7 @@ Examples:
 		})
 
 		// run the git flow
-		projectGitFlow(ctx, logger, projectData, format)
+		projectGitFlow(ctx, logger)
 
 		if format == "json" {
 			json.NewEncoder(os.Stdout).Encode(projectData)
@@ -658,7 +653,7 @@ Examples:
 
 			tui.ShowBanner("You're ready to deploy your first Agent!",
 				tui.Paragraph("Next steps:", para...),
-				true,
+				false,
 			)
 		}
 
