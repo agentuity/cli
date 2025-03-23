@@ -56,7 +56,7 @@ func isContextCanceled(ctx context.Context, err error) bool {
 	}
 }
 
-func (c *Websocket) StartReadingMessages(ctx context.Context, logger logger.Logger) {
+func (c *Websocket) StartReadingMessages(ctx context.Context, logger logger.Logger, port int) {
 	go func() {
 		defer close(c.Done)
 		for {
@@ -110,7 +110,7 @@ func (c *Websocket) StartReadingMessages(ctx context.Context, logger logger.Logg
 					logger.Error("failed to unmarshal agent message: %s", err)
 					return
 				}
-				processInputMessage(logger, c, m)
+				processInputMessage(logger, c, m, port)
 			}
 			if message.Type == "getAgents" {
 				agents := make([]Agent, 0)
@@ -332,7 +332,7 @@ func NewAgentsMessage(id string, payload AgentsPayload) Message {
 	}
 }
 
-func processInputMessage(logger logger.Logger, c *Websocket, m []byte) {
+func processInputMessage(logger logger.Logger, c *Websocket, m []byte, port int) {
 	var inputMsg InputMessage
 	if err := json.Unmarshal(m, &inputMsg); err != nil {
 		logger.Error("failed to unmarshal agent message: %s", err)
@@ -346,7 +346,7 @@ func processInputMessage(logger logger.Logger, c *Websocket, m []byte) {
 		return
 	}
 
-	url := fmt.Sprintf("http://localhost:%d/%s", c.Project.Project.Development.Port, inputMsg.Payload.AgentID)
+	url := fmt.Sprintf("http://localhost:%d/%s", port, inputMsg.Payload.AgentID)
 
 	// make a json object with the payload
 	payload := map[string]any{
@@ -360,6 +360,7 @@ func processInputMessage(logger logger.Logger, c *Websocket, m []byte) {
 		logger.Error("failed to marshal payload: %s", err)
 		return
 	}
+	logger.Debug("sending payload: %s to %s", string(jsonPayload), url)
 
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonPayload))
 	if err != nil {
@@ -374,7 +375,7 @@ func processInputMessage(logger logger.Logger, c *Websocket, m []byte) {
 		return
 	}
 
-	logger.Debug("response: %s", string(body))
+	logger.Debug("response: %s (status code: %d)", string(body), resp.StatusCode)
 
 	output, err := isOutputPayload(body)
 	if err != nil {
