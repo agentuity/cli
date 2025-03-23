@@ -2,8 +2,10 @@ package dev
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -26,7 +28,41 @@ func KillProjectServer(projectServerCmd *exec.Cmd) {
 	}
 }
 
-func CreateRunProjectCmd(log logger.Logger, theproject project.ProjectContext, liveDevConnection *Websocket, dir string, orgId string) (*exec.Cmd, error) {
+func isPortAvailable(port int) bool {
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return false
+	}
+	listener.Close()
+	return true
+}
+
+func findAvailablePort() (int, error) {
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return 0, err
+	}
+	defer listener.Close()
+	return listener.Addr().(*net.TCPAddr).Port, nil
+}
+
+func FindAvailablePort(p project.ProjectContext) (int, error) {
+	if v, ok := os.LookupEnv("PORT"); ok {
+		p, err := strconv.Atoi(v)
+		if err != nil {
+			return 0, err
+		}
+		if isPortAvailable(p) {
+			return p, nil
+		}
+	}
+	if isPortAvailable(p.Project.Development.Port) {
+		return p.Project.Development.Port, nil
+	}
+	return findAvailablePort()
+}
+
+func CreateRunProjectCmd(log logger.Logger, theproject project.ProjectContext, liveDevConnection *Websocket, dir string, orgId string, port int) (*exec.Cmd, error) {
 	// set the vars
 	projectServerCmd := exec.Command(theproject.Project.Development.Command, theproject.Project.Development.Args...)
 	projectServerCmd.Env = os.Environ()
@@ -46,8 +82,11 @@ func CreateRunProjectCmd(log logger.Logger, theproject project.ProjectContext, l
 		projectServerCmd.Env = append(projectServerCmd.Env, "NODE_ENV=development")
 	}
 
+	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("PORT=%d", port))
+
 	projectServerCmd.Stdout = os.Stdout
 	projectServerCmd.Stderr = os.Stderr
 	projectServerCmd.Stdin = os.Stdin
+
 	return projectServerCmd, nil
 }

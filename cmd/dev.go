@@ -80,7 +80,12 @@ Examples:
 		}
 		defer websocketConn.Close()
 
-		projectServerCmd, err := dev.CreateRunProjectCmd(log, theproject, websocketConn, dir, orgId)
+		port, err := dev.FindAvailablePort(theproject)
+		if err != nil {
+			log.Fatal("failed to find available port: %s", err)
+		}
+
+		projectServerCmd, err := dev.CreateRunProjectCmd(log, theproject, websocketConn, dir, orgId, port)
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 		}
@@ -119,11 +124,11 @@ Examples:
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start project: %s", err))).ShowErrorAndExit()
 		}
 
-		websocketConn.StartReadingMessages(ctx, log)
+		websocketConn.StartReadingMessages(ctx, log, port)
 		devUrl := websocketConn.WebURL(appUrl)
 
 		// Display local interaction instructions
-		displayLocalInstructions(theproject.Project.Development.Port, theproject.Project.Agents, devUrl)
+		displayLocalInstructions(port, theproject.Project.Agents, devUrl)
 
 		go func() {
 			for {
@@ -138,7 +143,7 @@ Examples:
 				// If it was a deliberate restart, start the new process here
 				if isDeliberateRestart {
 					isDeliberateRestart = false
-					projectServerCmd, err = dev.CreateRunProjectCmd(log, theproject, websocketConn, dir, orgId)
+					projectServerCmd, err = dev.CreateRunProjectCmd(log, theproject, websocketConn, dir, orgId, port)
 					if err != nil {
 						errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 					}
