@@ -42,25 +42,25 @@ Examples:
   agentuity run --dir /path/to/project`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log := env.NewLogger(cmd)
-		dir := project.ResolveProjectDir(log, cmd)
 		_, appUrl, _ := util.GetURLs(log)
 		websocketUrl := viper.GetString("overrides.websocket_url")
 		websocketId, _ := cmd.Flags().GetString("websocket-id")
 		apiKey, userId := util.EnsureLoggedIn()
 		theproject := project.EnsureProject(cmd)
+		dir := theproject.Dir
 		isDeliberateRestart := false
 
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		checkForUpgrade(ctx)
+		checkForUpgrade(ctx, log)
 
 		if theproject.NewProject {
 			var projectId string
 			if theproject.Project.ProjectId != "" {
 				projectId = theproject.Project.ProjectId
 			}
-			ShowNewProjectImport(ctx, log, theproject.APIURL, apiKey, projectId, theproject.Project, dir, false)
+			ShowNewProjectImport(ctx, log, cmd, theproject.APIURL, apiKey, projectId, theproject.Project, dir, false)
 		}
 
 		project, err := theproject.Project.GetProject(ctx, log, theproject.APIURL, apiKey)
@@ -119,7 +119,7 @@ Examples:
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start project: %s", err))).ShowErrorAndExit()
 		}
 
-		websocketConn.StartReadingMessages(log)
+		websocketConn.StartReadingMessages(ctx, log)
 		devUrl := websocketConn.WebURL(appUrl)
 
 		// Display local interaction instructions
@@ -167,12 +167,6 @@ Examples:
 	},
 }
 
-func init() {
-	rootCmd.AddCommand(devRunCmd)
-	devRunCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
-	devRunCmd.Flags().String("websocket-id", "", "The websocket room id to use for the development agent")
-}
-
 func displayLocalInstructions(port int, agents []project.AgentConfig, devModeUrl string) {
 	title := tui.Title("🚀 Local Agent Interaction")
 
@@ -208,4 +202,11 @@ func displayLocalInstructions(port int, agents []project.AgentConfig, devModeUrl
 	fmt.Println(tui.Link("%s", devModeUrl))
 
 	fmt.Println()
+}
+
+func init() {
+	rootCmd.AddCommand(devRunCmd)
+	devRunCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
+	devRunCmd.Flags().String("websocket-id", "", "The websocket room id to use for the development agent")
+	devRunCmd.Flags().String("org-id", "", "The organization to create the project in on import")
 }

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
-	"time"
 
 	"github.com/agentuity/cli/internal/auth"
 	"github.com/agentuity/cli/internal/errsystem"
@@ -94,7 +94,7 @@ Examples:
 		tui.ClearScreen()
 		initScreenWithLogo()
 		tui.ShowSuccess("Welcome to Agentuity! You are now logged in")
-		checkForUpgrade(ctx)
+		checkForUpgrade(ctx, logger)
 	},
 }
 
@@ -109,13 +109,7 @@ Examples:
   agentuity logout
   agentuity auth logout`,
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("auth.api_key", "")
-		viper.Set("auth.user_id", "")
-		viper.Set("auth.expires", time.Now().UnixMilli())
-		if err := viper.WriteConfig(); err != nil {
-			errsystem.New(errsystem.ErrWriteConfigurationFile, err,
-				errsystem.WithContextMessage("Failed to write viper config")).ShowErrorAndExit()
-		}
+		auth.Logout()
 		tui.ShowSuccess("You have been logged out")
 	},
 }
@@ -140,10 +134,7 @@ Examples:
 				errsystem.WithContextMessage("Failed to get user")).ShowErrorAndExit()
 		}
 		if user == nil {
-			viper.Set("auth.api_key", "")
-			viper.Set("auth.user_id", "")
-			viper.Set("auth.expires", time.Now().UnixMilli())
-			viper.WriteConfig()
+			auth.Logout()
 			util.ShowLogin()
 			os.Exit(1)
 		}
@@ -156,6 +147,9 @@ Examples:
 			tui.PadRight("Name:", 15, " ")+" "+tui.Bold(tui.PadRight(user.FirstName+" "+user.LastName, 30, " "))+" "+tui.Muted(userId),
 			orgs...,
 		)
+		if strings.Contains(apiUrl, "agentuity.dev") {
+			body += "\n\n" + tui.Warning("Logged in to development, not production")
+		}
 		tui.ShowBanner(tui.Muted("Currently logged in as:"), body, false)
 	},
 }

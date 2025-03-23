@@ -46,6 +46,7 @@ Examples:
   agentuity version check
   agentuity version check --upgrade`,
 	Run: func(cmd *cobra.Command, args []string) {
+		logger := env.NewLogger(cmd)
 		upgrade, _ := cmd.Flags().GetBool("upgrade")
 		if Version == "dev" {
 			tui.ShowWarning("You are using the development version of the Agentuity CLI.")
@@ -54,11 +55,10 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		if upgrade {
-			util.CheckLatestRelease(ctx)
+			util.CheckLatestRelease(ctx, logger)
 		} else {
 			release, err := util.GetLatestRelease(ctx)
 			if err != nil {
-				logger := env.NewLogger(cmd)
 				logger.Fatal("%s", err)
 			}
 			latestVersion := semver.MustParse(release)

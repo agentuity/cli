@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/agentuity/cli/internal/errsystem"
+	"github.com/agentuity/cli/internal/mcp"
 	"github.com/agentuity/cli/internal/organization"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/templates"
@@ -175,7 +177,7 @@ func promptForProjectDetail(ctx context.Context, logger logger.Logger, apiUrl, a
 	return name, description
 }
 
-func promptForOrganization(ctx context.Context, logger logger.Logger, apiUrl string, token string) string {
+func promptForOrganization(ctx context.Context, logger logger.Logger, cmd *cobra.Command, apiUrl string, token string) string {
 	orgs, err := organization.ListOrganizations(ctx, logger, apiUrl, token)
 	if err != nil {
 		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list organizations")).ShowErrorAndExit()
@@ -188,11 +190,26 @@ func promptForOrganization(ctx context.Context, logger logger.Logger, apiUrl str
 	if len(orgs) == 1 {
 		orgId = orgs[0].OrgId
 	} else {
-		var opts []tui.Option
-		for _, org := range orgs {
-			opts = append(opts, tui.Option{ID: org.OrgId, Text: org.Name})
+		prefOrgId, _ := cmd.Flags().GetString("org-id")
+		if prefOrgId == "" {
+			prefOrgId = viper.GetString("preferences.orgId")
 		}
-		orgId = tui.Select(logger, "What organization should we create the project in?", "", opts)
+		if tui.HasTTY {
+			var opts []tui.Option
+			for _, org := range orgs {
+				opts = append(opts, tui.Option{ID: org.OrgId, Text: org.Name, Selected: prefOrgId == org.OrgId})
+			}
+			orgId = tui.Select(logger, "What organization should we create the project in?", "", opts)
+			viper.Set("preferences.orgId", orgId)
+			viper.WriteConfig() // remember the preference
+		} else {
+			for _, org := range orgs {
+				if org.OrgId == prefOrgId {
+					return org.OrgId
+				}
+			}
+			logger.Fatal("no TTY and no organization preference found. re-run with --org-id")
+		}
 	}
 	return orgId
 }
@@ -304,6 +321,7 @@ Flags:
   --dir        The directory for the project
   --provider   The provider template to use for the project
   --template   The template to use for the project
+	--force      Force the creation of the project even if the directory already exists
 
 Examples:
   agentuity project create "My Project" "Project description" "My Agent" "Agent description" bearer
@@ -324,9 +342,52 @@ Examples:
 			errsystem.New(errsystem.ErrListFilesAndDirectories, err, errsystem.WithContextMessage("Failed to get current working directory")).ShowErrorAndExit()
 		}
 
-		checkForUpgrade(ctx)
+		checkForUpgrade(ctx, logger)
 
-		orgId := promptForOrganization(ctx, logger, apiUrl, apikey)
+		if tui.HasTTY {
+			// handle MCP server installation
+			detected, err := mcp.Detect(true)
+			if err != nil {
+				logger.Fatal("%s", err)
+			}
+			if len(detected) > 0 {
+				var clients []string
+				for _, config := range detected {
+					if !config.Installed || config.Detected {
+						continue
+					}
+					clients = append(clients, config.Name)
+				}
+				if len(clients) > 0 {
+					fmt.Println()
+					fmt.Println(tui.Bold("Activate the Agentuity MCP to enhance the following tools:"))
+					fmt.Println()
+					for _, client := range clients {
+						tui.ShowSuccess("%s", tui.PadRight(client, 20, " "))
+					}
+					fmt.Println()
+					fmt.Println(tui.Muted("By installing, you will have advanced AI Agent capabilities."))
+					fmt.Println()
+					yesno := tui.Ask(logger, tui.Bold("Would you like to install?"), true)
+					fmt.Println()
+					if yesno {
+						fmt.Println()
+						if err := mcp.Install(ctx, logger); err != nil {
+							logger.Fatal("%s", err)
+						}
+					} else {
+						fmt.Println()
+						tui.ShowWarning("You can install the Agentuity tooling later by running: \n\n\t%s", tui.Command("mcp", "install"))
+					}
+					fmt.Println()
+					tui.WaitForAnyKeyMessage("Press any key to continue with project creation ...")
+					fmt.Println()
+					initScreenWithLogo() // re-clear the screen
+				}
+			}
+		}
+
+		orgId := promptForOrganization(ctx, logger, cmd, apiUrl, apikey)
 
 		var name, description, agentName, agentDescription, authType string
 
@@ -353,11 +414,23 @@ Examples:
 			projectDir = tui.InputWithPlaceholder(logger, "What directory should the project be created in?", "The directory to create the project in", projectDir)
 		}
 
+		force, _ := cmd.Flags().GetBool("force")
+
 		if util.Exists(projectDir) {
-			if !tui.Ask(logger, tui.Paragraph(tui.Secondary("The directory ")+tui.Bold(projectDir)+tui.Secondary(" already exists."), "Delete and continue?"), true) {
-				return
+			if !force {
+				if tui.HasTTY {
+					fmt.Println(tui.Secondary("The directory ") + tui.Bold(projectDir) + tui.Secondary(" already exists."))
+					fmt.Println()
+					if !tui.Ask(logger, "Delete and continue?", true) {
+						return
+					}
+				} else {
+					logger.Fatal("The directory %s already exists. Use --force to overwrite.", projectDir)
+					os.Exit(1)
+				}
 			}
 			os.RemoveAll(projectDir)
+			initScreenWithLogo()
 		}
 
 		var providerName string
@@ -413,6 +486,10 @@ Examples:
 		}
 
 		if providerName == "" {
+			if !tui.HasTTY {
+				logger.Fatal("no provider provided and no TTY detected. Please select a provider using the --provider flag")
+				os.Exit(1)
+			}
 
 			var items []list.Item
 
@@ -434,6 +511,11 @@ Examples:
 		}
 
 		if templateName == "" {
+			if !tui.HasTTY {
+				logger.Fatal("no template provided and no TTY detected. Please select a template using the --template flag")
+				os.Exit(1)
+			}
+
 			templates, err := templates.LoadLanguageTemplates(provider.Identifier)
 			if err != nil {
 				errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from template provider")).ShowErrorAndExit()
@@ -464,7 +546,11 @@ Examples:
 		}
 
 		if agentName == "" {
-			agentName, agentDescription, authType = getAgentInfoFlow(logger, nil, agentName, agentDescription)
+			if !tui.HasTTY {
+				logger.Fatal("no agent name provided and no TTY detected. Please provide an agent name using the arguments from the command line")
+				os.Exit(1)
+			}
+			agentName, agentDescription, authType = getAgentInfoFlow(logger, nil, agentName, agentDescription, authType)
 		}
 
 		var projectData *project.ProjectData
@@ -478,6 +564,7 @@ Examples:
 			AgentName:        agentName,
 			AgentDescription: agentDescription,
 			TemplateName:     templateName,
+			AgentuityCommand: getAgentuityCommand(),
 		}
 
 		tui.ShowSpinner("checking dependencies ...", func() {
@@ -519,19 +606,25 @@ Examples:
 			viper.WriteConfig()
 		})
 
-		var para []string
-		para = append(para, tui.Secondary("1. Switch into the project directory at ")+tui.Directory(projectDir))
-		para = append(para, tui.Secondary("2. Run ")+tui.Command("run")+tui.Secondary(" to run the project locally in development mode"))
-		para = append(para, tui.Secondary("3. Run ")+tui.Command("deploy")+tui.Secondary(" to deploy the project to the Agentuity Agent Cloud"))
-		if authType != "none" {
-			para = append(para, tui.Secondary("4. Run ")+tui.Command("agent apikey")+tui.Secondary(" to fetch the API key for the agent"))
-		}
-		para = append(para, tui.Secondary("🏠 Access your project at ")+tui.Link("%s/projects/%s", appUrl, projectData.ProjectId))
+		format, _ := cmd.Flags().GetString("format")
 
-		tui.ShowBanner("You're ready to deploy your first Agent!",
-			tui.Paragraph("Next steps:", para...),
-			true,
-		)
+		if format == "json" {
+			json.NewEncoder(os.Stdout).Encode(projectData)
+		} else {
+			var para []string
+			para = append(para, tui.Secondary("1. Switch into the project directory at ")+tui.Directory(projectDir))
+			para = append(para, tui.Secondary("2. Run ")+tui.Command("run")+tui.Secondary(" to run the project locally in development mode"))
+			para = append(para, tui.Secondary("3. Run ")+tui.Command("deploy")+tui.Secondary(" to deploy the project to the Agentuity Agent Cloud"))
+			if authType != "none" {
+				para = append(para, tui.Secondary("4. Run ")+tui.Command("agent apikey")+tui.Secondary(" to fetch the Webhook API key for the agent"))
+			}
+			para = append(para, tui.Secondary("🏠 Access your project at ")+tui.Link("%s/projects/%s", appUrl, projectData.ProjectId))
+
+			tui.ShowBanner("You're ready to deploy your first Agent!",
+				tui.Paragraph("Next steps:", para...),
+				true,
+			)
+		}
 
 	},
 }
@@ -570,6 +663,11 @@ Examples:
 			}
 		}
 		tui.ShowSpinner("fetching projects ...", action)
+		format, _ := cmd.Flags().GetString("format")
+		if format == "json" {
+			json.NewEncoder(os.Stdout).Encode(projects)
+			return
+		}
 		if len(projects) == 0 {
 			showNoProjects()
 			return
@@ -644,7 +742,7 @@ Examples:
 			return
 		}
 
-		if !tui.Ask(logger, tui.Paragraph("Are you sure you want to delete the selected projects?", "This action cannot be undone."), true) {
+		if !tui.Ask(logger, "Are you sure you want to delete the selected projects?", true) {
 			tui.ShowWarning("cancelled")
 			return
 		}
@@ -684,7 +782,7 @@ Examples:
 		defer cancel()
 		logger := env.NewLogger(cmd)
 		context := project.EnsureProject(cmd)
-		ShowNewProjectImport(ctx, logger, context.APIURL, context.Token, "", context.Project, context.Dir, true)
+		ShowNewProjectImport(ctx, logger, cmd, context.APIURL, context.Token, "", context.Project, context.Dir, true)
 	},
 }
 
@@ -698,8 +796,14 @@ func init() {
 
 	for _, cmd := range []*cobra.Command{projectNewCmd, projectImportCmd} {
 		cmd.Flags().StringP("dir", "d", "", "The directory for the project")
+		cmd.Flags().String("org-id", "", "The organization to create the project in")
+	}
+
+	for _, cmd := range []*cobra.Command{projectNewCmd, projectListCmd} {
+		cmd.Flags().String("format", "text", "The format to use for the output. Can be either 'text' or 'json'")
 	}
 
 	projectNewCmd.Flags().StringP("provider", "p", "", "The provider template to use for the project")
 	projectNewCmd.Flags().StringP("template", "t", "", "The template to use for the project")
+	projectNewCmd.Flags().Bool("force", false, "Force the project to be created even if the directory already exists")
 }

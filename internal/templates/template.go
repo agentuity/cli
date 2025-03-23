@@ -21,6 +21,7 @@ type TemplateContext struct {
 	ProjectDir       string
 	Template         *Template
 	TemplateName     string
+	AgentuityCommand string
 }
 
 func funcTemplates(t *template.Template) *template.Template {

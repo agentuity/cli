@@ -474,7 +474,7 @@ func LoadProject(logger logger.Logger, dir string, apiUrl string, appUrl string,
 
 func EnsureProject(cmd *cobra.Command) ProjectContext {
 	logger := env.NewLogger(cmd)
-	dir := ResolveProjectDir(logger, cmd)
+	dir := ResolveProjectDir(logger, cmd, true)
 	apiUrl, appUrl, transportUrl := util.GetURLs(logger)
 	var token string
 	// if the --api-key flag is used, we only need to verify the api key
@@ -498,7 +498,47 @@ func EnsureProject(cmd *cobra.Command) ProjectContext {
 	return p
 }
 
-func ResolveProjectDir(logger logger.Logger, cmd *cobra.Command) string {
+func TryProject(cmd *cobra.Command) ProjectContext {
+	logger := env.NewLogger(cmd)
+	dir := ResolveProjectDir(logger, cmd, false)
+	apiUrl, appUrl, transportUrl := util.GetURLs(logger)
+	var token string
+	// if the --api-key flag is used, we only need to verify the api key
+	if cmd.Flags().Changed("api-key") {
+		token = util.EnsureLoggedInWithOnlyAPIKey()
+	} else {
+		apikey, _, ok := util.TryLoggedIn()
+		if ok {
+			token = apikey
+		}
+	}
+	if token == "" || dir == "" || !util.Exists(filepath.Join(dir, "agentuity.yaml")) {
+		return ProjectContext{
+			Logger:       logger,
+			Dir:          dir,
+			NewProject:   true,
+			APIURL:       apiUrl,
+			APPURL:       appUrl,
+			TransportURL: transportUrl,
+			Token:        token,
+		}
+	}
+	p := LoadProject(logger, dir, apiUrl, appUrl, transportUrl, token)
+	if !p.NewProject && Version != "" && Version != "dev" && p.Project.Version != "" {
+		v := semver.MustParse(Version)
+		c, err := semver.NewConstraint(p.Project.Version)
+		if err != nil {
+			errsystem.New(errsystem.ErrInvalidConfiguration, err,
+				errsystem.WithContextMessage(fmt.Sprintf("Error parsing project version constraint: %s", p.Project.Version))).ShowErrorAndExit()
+		}
+		if !c.Check(v) {
+			logger.Fatal("This project is not compatible with CLI version %s. Please upgrade your Agentuity CLI to version %s.", Version, p.Project.Version)
+		}
+	}
+	return p
+}
+
+func ResolveProjectDir(logger logger.Logger, cmd *cobra.Command, required bool) string {
 	cwd, err := os.Getwd()
 	if err != nil {
 		errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
@@ -508,14 +548,65 @@ func ResolveProjectDir(logger logger.Logger, cmd *cobra.Command) string {
 	dirFlag, _ := cmd.Flags().GetString("dir")
 	if dirFlag != "" {
 		dir = dirFlag
+	} else {
+		if val, ok := os.LookupEnv("VSCODE_CWD"); ok {
+			dir = val
+		}
 	}
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
 			errsystem.WithUserMessage(fmt.Sprintf("Failed to get absolute path: %s", err))).ShowErrorAndExit()
 	}
-	if !ProjectExists(abs) {
+	if !ProjectExists(abs) && required {
 		logger.Fatal("Project file not found: %s", filepath.Join(abs, "agentuity.yaml"))
 	}
 	return abs
+}
+
+func SaveEnvValue(ctx context.Context, logger logger.Logger, dir string, keyvalues map[string]string) error {
+	filename := filepath.Join(dir, ".env")
+	envs, err := env.ParseEnvFile(filename)
+	if err != nil {
+		return fmt.Errorf("error parsing env file: %w", err)
+	}
+	for k, v := range keyvalues {
+		found := false
+		for i, env := range envs {
+			if env.Key == k {
+				envs[i].Val = v
+				found = true
+				break
+			}
+		}
+		if !found {
+			envs = append(envs, env.EnvLine{Key: k, Val: v})
+		}
+	}
+	return env.WriteEnvFile(filename, envs)
+}
+
+func RemoveEnvValues(ctx context.Context, logger logger.Logger, dir string, keys ...string) error {
+	filename := filepath.Join(dir, ".env")
+	envs, err := env.ParseEnvFile(filename)
+	if err != nil {
+		return fmt.Errorf("error parsing env file: %w", err)
+	}
+	newenvs := make([]env.EnvLine, 0)
+	for _, env := range envs {
+		var found bool
+		for _, k := range keys {
+			if env.Key == k {
+				found = true
+				break
+			}
+		}
+		if !found {
+			newenvs = append(newenvs, env)
+		}
+	}
+	if len(newenvs) != len(envs) {
+		return env.WriteEnvFile(filename, newenvs)
+	}
+	return nil
 }

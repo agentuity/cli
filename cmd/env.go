@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -21,7 +22,6 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 var envCmd = &cobra.Command{
@@ -36,7 +36,7 @@ Use the subcommands to set, get, list, and delete environment variables and secr
 }
 
 var (
-	hasTTY          = term.IsTerminal(int(os.Stdout.Fd()))
+	hasTTY          = tui.HasTTY
 	looksLikeSecret = regexp.MustCompile(`(?i)KEY|SECRET|TOKEN|PASSWORD|sk_`)
 	isAgentuityEnv  = regexp.MustCompile(`(?i)AGENTUITY_`)
 )
@@ -245,17 +245,23 @@ Examples:
 		}
 
 		action := func() {
+			combined := make(map[string]string)
 			// make sure secrets are not in envs as duplicates since secrets take precedence
 			for k := range secrets {
 				delete(envs, k)
+				combined[k] = secrets[k]
 			}
 			// make sure envs are not in secrets as duplicates since envs take precedence
 			for k := range envs {
 				delete(secrets, k)
+				combined[k] = envs[k]
 			}
 			_, err := theproject.SetProjectEnv(ctx, logger, apiUrl, apiKey, envs, secrets)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithUserMessage("Failed to save project settings")).ShowErrorAndExit()
+			}
+			if err := project.SaveEnvValue(ctx, logger, dir, combined); err != nil {
+				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithUserMessage("Failed to save .env file")).ShowErrorAndExit()
 			}
 		}
 
@@ -301,9 +307,18 @@ Examples:
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}
+		format, _ := cmd.Flags().GetString("format")
+		var outkv map[string]string
+		if format == "json" {
+			outkv = make(map[string]string)
+		}
 		var found bool
 		for key, value := range projectData.Env {
 			if key == args[0] {
+				if format == "json" {
+					outkv[key] = value
+					continue
+				}
 				if !hasTTY {
 					fmt.Println(value)
 				} else {
@@ -316,6 +331,10 @@ Examples:
 		if !found {
 			for key, value := range projectData.Secrets {
 				if key == args[0] {
+					if format == "json" {
+						outkv[key] = value
+						continue
+					}
 					if !hasTTY {
 						fmt.Println(value)
 					} else {
@@ -325,6 +344,10 @@ Examples:
 					break
 				}
 			}
+		}
+		if format == "json" {
+			json.NewEncoder(os.Stdout).Encode(outkv)
+			return
 		}
 		if !found {
 			tui.ShowWarning("No environment variables or secrets set for this project named %s", args[0])
@@ -357,6 +380,16 @@ Examples:
 		projectData, err := theproject.GetProject(ctx, logger, apiUrl, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
+		}
+
+		format, _ := cmd.Flags().GetString("format")
+		if format == "json" {
+			kv := map[string]any{
+				"environment": projectData.Env,
+				"secrets":     projectData.Secrets,
+			}
+			json.NewEncoder(os.Stdout).Encode(kv)
+			return
 		}
 		for key, value := range projectData.Env {
 			if !hasTTY {
@@ -494,6 +527,7 @@ Examples:
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 			}
+			project.RemoveEnvValues(ctx, logger, context.Dir, append(envsToDelete, secretsToDelete...)...)
 			switch {
 			case len(envsToDelete) > 0 && len(secretsToDelete) > 0:
 				tui.ShowSuccess("Environment variables and secrets deleted")
@@ -525,7 +559,12 @@ func init() {
 	envCmd.AddCommand(envDeleteCmd)
 
 	envDeleteCmd.Flags().Bool("force", !hasTTY, "Don't prompt for confirmation")
+
 	for _, cmd := range []*cobra.Command{envSetCmd, envListCmd, envGetCmd, envDeleteCmd} {
 		cmd.Flags().StringP("dir", "d", ".", "The directory to the project to deploy")
+	}
+
+	for _, cmd := range []*cobra.Command{envListCmd, envGetCmd} {
+		cmd.Flags().String("format", "text", "The format to use for the output. Can be either 'text' or 'json'")
 	}
 }

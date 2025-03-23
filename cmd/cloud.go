@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -72,7 +73,7 @@ type startRequest struct {
 	Metadata  *deployer.Metadata `json:"metadata,omitempty"`
 }
 
-func ShowNewProjectImport(ctx context.Context, logger logger.Logger, apiUrl, apikey, projectId string, project *project.Project, dir string, isImport bool) {
+func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.Command, apiUrl, apikey, projectId string, project *project.Project, dir string, isImport bool) {
 	title := "Import Project"
 	var message string
 	if isImport {
@@ -88,12 +89,12 @@ func ShowNewProjectImport(ctx context.Context, logger logger.Logger, apiUrl, api
 	tui.ShowBanner(title, message, false)
 	tui.WaitForAnyKey()
 	tui.ClearScreen()
-	orgId := promptForOrganization(ctx, logger, apiUrl, apikey)
+	orgId := promptForOrganization(ctx, logger, cmd, apiUrl, apikey)
 	name, description := promptForProjectDetail(ctx, logger, apiUrl, apikey, project.Name, project.Description)
 	project.Name = name
 	project.Description = description
 	var createWebhookAuth bool
-	auth := getAgentAuthType(logger)
+	auth := getAgentAuthType(logger, "")
 	if auth == "bearer" {
 		createWebhookAuth = true
 	}
@@ -146,7 +147,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(parentCtx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		checkForUpgrade(ctx)
+		checkForUpgrade(ctx, logger)
 
 		var keys []string
 		var state map[string]agentListState
@@ -195,7 +196,7 @@ Examples:
 			if theproject != nil {
 				projectId = theproject.ProjectId
 			}
-			ShowNewProjectImport(ctx, logger, apiUrl, token, projectId, theproject, dir, false)
+			ShowNewProjectImport(ctx, logger, cmd, apiUrl, token, projectId, theproject, dir, false)
 		}
 
 		// check to see if we have any env vars that are not in the project
@@ -575,20 +576,33 @@ Examples:
 
 		tui.ShowSpinner("Deploying ...", action)
 
-		if tui.HasTTY {
-			body := tui.Body("· Track your project at\n  " + tui.Link("%s/projects/%s", appUrl, theproject.ProjectId))
-			var body2 string
+		format, _ := cmd.Flags().GetString("format")
+		if format == "json" {
+			buf, _ := json.Marshal(theproject)
+			kv := map[string]any{}
+			json.Unmarshal(buf, &kv)
+			kv["deployment_id"] = startResponse.Data.DeploymentId
+			kv["deployment_url"] = fmt.Sprintf("%s/projects/%s/deployments", appUrl, theproject.ProjectId)
+			kv["project_url"] = fmt.Sprintf("%s/projects/%s", appUrl, theproject.ProjectId)
+			json.NewEncoder(os.Stdout).Encode(kv)
+		} else {
+			if tui.HasTTY {
+				if tui.HasTTY {
+					body := tui.Body("· Track your project at\n  " + tui.Link("%s/projects/%s", appUrl, theproject.ProjectId))
+					var body2 string
 
-			if len(theproject.Agents) == 1 {
-				body2 = "\n\n"
-				if webhookToken != "" {
-					body2 += tui.Body("· Run ") + tui.Command("agent apikey "+theproject.Agents[0].ID) + tui.Body("\n  to fetch the API key for this webhook")
-					body2 += "\n\n"
+					if len(theproject.Agents) == 1 {
+						body2 = "\n\n"
+						if webhookToken != "" {
+							body2 += tui.Body("· Run ") + tui.Command("agent apikey "+theproject.Agents[0].ID) + tui.Body("\n  to fetch the Webhook API key for this webhook")
+							body2 += "\n\n"
+						}
+						body2 += tui.Body(fmt.Sprintf("· Send %s webhook request to\n  ", theproject.Agents[0].Name) + tui.Link("%s/webhook/%s", transportUrl, strings.TrimLeft(theproject.Agents[0].ID, "agent_")))
+					}
+
+					tui.ShowBanner("Your project was deployed successfully!", body+body2, true)
 				}
-				body2 += tui.Body(fmt.Sprintf("· Send %s webhook request to\n  ", theproject.Agents[0].Name) + tui.Link("%s/%s", transportUrl, strings.TrimLeft(theproject.Agents[0].ID, "agent_")))
 			}
-
-			tui.ShowBanner("Your project was deployed successfully!", body+body2, true)
 		}
 	},
 }
@@ -614,4 +628,6 @@ func init() {
 	cloudDeployCmd.Flags().Bool("ci", false, "Used to track a specific CI job")
 	cloudDeployCmd.Flags().MarkHidden("deploymentId")
 	cloudDeployCmd.Flags().MarkHidden("ci")
+	cloudDeployCmd.Flags().String("format", "text", "The output format to use for results which can be either 'text' or 'json'")
+	cloudDeployCmd.Flags().String("org-id", "", "The organization to create the project in")
 }

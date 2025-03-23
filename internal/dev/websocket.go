@@ -2,6 +2,7 @@ package dev
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,12 +44,28 @@ func isOutputPayload(message []byte) (*OutputPayload, error) {
 	return &op, nil
 }
 
-func (c *Websocket) StartReadingMessages(logger logger.Logger) {
+func isContextCanceled(ctx context.Context, err error) bool {
+	if errors.Is(err, context.Canceled) {
+		return true
+	}
+	select {
+	case <-ctx.Done():
+		return true
+	default:
+		return false
+	}
+}
+
+func (c *Websocket) StartReadingMessages(ctx context.Context, logger logger.Logger) {
 	go func() {
 		defer close(c.Done)
 		for {
 			_, m, err := c.conn.ReadMessage()
 			if err != nil {
+				if isContextCanceled(ctx, err) {
+					logger.Debug("shutdown in progress, exiting")
+					return
+				}
 				if errors.Is(err, websocket.ErrCloseSent) || errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
 					logger.Debug("connection closed")
 					if c.retryCount < c.maxRetries {
