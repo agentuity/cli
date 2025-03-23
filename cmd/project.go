@@ -324,10 +324,7 @@ func projectGitFlow(ctx context.Context, logger logger.Logger) {
 			body := tui.Paragraph(
 				tui.Secondary("✓ Added GitHub Action Workflow to your project."),
 				tui.Secondary("After you push your code, make sure you set your API Key from .env as"),
-				tui.Secondary(
-					fmt.Sprintf("a secret %s in your GitHub configuration.",
-						tui.Highlight("AGENTUITY_API_KEY")),
-				),
+				tui.Secondary("a secret ")+tui.Bold("AGENTUITY_API_KEY")+tui.Secondary("in your GitHub configuration."),
 			)
 			tui.ShowBanner("GitHub Action", body, false)
 		case "app":
