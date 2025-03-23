@@ -24,11 +24,16 @@ var mcpCmd = &cobra.Command{
 	Short: "Manage MCP commands",
 	Long: `Manage MCP commands.
 
-Flags:
-  --long    Print the long version including commit hash and build date
+The Agentuity CLI implements the Model Context Protocol (MCP).  The Agentuity
+CLI can be configured with a MCP client (such as Cursor, Windsurf, Claude Desktop etc)
+to increase the capabilities of the AI Agent inside the client.
+
+For more information on the MCP protocol, see https://modelcontextprotocol.io/
 
 Examples:
-  agentuity mcp`,
+  agentuity mcp install
+  agentuity mcp uninstall
+  agentuity mcp list`,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
