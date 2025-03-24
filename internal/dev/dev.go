@@ -24,12 +24,13 @@ func KillProjectServer(projectServerCmd *exec.Cmd) {
 	case <-ch:
 		break
 	case <-time.After(time.Second * 10):
-		projectServerCmd.Process.Kill()
+		// this will kill the process group not just the parent process
+		syscall.Kill(-projectServerCmd.Process.Pid, syscall.SIGKILL)
 	}
 }
 
 func isPortAvailable(port int) bool {
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	listener, err := net.Listen("tcp4", fmt.Sprintf("0.0.0.0:%d", port))
 	if err != nil {
 		return false
 	}
@@ -38,7 +39,7 @@ func isPortAvailable(port int) bool {
 }
 
 func findAvailablePort() (int, error) {
-	listener, err := net.Listen("tcp", ":0")
+	listener, err := net.Listen("tcp4", "0.0.0.0:0")
 	if err != nil {
 		return 0, err
 	}
@@ -47,7 +48,7 @@ func findAvailablePort() (int, error) {
 }
 
 func FindAvailablePort(p project.ProjectContext) (int, error) {
-	if v, ok := os.LookupEnv("PORT"); ok {
+	if v, ok := os.LookupEnv("PORT"); ok && v != "" {
 		p, err := strconv.Atoi(v)
 		if err != nil {
 			return 0, err
@@ -65,7 +66,7 @@ func FindAvailablePort(p project.ProjectContext) (int, error) {
 func CreateRunProjectCmd(log logger.Logger, theproject project.ProjectContext, liveDevConnection *Websocket, dir string, orgId string, port int) (*exec.Cmd, error) {
 	// set the vars
 	projectServerCmd := exec.Command(theproject.Project.Development.Command, theproject.Project.Development.Args...)
-	projectServerCmd.Env = os.Environ()
+	projectServerCmd.Env = os.Environ()[:]
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_OTLP_BEARER_TOKEN=%s", liveDevConnection.OtelToken))
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_OTLP_URL=%s", liveDevConnection.OtelUrl))
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_URL=%s", theproject.APIURL))
@@ -87,6 +88,9 @@ func CreateRunProjectCmd(log logger.Logger, theproject project.ProjectContext, l
 	projectServerCmd.Stdout = os.Stdout
 	projectServerCmd.Stderr = os.Stderr
 	projectServerCmd.Stdin = os.Stdin
+
+	// set this process as the parent of the process group since it will likely span child processes
+	projectServerCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	return projectServerCmd, nil
 }
