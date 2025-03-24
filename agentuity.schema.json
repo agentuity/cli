@@ -33,7 +33,7 @@
 		},
 		"development": {
 			"type": "object",
-			"required": ["port", "watch", "command", "args"],
+			"required": ["port", "watch", "command"],
 			"properties": {
 				"port": {
 					"type": "integer",
@@ -71,18 +71,18 @@
 		},
 		"deployment": {
 			"type": "object",
-			"required": ["command", "args", "resources"],
+			"required": ["command", "resources"],
 			"properties": {
 				"command": {
 					"type": "string",
-					"description": "The command to run in deployment"
+					"description": "The command to run in the cloud deployment"
 				},
 				"args": {
 					"type": "array",
 					"items": {
 						"type": "string"
 					},
-					"description": "The arguments to pass in deployment"
+					"description": "The arguments to pass to the command when running in the cloud deployment"
 				},
 				"resources": {
 					"type": "object",
@@ -90,18 +90,18 @@
 					"properties": {
 						"memory": {
 							"type": "string",
-							"pattern": "^\\d+Mi$",
-							"description": "The memory requirements"
+							"pattern": "^\\d+([KGMT]i)?$",
+							"description": "The memory requirements expressed in bytes. 1GB is is represented as 1Gi"
 						},
 						"cpu": {
 							"type": "string",
-							"pattern": "^\\d+M$",
-							"description": "The CPU requirements"
+							"pattern": "^\\d+([mM])$",
+							"description": "The CPU requirements expressed in millicores. 1 CPU unit is 1000 millicores or 1000m"
 						},
 						"disk": {
 							"type": "string",
-							"pattern": "^\\d+Mi$",
-							"description": "The disk size requirements"
+							"pattern": "^\\d+([KGMT]i)?$",
+							"description": "The disk size requirements expressed in bytes. 1GB is is represented as 1Gi"
 						}
 					}
 				}
@@ -109,15 +109,15 @@
 		},
 		"bundler": {
 			"type": "object",
-			"required": ["enabled", "identifier", "language", "runtime", "agents"],
+			"required": ["enabled", "identifier", "language", "agents"],
 			"properties": {
 				"enabled": {
 					"type": "boolean",
-					"description": "Whether bundling is enabled"
+					"description": "Whether bundling is enabled for this provider"
 				},
 				"identifier": {
 					"type": "string",
-					"description": "The bundler identifier"
+					"description": "The provider identifier"
 				},
 				"language": {
 					"type": "string",
@@ -133,7 +133,7 @@
 					"properties": {
 						"dir": {
 							"type": "string",
-							"description": "The directory containing agents"
+							"description": "The directory location where the agents are located"
 						}
 					}
 				},
@@ -160,6 +160,10 @@
 					"name": {
 						"type": "string",
 						"description": "The name of the Agent which is editable"
+					},
+					"description": {
+						"type": "string",
+						"description": "The description of the Agent which is editable"
 					}
 				}
 			},
