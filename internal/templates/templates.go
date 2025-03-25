@@ -47,6 +47,7 @@ func (r *Requirement) checkForBrew(brew string, formula string) bool {
 	c.Stdin = nil
 	c.Stdout = io.Discard
 	c.Stderr = io.Discard
+	util.ProcessSetup(c)
 	out, err := c.Output()
 	if err != nil {
 		return false
@@ -62,6 +63,7 @@ func (r *Requirement) upgradeBrew(brew string, formula string) error {
 	c.Stdin = nil
 	c.Stdout = io.Discard
 	c.Stderr = io.Discard
+	util.ProcessSetup(c)
 	if err := c.Run(); err != nil {
 		return fmt.Errorf("failed to update brew: %s", err)
 	}
@@ -77,6 +79,7 @@ func (r *Requirement) installBrew(brew string, formula string) error {
 	c.Stdin = os.Stdin
 	c.Stdout = io.Discard
 	c.Stderr = io.Discard
+	util.ProcessSetup(c)
 	return c.Run()
 }
 
@@ -88,6 +91,7 @@ func (r *Requirement) TryInstall(ctx TemplateContext) error {
 			c.Stdin = os.Stdin
 			c.Stdout = io.Discard
 			c.Stderr = io.Discard
+			util.ProcessSetup(c)
 			return c.Run()
 		}
 	}
@@ -117,6 +121,7 @@ func (r *Requirement) Matches(ctx TemplateContext) bool {
 	if command, ok := r.hasCommand(r.Command); ok {
 		ctx.Logger.Debug("checking version of %s", command)
 		c := exec.Command(command, r.Args...)
+		util.ProcessSetup(c)
 		out, err := c.Output()
 		if err != nil {
 			return false

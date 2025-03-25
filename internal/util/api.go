@@ -73,6 +73,7 @@ func NewAPIClient(ctx context.Context, logger logger.Logger, baseURL, token stri
 type APIResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
+	Code    string `json:"code,omitempty"`
 	Error   struct {
 		Issues []struct {
 			Code    string   `json:"code"`
@@ -138,13 +139,16 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 		return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error reading response body: %w", err), traceID)
 	}
 
-	c.logger.Debug("response body: %s, content-type: %s", string(respBody), resp.Header.Get("content-type"))
+	c.logger.Debug("response body: %s, content-type: %s, user-agent: %s", string(respBody), resp.Header.Get("content-type"), UserAgent())
 	if resp.StatusCode > 299 && strings.Contains(resp.Header.Get("content-type"), "application/json") {
 		var apiResponse APIResponse
 		if err := json.Unmarshal(respBody, &apiResponse); err != nil {
 			return NewAPIError(u.String(), method, resp.StatusCode, string(respBody), fmt.Errorf("error unmarshalling response: %w", err), traceID)
 		}
 		if !apiResponse.Success {
+			if apiResponse.Code == "UPGRADE_REQUIRED" {
+				return NewAPIError(u.String(), method, http.StatusUnprocessableEntity, apiResponse.Message, fmt.Errorf("%s", apiResponse.Message), traceID)
+			}
 			if len(apiResponse.Error.Issues) > 0 {
 				var errs []string
 				for _, issue := range apiResponse.Error.Issues {

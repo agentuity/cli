@@ -24,7 +24,8 @@ builds:
       - darwin
 
 archives:
-  - formats: ['tar.gz']
+  - id: "agentuity"
+    formats: ['tar.gz']
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       agentuity_
@@ -39,15 +40,16 @@ archives:
         formats: ['zip']
 checksum:
   name_template: "checksums.txt"
+
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
+
 changelog:
   sort: asc
   filters:
     exclude:
       - "^docs:"
       - "^test:"
-
 
 notarize:
   macos:
@@ -100,8 +102,11 @@ notarize:
         # Not recommended, as it could take a really long time.
         wait: false
         # timeout: 20m
+
 brews:
   - name: agentuity
+    ids:
+      - agentuity
     repository:
       owner: agentuity
       name: homebrew-tap
@@ -115,3 +120,14 @@ brews:
       bin.install "agentuity"
     alternative_names:
       - "agentuity@{{ .Version }}"
+
+msi:
+  - id: agentuity
+    name: "agentuity-{{.MsiArch}}"
+    wxs: ./installer.wsx
+    ids:
+      - agentuity
+    goamd64: v1
+    replace: true
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    version: v3

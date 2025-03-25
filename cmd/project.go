@@ -308,6 +308,7 @@ func showItemSelector(title string, items []list.Item) list.Item {
 
 func gitCommand(ctx context.Context, projectDir string, git string, args ...string) error {
 	c := exec.CommandContext(ctx, git, args...)
+	util.ProcessSetup(c)
 	c.Dir = projectDir
 	return c.Run()
 }

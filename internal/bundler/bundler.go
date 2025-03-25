@@ -47,6 +47,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		default:
 			return fmt.Errorf("unsupported runtime: %s", theproject.Bundler.Runtime)
 		}
+		util.ProcessSetup(install)
 		install.Dir = dir
 		out, err := install.CombinedOutput()
 		if err != nil {
@@ -155,6 +156,7 @@ func bundlePython(ctx BundleContext, dir string, outdir string, theproject *proj
 		default:
 			return fmt.Errorf("unsupported runtime: %s", theproject.Bundler.Runtime)
 		}
+		util.ProcessSetup(install)
 		install.Dir = dir
 		out, err := install.CombinedOutput()
 		if err != nil {

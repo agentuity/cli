@@ -167,12 +167,25 @@ func Install(ctx context.Context, logger logger.Logger) error {
 	if len(detected) == 0 {
 		return nil
 	}
-	executable, err := exec.LookPath(agentuityToolCommand)
-	if err != nil {
-		return fmt.Errorf("failed to find %s: %w", agentuityToolCommand, err)
-	}
-	if executable == "" {
-		return fmt.Errorf("failed to find %s", agentuityToolCommand)
+	var executable string
+	if runtime.GOOS == "windows" {
+		executable = "agentuity.exe" // already on the PATH in windows
+	} else {
+		executable, err = exec.LookPath(agentuityToolCommand)
+		if err != nil {
+			if errors.Is(err, exec.ErrNotFound) {
+				bin, err := os.Executable()
+				if err != nil {
+					return fmt.Errorf("failed to get executable path: %w", err)
+				}
+				executable = bin
+			} else {
+				return fmt.Errorf("failed to find %s: %w", agentuityToolCommand, err)
+			}
+		}
+		if executable == "" {
+			return fmt.Errorf("failed to find %s", agentuityToolCommand)
+		}
 	}
 	var installed int
 	for _, config := range detected {
@@ -263,7 +276,7 @@ func init() {
 		Transport:      "stdio",
 		Application: &MCPClientApplicationConfig{
 			MacOS:   "/Applications/Cursor.app/Contents/MacOS/Cursor",
-			Windows: filepath.Join(util.GetAppSupportDir("cursor"), "Cursor.exe"),
+			Windows: filepath.Join(util.GetAppSupportDir(filepath.Join("Programs", "cursor")), "Cursor.exe"),
 		},
 	})
 	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
@@ -273,7 +286,7 @@ func init() {
 		Transport:      "stdio",
 		Application: &MCPClientApplicationConfig{
 			MacOS:   "/Applications/Windsurf.app/Contents/MacOS/Electron",
-			Windows: filepath.Join(util.GetAppSupportDir("Windsurf"), "Windsurf.exe"),
+			Windows: filepath.Join(util.GetAppSupportDir(filepath.Join("Programs", "Windsurf")), "Windsurf.exe"),
 		},
 	})
 	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{

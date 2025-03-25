@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/agentuity/cli/internal/project"
+	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
 )
 
@@ -25,7 +26,7 @@ func KillProjectServer(projectServerCmd *exec.Cmd) {
 		break
 	case <-time.After(time.Second * 10):
 		// this will kill the process group not just the parent process
-		syscall.Kill(-projectServerCmd.Process.Pid, syscall.SIGKILL)
+		util.ProcessKill(projectServerCmd)
 	}
 }
 
@@ -89,8 +90,7 @@ func CreateRunProjectCmd(log logger.Logger, theproject project.ProjectContext, l
 	projectServerCmd.Stderr = os.Stderr
 	projectServerCmd.Stdin = os.Stdin
 
-	// set this process as the parent of the process group since it will likely span child processes
-	projectServerCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	util.ProcessSetup(projectServerCmd)
 
 	return projectServerCmd, nil
 }
