@@ -7,6 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/agentuity/cli/internal/project"
+	"github.com/agentuity/cli/internal/util"
 	mcp_golang "github.com/agentuity/mcp-golang/v2"
 )
 
@@ -40,6 +41,7 @@ func execCommand(ctx context.Context, dir string, command string, args ...string
 	args = append([]string{command}, args...)
 	args = append(args, "--log-level", "warn")
 	cmd := exec.CommandContext(ctx, exe, args...)
+	util.ProcessSetup(cmd)
 	if dir != "" {
 		cmd.Dir = dir
 	}

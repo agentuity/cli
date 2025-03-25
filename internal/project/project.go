@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -255,8 +256,11 @@ func ProjectWithNameExists(ctx context.Context, logger logger.Logger, baseUrl st
 	if err := client.Do("GET", fmt.Sprintf("/cli/project/exists/%s", url.PathEscape(name)), nil, &resp); err != nil {
 		var apiErr *util.APIError
 		if errors.As(err, &apiErr) {
-			if apiErr.Status == 409 {
+			if apiErr.Status == http.StatusConflict {
 				return true, nil
+			}
+			if apiErr.Status == http.StatusUnprocessableEntity {
+				return false, apiErr
 			}
 		}
 		return false, fmt.Errorf("error validating project name: %w", err)

@@ -9,6 +9,7 @@ import (
 	"github.com/agentuity/cli/internal/bundler"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
+	"github.com/agentuity/cli/internal/util"
 	"github.com/spf13/cobra"
 )
 
@@ -76,6 +77,7 @@ Examples:
 				projectContext.Logger.Fatal("Failed to get current working directory: %s", err)
 			}
 			c := exec.Command(bin, args...)
+			util.ProcessSetup(c)
 			c.Dir = cwd
 			c.Stdin = nil
 			c.Env = os.Environ()
