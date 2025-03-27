@@ -1,5 +1,5 @@
 <div align="center">
-    <img src=".github/Agentuity.png" alt="Agentuity" width="100"/> <br/>
+    <img src="https://raw.githubusercontent.com/agentuity/cli/main/.github/Agentuity.png" alt="Agentuity" width="100"/> <br/>
     <strong>Build Agents, Not Infrastructure</strong> <br/>
 <br />
 <a href="https://github.com/agentuity/cli/releases"><img alt="Release version" src="https://img.shields.io/github/v/release/agentuity/cli"></a>
