@@ -292,7 +292,7 @@ Arguments:
 
 Examples:
   agentuity env get API_KEY`,
-	Args: cobra.MaximumNArgs(1),
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
