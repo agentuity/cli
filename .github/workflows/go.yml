@@ -71,25 +71,25 @@ jobs:
     - name: Test Install Script (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        # Make script executable
-        bash -c "chmod +x ./install.sh"
+        # Windows test - simplified to avoid bash usage
+        Write-Host "Testing install script on Windows..."
         
-        # Create test directory
-        $testDir = "$env:TEMP/agentuity-test"
-        New-Item -ItemType Directory -Force -Path $testDir | Out-Null
+        # Set up environment for testing
+        $env:NONINTERACTIVE = "true"
+        $env:OS = "Windows"
+        $env:ARCH = "x86_64"
         
-        # Create a mock executable for testing
-        Write-Host "Creating mock executable for testing..."
-        $mockScript = @"
-@echo off
-echo 0.0.74
-"@
-        Set-Content -Path "$testDir/agentuity.exe.bat" -Value $mockScript
-        New-Item -ItemType File -Force -Path "$testDir/agentuity.exe" | Out-Null
+        # Make script executable using PowerShell
+        if (Test-Path "install.sh") {
+          Write-Host "Found install.sh script"
+        } else {
+          Write-Host "install.sh not found"
+          exit 1
+        }
         
         # Test with default options (latest version)
         Write-Host "Testing install script with default options..."
-        bash -c "NONINTERACTIVE=true ./install.sh -d '$env:TEMP/agentuity-test-download'"
+        & sh -c "./install.sh -d '$env:TEMP/agentuity-test-download'"
         
         # Verify MSI was downloaded
         if (Test-Path "$env:USERPROFILE/agentuity-x64.msi") {
@@ -97,7 +97,7 @@ echo 0.0.74
           
           # Test with specific version
           Write-Host "Testing install script with specific version..."
-          bash -c "NONINTERACTIVE=true ./install.sh -d '$env:TEMP/agentuity-test-version-download' -v 0.0.74"
+          & sh -c "./install.sh -d '$env:TEMP/agentuity-test-version-download' -v 0.0.74"
           
           # Verify version-specific MSI was downloaded
           if (Test-Path "$env:USERPROFILE/agentuity-x64.msi") {
@@ -110,4 +110,4 @@ echo 0.0.74
           Write-Host "MSI download verification failed"
           exit 1
         }
-      shell: pwsh                  
+      shell: pwsh                       
