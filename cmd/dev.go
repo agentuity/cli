@@ -211,8 +211,8 @@ func displayLocalInstructions(port int, agents []project.AgentConfig, devModeUrl
 func init() {
 	rootCmd.AddCommand(devCmd)
 	devCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
-	websocketFlag := devCmd.Flags().String("websocket-id", "", "The websocket room id to use for the development agent")
-	orgIdFlag := devCmd.Flags().String("org-id", "", "The organization to create the project in on import")
+	devCmd.Flags().String("websocket-id", "", "The websocket room id to use for the development agent")
+	devCmd.Flags().String("org-id", "", "The organization to create the project in on import")
 	devCmd.Flags().MarkHidden("websocket-id")
 	devCmd.Flags().MarkHidden("org-id")
 }
