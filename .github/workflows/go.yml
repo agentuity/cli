@@ -34,6 +34,7 @@ jobs:
   test-install:
     name: Test Install Script
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
@@ -105,4 +106,4 @@ jobs:
           Write-Host "Installation failed - executable not found"
           exit 1
         }
-      shell: pwsh        
+      shell: pwsh          
