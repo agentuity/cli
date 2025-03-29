@@ -48,13 +48,22 @@ jobs:
         ./install.sh -d /tmp/agentuity-test
         # Verify installation
         /tmp/agentuity-test/agentuity --version
-        # Test with specific version if available
-        if [ -n "$(curl -s https://api.github.com/repos/agentuity/cli/releases | grep -m 1 '"tag_name":')" ]; then
-          VERSION=$(curl -s https://api.github.com/repos/agentuity/cli/releases | grep -m 1 '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-          VERSION="${VERSION#v}"
-          ./install.sh -d /tmp/agentuity-test-version -v $VERSION
+        
+        # Test with specific version if available - simplified to avoid potential issues
+        LATEST_VERSION=$(/tmp/agentuity-test/agentuity --version)
+        if [ -n "$LATEST_VERSION" ]; then
+          echo "Testing installation with specific version: $LATEST_VERSION"
+          ./install.sh -d /tmp/agentuity-test-version -v $LATEST_VERSION
           # Verify installation with specific version
-          /tmp/agentuity-test-version/agentuity --version | grep -q "$VERSION" || exit 1
+          INSTALLED_VERSION=$(/tmp/agentuity-test-version/agentuity --version)
+          echo "Installed version: $INSTALLED_VERSION"
+          echo "Expected version: $LATEST_VERSION"
+          if [ "$INSTALLED_VERSION" = "$LATEST_VERSION" ]; then
+            echo "Version verification successful"
+          else
+            echo "Version verification failed"
+            exit 1
+          fi
         fi
       shell: bash
       
@@ -79,4 +88,4 @@ jobs:
             exit 1
           }
         }
-      shell: pwsh    
+      shell: pwsh      
