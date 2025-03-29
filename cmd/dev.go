@@ -38,7 +38,6 @@ Flags:
 
 Examples:
   agentuity dev
-  agentuity run
   agentuity dev --dir /path/to/project`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log := env.NewLogger(cmd)
