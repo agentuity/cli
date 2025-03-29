@@ -73,19 +73,36 @@ jobs:
         # Make script executable
         bash -c "chmod +x ./install.sh"
         # Test with default options (latest version)
-        bash ./install.sh -d $env:TEMP\agentuity-test
+        bash ./install.sh -d "$env:TEMP/agentuity-test"
         # Verify installation
-        $env:TEMP\agentuity-test\agentuity.exe --version
-        # Test with specific version if available
-        $hasReleases = bash -c "curl -s https://api.github.com/repos/agentuity/cli/releases | grep -m 1 '\"tag_name\":'"
-        if ($hasReleases) {
-          $VERSION = bash -c "curl -s https://api.github.com/repos/agentuity/cli/releases | grep -m 1 '\"tag_name\":' | sed -E 's/.*\"([^\"]+)\".*/\1/'"
-          $VERSION = $VERSION -replace "v", ""
-          bash ./install.sh -d $env:TEMP\agentuity-test-version -v $VERSION
-          # Verify installation with specific version
-          $installedVersion = & $env:TEMP\agentuity-test-version\agentuity.exe --version
-          if (-not ($installedVersion -match $VERSION)) {
-            exit 1
+        if (Test-Path "$env:TEMP/agentuity-test/agentuity.exe") {
+          $version = & "$env:TEMP/agentuity-test/agentuity.exe" --version
+          Write-Host "Installed version: $version"
+          
+          # Test with specific version if available
+          if ($version) {
+            Write-Host "Testing installation with specific version: $version"
+            bash ./install.sh -d "$env:TEMP/agentuity-test-version" -v $version
+            
+            # Verify installation with specific version
+            if (Test-Path "$env:TEMP/agentuity-test-version/agentuity.exe") {
+              $installedVersion = & "$env:TEMP/agentuity-test-version/agentuity.exe" --version
+              Write-Host "Installed specific version: $installedVersion"
+              Write-Host "Expected version: $version"
+              
+              if ($installedVersion -eq $version) {
+                Write-Host "Version verification successful"
+              } else {
+                Write-Host "Version verification failed"
+                exit 1
+              }
+            } else {
+              Write-Host "Version-specific installation failed - executable not found"
+              exit 1
+            }
           }
+        } else {
+          Write-Host "Installation failed - executable not found"
+          exit 1
         }
-      shell: pwsh      
+      shell: pwsh        
