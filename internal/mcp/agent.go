@@ -83,7 +83,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			
+
 			var agents []project.AgentConfig
 			for _, agent := range c.Project.Agents {
 				if !slices.Contains(deleted, agent.ID) {
@@ -91,11 +91,11 @@ func init() {
 				}
 			}
 			c.Project.Agents = agents
-			
+
 			if err := c.Project.Save(c.ProjectDir); err != nil {
 				return nil, fmt.Errorf("failed to save project after agent delete: %w", err)
 			}
-			
+
 			return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(fmt.Sprintf("Successfully deleted %d agent(s): %v", len(deleted), deleted))), nil
 		})
 	})

@@ -101,14 +101,14 @@ func TestDoPathHandling(t *testing.T) {
 
 type mockLogger struct{}
 
-func (m *mockLogger) Debug(format string, args ...interface{})  {}
-func (m *mockLogger) Info(format string, args ...interface{})   {}
-func (m *mockLogger) Warn(format string, args ...interface{})   {}
-func (m *mockLogger) Error(format string, args ...interface{})  {}
-func (m *mockLogger) Fatal(format string, args ...interface{})  {}
-func (m *mockLogger) Trace(format string, args ...interface{})  {}
-func (m *mockLogger) SetLevel(level string)                     {}
-func (m *mockLogger) GetLevel() string                          { return "info" }
+func (m *mockLogger) Debug(format string, args ...interface{}) {}
+func (m *mockLogger) Info(format string, args ...interface{})  {}
+func (m *mockLogger) Warn(format string, args ...interface{})  {}
+func (m *mockLogger) Error(format string, args ...interface{}) {}
+func (m *mockLogger) Fatal(format string, args ...interface{}) {}
+func (m *mockLogger) Trace(format string, args ...interface{}) {}
+func (m *mockLogger) SetLevel(level string)                    {}
+func (m *mockLogger) GetLevel() string                         { return "info" }
 func (m *mockLogger) WithField(key string, value interface{}) logger.Logger {
 	return m
 }
