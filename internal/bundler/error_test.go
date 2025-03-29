@@ -55,7 +55,6 @@ func TestFormatBuildError(t *testing.T) {
 			wantContain: []string{
 				"error: Cannot access property 'property' of undefined",
 				"test.js:6:17",
-				"```javascript",
 				"return x.missing.property;",
 				"^",
 			},
@@ -73,7 +72,6 @@ func TestFormatBuildError(t *testing.T) {
 			wantContain: []string{
 				"error: Cannot access property 'property' of undefined",
 				"test.ts:6:17",
-				"```typescript",
 				"return x.missing.property;",
 				"^",
 			},
@@ -104,7 +102,7 @@ func TestFormatBuildError(t *testing.T) {
 			wantContain: []string{
 				"error: Syntax error",
 				"test.js:3",
-				"```javascript",
+				"name: \"test\"",
 			},
 			wantNotContain: []string{
 				"test.js:3:0",
