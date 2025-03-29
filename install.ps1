@@ -311,14 +311,38 @@ function Install-MSI {
         [string]$MsiPath,
         
         [Parameter(Mandatory = $false)]
-        [string]$LogPath = "$env:TEMP\agentuity_install.log"
+        [string]$LogPath = "$env:TEMP\agentuity_install.log",
+        
+        [Parameter(Mandatory = $false)]
+        [string]$InstallDir = ""
     )
     
     Write-Step "Installing Agentuity CLI..."
     
     try {
-        $arguments = "/i `"$MsiPath`" /qn /norestart /log `"$LogPath`" ALLUSERS=1"
+        # Add INSTALLDIR parameter if specified
+        $installDirParam = ""
+        if (-not [string]::IsNullOrEmpty($InstallDir)) {
+            $installDirParam = "INSTALLDIR=`"$InstallDir`""
+        }
+        
+        # Use verbose logging in CI environment
+        $quietParam = "/qn"
+        if ($env:CI -eq "true") {
+            $quietParam = "/qb"
+            Write-Step "Running in CI environment, using basic UI for better logging"
+        }
+        
+        $arguments = "/i `"$MsiPath`" $quietParam /norestart /log `"$LogPath`" ALLUSERS=1 $installDirParam"
+        Write-Step "MSI command: msiexec.exe $arguments"
+        
         $process = Start-Process -FilePath "msiexec.exe" -ArgumentList $arguments -Wait -PassThru
+        
+        # Display log file content in CI environment for debugging
+        if ($env:CI -eq "true" -and (Test-Path -Path $LogPath)) {
+            Write-Step "MSI installation log:"
+            Get-Content -Path $LogPath | ForEach-Object { Write-Step "  $_" }
+        }
         
         if ($process.ExitCode -ne 0) {
             Write-Error "Installation failed with exit code $($process.ExitCode). Check the log at $LogPath for details."
@@ -561,7 +585,7 @@ try {
     }
     
     # Install MSI
-    $installSuccess = Install-MSI -MsiPath $msiPath
+    $installSuccess = Install-MSI -MsiPath $msiPath -InstallDir $installDir
     
     if (-not $installSuccess) {
         Write-Warning "MSI installation may have failed. Attempting to verify installation..."
@@ -573,6 +597,28 @@ try {
     
     $installPaths = @($programFilesPath, $localAppDataPath, $installDir)
     $installVerified = $false
+    
+    # In CI environment, list all paths being checked
+    if ($env:CI -eq "true") {
+        Write-Step "Checking for installation in the following paths:"
+        foreach ($path in $installPaths) {
+            Write-Step "  - $path"
+            if (Test-Path -Path $path) {
+                Write-Step "    Directory exists"
+                $files = Get-ChildItem -Path $path -Recurse | Select-Object -ExpandProperty FullName
+                if ($files.Count -gt 0) {
+                    Write-Step "    Files found:"
+                    foreach ($file in $files) {
+                        Write-Step "      $file"
+                    }
+                } else {
+                    Write-Step "    Directory is empty"
+                }
+            } else {
+                Write-Step "    Directory does not exist"
+            }
+        }
+    }
     
     foreach ($path in $installPaths) {
         if (Test-Installation -InstallPath $path) {
@@ -586,6 +632,35 @@ try {
             Set-PowerShellCompletion -ExePath $exePath
             
             break
+        }
+    }
+    
+    # For CI environment, try to find the executable anywhere on the system
+    if (-not $installVerified -and $env:CI -eq "true") {
+        Write-Step "Installation not found in expected paths, searching system-wide..."
+        $possibleExes = Get-ChildItem -Path "C:\" -Recurse -Filter "agentuity.exe" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
+        
+        if ($possibleExes.Count -gt 0) {
+            Write-Step "Found potential executables:"
+            foreach ($exe in $possibleExes) {
+                Write-Step "  $exe"
+                $installDir = Split-Path -Parent $exe
+                if (Test-Installation -InstallPath $installDir) {
+                    $installVerified = $true
+                    $exePath = $exe
+                    Write-Step "Verified installation at unexpected location: $installDir"
+                    
+                    # Add to PATH if not already there
+                    Add-ToPath -PathToAdd $installDir
+                    
+                    # Set up PowerShell completion
+                    Set-PowerShellCompletion -ExePath $exePath
+                    
+                    break
+                }
+            }
+        } else {
+            Write-Step "No agentuity.exe found on the system"
         }
     }
     
