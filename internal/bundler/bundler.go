@@ -2,7 +2,6 @@ package bundler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
