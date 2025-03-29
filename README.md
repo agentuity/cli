@@ -98,7 +98,7 @@ agentuity agent delete
 
 ```bash
 # Run the development server
-agentuity run
+agentuity dev
 
 # Deploy your project to the cloud
 agentuity deploy
