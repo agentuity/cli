@@ -1,6 +1,7 @@
 package util
 
 import (
+	"archive/zip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -17,7 +18,7 @@ import (
 	"github.com/agentuity/go-common/tui"
 )
 
-func DownloadFile(url, filePath string) error {
+func downloadFile(url, filePath string) error {
 	dir := filepath.Dir(filePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
@@ -53,7 +54,7 @@ func DownloadFile(url, filePath string) error {
 	return nil
 }
 
-func VerifyChecksum(filePath, expectedChecksum string) (bool, error) {
+func verifyChecksum(filePath, expectedChecksum string) (bool, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return false, fmt.Errorf("failed to open file: %w", err)
@@ -69,7 +70,7 @@ func VerifyChecksum(filePath, expectedChecksum string) (bool, error) {
 	return actualChecksum == expectedChecksum, nil
 }
 
-func GetChecksumFromFile(checksumFilePath, targetFileName string) (string, error) {
+func getChecksumFromFile(checksumFilePath, targetFileName string) (string, error) {
 	data, err := os.ReadFile(checksumFilePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read checksum file: %w", err)
@@ -86,7 +87,7 @@ func GetChecksumFromFile(checksumFilePath, targetFileName string) (string, error
 	return "", fmt.Errorf("checksum not found for %s", targetFileName)
 }
 
-func GetBinaryName() string {
+func getBinaryName() string {
 	binaryName := "agentuity"
 	if runtime.GOOS == "windows" {
 		binaryName += ".exe"
@@ -94,7 +95,7 @@ func GetBinaryName() string {
 	return binaryName
 }
 
-func GetReleaseAssetName(version string) string {
+func getReleaseAssetName(version string) string {
 	goos := runtime.GOOS
 	arch := runtime.GOARCH
 	
@@ -124,7 +125,7 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 		}
 	}
 	
-	release, err := GetLatestRelease(ctx)
+	release, err := GetLatestRelease(ctx) // Using public function from version.go
 	if err != nil {
 		return fmt.Errorf("failed to get latest release: %w", err)
 	}
@@ -134,7 +135,7 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 		return nil
 	}
 	
-	assetName := GetReleaseAssetName(release)
+	assetName := getReleaseAssetName(release)
 	checksumFileName := "checksums.txt"
 	
 	tempDir, err := os.MkdirTemp("", "agentuity-upgrade")
@@ -149,25 +150,47 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 	assetPath := filepath.Join(tempDir, assetName)
 	checksumPath := filepath.Join(tempDir, checksumFileName)
 	
-	logger.Info("Downloading %s", assetName)
-	if err := DownloadFile(assetURL, assetPath); err != nil {
-		return fmt.Errorf("failed to download release asset: %w", err)
+	var downloadErr error
+	downloadAction := func() {
+		if err := downloadFile(assetURL, assetPath); err != nil {
+			downloadErr = fmt.Errorf("failed to download release asset: %w", err)
+		}
+	}
+	tui.ShowSpinner("Downloading release asset...", downloadAction)
+	if downloadErr != nil {
+		return downloadErr
 	}
 	
-	logger.Info("Downloading %s", checksumFileName)
-	if err := DownloadFile(checksumURL, checksumPath); err != nil {
-		return fmt.Errorf("failed to download checksum file: %w", err)
+	var checksumDownloadErr error
+	checksumAction := func() {
+		if err := downloadFile(checksumURL, checksumPath); err != nil {
+			checksumDownloadErr = fmt.Errorf("failed to download checksum file: %w", err)
+		}
+	}
+	tui.ShowSpinner("Downloading checksum file...", checksumAction)
+	if checksumDownloadErr != nil {
+		return checksumDownloadErr
 	}
 	
-	logger.Info("Verifying checksum")
-	checksum, err := GetChecksumFromFile(checksumPath, assetName)
-	if err != nil {
-		return fmt.Errorf("failed to get checksum: %w", err)
+	var checksumErr error
+	var checksum string
+	var valid bool
+	verifyAction := func() {
+		var err1, err2 error
+		checksum, err1 = getChecksumFromFile(checksumPath, assetName)
+		if err1 != nil {
+			checksumErr = fmt.Errorf("failed to get checksum: %w", err1)
+			return
+		}
+		
+		valid, err2 = verifyChecksum(assetPath, checksum)
+		if err2 != nil {
+			checksumErr = fmt.Errorf("failed to verify checksum: %w", err2)
+		}
 	}
-	
-	valid, err := VerifyChecksum(assetPath, checksum)
-	if err != nil {
-		return fmt.Errorf("failed to verify checksum: %w", err)
+	tui.ShowSpinner("Verifying checksum...", verifyAction)
+	if checksumErr != nil {
+		return checksumErr
 	}
 	
 	if !valid {
@@ -183,7 +206,7 @@ func replaceBinary(logger logger.Logger, assetPath, version string) error {
 		return fmt.Errorf("failed to get current executable path: %w", err)
 	}
 	
-	appDir := GetAppSupportDir("agentuity")
+	appDir := GetAppSupportDir("agentuity") // Using public function from user.go
 	if appDir == "" {
 		return fmt.Errorf("failed to get app support directory")
 	}
@@ -198,9 +221,15 @@ func replaceBinary(logger logger.Logger, assetPath, version string) error {
 		backupPath += ".exe"
 	}
 	
-	logger.Info("Creating backup at %s", backupPath)
-	if err := copyFile(currentExe, backupPath); err != nil {
-		return fmt.Errorf("failed to create backup: %w", err)
+	var backupErr error
+	backupAction := func() {
+		if err := copyFile(currentExe, backupPath); err != nil {
+			backupErr = fmt.Errorf("failed to create backup: %w", err)
+		}
+	}
+	tui.ShowSpinner("Creating backup...", backupAction)
+	if backupErr != nil {
+		return backupErr
 	}
 	
 	tempDir, err := os.MkdirTemp("", "agentuity-extract")
@@ -209,7 +238,6 @@ func replaceBinary(logger logger.Logger, assetPath, version string) error {
 	}
 	defer os.RemoveAll(tempDir)
 	
-	logger.Info("Extracting new binary")
 	binaryPath := extractBinary(logger, assetPath, tempDir)
 	if binaryPath == "" {
 		return fmt.Errorf("failed to extract binary")
@@ -225,16 +253,23 @@ func replaceBinary(logger logger.Logger, assetPath, version string) error {
 	}
 	fileMode := info.Mode()
 	
-	logger.Info("Replacing binary at %s", currentExe)
-	if err := copyFile(binaryPath, currentExe); err != nil {
-		logger.Error("Failed to replace binary: %v", err)
-		logger.Info("Attempting to restore from backup")
-		copyFile(backupPath, currentExe)
-		return fmt.Errorf("failed to replace binary: %w", err)
+	var replaceErr error
+	replaceAction := func() {
+		if err := copyFile(binaryPath, currentExe); err != nil {
+			replaceErr = fmt.Errorf("failed to replace binary: %w", err)
+			logger.Error("Failed to replace binary: %v", err)
+			logger.Info("Attempting to restore from backup")
+			copyFile(backupPath, currentExe)
+			return
+		}
+		
+		if err := os.Chmod(currentExe, fileMode); err != nil {
+			logger.Error("Failed to set file permissions: %v", err)
+		}
 	}
-	
-	if err := os.Chmod(currentExe, fileMode); err != nil {
-		logger.Error("Failed to set file permissions: %v", err)
+	tui.ShowSpinner("Replacing binary...", replaceAction)
+	if replaceErr != nil {
+		return replaceErr
 	}
 	
 	tui.ShowSuccess("Successfully upgraded to version %s", version)
@@ -278,49 +313,104 @@ func checkWritePermission(filePath string) error {
 }
 
 func extractBinary(logger logger.Logger, assetPath, extractDir string) string {
-	var cmd *exec.Cmd
-	binaryName := GetBinaryName()
-	
-	if strings.HasSuffix(assetPath, ".zip") {
-		cmd = exec.Command("unzip", "-o", assetPath, "-d", extractDir)
-	} else {
-		cmd = exec.Command("tar", "-xzf", assetPath, "-C", extractDir)
-	}
-	
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	
-	logger.Info("Running: %s", cmd.String())
-	err := cmd.Run()
-	if err != nil {
-		logger.Error("Failed to extract archive: %v", err)
-		return ""
-	}
-	
+	var extractErr error
 	var binaryPath string
-	err = filepath.Walk(extractDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() && filepath.Base(path) == binaryName {
-			binaryPath = path
-			return filepath.SkipDir
-		}
-		return nil
-	})
 	
-	if err != nil {
-		logger.Error("Failed to find binary in extracted archive: %v", err)
-		return ""
+	extractAction := func() {
+		binaryName := getBinaryName()
+		
+		if strings.HasSuffix(assetPath, ".zip") {
+			reader, err := zip.OpenReader(assetPath)
+			if err != nil {
+				extractErr = fmt.Errorf("failed to open zip file: %w", err)
+				return
+			}
+			defer reader.Close()
+			
+			for _, file := range reader.File {
+				path := filepath.Join(extractDir, file.Name)
+				
+				if !strings.HasPrefix(path, filepath.Clean(extractDir)+string(os.PathSeparator)) {
+					continue
+				}
+				
+				if file.FileInfo().IsDir() {
+					os.MkdirAll(path, file.Mode())
+					continue
+				}
+				
+				if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+					extractErr = fmt.Errorf("failed to create directory: %w", err)
+					return
+				}
+				
+				outFile, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
+				if err != nil {
+					extractErr = fmt.Errorf("failed to create file: %w", err)
+					return
+				}
+				
+				inFile, err := file.Open()
+				if err != nil {
+					outFile.Close()
+					extractErr = fmt.Errorf("failed to open file in archive: %w", err)
+					return
+				}
+				
+				_, err = io.Copy(outFile, inFile)
+				outFile.Close()
+				inFile.Close()
+				if err != nil {
+					extractErr = fmt.Errorf("failed to copy file: %w", err)
+					return
+				}
+				
+				if filepath.Base(path) == binaryName {
+					binaryPath = path
+				}
+			}
+		} else {
+			cmd := exec.Command("tar", "-xzf", assetPath, "-C", extractDir)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			
+			if err := cmd.Run(); err != nil {
+				extractErr = fmt.Errorf("failed to extract archive: %w", err)
+				return
+			}
+			
+			err := filepath.Walk(extractDir, func(path string, info os.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+				if !info.IsDir() && filepath.Base(path) == binaryName {
+					binaryPath = path
+					return filepath.SkipDir
+				}
+				return nil
+			})
+			
+			if err != nil {
+				extractErr = fmt.Errorf("failed to find binary in extracted archive: %w", err)
+				return
+			}
+		}
+		
+		if binaryPath == "" {
+			extractErr = fmt.Errorf("binary not found in extracted archive")
+			return
+		}
+		
+		if runtime.GOOS != "windows" {
+			os.Chmod(binaryPath, 0755)
+		}
 	}
 	
-	if binaryPath == "" {
-		logger.Error("Binary not found in extracted archive")
-		return ""
-	}
+	tui.ShowSpinner("Extracting release archive...", extractAction)
 	
-	if runtime.GOOS != "windows" {
-		os.Chmod(binaryPath, 0755)
+	if extractErr != nil {
+		logger.Error("%v", extractErr)
+		return ""
 	}
 	
 	return binaryPath
