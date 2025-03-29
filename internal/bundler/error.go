@@ -49,11 +49,6 @@ func FormatBuildError(projectDir string, err api.Message) string {
 				normalTextStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#000000", Dark: "#ffffff"})
 				errorPointerStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#ff0000", Dark: "#ff6666"}).Bold(true)
 				
-				language := "javascript"
-				if filepath.Ext(err.Location.File) == ".ts" {
-					language = "typescript"
-				}
-				
 				errorLineIndex := -1
 				for i, _ := range lines {
 					lineNum := startLine + i + 1
