@@ -72,9 +72,39 @@ Examples:
 	},
 }
 
+var upgradeCmd = &cobra.Command{
+	Use:   "upgrade",
+	Short: "Upgrade the Agentuity CLI to the latest version",
+	Long: `Upgrade the Agentuity CLI to the latest version.
+
+This command will check for the latest version of the Agentuity CLI and upgrade if a newer version is available.
+It will create a backup of the current binary before installing the new version.
+
+On macOS, if the CLI was installed using Homebrew, it will use Homebrew to upgrade.
+
+Examples:
+  agentuity version upgrade
+  agentuity version upgrade --force`,
+	Run: func(cmd *cobra.Command, args []string) {
+		logger := env.NewLogger(cmd)
+		force, _ := cmd.Flags().GetBool("force")
+		if Version == "dev" {
+			tui.ShowWarning("You are using the development version of the Agentuity CLI. Cannot upgrade.")
+			return
+		}
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		if err := util.UpgradeCLI(ctx, logger, force); err != nil {
+			logger.Fatal("%s", err)
+		}
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(versionCmd)
 	versionCmd.AddCommand(versionCheckCmd)
+	versionCmd.AddCommand(upgradeCmd)
 	versionCmd.Flags().Bool("long", false, "Print the long version")
 	versionCheckCmd.Flags().Bool("upgrade", false, "Upgrade to the latest version if possible")
+	upgradeCmd.Flags().Bool("force", false, "Force upgrade even if already on the latest version")
 }
