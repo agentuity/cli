@@ -227,6 +227,7 @@ function Get-Architecture {
 function Get-DefaultInstallDir {
     if ([string]::IsNullOrEmpty($InstallDir)) {
         if (Test-Administrator) {
+            # Return the standard Program Files path by default
             return [System.IO.Path]::Combine($env:ProgramFiles, "Agentuity")
         }
         else {
@@ -476,6 +477,20 @@ function Set-PowerShellCompletion {
     Write-Step "Setting up PowerShell completion..."
     
     try {
+        # Verify the executable exists
+        if (-not (Test-Path -Path $ExePath)) {
+            # If the provided path doesn't exist, try to find the executable in Program Files (x86)
+            $programFilesX86Path = [System.IO.Path]::Combine(${env:ProgramFiles(x86)}, "Agentuity", "agentuity.exe")
+            
+            if (Test-Path -Path $programFilesX86Path) {
+                Write-Step "Found executable in Program Files (x86) instead of the expected location"
+                $ExePath = $programFilesX86Path
+            } else {
+                Write-Warning "Executable not found at $ExePath or $programFilesX86Path"
+                throw "Executable not found"
+            }
+        }
+        
         # Create PowerShell profile directory if it doesn't exist
         $profileDir = Split-Path -Parent $PROFILE
         if (-not (Test-Path -Path $profileDir)) {
@@ -657,9 +672,10 @@ try {
     
     # Verify installation
     $programFilesPath = [System.IO.Path]::Combine($env:ProgramFiles, "Agentuity")
+    $programFilesX86Path = [System.IO.Path]::Combine(${env:ProgramFiles(x86)}, "Agentuity")
     $localAppDataPath = [System.IO.Path]::Combine($env:LOCALAPPDATA, "Agentuity")
     
-    $installPaths = @($programFilesPath, $localAppDataPath, $installDir)
+    $installPaths = @($programFilesPath, $programFilesX86Path, $localAppDataPath, $installDir)
     $installVerified = $false
     
     # In CI environment, list all paths being checked
