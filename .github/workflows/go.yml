@@ -68,11 +68,11 @@ jobs:
         fi
       shell: bash
       
-    - name: Test Install Script (Windows)
+    - name: Test Bash Install Script (Windows)
       if: matrix.os == 'windows-latest'
       run: |
         # Windows test - simplified to avoid bash usage
-        Write-Host "Testing install script on Windows..."
+        Write-Host "Testing bash install script on Windows..."
         
         # Set up environment for testing
         $env:NONINTERACTIVE = "true"
@@ -110,4 +110,71 @@ jobs:
           Write-Host "MSI download verification failed"
           exit 1
         }
-      shell: pwsh                       
+      shell: pwsh
+      
+    - name: Test PowerShell Install Script (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        Write-Host "Testing PowerShell install script on Windows..."
+        
+        # Verify the PowerShell script exists
+        if (Test-Path "install.ps1") {
+          Write-Host "Found install.ps1 script"
+        } else {
+          Write-Host "install.ps1 not found"
+          exit 1
+        }
+        
+        # Create test directory
+        $testDir = Join-Path $env:TEMP "agentuity-ps-test"
+        if (Test-Path $testDir) {
+          Remove-Item -Path $testDir -Recurse -Force
+        }
+        New-Item -Path $testDir -ItemType Directory -Force | Out-Null
+        
+        # Test with default options but NoPrompt
+        Write-Host "Testing PowerShell install script with default options..."
+        & powershell -ExecutionPolicy Bypass -File .\install.ps1 -InstallDir $testDir -NoPrompt
+        
+        # Verify installation
+        $exePath = Join-Path -Path $testDir -ChildPath "agentuity.exe"
+        if (Test-Path $exePath) {
+          Write-Host "Installation verification successful"
+          
+          # Get installed version
+          $installedVersion = & $exePath version
+          Write-Host "Installed version: $installedVersion"
+          
+          # Test with specific version
+          $specificVersion = "0.0.74"
+          Write-Host "Testing PowerShell install script with specific version $specificVersion..."
+          $versionTestDir = Join-Path $env:TEMP "agentuity-ps-test-version"
+          if (Test-Path $versionTestDir) {
+            Remove-Item -Path $versionTestDir -Recurse -Force
+          }
+          New-Item -Path $versionTestDir -ItemType Directory -Force | Out-Null
+          
+          & powershell -ExecutionPolicy Bypass -File .\install.ps1 -Version $specificVersion -InstallDir $versionTestDir -NoPrompt
+          
+          # Verify version-specific installation
+          $versionExePath = Join-Path -Path $versionTestDir -ChildPath "agentuity.exe"
+          if (Test-Path $versionExePath) {
+            Write-Host "Version-specific installation verification successful"
+            $versionInstalledVersion = & $versionExePath version
+            Write-Host "Version-specific installed version: $versionInstalledVersion"
+            
+            if ($versionInstalledVersion -match $specificVersion) {
+              Write-Host "Version verification successful"
+            } else {
+              Write-Host "Version verification failed. Expected: $specificVersion, Got: $versionInstalledVersion"
+              exit 1
+            }
+          } else {
+            Write-Host "Version-specific installation verification failed"
+            exit 1
+          }
+        } else {
+          Write-Host "Installation verification failed"
+          exit 1
+        }
+      shell: pwsh                                                                     
