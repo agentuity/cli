@@ -546,12 +546,16 @@ func upgradeWithWindowsMsi(ctx context.Context, logger logger.Logger, version st
 	}
 	
 	logger.Info("Installing new version")
-	cmd := exec.Command("msiexec", "/i", installerPath, "/qn", "REINSTALLMODE=amus", "REINSTALL=ALL")
+	updateCmd := exec.Command("msiexec", "/update", installerPath, "/qn")
 	
 	var installErr error
 	installAction := func() {
-		if err := cmd.Run(); err != nil {
-			installErr = fmt.Errorf("failed to run MSI installer: %w", err)
+		if err := updateCmd.Run(); err != nil {
+			logger.Warn("Update approach failed, trying install with reinstall: %v", err)
+			installCmd := exec.Command("msiexec", "/i", installerPath, "/qn", "REINSTALLMODE=amus", "REINSTALL=ALL")
+			if err := installCmd.Run(); err != nil {
+				installErr = fmt.Errorf("failed to run MSI installer: %w", err)
+			}
 		}
 	}
 	tui.ShowSpinner("Installing upgrade...", installAction)
