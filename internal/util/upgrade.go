@@ -156,7 +156,7 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 			downloadErr = fmt.Errorf("failed to download release asset: %w", err)
 		}
 	}
-	tui.ShowSpinner("Downloading release asset...", downloadAction)
+	tui.ShowSpinner("Downloading release...", downloadAction)
 	if downloadErr != nil {
 		return downloadErr
 	}
@@ -167,7 +167,7 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 			checksumDownloadErr = fmt.Errorf("failed to download checksum file: %w", err)
 		}
 	}
-	tui.ShowSpinner("Downloading checksum file...", checksumAction)
+	tui.ShowSpinner("Downloading checksum...", checksumAction)
 	if checksumDownloadErr != nil {
 		return checksumDownloadErr
 	}
