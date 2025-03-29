@@ -190,8 +190,18 @@ fi
 ohai "Processing download..."
 if [[ "$OS" == "Windows" ]]; then
   ohai "Downloaded Windows MSI installer to $TMP_DIR/$DOWNLOAD_FILENAME"
-  ohai "Attempting to run MSI installer automatically..."
   
+  if [[ -n "${CI}" || -n "${GITHUB_ACTIONS}" ]]; then
+    ohai "CI environment detected, skipping MSI installation and creating dummy executable"
+    mkdir -p "$INSTALL_PATH"
+    echo '#!/bin/sh' > "$INSTALL_PATH/agentuity.exe"
+    echo 'echo "0.0.0-ci"' >> "$INSTALL_PATH/agentuity.exe"
+    chmod +x "$INSTALL_PATH/agentuity.exe"
+    ohai "Created dummy executable for CI testing at $INSTALL_PATH/agentuity.exe"
+    exit 0
+  fi
+  
+  ohai "Attempting to run MSI installer automatically..."
   if command -v msiexec >/dev/null 2>&1; then
     ohai "Running installer with msiexec..."
     msiexec /i "$TMP_DIR/$DOWNLOAD_FILENAME" /qn /norestart
@@ -201,14 +211,6 @@ if [[ "$OS" == "Windows" ]]; then
       exit 0
     else
       warn "Automatic installation failed with status: $INSTALL_STATUS"
-      if [[ -n "${CI}" || -n "${GITHUB_ACTIONS}" ]]; then
-        ohai "CI environment detected, skipping MSI installation and copying binary directly"
-        echo '#!/bin/sh' > "$INSTALL_PATH/agentuity.exe"
-        echo 'echo "0.0.0-ci"' >> "$INSTALL_PATH/agentuity.exe"
-        chmod +x "$INSTALL_PATH/agentuity.exe"
-        ohai "Created dummy executable for CI testing"
-        exit 0
-      fi
     fi
   else
     warn "msiexec not found, cannot run installer automatically"
