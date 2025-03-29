@@ -114,6 +114,10 @@ jobs:
       
     - name: Test PowerShell Install Script (Windows)
       if: matrix.os == 'windows-latest'
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        CI: true
+        AGENTUITY_TEST_VERSION: "0.0.74"
       run: |
         Write-Host "Testing PowerShell install script on Windows..."
         
@@ -177,4 +181,4 @@ jobs:
           Write-Host "Installation verification failed"
           exit 1
         }
-      shell: pwsh                                                                     
+      shell: pwsh                                                                                                                                          
