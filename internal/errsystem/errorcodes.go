@@ -98,4 +98,8 @@ var (
 		Code:    "CLI-0024",
 		Message: "Error adding GitHub Action Workflow to the project",
 	}
+	ErrUpgradeCli = errorType{
+		Code:    "CLI-0025",
+		Message: "Failed to upgrade CLI",
+	}
 )
