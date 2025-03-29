@@ -125,20 +125,15 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		},
 	})
 	if len(result.Errors) > 0 {
-		var errs []error
 		fmt.Println("\n" + tui.Warning("Build Failed") + "\n")
 		
 		for _, err := range result.Errors {
 			formattedError := FormatBuildError(dir, err)
 			fmt.Println(formattedError)
-			
-			if err.Location != nil {
-				errs = append(errs, fmt.Errorf("failed to bundle %s (line %d): %s", err.Location.File, err.Location.Line, err.Text))
-			} else {
-				errs = append(errs, fmt.Errorf("failed to bundle: %s", err.Text))
-			}
 		}
-		return errors.Join(errs...)
+		
+		os.Exit(2)
+		return nil // This line will never be reached due to os.Exit
 	}
 	return nil
 }
