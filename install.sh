@@ -50,7 +50,8 @@ if [[ "$OS" == "Darwin" ]]; then
       
       if [[ "$VERSION" != "latest" ]]; then
         ohai "Installing Agentuity CLI version $VERSION using Homebrew..."
-        brew install agentuity/tap/agentuity@$VERSION
+        FORMULA="agentuity/tap/agentuity@${VERSION}"
+        brew install $FORMULA
       else
         ohai "Installing latest Agentuity CLI version using Homebrew..."
         brew install agentuity/tap/agentuity
