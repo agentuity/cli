@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strings"
 	"syscall"
 
 	"github.com/Masterminds/semver"
@@ -100,20 +101,21 @@ Examples:
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		force, _ := cmd.Flags().GetBool("force")
-		if Version == "dev" {
-			tui.ShowWarning("You are using the development version of the Agentuity CLI. Cannot upgrade.")
+		if Version == "dev" || strings.HasSuffix(Version, "-next") {
+			tui.ShowWarning("You are using the development version of the Agentuity CLI which cannot be upgraded.")
 			return
 		}
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		if err := util.UpgradeCLI(ctx, logger, force); err != nil {
-			errsystem.New(errsystem.ErrUpgradeCli, err).ShowErrorAndExit()
+			errsystem.New(errsystem.ErrUpgradeCli, err, errsystem.WithAttributes(map[string]any{"version": Version})).ShowErrorAndExit()
 		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(upgradeCmd)
 	versionCmd.AddCommand(versionCheckCmd)
 	versionCmd.AddCommand(upgradeCmd)
 	versionCmd.Flags().Bool("long", false, "Print the long version")

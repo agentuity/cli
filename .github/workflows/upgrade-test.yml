@@ -77,7 +77,7 @@ jobs:
           
           # Create a mock release with the new version
           mkdir -p mock-release
-          go build -ldflags "-X github.com/agentuity/cli/cmd.Version=$NEW_VERSION" -o mock-release/agentuity
+          go build -ldflags "-X main.version=$NEW_VERSION" -o mock-release/agentuity
           
           # Create checksums file
           cd mock-release
