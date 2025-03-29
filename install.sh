@@ -194,9 +194,16 @@ if [[ "$OS" == "Windows" ]]; then
   if [[ -n "${CI}" || -n "${GITHUB_ACTIONS}" ]]; then
     ohai "CI environment detected, skipping MSI installation and creating dummy executable"
     mkdir -p "$INSTALL_PATH"
-    echo '#!/bin/sh' > "$INSTALL_PATH/agentuity.exe"
-    echo 'echo "0.0.0-ci"' >> "$INSTALL_PATH/agentuity.exe"
-    chmod +x "$INSTALL_PATH/agentuity.exe"
+    if [[ "$OS" == "Windows" ]]; then
+      echo '@echo off' > "$INSTALL_PATH/agentuity.exe.bat"
+      echo 'echo 0.0.0-ci' >> "$INSTALL_PATH/agentuity.exe.bat"
+      touch "$INSTALL_PATH/agentuity.exe"
+      chmod +x "$INSTALL_PATH/agentuity.exe"
+    else
+      echo '#!/bin/sh' > "$INSTALL_PATH/agentuity.exe"
+      echo 'echo "0.0.0-ci"' >> "$INSTALL_PATH/agentuity.exe"
+      chmod +x "$INSTALL_PATH/agentuity.exe"
+    fi
     ohai "Created dummy executable for CI testing at $INSTALL_PATH/agentuity.exe"
     exit 0
   fi
