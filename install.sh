@@ -44,6 +44,31 @@ if [[ "$OS" == "Darwin" ]]; then
   OS="Darwin"
   EXTENSION="tar.gz"
   INSTALL_DIR="/usr/local/bin"
+  
+  if command -v brew >/dev/null 2>&1 && [[ "$NO_BREW" != "true" ]]; then
+      ohai "Homebrew detected! Installing Agentuity CLI using Homebrew..."
+      if [[ "$VERSION" != "latest" ]]; then
+        warn "Version specification is not supported with Homebrew installation."
+        warn "Installing latest version instead. If you need a specific version,"
+        warn "use the --no-brew flag to use direct installation."
+        
+        read -p "Continue with Homebrew installation of latest version? [Y/n] " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]] && [[ ! -z $REPLY ]]; then
+          abort "Installation aborted by user."
+        fi
+      fi
+      
+      brew install agentuity/tap/agentuity
+      
+      if command -v agentuity >/dev/null 2>&1; then
+        ohai "Agentuity CLI installed successfully via Homebrew!"
+        ohai "Version: $(agentuity --version)"
+        exit 0
+      else
+        abort "Homebrew installation failed. Please try again or use manual installation."
+      fi
+  fi
 elif [[ "$OS" == "Linux" ]]; then
   OS="Linux"
   EXTENSION="tar.gz"
@@ -69,11 +94,16 @@ while [[ $# -gt 0 ]]; do
       INSTALL_PATH="$2"
       shift 2
       ;;
+    --no-brew)
+      NO_BREW=true
+      shift
+      ;;
     -h|--help)
       echo "Usage: install.sh [options]"
       echo "Options:"
       echo "  -v, --version VERSION    Install specific version"
       echo "  -d, --dir DIRECTORY      Install to specific directory"
+      echo "  --no-brew               Skip Homebrew installation on macOS"
       echo "  -h, --help               Show this help message"
       exit 0
       ;;
@@ -163,10 +193,26 @@ fi
 ohai "Processing download..."
 if [[ "$OS" == "Windows" ]]; then
   ohai "Downloaded Windows MSI installer to $TMP_DIR/$DOWNLOAD_FILENAME"
-  ohai "To install, run the MSI installer manually"
-  echo "  $TMP_DIR/$DOWNLOAD_FILENAME"
+  ohai "Attempting to run MSI installer automatically..."
+  
+  if command -v msiexec >/dev/null 2>&1; then
+    ohai "Running installer with msiexec..."
+    msiexec /i "$TMP_DIR/$DOWNLOAD_FILENAME" /quiet
+    INSTALL_STATUS=$?
+    if [[ $INSTALL_STATUS -eq 0 ]]; then
+      ohai "Installation completed successfully!"
+      exit 0
+    else
+      warn "Automatic installation failed with status: $INSTALL_STATUS"
+    fi
+  else
+    warn "msiexec not found, cannot run installer automatically"
+  fi
+  
   cp "$TMP_DIR/$DOWNLOAD_FILENAME" "$HOME/" || abort "Failed to copy MSI to $HOME/"
   ohai "MSI installer copied to $HOME/$DOWNLOAD_FILENAME"
+  ohai "To install manually, run the MSI installer at:"
+  echo "  $HOME/$DOWNLOAD_FILENAME"
   exit 0
 elif [[ "$EXTENSION" == "tar.gz" ]]; then
   ohai "Extracting..."
