@@ -53,7 +53,7 @@ func init() {
 			if resp := ensureLoggedIn(&c); resp != nil {
 				return resp, nil
 			}
-			templates, err := templates.LoadTemplates()
+			templates, err := templates.LoadTemplates(ctx, c.TemplateDir)
 			if err != nil {
 				return nil, err
 			}
@@ -75,7 +75,7 @@ func init() {
 			if resp := ensureLoggedIn(&c); resp != nil {
 				return resp, nil
 			}
-			templates, err := templates.LoadLanguageTemplates(args.Provider)
+			templates, err := templates.LoadLanguageTemplates(ctx, c.TemplateDir, args.Provider)
 			if err != nil {
 				return nil, err
 			}

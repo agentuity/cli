@@ -1,16 +1,22 @@
 package templates
 
 import (
+	"archive/zip"
+	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver"
 	"github.com/agentuity/cli/internal/util"
+	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 )
 
@@ -156,7 +162,7 @@ type Template struct {
 }
 
 func (t *Template) NewProject(ctx TemplateContext) (*TemplateRules, error) {
-	rules, err := LoadTemplateRuleForIdentifier(t.Identifier)
+	rules, err := LoadTemplateRuleForIdentifier(ctx.TemplateDir, t.Identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -193,14 +199,12 @@ func (t *Template) Install(ctx TemplateContext) error {
 }
 
 func (t *Template) AddGitHubAction(ctx TemplateContext) error {
-	name := "common/github/" + t.Identifier + ".yaml"
+	name := filepath.Join(ctx.TemplateDir, "common", "github", t.Identifier+".yaml")
 	reader, err := getEmbeddedFile(name)
 	if err != nil {
 		return fmt.Errorf("failed to load embedded file for %s: %s", name, err)
 	}
-	if reader == nil {
-		return fmt.Errorf("template %s not found", name)
-	}
+	defer reader.Close()
 	buf, err := io.ReadAll(reader)
 	outdir := filepath.Join(ctx.ProjectDir, ".github", "workflows")
 	if err := os.MkdirAll(outdir, 0755); err != nil {
@@ -224,17 +228,181 @@ func loadTemplates(reader io.Reader) (Templates, error) {
 	return templates, nil
 }
 
-// LoadTemplates returns all the templates available
-func LoadTemplates() (Templates, error) {
-	reader, err := getEmbeddedFile("templates.yaml")
+type Release struct {
+	ZipballURL string `json:"zipball_url"`
+	TagName    string `json:"tag_name"`
+}
+
+const githubTemplatesLatest = "https://api.github.com/repos/agentuity/templates/releases/latest"
+
+func getLatestRelease(ctx context.Context) (string, string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", githubTemplatesLatest, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open embedded templates file: %s", err)
+		return "", "", err
+	}
+	req.Header.Set("User-Agent", util.UserAgent())
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", "", fmt.Errorf("failed to get latest release: %s", resp.Status)
+	}
+
+	var release Release
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return "", "", err
+	}
+
+	return release.TagName, release.ZipballURL, nil
+}
+
+const markerFileName = ".marker"
+
+func unzip(src, dest string) error {
+	r, err := zip.OpenReader(src)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	var rootDir string
+
+	for _, f := range r.File {
+		if strings.Contains(f.Name, "..") {
+			return fmt.Errorf("invalid file path: %s", f.Name)
+		}
+
+		// find the root directory
+		if rootDir == "" && f.FileInfo().IsDir() {
+			rootDir = f.Name
+			continue
+		}
+
+		// skip the .github directory
+		if strings.HasPrefix(f.Name, filepath.Join(rootDir, ".github")) {
+			continue
+		}
+
+		rc, err := f.Open()
+		if err != nil {
+			return err
+		}
+		defer rc.Close()
+
+		fpath := filepath.Join(dest, strings.Replace(f.Name, rootDir, "", 1))
+
+		if f.FileInfo().IsDir() {
+			os.MkdirAll(fpath, os.ModePerm)
+		} else {
+			var fdir string
+			if lastIndex := strings.LastIndex(fpath, string(os.PathSeparator)); lastIndex > -1 {
+				fdir = fpath[:lastIndex]
+			}
+
+			err = os.MkdirAll(fdir, os.ModePerm)
+			if err != nil {
+				return err
+			}
+			f, err := os.OpenFile(
+				fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+
+			_, err = io.Copy(f, rc)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// LoadTemplatesFromGithub loads the templates from github and returns the templates
+// If the etag is provided, it will be used to check if the templates have changed
+// If the templates have not changed, it will return the templates from the local directory
+// If the templates have changed, it will download the new templates and return them
+func LoadTemplatesFromGithub(ctx context.Context, dir string) (Templates, error) {
+	etag := viper.GetString("templates.etag")
+	release := viper.GetString("templates.release")
+	tagName, zipballURL, err := getLatestRelease(ctx)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", zipballURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", util.UserAgent())
+	if etag != "" && release == tagName && util.Exists(filepath.Join(dir, markerFileName)) {
+		req.Header.Set("If-None-Match", etag)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusNotModified:
+		return loadTemplateFromDir(ctx, dir)
+	case http.StatusOK:
+		break
+	default:
+		return nil, fmt.Errorf("failed to load templates from github: %s", resp.Status)
+	}
+
+	etag = resp.Header.Get("ETag")
+	if etag != "" {
+		viper.Set("templates.etag", etag)
+		viper.Set("templates.release", tagName)
+		viper.WriteConfig()
+	}
+
+	tmpfile, err := os.CreateTemp("", "agentuity-templates.zip")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(tmpfile.Name())
+	if _, err := io.Copy(tmpfile, resp.Body); err != nil {
+		return nil, err
+	}
+
+	os.RemoveAll(dir) // clear the directory first
+
+	if err := unzip(tmpfile.Name(), dir); err != nil {
+		return nil, err
+	}
+
+	// write a marker file to the directory to indicate that the templates have been loaded
+	if err := os.WriteFile(filepath.Join(dir, markerFileName), []byte(time.Now().Format(time.RFC3339)), 0600); err != nil {
+		return nil, err
+	}
+
+	return loadTemplateFromDir(ctx, dir)
+}
+
+func loadTemplateFromDir(ctx context.Context, dir string) (Templates, error) {
+	reader, err := getEmbeddedFile(filepath.Join(dir, "runtimes.yaml"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open embedded runtimes file: %s", err)
 	}
 	return loadTemplates(reader)
 }
 
-func LoadLanguageTemplates(runtime string) (LanguageTemplates, error) {
-	reader, err := getEmbeddedFile(runtime + "/templates.yaml")
+// LoadTemplates returns all the templates available
+func LoadTemplates(ctx context.Context, dir string) (Templates, error) {
+	return LoadTemplatesFromGithub(ctx, dir)
+}
+
+func LoadLanguageTemplates(ctx context.Context, dir string, runtime string) (LanguageTemplates, error) {
+	reader, err := getEmbeddedFile(filepath.Join(dir, runtime, "templates.yaml"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load embedded file for %s: %s", runtime+"/templates.yaml", err)
 	}
@@ -248,8 +416,8 @@ func LoadLanguageTemplates(runtime string) (LanguageTemplates, error) {
 	return templates, nil
 }
 
-func IsValidRuntimeTemplateName(runtime string, name string) bool {
-	templates, err := LoadLanguageTemplates(runtime)
+func IsValidRuntimeTemplateName(ctx context.Context, dir string, runtime string, name string) bool {
+	templates, err := LoadLanguageTemplates(ctx, dir, runtime)
 	if err != nil {
 		return false
 	}

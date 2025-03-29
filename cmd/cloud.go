@@ -159,7 +159,7 @@ Examples:
 			var keys []string
 
 			if !context.NewProject {
-				keys, state = reconcileAgentList(logger, apiUrl, token, context)
+				keys, state = reconcileAgentList(logger, cmd, apiUrl, token, context)
 
 				if len(keys) == 0 {
 					tui.ShowWarning("no Agents found")
@@ -634,4 +634,5 @@ func init() {
 	cloudDeployCmd.Flags().MarkHidden("ci")
 	cloudDeployCmd.Flags().String("format", "text", "The output format to use for results which can be either 'text' or 'json'")
 	cloudDeployCmd.Flags().String("org-id", "", "The organization to create the project in")
+	cloudDeployCmd.Flags().String("templates-dir", "", "The directory to load the templates. Defaults to loading them from the github.com/agentuity/templates repository")
 }

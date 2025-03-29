@@ -139,6 +139,10 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		logger := env.NewLogger(cmd)
+		tmplDir, err := getConfigTemplateDir(cmd)
+		if err != nil {
+			logger.Fatal("%s", err)
+		}
 		var t transport.Transport
 		if stdioTransport {
 			t = stdio.NewStdioServerTransport()
@@ -159,9 +163,9 @@ Examples:
 			TransportURL: project.TransportURL,
 			Project:      project.Project,
 			LoggedIn:     project.Token != "",
+			TemplateDir:  tmplDir,
 		}
-		err := mcp.Register(mcpContext)
-		if err != nil {
+		if err := mcp.Register(mcpContext); err != nil {
 			logger.Fatal("%s", err)
 		}
 		if err := server.Serve(ctx); err != nil {

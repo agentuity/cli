@@ -21,6 +21,7 @@ type MCPContext struct {
 	LoggedIn     bool
 	ProjectDir   string
 	Project      *project.Project
+	TemplateDir  string
 }
 
 type NoArguments struct {
