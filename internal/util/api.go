@@ -102,7 +102,19 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 	if err != nil {
 		return NewAPIError(c.baseURL, method, 0, "", fmt.Errorf("error parsing base url: %w", err), traceID)
 	}
-	u.Path = path
+	
+	basePath := u.Path
+	if path == "" {
+		u.Path = basePath
+	} else if basePath == "" || basePath == "/" {
+		u.Path = path
+	} else {
+		if strings.HasPrefix(path, "/") {
+			u.Path = basePath + path
+		} else {
+			u.Path = basePath + "/" + path
+		}
+	}
 
 	var body []byte
 	if payload != nil {
