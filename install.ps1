@@ -4,7 +4,7 @@
 .DESCRIPTION
     Downloads and installs the latest version of the Agentuity CLI for Windows.
     This script can be invoked directly with:
-    iwr https://get.agentuity.sh/install.ps1 -useb | iex
+    iwr https://agentuity.sh/install.ps1 -useb | iex
 .PARAMETER Version
     Specific version to install. If not specified, installs the latest version.
 .PARAMETER InstallDir
