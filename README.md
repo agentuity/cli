@@ -10,8 +10,6 @@
 
 # Agentuity CLI
 
-> [!WARNING]  
-> This repository is under heavy development and it is not yet stable or ready for use.
 
 The command line tools for the Agentuity Agent Cloud Platform.  These tools are used to build, manage, and deploy Agents to the Agentuity platform.
 
