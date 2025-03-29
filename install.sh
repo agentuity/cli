@@ -123,9 +123,42 @@ else
 fi
 
 DOWNLOAD_URL="https://github.com/agentuity/cli/releases/download/v${VERSION}/${DOWNLOAD_FILENAME}"
+CHECKSUMS_URL="https://github.com/agentuity/cli/releases/download/v${VERSION}/checksums.txt"
 
 ohai "Downloading Agentuity CLI v${VERSION} for ${OS}/${ARCH}..."
 curl -L --progress-bar "$DOWNLOAD_URL" -o "$TMP_DIR/$DOWNLOAD_FILENAME" || abort "Failed to download from $DOWNLOAD_URL"
+
+if [[ "$OS" != "Windows" ]]; then
+  ohai "Downloading checksums for verification..."
+  if ! curl -L --silent "$CHECKSUMS_URL" -o "$TMP_DIR/checksums.txt"; then
+    warn "Failed to download checksums file. Skipping verification."
+  else
+    ohai "Verifying checksum..."
+    if command -v sha256sum >/dev/null 2>&1; then
+      CHECKSUM_TOOL="sha256sum"
+    elif command -v shasum >/dev/null 2>&1; then
+      CHECKSUM_TOOL="shasum -a 256"
+    else
+      warn "Neither sha256sum nor shasum found. Skipping checksum verification."
+      CHECKSUM_TOOL=""
+    fi
+    
+    if [[ -n "$CHECKSUM_TOOL" ]]; then
+      cd "$TMP_DIR"
+      COMPUTED_CHECKSUM=$($CHECKSUM_TOOL "$DOWNLOAD_FILENAME" | cut -d ' ' -f 1)
+      EXPECTED_CHECKSUM=$(grep "$DOWNLOAD_FILENAME" checksums.txt | cut -d ' ' -f 1)
+      
+      if [[ -z "$EXPECTED_CHECKSUM" ]]; then
+        warn "Checksum for $DOWNLOAD_FILENAME not found in checksums.txt. Skipping verification."
+      elif [[ "$COMPUTED_CHECKSUM" != "$EXPECTED_CHECKSUM" ]]; then
+        abort "Checksum verification failed. Expected: $EXPECTED_CHECKSUM, Got: $COMPUTED_CHECKSUM"
+      else
+        ohai "Checksum verification passed!"
+      fi
+      cd - > /dev/null
+    fi
+  fi
+fi
 
 ohai "Processing download..."
 if [[ "$OS" == "Windows" ]]; then
