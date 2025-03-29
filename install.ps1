@@ -461,11 +461,13 @@ if (-not (Test-Administrator) -and [string]::IsNullOrEmpty($InstallDir)) {
 
 # Determine version to install
 if ($Version -eq "latest") {
-    $Version = Get-LatestReleaseVersion
+    $VersionToUse = Get-LatestReleaseVersion
+} else {
+    $VersionToUse = $Version
 }
 
 # Remove 'v' prefix if present
-$Version = $Version.TrimStart('v')
+$VersionToUse = $VersionToUse.TrimStart('v')
 
 # Determine architecture
 $arch = Get-Architecture
@@ -496,8 +498,8 @@ else {
 }
 
 # Construct download URLs
-$downloadUrl = "https://github.com/agentuity/cli/releases/download/v${Version}/${downloadFilename}"
-$checksumsUrl = "https://github.com/agentuity/cli/releases/download/v${Version}/checksums.txt"
+$downloadUrl = "https://github.com/agentuity/cli/releases/download/v${VersionToUse}/${downloadFilename}"
+$checksumsUrl = "https://github.com/agentuity/cli/releases/download/v${VersionToUse}/checksums.txt"
 
 # Create temporary directory
 $tempDir = Join-Path -Path $env:TEMP -ChildPath "agentuity_install_$([Guid]::NewGuid().ToString())"
