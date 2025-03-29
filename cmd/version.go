@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
+	"strings"
 	"syscall"
 
 	"github.com/Masterminds/semver"
+	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/tui"
@@ -59,7 +62,7 @@ Examples:
 		} else {
 			release, err := util.GetLatestRelease(ctx)
 			if err != nil {
-				logger.Fatal("%s", err)
+				errsystem.New(errsystem.ErrUpgradeCli, err).ShowErrorAndExit()
 			}
 			latestVersion := semver.MustParse(release)
 			currentVersion := semver.MustParse(Version)
@@ -72,9 +75,50 @@ Examples:
 	},
 }
 
+var upgradeCmd = &cobra.Command{
+	Use:   "upgrade",
+	Short: "Upgrade the Agentuity CLI to the latest version",
+	Long: func() string {
+		baseDesc := `Upgrade the Agentuity CLI to the latest version.
+
+This command will check for the latest version of the Agentuity CLI and upgrade if a newer version is available.
+It will create a backup of the current binary before installing the new version.`
+
+		if runtime.GOOS == "darwin" {
+			baseDesc += `
+
+On macOS, if the CLI was installed using Homebrew, it will use Homebrew to upgrade.`
+		}
+
+		baseDesc += `
+
+Examples:
+  agentuity version upgrade
+  agentuity version upgrade --force`
+
+		return baseDesc
+	}(),
+	Run: func(cmd *cobra.Command, args []string) {
+		logger := env.NewLogger(cmd)
+		force, _ := cmd.Flags().GetBool("force")
+		if Version == "dev" || strings.HasSuffix(Version, "-next") {
+			tui.ShowWarning("You are using the development version of the Agentuity CLI which cannot be upgraded.")
+			return
+		}
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		if err := util.UpgradeCLI(ctx, logger, force); err != nil {
+			errsystem.New(errsystem.ErrUpgradeCli, err, errsystem.WithAttributes(map[string]any{"version": Version})).ShowErrorAndExit()
+		}
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(upgradeCmd)
 	versionCmd.AddCommand(versionCheckCmd)
+	versionCmd.AddCommand(upgradeCmd)
 	versionCmd.Flags().Bool("long", false, "Print the long version")
 	versionCheckCmd.Flags().Bool("upgrade", false, "Upgrade to the latest version if possible")
+	upgradeCmd.Flags().Bool("force", false, "Force upgrade even if already on the latest version")
 }

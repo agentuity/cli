@@ -196,8 +196,8 @@ github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/ProtonMail/go-crypto v1.1.5 h1:eoAQfK2dwL+tFSFpr7TbOaPNUbPiJj4fLYwwGE1FQO4=
 github.com/ProtonMail/go-crypto v1.1.5/go.mod h1:rA3QumHc/FZ8pAHreoekgiAbzpNsfQAosU5td4SnOrE=
-github.com/agentuity/go-common v1.0.24 h1:gTbfJ8lGjVxE+awq0s8K2mdHJjeMZumxpUeR7I01LWs=
-github.com/agentuity/go-common v1.0.24/go.mod h1:ITySjYBLEL3Jjmvwt1sJ+HALGWTNMOOotlhm5Hmuxzc=
+github.com/agentuity/go-common v1.0.25 h1:PKjOjaLTySMRatE9fKPwpYdwDabBhCd25hro54IofHY=
+github.com/agentuity/go-common v1.0.25/go.mod h1:ITySjYBLEL3Jjmvwt1sJ+HALGWTNMOOotlhm5Hmuxzc=
 github.com/agentuity/mcp-golang/v2 v2.0.2 h1:wZqS/aHWZsQoU/nd1E1/iMsVY2dywWT9+PFlf+3YJxo=
 github.com/agentuity/mcp-golang/v2 v2.0.2/go.mod h1:U105tZXyTatxxOBlcObRgLb/ULvGgT2DJ1nq/8++P6Q=
 github.com/alecthomas/chroma v0.10.0 h1:7XDcGkCQopCNKjZHfYrNLraA+M7e0fMiJ/Mfikbfjek=

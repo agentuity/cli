@@ -76,3 +76,6 @@ errors:
 
   - code: CLI-0024
     message: Error adding GitHub Action Workflow to the project
+
+  - code: CLI-0025
+    message: Failed to upgrade CLI
