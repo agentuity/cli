@@ -96,7 +96,7 @@ func UserAgent() string {
 	return "Agentuity CLI/" + Version + " (" + gitSHA + ")"
 }
 
-func (c *APIClient) Do(method, path string, payload interface{}, response interface{}) error {
+func (c *APIClient) Do(method, pathParam string, payload interface{}, response interface{}) error {
 	var traceID string
 
 	u, err := url.Parse(c.baseURL)
@@ -105,12 +105,12 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 	}
 	
 	basePath := u.Path
-	if path == "" {
+	if pathParam == "" {
 		u.Path = basePath
 	} else if basePath == "" || basePath == "/" {
-		u.Path = path
+		u.Path = pathParam
 	} else {
-		u.Path = path.Join(basePath, path)
+		u.Path = path.Join(basePath, pathParam)
 	}
 
 	var body []byte
