@@ -2,7 +2,6 @@ package bundler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,6 +15,7 @@ import (
 	"github.com/agentuity/go-common/logger"
 	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/sys"
+	"github.com/agentuity/go-common/tui"
 	"github.com/evanw/esbuild/pkg/api"
 )
 
@@ -124,15 +124,15 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		},
 	})
 	if len(result.Errors) > 0 {
-		var errs []error
+		fmt.Println("\n" + tui.Warning("Build Failed") + "\n")
+
 		for _, err := range result.Errors {
-			if err.Location != nil {
-				errs = append(errs, fmt.Errorf("failed to bundle %s (line %d): %s", err.Location.File, err.Location.Line, err.Text))
-			} else {
-				errs = append(errs, fmt.Errorf("failed to bundle: %s", err.Text))
-			}
+			formattedError := formatESBuildError(dir, err)
+			fmt.Println(formattedError)
 		}
-		return errors.Join(errs...)
+
+		os.Exit(2)
+		return nil // This line will never be reached due to os.Exit
 	}
 	return nil
 }

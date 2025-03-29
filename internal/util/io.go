@@ -2,6 +2,7 @@ package util
 
 import (
 	"archive/zip"
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -157,4 +158,41 @@ func ZipDir(dir string, outfilename string, opts ...ZipDirCallbackMatcher) error
 	zw.Flush()
 	zw.Close()
 	return zf.Close()
+}
+
+func ReadFileLines(filename string, startLine, endLine int) ([]string, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, fmt.Errorf("error opening file: %w", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	var lines []string
+	lineNum := 0
+
+	for scanner.Scan() {
+		if lineNum >= startLine && (endLine < 0 || lineNum <= endLine) {
+			lines = append(lines, scanner.Text())
+		}
+		lineNum++
+		if endLine >= 0 && lineNum > endLine {
+			break
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading file: %w", err)
+	}
+
+	return lines, nil
+}
+
+func GetRelativePath(basePath, absolutePath string) string {
+	rel, err := filepath.Rel(basePath, absolutePath)
+	if err != nil {
+		return absolutePath
+	}
+	rel = filepath.ToSlash(rel)
+	return rel
 }
