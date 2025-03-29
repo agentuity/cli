@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/mcp"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/go-common/env"
@@ -141,7 +142,7 @@ Examples:
 		logger := env.NewLogger(cmd)
 		tmplDir, err := getConfigTemplateDir(cmd)
 		if err != nil {
-			logger.Fatal("%s", err)
+			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
 		}
 		var t transport.Transport
 		if stdioTransport {

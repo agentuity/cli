@@ -488,7 +488,7 @@ Examples:
 
 		tmplDir, err := getConfigTemplateDir(cmd)
 		if err != nil {
-			logger.Fatal("%s", err)
+			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
 		}
 
 		var tmpls templates.Templates

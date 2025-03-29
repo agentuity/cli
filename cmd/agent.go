@@ -293,17 +293,12 @@ var agentCreateCmd = &cobra.Command{
 
 			tmpdir, err := getConfigTemplateDir(cmd)
 			if err != nil {
-				logger.Fatal("%s", err)
+				errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
 			}
 
 			rules, err := templates.LoadTemplateRuleForIdentifier(tmpdir, theproject.Project.Bundler.Identifier)
 			if err != nil {
 				errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithAttributes(map[string]any{"identifier": theproject.Project.Bundler.Identifier})).ShowErrorAndExit()
-			}
-
-			tmplDir, err := getConfigTemplateDir(cmd)
-			if err != nil {
-				logger.Fatal("%s", err)
 			}
 
 			if err := rules.NewAgent(templates.TemplateContext{
@@ -313,7 +308,7 @@ var agentCreateCmd = &cobra.Command{
 				Description:      description,
 				AgentDescription: description,
 				ProjectDir:       theproject.Dir,
-				TemplateDir:      tmplDir,
+				TemplateDir:      tmpdir,
 				AgentuityCommand: getAgentuityCommand(),
 			}); err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithAttributes(map[string]any{"name": name})).ShowErrorAndExit()
@@ -370,7 +365,7 @@ func reconcileAgentList(logger logger.Logger, cmd *cobra.Command, apiUrl string,
 
 	tmpdir, err := getConfigTemplateDir(cmd)
 	if err != nil {
-		logger.Fatal("%s", err)
+		errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
 	}
 
 	rules, err := templates.LoadTemplateRuleForIdentifier(tmpdir, theproject.Project.Bundler.Identifier)
