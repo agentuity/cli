@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/agentuity/cli/internal/util"
-	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/evanw/esbuild/pkg/api"
 )
@@ -41,49 +40,44 @@ func FormatBuildError(projectDir string, err api.Message) string {
 
 			lines, readErr := util.ReadFileLines(err.Location.File, startLine, endLine)
 			if readErr == nil && len(lines) > 0 {
-
-				var mdBuilder strings.Builder
-
+				builder.WriteString("\n")
+				
+				maxLineNum := startLine + len(lines)
+				lineNumWidth := len(fmt.Sprintf("%d", maxLineNum))
+				
+				lineNumberStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#666666", Dark: "#999999"})
+				normalTextStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#000000", Dark: "#ffffff"})
+				errorPointerStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#ff0000", Dark: "#ff6666"}).Bold(true)
+				
 				language := "javascript"
 				if filepath.Ext(err.Location.File) == ".ts" {
 					language = "typescript"
 				}
-
-				maxLineNum := startLine + len(lines)
-				lineNumWidth := len(fmt.Sprintf("%d", maxLineNum))
-
-				mdBuilder.WriteString(fmt.Sprintf("```%s\n", language))
-
+				
+				errorLineIndex := -1
+				for i, _ := range lines {
+					lineNum := startLine + i + 1
+					if lineNum == err.Location.Line {
+						errorLineIndex = i
+						break
+					}
+				}
+				
 				for i, line := range lines {
 					lineNum := startLine + i + 1
-					mdBuilder.WriteString(fmt.Sprintf("%*d | %s\n", lineNumWidth, lineNum, line))
-				}
-
-				mdBuilder.WriteString("```\n")
-
-				renderer, _ := glamour.NewTermRenderer(
-					glamour.WithAutoStyle(),
-					glamour.WithWordWrap(120),
-				)
-
-				rendered, _ := renderer.Render(mdBuilder.String())
-				builder.WriteString(rendered)
-
-				if err.Location.Column > 0 {
-					lineNumberStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#666666", Dark: "#999999"})
-					errorPointerStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#ff0000", Dark: "#ff6666"}).Bold(true)
-
-					maxLineNum := startLine + len(lines)
-					lineNumWidth := len(fmt.Sprintf("%d", maxLineNum))
-					emptyLineNumFormat := fmt.Sprintf("%%%ds │ ", lineNumWidth+1)
-
-					pointerIndent := strings.Repeat(" ", err.Location.Column)
-					builder.WriteString(lineNumberStyle.Render(fmt.Sprintf(emptyLineNumFormat, "")))
-					builder.WriteString(errorPointerStyle.Render(fmt.Sprintf("%s^", pointerIndent)) + "\n")
-
-					if err.Text != "" {
-						builder.WriteString(lineNumberStyle.Render(fmt.Sprintf(emptyLineNumFormat, "")))
-						builder.WriteString(errorPointerStyle.Render(fmt.Sprintf("%s%s", pointerIndent, err.Text)) + "\n")
+					
+					builder.WriteString(lineNumberStyle.Render(fmt.Sprintf("%*d | ", lineNumWidth, lineNum)))
+					builder.WriteString(normalTextStyle.Render(line) + "\n")
+					
+					if i == errorLineIndex - 1 && err.Location.Column > 0 {
+						pointerIndent := strings.Repeat(" ", err.Location.Column)
+						builder.WriteString(lineNumberStyle.Render(fmt.Sprintf("%*s │ ", lineNumWidth, "")))
+						builder.WriteString(errorPointerStyle.Render(fmt.Sprintf("%s^", pointerIndent)) + "\n")
+						
+						if err.Text != "" {
+							builder.WriteString(lineNumberStyle.Render(fmt.Sprintf("%*s │ ", lineNumWidth, "")))
+							builder.WriteString(errorPointerStyle.Render(fmt.Sprintf("%s%s", pointerIndent, err.Text)) + "\n")
+						}
 					}
 				}
 			}
