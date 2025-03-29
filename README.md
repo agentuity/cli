@@ -136,6 +136,11 @@ To add a new error code:
 
 For more details, see the [Error Code System documentation](tools/README.md).
 
+## Templates
+
+The CLI provides a set of templates for building Agents. These templates are used to create new Agent projects and are stored in the [agentuity/templates](https://github.com/agentuity/templates) repository. See the [Templates README](https://github.com/agentuity/templates/blob/main/README.md) for more details.
+
+
 ## License
 
 See the [LICENSE](LICENSE.md) file for details.
