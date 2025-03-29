@@ -30,8 +30,18 @@ jobs:
 
     - name: Test
       run: go test -v ./...
-      
-    - name: Test Install Script
+
+  test-install:
+    name: Test Install Script
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Test Install Script (Linux)
+      if: matrix.os == 'ubuntu-latest'
       run: |
         chmod +x ./install.sh
         # Test with default options (latest version)
@@ -45,4 +55,28 @@ jobs:
           ./install.sh -d /tmp/agentuity-test-version -v $VERSION
           # Verify installation with specific version
           /tmp/agentuity-test-version/agentuity --version | grep -q "$VERSION" || exit 1
-        fi 
+        fi
+      shell: bash
+      
+    - name: Test Install Script (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        # Make script executable
+        bash -c "chmod +x ./install.sh"
+        # Test with default options (latest version)
+        bash ./install.sh -d $env:TEMP\agentuity-test
+        # Verify installation
+        $env:TEMP\agentuity-test\agentuity.exe --version
+        # Test with specific version if available
+        $hasReleases = bash -c "curl -s https://api.github.com/repos/agentuity/cli/releases | grep -m 1 '\"tag_name\":'"
+        if ($hasReleases) {
+          $VERSION = bash -c "curl -s https://api.github.com/repos/agentuity/cli/releases | grep -m 1 '\"tag_name\":' | sed -E 's/.*\"([^\"]+)\".*/\1/'"
+          $VERSION = $VERSION -replace "v", ""
+          bash ./install.sh -d $env:TEMP\agentuity-test-version -v $VERSION
+          # Verify installation with specific version
+          $installedVersion = & $env:TEMP\agentuity-test-version\agentuity.exe --version
+          if (-not ($installedVersion -match $VERSION)) {
+            exit 1
+          }
+        }
+      shell: pwsh    
