@@ -1,3 +1,4 @@
+#!/bin/sh
 
 set -e
 
@@ -11,9 +12,15 @@ tty_blue="$(tty_mkbold 34)"
 tty_red="$(tty_mkbold 31)"
 tty_bold="$(tty_mkbold 39)"
 tty_reset="$(tty_escape 0)"
+tty_cyan="$(tty_mkbold 36)"
+tty_underline="$(tty_escape 4)"
 
 ohai() {
   printf "${tty_blue}==>${tty_bold} %s${tty_reset}\n" "$1"
+}
+
+url() {
+  printf "${tty_cyan}${tty_underline}%s${tty_reset}" "$1"
 }
 
 warn() {
@@ -23,6 +30,12 @@ warn() {
 abort() {
   printf "${tty_red}Error${tty_reset}: %s\n" "$1" >&2
   exit 1
+}
+
+success() {
+  ohai "Installation complete! Run 'agentuity --help' to get started."
+  ohai "For more information, visit: $(url "https://agentuity.dev")"
+  exit 0
 }
 
 OS="$(uname -s)"
@@ -108,6 +121,32 @@ if [[ ! -d "$INSTALL_PATH" ]]; then
   mkdir -p "$INSTALL_PATH" || abort "Failed to create directory: $INSTALL_PATH"
 fi
 
+if [[ "$OS" == "Darwin" ]] && command -v brew >/dev/null 2>&1 && [[ "$NO_BREW" != "true" ]]; then
+  ohai "Homebrew detected! Installing Agentuity CLI using Homebrew..."
+  
+  if [[ "$VERSION" != "latest" ]]; then
+    ohai "Installing Agentuity CLI version $VERSION using Homebrew..."
+    
+    if [[ -z "$VERSION" ]]; then
+      abort "Version is empty. This should not happen."
+    fi
+    
+    VERSION="${VERSION#v}"
+    
+    ohai "Using Homebrew formula: agentuity/tap/agentuity@$VERSION"
+    brew install "agentuity/tap/agentuity@$VERSION"
+  else
+    ohai "Installing latest Agentuity CLI version using Homebrew..."
+    brew install -q agentuity/tap/agentuity
+  fi
+  
+  if command -v agentuity >/dev/null 2>&1; then
+    success
+  else
+    abort "Homebrew installation failed. Please try again or use manual installation."
+  fi
+fi
+
 if [[ ! -d "$INSTALL_PATH" ]]; then
   ohai "Creating install directory: $INSTALL_PATH"
   mkdir -p "$INSTALL_PATH" || abort "Failed to create directory: $INSTALL_PATH. Try running with sudo or specify a different directory with --dir."
@@ -132,34 +171,6 @@ if [[ ! -w "$INSTALL_PATH" ]]; then
     fi
   else
     abort "No write permission to $INSTALL_PATH. Try running with sudo or specify a different directory with --dir."
-  fi
-fi
-
-if [[ "$OS" == "Darwin" ]] && command -v brew >/dev/null 2>&1 && [[ "$NO_BREW" != "true" ]]; then
-  ohai "Homebrew detected! Installing Agentuity CLI using Homebrew..."
-  
-  if [[ "$VERSION" != "latest" ]]; then
-    ohai "Installing Agentuity CLI version $VERSION using Homebrew..."
-    
-    if [[ -z "$VERSION" ]]; then
-      abort "Version is empty. This should not happen."
-    fi
-    
-    VERSION="${VERSION#v}"
-    
-    ohai "Using Homebrew formula: agentuity/tap/agentuity@$VERSION"
-    brew install "agentuity/tap/agentuity@$VERSION"
-  else
-    ohai "Installing latest Agentuity CLI version using Homebrew..."
-    brew install agentuity/tap/agentuity
-  fi
-  
-  if command -v agentuity >/dev/null 2>&1; then
-    ohai "Agentuity CLI installed successfully via Homebrew!"
-    ohai "Version: $(agentuity --version)"
-    exit 0
-  else
-    abort "Homebrew installation failed. Please try again or use manual installation."
   fi
 fi
 
@@ -400,5 +411,4 @@ if command -v "$INSTALL_PATH/agentuity" >/dev/null 2>&1; then
   echo "  For fish: $INSTALL_PATH/agentuity completion fish > ~/.config/fish/completions/agentuity.fish"
 fi
 
-ohai "Installation complete! Run 'agentuity --help' to get started."
-echo "For more information, visit: https://agentuity.com"
+success
