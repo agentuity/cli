@@ -523,8 +523,30 @@ func upgradeWithWindowsMsi(ctx context.Context, logger logger.Logger, version st
 		return downloadErr
 	}
 	
-	logger.Info("Running MSI installer")
-	cmd := exec.Command("msiexec", "/i", installerPath, "/qn")
+	exe, _ := os.Executable()
+	exePath := filepath.Dir(exe)
+	productCodePath := filepath.Join(exePath, "product_code.txt")
+	
+	if _, err := os.Stat(productCodePath); err == nil {
+		productCodeBytes, err := os.ReadFile(productCodePath)
+		if err == nil {
+			productCode := strings.TrimSpace(string(productCodeBytes))
+			if productCode != "" {
+				logger.Info("Uninstalling existing installation")
+				uninstallCmd := exec.Command("msiexec", "/x", productCode, "/qn")
+				
+				uninstallAction := func() {
+					if err := uninstallCmd.Run(); err != nil {
+						logger.Warn("Failed to uninstall existing installation: %v", err)
+					}
+				}
+				tui.ShowSpinner("Uninstalling previous version...", uninstallAction)
+			}
+		}
+	}
+	
+	logger.Info("Installing new version")
+	cmd := exec.Command("msiexec", "/i", installerPath, "/qn", "REINSTALLMODE=amus", "REINSTALL=ALL")
 	
 	var installErr error
 	installAction := func() {
