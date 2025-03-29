@@ -191,20 +191,12 @@ ohai "Processing download..."
 if [[ "$OS" == "Windows" ]]; then
   ohai "Downloaded Windows MSI installer to $TMP_DIR/$DOWNLOAD_FILENAME"
   
-  if [[ -n "${CI}" || -n "${GITHUB_ACTIONS}" ]]; then
-    ohai "CI environment detected, skipping MSI installation and creating dummy executable"
-    mkdir -p "$INSTALL_PATH"
-    if [[ "$OS" == "Windows" ]]; then
-      echo '@echo off' > "$INSTALL_PATH/agentuity.exe.bat"
-      echo 'echo 0.0.0-ci' >> "$INSTALL_PATH/agentuity.exe.bat"
-      touch "$INSTALL_PATH/agentuity.exe"
-      chmod +x "$INSTALL_PATH/agentuity.exe"
-    else
-      echo '#!/bin/sh' > "$INSTALL_PATH/agentuity.exe"
-      echo 'echo "0.0.0-ci"' >> "$INSTALL_PATH/agentuity.exe"
-      chmod +x "$INSTALL_PATH/agentuity.exe"
-    fi
-    ohai "Created dummy executable for CI testing at $INSTALL_PATH/agentuity.exe"
+  if [[ -n "${CI}" || -n "${GITHUB_ACTIONS}" || -n "${NONINTERACTIVE}" ]]; then
+    warn "Non-interactive environment detected, skipping automatic MSI installation"
+    cp "$TMP_DIR/$DOWNLOAD_FILENAME" "$HOME/" || abort "Failed to copy MSI to $HOME/"
+    ohai "MSI installer copied to $HOME/$DOWNLOAD_FILENAME"
+    ohai "To install manually, run the MSI installer at:"
+    echo "  $HOME/$DOWNLOAD_FILENAME"
     exit 0
   fi
   

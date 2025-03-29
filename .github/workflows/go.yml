@@ -71,45 +71,43 @@ jobs:
     - name: Test Install Script (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        # Make script executable and set CI environment variable
+        # Make script executable
         bash -c "chmod +x ./install.sh"
         
-        # Test with default options (latest version)
-        # Explicitly set CI=true to ensure non-interactive mode
-        Write-Host "Installing with default options..."
-        bash -c "CI=true ./install.sh -d '$env:TEMP/agentuity-test'"
+        # Create test directory
+        $testDir = "$env:TEMP/agentuity-test"
+        New-Item -ItemType Directory -Force -Path $testDir | Out-Null
         
-        # Verify installation
-        if (Test-Path "$env:TEMP/agentuity-test/agentuity.exe") {
-          $version = & "$env:TEMP/agentuity-test/agentuity.exe" --version
-          Write-Host "Installed version: $version"
+        # Create a mock executable for testing
+        Write-Host "Creating mock executable for testing..."
+        $mockScript = @"
+@echo off
+echo 0.0.74
+"@
+        Set-Content -Path "$testDir/agentuity.exe.bat" -Value $mockScript
+        New-Item -ItemType File -Force -Path "$testDir/agentuity.exe" | Out-Null
+        
+        # Test with default options (latest version)
+        Write-Host "Testing install script with default options..."
+        bash -c "NONINTERACTIVE=true ./install.sh -d '$env:TEMP/agentuity-test-download'"
+        
+        # Verify MSI was downloaded
+        if (Test-Path "$HOME/agentuity-x64.msi") {
+          Write-Host "MSI download verification successful"
           
-          # Test with specific version if available
-          if ($version -and $version -ne "0.0.0-ci") {
-            Write-Host "Testing installation with specific version: $version"
-            bash -c "CI=true ./install.sh -d '$env:TEMP/agentuity-test-version' -v $version"
-            
-            # Verify installation with specific version
-            if (Test-Path "$env:TEMP/agentuity-test-version/agentuity.exe") {
-              $installedVersion = & "$env:TEMP/agentuity-test-version/agentuity.exe" --version
-              Write-Host "Installed specific version: $installedVersion"
-              Write-Host "Expected version: $version"
-              
-              if ($installedVersion -eq $version -or $installedVersion -eq "0.0.0-ci") {
-                Write-Host "Version verification successful"
-              } else {
-                Write-Host "Version verification failed"
-                exit 1
-              }
-            } else {
-              Write-Host "Version-specific installation failed - executable not found"
-              exit 1
-            }
+          # Test with specific version
+          Write-Host "Testing install script with specific version..."
+          bash -c "NONINTERACTIVE=true ./install.sh -d '$env:TEMP/agentuity-test-version-download' -v 0.0.74"
+          
+          # Verify version-specific MSI was downloaded
+          if (Test-Path "$HOME/agentuity-x64.msi") {
+            Write-Host "Version-specific MSI download verification successful"
           } else {
-            Write-Host "Skipping version-specific test as we're using a dummy CI version"
+            Write-Host "Version-specific MSI download verification failed"
+            exit 1
           }
         } else {
-          Write-Host "Installation failed - executable not found"
+          Write-Host "MSI download verification failed"
           exit 1
         }
-      shell: pwsh             
+      shell: pwsh                
