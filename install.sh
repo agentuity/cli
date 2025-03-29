@@ -47,19 +47,14 @@ if [[ "$OS" == "Darwin" ]]; then
   
   if command -v brew >/dev/null 2>&1 && [[ "$NO_BREW" != "true" ]]; then
       ohai "Homebrew detected! Installing Agentuity CLI using Homebrew..."
-      if [[ "$VERSION" != "latest" ]]; then
-        warn "Version specification is not supported with Homebrew installation."
-        warn "Installing latest version instead. If you need a specific version,"
-        warn "use the --no-brew flag to use direct installation."
-        
-        read -p "Continue with Homebrew installation of latest version? [Y/n] " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]] && [[ ! -z $REPLY ]]; then
-          abort "Installation aborted by user."
-        fi
-      fi
       
-      brew install agentuity/tap/agentuity
+      if [[ "$VERSION" != "latest" ]]; then
+        ohai "Installing Agentuity CLI version $VERSION using Homebrew..."
+        brew install agentuity/tap/agentuity@$VERSION
+      else
+        ohai "Installing latest Agentuity CLI version using Homebrew..."
+        brew install agentuity/tap/agentuity
+      fi
       
       if command -v agentuity >/dev/null 2>&1; then
         ohai "Agentuity CLI installed successfully via Homebrew!"
@@ -103,7 +98,9 @@ while [[ $# -gt 0 ]]; do
       echo "Options:"
       echo "  -v, --version VERSION    Install specific version"
       echo "  -d, --dir DIRECTORY      Install to specific directory"
-      echo "  --no-brew               Skip Homebrew installation on macOS"
+      if [[ "$OS" == "Darwin" ]]; then
+        echo "  --no-brew               Skip Homebrew installation on macOS"
+      fi
       echo "  -h, --help               Show this help message"
       exit 0
       ;;
