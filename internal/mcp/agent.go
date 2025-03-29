@@ -2,7 +2,9 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/agentuity/cli/internal/agent"
 	mcp_golang "github.com/agentuity/mcp-golang/v2"
 )
 
@@ -15,6 +17,11 @@ type CreateAgentArguments struct {
 
 type ListAgentsArguments struct {
 	Directory string `json:"directory" jsonschema:"required,description=The directory where the project is located"`
+}
+
+type DeleteAgentArguments struct {
+	AgentIds  []string `json:"agentIds" jsonschema:"required,description=The IDs of the agents to delete"`
+	Directory string   `json:"directory" jsonschema:"required,description=The directory where the project is located"`
 }
 
 func init() {
@@ -53,6 +60,28 @@ func init() {
 				return nil, err
 			}
 			return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(result)), nil
+		})
+	})
+
+	register(func(c MCPContext) error {
+		return c.Server.RegisterTool("delete_agent", "this is a tool for deleting one or more Agents from the agentuity cloud platform", func(ctx context.Context, args DeleteAgentArguments) (*mcp_golang.ToolResponse, error) {
+			if resp := ensureLoggedIn(&c); resp != nil {
+				return resp, nil
+			}
+			if args.Directory != "" {
+				c.ProjectDir = args.Directory
+			}
+			if resp := ensureProject(&c); resp != nil {
+				return resp, nil
+			}
+			if len(args.AgentIds) == 0 {
+				return nil, fmt.Errorf("no agents to delete")
+			}
+			deleted, err := agent.DeleteAgents(ctx, c.Logger, c.APIURL, c.APIKey, c.Project.ProjectId, args.AgentIds)
+			if err != nil {
+				return nil, err
+			}
+			return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(fmt.Sprintf("Successfully deleted %d agent(s): %v", len(deleted), deleted))), nil
 		})
 	})
 }
