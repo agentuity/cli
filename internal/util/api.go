@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"regexp"
 	"runtime/debug"
 	"strings"
@@ -95,14 +96,22 @@ func UserAgent() string {
 	return "Agentuity CLI/" + Version + " (" + gitSHA + ")"
 }
 
-func (c *APIClient) Do(method, path string, payload interface{}, response interface{}) error {
+func (c *APIClient) Do(method, pathParam string, payload interface{}, response interface{}) error {
 	var traceID string
 
 	u, err := url.Parse(c.baseURL)
 	if err != nil {
 		return NewAPIError(c.baseURL, method, 0, "", fmt.Errorf("error parsing base url: %w", err), traceID)
 	}
-	u.Path = path
+	
+	basePath := u.Path
+	if pathParam == "" {
+		u.Path = basePath
+	} else if basePath == "" || basePath == "/" {
+		u.Path = pathParam
+	} else {
+		u.Path = path.Join(basePath, pathParam)
+	}
 
 	var body []byte
 	if payload != nil {
