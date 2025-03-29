@@ -149,8 +149,8 @@ jobs:
           $installedVersion = & $exePath version
           Write-Host "Installed version: $installedVersion"
           
-          # Test with specific version
-          $specificVersion = "0.0.74"
+          # Test with specific version from environment variable
+          $specificVersion = $env:AGENTUITY_TEST_VERSION
           Write-Host "Testing PowerShell install script with specific version $specificVersion..."
           $versionTestDir = Join-Path $env:TEMP "agentuity-ps-test-version"
           if (Test-Path $versionTestDir) {
@@ -181,4 +181,4 @@ jobs:
           Write-Host "Installation verification failed"
           exit 1
         }
-      shell: pwsh                                                                                                                                          
+      shell: pwsh                                                                                                                                                                                        
