@@ -50,7 +50,7 @@ elif [[ "$OS" == "Linux" ]]; then
   INSTALL_DIR="/usr/local/bin"
 elif [[ "$OS" == "MINGW"* ]] || [[ "$OS" == "MSYS"* ]] || [[ "$OS" == "CYGWIN"* ]]; then
   OS="Windows"
-  EXTENSION="zip"
+  EXTENSION="msi"
   INSTALL_DIR="$HOME/bin"
 else
   abort "Unsupported operating system: $OS"
@@ -109,16 +109,37 @@ if [[ "$VERSION" == "latest" ]]; then
 fi
 
 VERSION="${VERSION#v}"
-DOWNLOAD_FILENAME="agentuity_${OS}_${ARCH}.${EXTENSION}"
+
+if [[ "$OS" == "Windows" ]]; then
+  if [[ "$ARCH" == "x86_64" ]]; then
+    DOWNLOAD_FILENAME="agentuity-x64.msi"
+  elif [[ "$ARCH" == "arm64" ]]; then
+    DOWNLOAD_FILENAME="agentuity-arm64.msi"
+  else
+    DOWNLOAD_FILENAME="agentuity-x86.msi"
+  fi
+else
+  DOWNLOAD_FILENAME="agentuity_${OS}_${ARCH}.${EXTENSION}"
+fi
+
 DOWNLOAD_URL="https://github.com/agentuity/cli/releases/download/v${VERSION}/${DOWNLOAD_FILENAME}"
 
 ohai "Downloading Agentuity CLI v${VERSION} for ${OS}/${ARCH}..."
 curl -L --progress-bar "$DOWNLOAD_URL" -o "$TMP_DIR/$DOWNLOAD_FILENAME" || abort "Failed to download from $DOWNLOAD_URL"
 
-ohai "Extracting..."
-if [[ "$EXTENSION" == "tar.gz" ]]; then
+ohai "Processing download..."
+if [[ "$OS" == "Windows" ]]; then
+  ohai "Downloaded Windows MSI installer to $TMP_DIR/$DOWNLOAD_FILENAME"
+  ohai "To install, run the MSI installer manually"
+  echo "  $TMP_DIR/$DOWNLOAD_FILENAME"
+  cp "$TMP_DIR/$DOWNLOAD_FILENAME" "$HOME/" || abort "Failed to copy MSI to $HOME/"
+  ohai "MSI installer copied to $HOME/$DOWNLOAD_FILENAME"
+  exit 0
+elif [[ "$EXTENSION" == "tar.gz" ]]; then
+  ohai "Extracting..."
   tar -xzf "$TMP_DIR/$DOWNLOAD_FILENAME" -C "$TMP_DIR" || abort "Failed to extract archive"
 elif [[ "$EXTENSION" == "zip" ]]; then
+  ohai "Extracting..."
   unzip -q "$TMP_DIR/$DOWNLOAD_FILENAME" -d "$TMP_DIR" || abort "Failed to extract archive"
 else
   abort "Unknown archive format: $EXTENSION"
