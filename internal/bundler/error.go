@@ -43,7 +43,13 @@ func FormatBuildError(projectDir string, err api.Message) string {
 				builder.WriteString("\n")
 				
 				var mdBuilder strings.Builder
-				mdBuilder.WriteString("```javascript\n")
+				
+				language := "javascript"
+				if strings.HasSuffix(strings.ToLower(err.Location.File), ".ts") {
+					language = "typescript"
+				}
+				
+				mdBuilder.WriteString(fmt.Sprintf("```%s\n", language))
 				
 				for i, line := range lines {
 					lineNum := startLine + i + 1
