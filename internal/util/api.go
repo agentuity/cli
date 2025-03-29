@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"regexp"
 	"runtime/debug"
 	"strings"
@@ -109,11 +110,7 @@ func (c *APIClient) Do(method, path string, payload interface{}, response interf
 	} else if basePath == "" || basePath == "/" {
 		u.Path = path
 	} else {
-		if strings.HasPrefix(path, "/") {
-			u.Path = basePath + path
-		} else {
-			u.Path = basePath + "/" + path
-		}
+		u.Path = path.Join(basePath, path)
 	}
 
 	var body []byte
