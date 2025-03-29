@@ -66,42 +66,8 @@ func FormatBuildError(projectDir string, err api.Message) string {
 					glamour.WithWordWrap(120),
 				)
 				
-				rendered, renderErr := renderer.Render(mdBuilder.String())
-				if renderErr == nil {
-					builder.WriteString(rendered)
-				} else {
-					lineNumberStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#666666", Dark: "#999999"})
-					normalTextStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#000000", Dark: "#ffffff"})
-					
-					maxLineNum := startLine + len(lines)
-					lineNumWidth := len(fmt.Sprintf("%d", maxLineNum))
-					lineNumFormat := fmt.Sprintf(" %%%dd │ ", lineNumWidth)
-					emptyLineNumFormat := fmt.Sprintf("%%%ds │ ", lineNumWidth+1)
-					
-					for i, line := range lines {
-						lineNum := startLine + i + 1
-						
-						if lineNum == err.Location.Line {
-							builder.WriteString(lineNumberStyle.Render(fmt.Sprintf(lineNumFormat, lineNum)))
-							builder.WriteString(normalTextStyle.Render(line) + "\n")
-							
-							if err.Location.Column > 0 {
-								pointerIndent := strings.Repeat(" ", err.Location.Column + lineNumWidth + 3)
-								errorPointerStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#ff0000", Dark: "#ff6666"}).Bold(true)
-								builder.WriteString(lineNumberStyle.Render(fmt.Sprintf(emptyLineNumFormat, "")))
-								builder.WriteString(errorPointerStyle.Render(fmt.Sprintf("%s^", pointerIndent)) + "\n")
-								
-								if err.Text != "" {
-									builder.WriteString(lineNumberStyle.Render(fmt.Sprintf(emptyLineNumFormat, "")))
-									builder.WriteString(errorPointerStyle.Render(fmt.Sprintf("%s%s", pointerIndent, err.Text)) + "\n")
-								}
-							}
-						} else {
-							builder.WriteString(lineNumberStyle.Render(fmt.Sprintf(lineNumFormat, lineNum)))
-							builder.WriteString(normalTextStyle.Render(line) + "\n")
-						}
-					}
-				}
+				rendered, _ := renderer.Render(mdBuilder.String())
+				builder.WriteString(rendered)
 				
 				if err.Location.Column > 0 {
 					lineNumberStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#666666", Dark: "#999999"})
@@ -111,7 +77,7 @@ func FormatBuildError(projectDir string, err api.Message) string {
 					lineNumWidth := len(fmt.Sprintf("%d", maxLineNum))
 					emptyLineNumFormat := fmt.Sprintf("%%%ds │ ", lineNumWidth+1)
 					
-					pointerIndent := strings.Repeat(" ", err.Location.Column + lineNumWidth + 3)
+					pointerIndent := strings.Repeat(" ", err.Location.Column)
 					builder.WriteString(lineNumberStyle.Render(fmt.Sprintf(emptyLineNumFormat, "")))
 					builder.WriteString(errorPointerStyle.Render(fmt.Sprintf("%s^", pointerIndent)) + "\n")
 					
