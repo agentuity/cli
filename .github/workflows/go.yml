@@ -29,4 +29,20 @@ jobs:
         govulncheck ./...
 
     - name: Test
-      run: go test -v ./... 
+      run: go test -v ./...
+      
+    - name: Test Install Script
+      run: |
+        chmod +x ./install.sh
+        # Test with default options (latest version)
+        ./install.sh -d /tmp/agentuity-test
+        # Verify installation
+        /tmp/agentuity-test/agentuity --version
+        # Test with specific version if available
+        if [ -n "$(curl -s https://api.github.com/repos/agentuity/cli/releases | grep -m 1 '"tag_name":')" ]; then
+          VERSION=$(curl -s https://api.github.com/repos/agentuity/cli/releases | grep -m 1 '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+          VERSION="${VERSION#v}"
+          ./install.sh -d /tmp/agentuity-test-version -v $VERSION
+          # Verify installation with specific version
+          /tmp/agentuity-test-version/agentuity --version | grep -q "$VERSION" || exit 1
+        fi 
