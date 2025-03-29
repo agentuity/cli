@@ -436,6 +436,7 @@ function Install-MSI {
         return $false
     }
 }
+}
 
 function Test-Installation {
     param (
