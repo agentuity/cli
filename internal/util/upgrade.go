@@ -166,8 +166,6 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 	}
 	
 	if isWindowsMsiInstallation() {
-		logger.Info("Detected Windows MSI installation, upgrading via MSI")
-		
 		release, err := GetLatestRelease(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get latest release: %w", err)
@@ -523,35 +521,12 @@ func upgradeWithWindowsMsi(ctx context.Context, logger logger.Logger, version st
 		return downloadErr
 	}
 	
-	exe, _ := os.Executable()
-	exePath := filepath.Dir(exe)
-	productCodePath := filepath.Join(exePath, "product_code.txt")
-	
-	if _, err := os.Stat(productCodePath); err == nil {
-		productCodeBytes, err := os.ReadFile(productCodePath)
-		if err == nil {
-			productCode := strings.TrimSpace(string(productCodeBytes))
-			if productCode != "" {
-				logger.Info("Uninstalling existing installation")
-				uninstallCmd := exec.Command("msiexec", "/x", productCode, "/qn")
-				
-				uninstallAction := func() {
-					if err := uninstallCmd.Run(); err != nil {
-						logger.Warn("Failed to uninstall existing installation: %v", err)
-					}
-				}
-				tui.ShowSpinner("Uninstalling previous version...", uninstallAction)
-			}
-		}
-	}
-	
-	logger.Info("Installing new version")
 	updateCmd := exec.Command("msiexec", "/update", installerPath, "/qn")
 	
 	var installErr error
 	installAction := func() {
 		if err := updateCmd.Run(); err != nil {
-			logger.Warn("Update approach failed, trying install with reinstall: %v", err)
+			tui.ShowWarning("Update approach failed, trying install with reinstall: %v", err)
 			installCmd := exec.Command("msiexec", "/i", installerPath, "/qn", "REINSTALLMODE=amus", "REINSTALL=ALL")
 			if err := installCmd.Run(); err != nil {
 				installErr = fmt.Errorf("failed to run MSI installer: %w", err)
