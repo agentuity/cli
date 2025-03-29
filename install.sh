@@ -139,18 +139,116 @@ else
 fi
 
 if [[ ":$PATH:" != *":$INSTALL_PATH:"* ]]; then
-  warn "$INSTALL_PATH is not in your PATH. You may need to add it to use agentuity command."
+  ohai "Adding $INSTALL_PATH to your PATH..."
+  
+  SHELL_CONFIG=""
   case "$SHELL" in
     */bash*)
-      echo "  echo 'export PATH=\"\$PATH:$INSTALL_PATH\"' >> ~/.bashrc"
+      SHELL_CONFIG="$HOME/.bashrc"
+      if [[ -f "$HOME/.bash_profile" ]]; then
+        SHELL_CONFIG="$HOME/.bash_profile"
+      fi
       ;;
     */zsh*)
-      echo "  echo 'export PATH=\"\$PATH:$INSTALL_PATH\"' >> ~/.zshrc"
+      SHELL_CONFIG="$HOME/.zshrc"
       ;;
-    *)
-      echo "  Add $INSTALL_PATH to your PATH"
+    */fish*)
+      SHELL_CONFIG="$HOME/.config/fish/config.fish"
       ;;
   esac
+  
+  if [[ -n "$SHELL_CONFIG" ]] && [[ -w "$SHELL_CONFIG" ]]; then
+    echo "export PATH=\"\$PATH:$INSTALL_PATH\"" >> "$SHELL_CONFIG"
+    ohai "Added $INSTALL_PATH to PATH in $SHELL_CONFIG"
+    export PATH="$PATH:$INSTALL_PATH"
+  else
+    warn "$INSTALL_PATH is not in your PATH. You may need to add it manually to use the agentuity command."
+    case "$SHELL" in
+      */bash*)
+        echo "  echo 'export PATH=\"\$PATH:$INSTALL_PATH\"' >> ~/.bashrc"
+        ;;
+      */zsh*)
+        echo "  echo 'export PATH=\"\$PATH:$INSTALL_PATH\"' >> ~/.zshrc"
+        ;;
+      */fish*)
+        echo "  echo 'set -gx PATH \$PATH $INSTALL_PATH' >> ~/.config/fish/config.fish"
+        ;;
+      *)
+        echo "  Add $INSTALL_PATH to your PATH"
+        ;;
+    esac
+  fi
+fi
+
+ohai "Setting up shell completions..."
+if command -v "$INSTALL_PATH/agentuity" >/dev/null 2>&1; then
+  COMPLETION_DIR=""
+  
+  case "$OS" in
+    "Darwin")
+      if [[ -d "/usr/local/etc/bash_completion.d" ]]; then
+        BASH_COMPLETION_DIR="/usr/local/etc/bash_completion.d"
+        if [[ -w "$BASH_COMPLETION_DIR" ]]; then
+          ohai "Generating bash completion script..."
+          "$INSTALL_PATH/agentuity" completion bash > "$BASH_COMPLETION_DIR/agentuity"
+          ohai "Bash completion installed to $BASH_COMPLETION_DIR/agentuity"
+        else
+          warn "No write permission to $BASH_COMPLETION_DIR. Skipping bash completion installation."
+        fi
+      fi
+      
+      if [[ -d "/usr/local/share/zsh/site-functions" ]]; then
+        ZSH_COMPLETION_DIR="/usr/local/share/zsh/site-functions"
+        if [[ -w "$ZSH_COMPLETION_DIR" ]]; then
+          ohai "Generating zsh completion script..."
+          "$INSTALL_PATH/agentuity" completion zsh > "$ZSH_COMPLETION_DIR/_agentuity"
+          ohai "Zsh completion installed to $ZSH_COMPLETION_DIR/_agentuity"
+        else
+          warn "No write permission to $ZSH_COMPLETION_DIR. Skipping zsh completion installation."
+        fi
+      fi
+      ;;
+    "Linux")
+      if [[ -d "/etc/bash_completion.d" ]]; then
+        BASH_COMPLETION_DIR="/etc/bash_completion.d"
+        if [[ -w "$BASH_COMPLETION_DIR" ]]; then
+          ohai "Generating bash completion script..."
+          "$INSTALL_PATH/agentuity" completion bash > "$BASH_COMPLETION_DIR/agentuity"
+          ohai "Bash completion installed to $BASH_COMPLETION_DIR/agentuity"
+        else
+          warn "No write permission to $BASH_COMPLETION_DIR. Skipping bash completion installation."
+          ohai "You can manually install bash completion with:"
+          echo "  $INSTALL_PATH/agentuity completion bash > ~/.bash_completion"
+        fi
+      fi
+      
+      if [[ -d "/usr/share/zsh/vendor-completions" ]]; then
+        ZSH_COMPLETION_DIR="/usr/share/zsh/vendor-completions"
+        if [[ -w "$ZSH_COMPLETION_DIR" ]]; then
+          ohai "Generating zsh completion script..."
+          "$INSTALL_PATH/agentuity" completion zsh > "$ZSH_COMPLETION_DIR/_agentuity"
+          ohai "Zsh completion installed to $ZSH_COMPLETION_DIR/_agentuity"
+        else
+          warn "No write permission to $ZSH_COMPLETION_DIR. Skipping zsh completion installation."
+          ohai "You can manually install zsh completion with:"
+          echo "  mkdir -p ~/.zsh/completion"
+          echo "  $INSTALL_PATH/agentuity completion zsh > ~/.zsh/completion/_agentuity"
+          echo "  echo 'fpath=(~/.zsh/completion \$fpath)' >> ~/.zshrc"
+          echo "  echo 'autoload -U compinit && compinit' >> ~/.zshrc"
+        fi
+      fi
+      ;;
+    "Windows")
+      ohai "You can manually install PowerShell completion with:"
+      echo "  $INSTALL_PATH/agentuity completion powershell > agentuity.ps1"
+      echo "  Move agentuity.ps1 to a directory in your PowerShell module path"
+      ;;
+  esac
+  
+  ohai "To manually set up shell completions, run:"
+  echo "  For bash: $INSTALL_PATH/agentuity completion bash > /path/to/bash_completion.d/agentuity"
+  echo "  For zsh:  $INSTALL_PATH/agentuity completion zsh > /path/to/zsh/site-functions/_agentuity"
+  echo "  For fish: $INSTALL_PATH/agentuity completion fish > ~/.config/fish/completions/agentuity.fish"
 fi
 
 ohai "Installation complete! Run 'agentuity --help' to get started."
