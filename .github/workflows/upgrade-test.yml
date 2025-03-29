@@ -26,8 +26,13 @@ jobs:
           cache: true
       
       - name: Build current version
+        shell: bash
         run: |
-          go build -o agentuity-current
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            go build -o agentuity-current.exe
+          else
+            go build -o agentuity-current
+          fi
       
       # Simulate having an older version installed
       - name: Create simulated previous version
@@ -37,9 +42,12 @@ jobs:
           # we'll create a simulated "previous version" from the current build
           
           # Copy the current build as our "previous" version
-          cp agentuity-current agentuity-previous
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            # On Windows, executables have .exe extension
             cp agentuity-current.exe agentuity-previous.exe
+          else
+            # On Unix systems (Linux/macOS)
+            cp agentuity-current agentuity-previous
           fi
           
           echo "Created simulated previous version"
