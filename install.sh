@@ -44,27 +44,6 @@ if [[ "$OS" == "Darwin" ]]; then
   OS="Darwin"
   EXTENSION="tar.gz"
   INSTALL_DIR="/usr/local/bin"
-  
-  if command -v brew >/dev/null 2>&1 && [[ "$NO_BREW" != "true" ]]; then
-      ohai "Homebrew detected! Installing Agentuity CLI using Homebrew..."
-      
-      if [[ "$VERSION" != "latest" ]]; then
-        ohai "Installing Agentuity CLI version $VERSION using Homebrew..."
-        FORMULA="agentuity/tap/agentuity@${VERSION}"
-        brew install $FORMULA
-      else
-        ohai "Installing latest Agentuity CLI version using Homebrew..."
-        brew install agentuity/tap/agentuity
-      fi
-      
-      if command -v agentuity >/dev/null 2>&1; then
-        ohai "Agentuity CLI installed successfully via Homebrew!"
-        ohai "Version: $(agentuity --version)"
-        exit 0
-      else
-        abort "Homebrew installation failed. Please try again or use manual installation."
-      fi
-  fi
 elif [[ "$OS" == "Linux" ]]; then
   OS="Linux"
   EXTENSION="tar.gz"
@@ -119,6 +98,34 @@ fi
 
 if [[ ! -w "$INSTALL_PATH" ]]; then
   abort "No write permission to $INSTALL_PATH. Try running with sudo or specify a different directory with --dir."
+fi
+
+if [[ "$OS" == "Darwin" ]] && command -v brew >/dev/null 2>&1 && [[ "$NO_BREW" != "true" ]]; then
+  ohai "Homebrew detected! Installing Agentuity CLI using Homebrew..."
+  
+  if [[ "$VERSION" != "latest" ]]; then
+    ohai "Installing Agentuity CLI version $VERSION using Homebrew..."
+    
+    if [[ -z "$VERSION" ]]; then
+      abort "Version is empty. This should not happen."
+    fi
+    
+    VERSION="${VERSION#v}"
+    
+    ohai "Using Homebrew formula: agentuity/tap/agentuity@$VERSION"
+    brew install "agentuity/tap/agentuity@$VERSION"
+  else
+    ohai "Installing latest Agentuity CLI version using Homebrew..."
+    brew install agentuity/tap/agentuity
+  fi
+  
+  if command -v agentuity >/dev/null 2>&1; then
+    ohai "Agentuity CLI installed successfully via Homebrew!"
+    ohai "Version: $(agentuity --version)"
+    exit 0
+  else
+    abort "Homebrew installation failed. Please try again or use manual installation."
+  fi
 fi
 
 TMP_DIR="$(mktemp -d)"
