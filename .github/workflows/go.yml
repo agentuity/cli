@@ -29,4 +29,85 @@ jobs:
         govulncheck ./...
 
     - name: Test
-      run: go test -v ./... 
+      run: go test -v ./...
+
+  test-install:
+    name: Test Install Script
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Test Install Script (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        chmod +x ./install.sh
+        # Test with default options (latest version)
+        ./install.sh -d /tmp/agentuity-test
+        # Verify installation
+        /tmp/agentuity-test/agentuity --version
+        
+        # Test with specific version if available - simplified to avoid potential issues
+        LATEST_VERSION=$(/tmp/agentuity-test/agentuity --version)
+        if [ -n "$LATEST_VERSION" ]; then
+          echo "Testing installation with specific version: $LATEST_VERSION"
+          ./install.sh -d /tmp/agentuity-test-version -v $LATEST_VERSION
+          # Verify installation with specific version
+          INSTALLED_VERSION=$(/tmp/agentuity-test-version/agentuity --version)
+          echo "Installed version: $INSTALLED_VERSION"
+          echo "Expected version: $LATEST_VERSION"
+          if [ "$INSTALLED_VERSION" = "$LATEST_VERSION" ]; then
+            echo "Version verification successful"
+          else
+            echo "Version verification failed"
+            exit 1
+          fi
+        fi
+      shell: bash
+      
+    - name: Test Install Script (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        # Windows test - simplified to avoid bash usage
+        Write-Host "Testing install script on Windows..."
+        
+        # Set up environment for testing
+        $env:NONINTERACTIVE = "true"
+        $env:OS = "Windows"
+        $env:ARCH = "x86_64"
+        
+        # Make script executable using PowerShell
+        if (Test-Path "install.sh") {
+          Write-Host "Found install.sh script"
+        } else {
+          Write-Host "install.sh not found"
+          exit 1
+        }
+        
+        # Test with default options (latest version)
+        Write-Host "Testing install script with default options..."
+        & sh -c "./install.sh -d '$env:TEMP/agentuity-test-download'"
+        
+        # Verify MSI was downloaded
+        if (Test-Path "$env:USERPROFILE/agentuity-x64.msi") {
+          Write-Host "MSI download verification successful"
+          
+          # Test with specific version
+          Write-Host "Testing install script with specific version..."
+          & sh -c "./install.sh -d '$env:TEMP/agentuity-test-version-download' -v 0.0.74"
+          
+          # Verify version-specific MSI was downloaded
+          if (Test-Path "$env:USERPROFILE/agentuity-x64.msi") {
+            Write-Host "Version-specific MSI download verification successful"
+          } else {
+            Write-Host "Version-specific MSI download verification failed"
+            exit 1
+          }
+        } else {
+          Write-Host "MSI download verification failed"
+          exit 1
+        }
+      shell: pwsh                       
