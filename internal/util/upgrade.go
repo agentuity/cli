@@ -95,6 +95,18 @@ func getBinaryName() string {
 	return binaryName
 }
 
+func isWindowsMsiInstallation() bool {
+	if runtime.GOOS != "windows" {
+		return false
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(exe), "\\program files\\") || 
+	       strings.Contains(strings.ToLower(exe), "\\program files (x86)\\")
+}
+
 func getReleaseAssetName(version string) string {
 	goos := runtime.GOOS
 	arch := runtime.GOARCH
@@ -116,6 +128,34 @@ func getReleaseAssetName(version string) string {
 	return fmt.Sprintf("agentuity_%s_%s.%s", strings.Title(goos), archName, extension)
 }
 
+func getMsiInstallerName(version string) string {
+	arch := runtime.GOARCH
+	var msiArch string
+	if arch == "amd64" {
+		msiArch = "x64"
+	} else if arch == "386" {
+		msiArch = "x86"
+	} else {
+		msiArch = arch
+	}
+	
+	return fmt.Sprintf("agentuity-%s.msi", msiArch)
+}
+
+func isAdmin() bool {
+	if runtime.GOOS != "windows" {
+		return false
+	}
+	
+	cmd := exec.Command("powershell", "-Command", "([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)")
+	output, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	
+	return strings.TrimSpace(string(output)) == "True"
+}
+
 func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 	if runtime.GOOS == "darwin" {
 		exe, err := os.Executable()
@@ -123,6 +163,22 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 			logger.Info("Detected Homebrew installation, upgrading via brew")
 			return upgradeWithHomebrew(logger)
 		}
+	}
+	
+	if isWindowsMsiInstallation() {
+		logger.Info("Detected Windows MSI installation, upgrading via MSI")
+		
+		release, err := GetLatestRelease(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get latest release: %w", err)
+		}
+		
+		if Version == release && !force {
+			tui.ShowSuccess("You are already on the latest version (%s)", release)
+			return nil
+		}
+		
+		return upgradeWithWindowsMsi(ctx, logger, release)
 	}
 	
 	release, err := GetLatestRelease(ctx) // Using public function from version.go
@@ -438,5 +494,49 @@ func upgradeWithHomebrew(logger logger.Logger) error {
 	version := strings.TrimSpace(string(v))
 	
 	tui.ShowSuccess("Successfully upgraded to version %s via Homebrew", version)
+	return nil
+}
+
+func upgradeWithWindowsMsi(ctx context.Context, logger logger.Logger, version string) error {
+	if !isAdmin() {
+		return fmt.Errorf("administrator privileges required to upgrade MSI installation. Please run the command as administrator")
+	}
+	
+	tempDir, err := os.MkdirTemp("", "agentuity-upgrade-msi")
+	if err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+	
+	installerName := getMsiInstallerName(version)
+	installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s/%s", version, installerName)
+	installerPath := filepath.Join(tempDir, installerName)
+	
+	var downloadErr error
+	downloadAction := func() {
+		if err := downloadFile(installerURL, installerPath); err != nil {
+			downloadErr = fmt.Errorf("failed to download MSI installer: %w", err)
+		}
+	}
+	tui.ShowSpinner("Downloading MSI installer...", downloadAction)
+	if downloadErr != nil {
+		return downloadErr
+	}
+	
+	logger.Info("Running MSI installer")
+	cmd := exec.Command("msiexec", "/i", installerPath, "/qn")
+	
+	var installErr error
+	installAction := func() {
+		if err := cmd.Run(); err != nil {
+			installErr = fmt.Errorf("failed to run MSI installer: %w", err)
+		}
+	}
+	tui.ShowSpinner("Installing upgrade...", installAction)
+	if installErr != nil {
+		return installErr
+	}
+	
+	tui.ShowSuccess("Successfully upgraded to version %s", version)
 	return nil
 }
