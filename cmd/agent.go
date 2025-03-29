@@ -49,7 +49,7 @@ var agentDeleteCmd = &cobra.Command{
 			logger.Fatal("No TTY detected, please specify an Agent id from the command line")
 		}
 
-		keys, state := reconcileAgentList(logger, apiUrl, theproject.Token, theproject)
+		keys, state := reconcileAgentList(logger, cmd, apiUrl, theproject.Token, theproject)
 		var selected []string
 
 		if len(args) > 0 {
@@ -291,7 +291,12 @@ var agentCreateCmd = &cobra.Command{
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to create Agent")).ShowErrorAndExit()
 			}
 
-			rules, err := templates.LoadTemplateRuleForIdentifier(theproject.Project.Bundler.Identifier)
+			tmpdir, err := getConfigTemplateDir(cmd)
+			if err != nil {
+				errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
+			}
+
+			rules, err := templates.LoadTemplateRuleForIdentifier(tmpdir, theproject.Project.Bundler.Identifier)
 			if err != nil {
 				errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithAttributes(map[string]any{"identifier": theproject.Project.Bundler.Identifier})).ShowErrorAndExit()
 			}
@@ -303,6 +308,7 @@ var agentCreateCmd = &cobra.Command{
 				Description:      description,
 				AgentDescription: description,
 				ProjectDir:       theproject.Dir,
+				TemplateDir:      tmpdir,
 				AgentuityCommand: getAgentuityCommand(),
 			}); err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithAttributes(map[string]any{"name": name})).ShowErrorAndExit()
@@ -351,13 +357,18 @@ func normalAgentName(name string) string {
 	return util.SafeFilename(strings.ToLower(name))
 }
 
-func reconcileAgentList(logger logger.Logger, apiUrl string, apikey string, theproject project.ProjectContext) ([]string, map[string]agentListState) {
+func reconcileAgentList(logger logger.Logger, cmd *cobra.Command, apiUrl string, apikey string, theproject project.ProjectContext) ([]string, map[string]agentListState) {
 	remoteAgents, err := getAgentList(logger, apiUrl, apikey, theproject)
 	if err != nil {
 		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent list")).ShowErrorAndExit()
 	}
 
-	rules, err := templates.LoadTemplateRuleForIdentifier(theproject.Project.Bundler.Identifier)
+	tmpdir, err := getConfigTemplateDir(cmd)
+	if err != nil {
+		errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
+	}
+
+	rules, err := templates.LoadTemplateRuleForIdentifier(tmpdir, theproject.Project.Bundler.Identifier)
 	if err != nil {
 		errsystem.New(errsystem.ErrInvalidConfiguration, err,
 			errsystem.WithContextMessage("Failed loading template rule"),
@@ -523,7 +534,7 @@ var agentListCmd = &cobra.Command{
 		apiUrl, _, _ := util.GetURLs(logger)
 
 		// perform the reconcilation
-		keys, state := reconcileAgentList(logger, apiUrl, project.Token, project)
+		keys, state := reconcileAgentList(logger, cmd, apiUrl, project.Token, project)
 
 		if len(keys) == 0 {
 			tui.ShowWarning("no Agents found")
@@ -570,7 +581,7 @@ Examples:
 		apiUrl, _, _ := util.GetURLs(logger)
 
 		// perform the reconcilation
-		keys, state := reconcileAgentList(logger, apiUrl, project.Token, project)
+		keys, state := reconcileAgentList(logger, cmd, apiUrl, project.Token, project)
 
 		if len(keys) == 0 {
 			tui.ShowWarning("no Agents found")
@@ -652,6 +663,7 @@ func init() {
 	agentCmd.AddCommand(agentGetApiKeyCmd)
 	for _, cmd := range []*cobra.Command{agentListCmd, agentCreateCmd, agentDeleteCmd, agentGetApiKeyCmd} {
 		cmd.Flags().StringP("dir", "d", "", "The project directory")
+		cmd.Flags().String("templates-dir", "", "The directory to load the templates. Defaults to loading them from the github.com/agentuity/templates repository")
 	}
 	for _, cmd := range []*cobra.Command{agentListCmd, agentCreateCmd} {
 		cmd.Flags().String("format", "text", "The format to use for the output. Can be either 'text' or 'json'")

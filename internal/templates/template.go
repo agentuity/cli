@@ -3,6 +3,7 @@ package templates
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"text/template"
 
@@ -18,6 +19,7 @@ type TemplateContext struct {
 	Description      string
 	AgentName        string
 	AgentDescription string
+	TemplateDir      string
 	ProjectDir       string
 	Template         *Template
 	TemplateName     string
@@ -112,11 +114,12 @@ type TemplateRules struct {
 
 type LanguageTemplates []ProjectTemplate
 
-func LoadTemplateRuleForIdentifier(identifier string) (*TemplateRules, error) {
-	reader, err := getEmbeddedFile(identifier + "/rules.yaml")
+func LoadTemplateRuleForIdentifier(templateDir, identifier string) (*TemplateRules, error) {
+	reader, err := getEmbeddedFile(filepath.Join(templateDir, identifier, "rules.yaml"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load embedded file for %s: %s", identifier+"/rules.yaml", err)
 	}
+	defer reader.Close()
 	var rules TemplateRules
 	if err := yaml.NewDecoder(reader).Decode(&rules); err != nil {
 		return nil, fmt.Errorf("failed to decode rules for %s: %s", identifier+"/rules.yaml", err)
@@ -125,7 +128,7 @@ func LoadTemplateRuleForIdentifier(identifier string) (*TemplateRules, error) {
 }
 
 func (t *TemplateRules) NewProject(ctx TemplateContext) error {
-	templates, err := LoadLanguageTemplates(t.Identifier)
+	templates, err := LoadLanguageTemplates(ctx.Context, ctx.TemplateDir, t.Identifier)
 	if err != nil {
 		return err
 	}

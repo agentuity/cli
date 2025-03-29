@@ -101,14 +101,15 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 	defines["process.env.AGENTUITY_CLOUD_AGENTS_JSON"] = fmt.Sprintf("'%s'", cstr.JSONStringify(agents))
 
 	result := api.Build(api.BuildOptions{
-		EntryPoints: entryPoints,
-		Bundle:      true,
-		Outdir:      outdir,
-		Write:       true,
-		Splitting:   false,
-		Sourcemap:   api.SourceMapExternal,
-		Format:      api.FormatESModule,
-		Platform:    api.PlatformNode,
+		EntryPoints:    entryPoints,
+		Bundle:         true,
+		Outdir:         outdir,
+		Write:          true,
+		Splitting:      false,
+		Sourcemap:      api.SourceMapExternal,
+		SourcesContent: api.SourcesContentInclude,
+		Format:         api.FormatESModule,
+		Platform:       api.PlatformNode,
 		Engines: []api.Engine{
 			{Name: api.EngineNode, Version: "22"},
 		},

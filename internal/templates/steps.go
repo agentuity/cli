@@ -232,10 +232,11 @@ func (s *CreateFileAction) Run(ctx TemplateContext) error {
 	ctx.Logger.Debug("Creating file: %s", filename)
 	var output []byte
 	if s.Template != "" {
-		fr, err := getEmbeddedFile(embeddedPath(s.Template))
+		fr, err := getEmbeddedFile(filepath.Join(ctx.TemplateDir, s.Template))
 		if err != nil {
 			return fmt.Errorf("failed to get embedded file: %s", err)
 		}
+		defer fr.Close()
 		tbuf, err := io.ReadAll(fr)
 		if err != nil {
 			return fmt.Errorf("failed to read embedded file: %s", err)
@@ -253,10 +254,11 @@ func (s *CreateFileAction) Run(ctx TemplateContext) error {
 	} else if s.Content != "" {
 		output = []byte(s.Content) // just use the content as is
 	} else if s.From != "" {
-		from, err := getEmbeddedFile(embeddedPath(s.From))
+		from, err := getEmbeddedFile(filepath.Join(ctx.TemplateDir, s.From))
 		if err != nil {
 			return fmt.Errorf("failed to get embedded file: %s", err)
 		}
+		defer from.Close()
 		buf, err := io.ReadAll(from)
 		if err != nil {
 			return fmt.Errorf("failed to read embedded file: %s", err)
@@ -280,10 +282,11 @@ type CopyFileAction struct {
 var _ Step = (*CopyFileAction)(nil)
 
 func (s *CopyFileAction) Run(ctx TemplateContext) error {
-	from, err := getEmbeddedFile(embeddedPath(s.From))
+	from, err := getEmbeddedFile(filepath.Join(ctx.TemplateDir, s.From))
 	if err != nil {
 		return fmt.Errorf("failed to get embedded file: %s", err)
 	}
+	defer from.Close()
 	buf, err := io.ReadAll(from)
 	if err != nil {
 		return fmt.Errorf("failed to read embedded file: %s", err)
@@ -312,7 +315,7 @@ var _ Step = (*CopyDirAction)(nil)
 
 func (s *CopyDirAction) Run(ctx TemplateContext) error {
 	filename := embeddedPath(s.From)
-	from, err := getEmbeddedDir(filename)
+	from, err := getEmbeddedDir(filepath.Join(ctx.TemplateDir, filename))
 	if err != nil {
 		return fmt.Errorf("failed to get embedded file: %s", err)
 	}
@@ -333,11 +336,12 @@ func (s *CopyDirAction) Run(ctx TemplateContext) error {
 				continue
 			}
 		}
-		name := embeddedPath(filepath.Join(s.From, file.Name()))
+		name := filepath.Join(ctx.TemplateDir, s.From, file.Name())
 		r, err := getEmbeddedFile(name)
 		if err != nil {
 			return fmt.Errorf("failed to get embedded file: %s", err)
 		}
+		defer r.Close()
 		buf, err := io.ReadAll(r)
 		if err != nil {
 			return fmt.Errorf("failed to read embedded file: %s", err)

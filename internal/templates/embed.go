@@ -1,27 +1,32 @@
 package templates
 
 import (
-	"embed"
+	"fmt"
 	"io"
 	"io/fs"
-	"strings"
+	"os"
+
+	"github.com/agentuity/cli/internal/util"
 )
 
-//go:embed data
-var embeddedData embed.FS
-
-func getEmbeddedFile(path string) (io.Reader, error) {
-	// Ensure the path starts with "data/"
-	if !strings.HasPrefix(path, "data/") {
-		path = "data/" + path
+func getEmbeddedFile(path string) (io.ReadCloser, error) {
+	if !util.Exists(path) {
+		return nil, fmt.Errorf("file not found: %s", path)
 	}
-	return embeddedData.Open(path)
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
 }
 
 func getEmbeddedDir(path string) ([]fs.DirEntry, error) {
-	// Ensure the path starts with "data/"
-	if !strings.HasPrefix(path, "data/") {
-		path = "data/" + path
+	if !util.Exists(path) {
+		return nil, fmt.Errorf("directory not found: %s", path)
 	}
-	return embeddedData.ReadDir(path)
+	files, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+	return files, nil
 }

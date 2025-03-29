@@ -486,14 +486,23 @@ Examples:
 		providerArg, _ := cmd.Flags().GetString("provider")
 		templateArg, _ := cmd.Flags().GetString("template")
 
-		tmpls, err := templates.LoadTemplates()
+		tmplDir, err := getConfigTemplateDir(cmd)
 		if err != nil {
-			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates")).ShowErrorAndExit()
+			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
 		}
 
-		if len(tmpls) == 0 {
-			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("No templates returned from load templates")).ShowErrorAndExit()
-		}
+		var tmpls templates.Templates
+
+		tui.ShowSpinner("Loading templates...", func() {
+			tmpls, err = templates.LoadTemplates(ctx, tmplDir)
+			if err != nil {
+				errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates")).ShowErrorAndExit()
+			}
+
+			if len(tmpls) == 0 {
+				errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("No templates returned from load templates")).ShowErrorAndExit()
+			}
+		})
 
 		var selectProvider string
 		var selectTemplate string
@@ -525,7 +534,7 @@ Examples:
 		}
 
 		if provider != nil && templateArg != "" {
-			if ok := templates.IsValidRuntimeTemplateName(provider.Identifier, templateArg); !ok {
+			if ok := templates.IsValidRuntimeTemplateName(ctx, tmplDir, provider.Identifier, templateArg); !ok {
 				logger.Fatal("invalid template name %s for %s", templateArg, provider.Name)
 			}
 			templateName = templateArg
@@ -562,7 +571,7 @@ Examples:
 				os.Exit(1)
 			}
 
-			templates, err := templates.LoadLanguageTemplates(provider.Identifier)
+			templates, err := templates.LoadLanguageTemplates(ctx, tmplDir, provider.Identifier)
 			if err != nil {
 				errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from template provider")).ShowErrorAndExit()
 			}
@@ -612,6 +621,7 @@ Examples:
 			AgentName:        agentName,
 			AgentDescription: agentDescription,
 			TemplateName:     templateName,
+			TemplateDir:      tmplDir,
 			AgentuityCommand: getAgentuityCommand(),
 		}
 
@@ -837,6 +847,23 @@ Examples:
 	},
 }
 
+func getConfigTemplateDir(cmd *cobra.Command) (string, error) {
+	if cmd.Flags().Changed("templates-dir") {
+		dir, _ := cmd.Flags().GetString("templates-dir")
+		if !util.Exists(dir) {
+			return "", fmt.Errorf("templates directory %s does not exist", dir)
+		}
+		return dir, nil
+	}
+	dir := filepath.Join(filepath.Dir(cfgFile), "templates")
+	if !util.Exists(dir) {
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			return "", err
+		}
+	}
+	return dir, nil
+}
+
 func init() {
 	rootCmd.AddCommand(projectCmd)
 	rootCmd.AddCommand(projectNewCmd)
@@ -857,4 +884,5 @@ func init() {
 	projectNewCmd.Flags().StringP("provider", "p", "", "The provider template to use for the project")
 	projectNewCmd.Flags().StringP("template", "t", "", "The template to use for the project")
 	projectNewCmd.Flags().Bool("force", false, "Force the project to be created even if the directory already exists")
+	projectNewCmd.Flags().String("templates-dir", "", "The directory to load the templates. Defaults to loading them from the github.com/agentuity/templates repository")
 }

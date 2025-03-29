@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/mcp"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/go-common/env"
@@ -139,6 +140,10 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		logger := env.NewLogger(cmd)
+		tmplDir, err := getConfigTemplateDir(cmd)
+		if err != nil {
+			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
+		}
 		var t transport.Transport
 		if stdioTransport {
 			t = stdio.NewStdioServerTransport()
@@ -159,9 +164,9 @@ Examples:
 			TransportURL: project.TransportURL,
 			Project:      project.Project,
 			LoggedIn:     project.Token != "",
+			TemplateDir:  tmplDir,
 		}
-		err := mcp.Register(mcpContext)
-		if err != nil {
+		if err := mcp.Register(mcpContext); err != nil {
 			logger.Fatal("%s", err)
 		}
 		if err := server.Serve(ctx); err != nil {
