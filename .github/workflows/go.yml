@@ -92,7 +92,7 @@ echo 0.0.74
         bash -c "NONINTERACTIVE=true ./install.sh -d '$env:TEMP/agentuity-test-download'"
         
         # Verify MSI was downloaded
-        if (Test-Path "$HOME/agentuity-x64.msi") {
+        if (Test-Path "$env:USERPROFILE/agentuity-x64.msi") {
           Write-Host "MSI download verification successful"
           
           # Test with specific version
@@ -100,7 +100,7 @@ echo 0.0.74
           bash -c "NONINTERACTIVE=true ./install.sh -d '$env:TEMP/agentuity-test-version-download' -v 0.0.74"
           
           # Verify version-specific MSI was downloaded
-          if (Test-Path "$HOME/agentuity-x64.msi") {
+          if (Test-Path "$env:USERPROFILE/agentuity-x64.msi") {
             Write-Host "Version-specific MSI download verification successful"
           } else {
             Write-Host "Version-specific MSI download verification failed"
@@ -110,4 +110,4 @@ echo 0.0.74
           Write-Host "MSI download verification failed"
           exit 1
         }
-      shell: pwsh                
+      shell: pwsh                  
