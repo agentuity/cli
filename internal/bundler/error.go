@@ -2,7 +2,6 @@ package bundler
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/agentuity/cli/internal/util"
