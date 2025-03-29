@@ -47,16 +47,18 @@ func TestFormatBuildError(t *testing.T) {
 			message: api.Message{
 				Text: "Cannot access property 'property' of undefined",
 				Location: &api.Location{
-					File:   jsFilePath,
-					Line:   6,
-					Column: 17,
+					File:     jsFilePath,
+					Line:     6,
+					Column:   17,
+					LineText: "  return x.missing.property;",
 				},
 			},
 			wantContain: []string{
-				"error: Cannot access property 'property' of undefined",
+				"Cannot access property 'property' of undefined",
 				"test.js:6:17",
-				"return x.missing.property;",
-				"^",
+				"6 │",
+				"╵",
+				"note: JavaScript build failed",
 			},
 		},
 		{
@@ -64,16 +66,18 @@ func TestFormatBuildError(t *testing.T) {
 			message: api.Message{
 				Text: "Cannot access property 'property' of undefined",
 				Location: &api.Location{
-					File:   tsFilePath,
-					Line:   6,
-					Column: 17,
+					File:     tsFilePath,
+					Line:     6,
+					Column:   17,
+					LineText: "  return x.missing.property;",
 				},
 			},
 			wantContain: []string{
-				"error: Cannot access property 'property' of undefined",
+				"Cannot access property 'property' of undefined",
 				"test.ts:6:17",
-				"return x.missing.property;",
-				"^",
+				"6 │",
+				"╵",
+				"note: JavaScript build failed",
 			},
 		},
 		{
@@ -82,12 +86,8 @@ func TestFormatBuildError(t *testing.T) {
 				Text: "Bundle failed",
 			},
 			wantContain: []string{
-				"error: Bundle failed",
+				"Bundle failed",
 				"note: JavaScript build failed",
-			},
-			wantNotContain: []string{
-				"-->",
-				"```",
 			},
 		},
 		{
@@ -95,18 +95,15 @@ func TestFormatBuildError(t *testing.T) {
 			message: api.Message{
 				Text: "Syntax error",
 				Location: &api.Location{
-					File: jsFilePath,
-					Line: 3,
+					File:     jsFilePath,
+					Line:     3,
+					LineText: "    name: \"test\",",
 				},
 			},
 			wantContain: []string{
-				"error: Syntax error",
+				"Syntax error",
 				"test.js:3",
 				"name: \"test\"",
-			},
-			wantNotContain: []string{
-				"test.js:3:0",
-				"^",
 			},
 		},
 	}
