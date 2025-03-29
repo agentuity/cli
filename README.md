@@ -13,6 +13,28 @@
 
 The command line tools for the Agentuity Agent Cloud Platform.  These tools are used to build, manage, and deploy Agents to the Agentuity platform.
 
+## Supported Frameworks
+
+### JavaScript/TypeScript
+
+| Framework | Bun | NodeJS |
+|-----------|-----|--------|
+| OpenAI SDK | ✅ | ✅ |
+| Anthropic SDK | ✅ | ✅ |
+| Vercel AI SDK with OpenAI | ✅ | ✅ |
+| Vercel AI SDK with Anthropic | ✅ | ✅ |
+
+### Python
+
+| Framework | Python (uv) |
+|-----------|-------------|
+| OpenAI | ✅ |
+| LiteLLM | ✅ |
+| Anthropic | ✅ |
+| LangChain | ✅ |
+| LlamaIndex | ✅ |
+| CrewAI | ✅ |
+
 ## Installation
 
 If you are on a Mac, you can install the CLI using Homebrew:
