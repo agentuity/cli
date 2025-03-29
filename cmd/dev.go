@@ -21,9 +21,9 @@ import (
 	"github.com/spf13/viper"
 )
 
-var devRunCmd = &cobra.Command{
-	Use:     "run",
-	Aliases: []string{"dev"},
+var devCmd = &cobra.Command{
+	Use:     "dev",
+	Aliases: []string{"run"},
 	Args:    cobra.NoArgs,
 	Short:   "Run the development server",
 	Long: `Run the development server for local testing and development.
@@ -37,9 +37,8 @@ Flags:
   --websocket-id   The websocket room ID to use for the development agent
 
 Examples:
-  agentuity run
   agentuity dev
-  agentuity run --dir /path/to/project`,
+  agentuity dev --dir /path/to/project`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log := env.NewLogger(cmd)
 		_, appUrl, _ := util.GetURLs(log)
@@ -210,8 +209,10 @@ func displayLocalInstructions(port int, agents []project.AgentConfig, devModeUrl
 }
 
 func init() {
-	rootCmd.AddCommand(devRunCmd)
-	devRunCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
-	devRunCmd.Flags().String("websocket-id", "", "The websocket room id to use for the development agent")
-	devRunCmd.Flags().String("org-id", "", "The organization to create the project in on import")
+	rootCmd.AddCommand(devCmd)
+	devCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
+	devCmd.Flags().String("websocket-id", "", "The websocket room id to use for the development agent")
+	devCmd.Flags().String("org-id", "", "The organization to run the project")
+	devCmd.Flags().MarkHidden("websocket-id")
+	devCmd.Flags().MarkHidden("org-id")
 }
