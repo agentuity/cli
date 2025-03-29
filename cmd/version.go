@@ -76,8 +76,9 @@ Examples:
 }
 
 var upgradeCmd = &cobra.Command{
-	Use:   "upgrade",
-	Short: "Upgrade the Agentuity CLI to the latest version",
+	Use:     "upgrade",
+	Aliases: []string{"update"},
+	Short:   "Upgrade the Agentuity CLI to the latest version",
 	Long: func() string {
 		baseDesc := `Upgrade the Agentuity CLI to the latest version.
 

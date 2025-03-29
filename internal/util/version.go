@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 
 	"github.com/Masterminds/semver"
@@ -56,36 +55,32 @@ func CheckLatestRelease(ctx context.Context, logger logger.Logger) error {
 	latestVersion := semver.MustParse(release)
 	currentVersion := semver.MustParse(Version)
 	if latestVersion.GreaterThan(currentVersion) {
-		showUpgradeNotice(logger, release)
+		showUpgradeNotice(ctx, logger, release)
 	}
 	return nil
 }
 
-func showUpgradeNotice(logger logger.Logger, version string) {
-	if runtime.GOOS == "darwin" {
-		exe, err := os.Executable()
-		if err != nil {
-			return
-		}
-		// if we are running from homebrew, we need to upgrade via homebrew
-		if tui.HasTTY && strings.Contains(exe, "/homebrew/Cellar/agentuity/") {
-			answer := tui.Ask(logger, tui.Bold(fmt.Sprintf("Agentuity version %s is available. Would you like to upgrade? [Y/n] ", version)), true)
-			fmt.Println()
-			if answer {
-				action := func() {
-					exec.Command("brew", "update").Run()
-					exec.Command("brew", "upgrade", "agentuity").Run()
-					v, _ := exec.Command(exe, "version").Output()
-					if strings.TrimSpace(string(v)) == version {
-						tui.ShowSuccess("Upgraded to %s", version)
-						return
-					}
-					tui.ShowWarning("Failed to upgrade. Please run `brew update && brew upgrade agentuity` manually.")
-				}
-				tui.ShowSpinner("Upgrading...", action)
-			}
-			return
-		}
+func showUpgradeNotice(ctx context.Context, logger logger.Logger, version string) {
+	exe, err := os.Executable()
+	if err != nil {
+		return
 	}
-	tui.ShowBanner("Agentuity Upgrade", fmt.Sprintf("Agentuity version %s is available. See %s for more information.", version, tui.Link("https://agentuity.dev/CLI/installation")), false)
+	// if we are running from homebrew, we need to upgrade via homebrew
+	if tui.HasTTY {
+		answer := tui.Ask(logger, tui.Bold(fmt.Sprintf("Agentuity version %s is available. Would you like to upgrade? [Y/n] ", version)), true)
+		fmt.Println()
+		if answer {
+			action := func() {
+				exec.CommandContext(ctx, exe, "update").Run()
+				v, _ := exec.CommandContext(ctx, exe, "version").Output()
+				if strings.TrimSpace(string(v)) == version {
+					tui.ShowSuccess("Upgraded to %s", version)
+					return
+				}
+				tui.ShowWarning("Failed to upgrade. Please see https://agentuity.dev/CLI/installation for instructions to upgrade manually.")
+			}
+			tui.ShowSpinner("Upgrading...", action)
+		}
+		return
+	}
 }

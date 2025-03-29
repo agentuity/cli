@@ -128,7 +128,7 @@ func getReleaseAssetName() string {
 	return fmt.Sprintf("agentuity_%s_%s.%s", strings.Title(goos), archName, extension)
 }
 
-func getMsiInstallerName(version string) string {
+func getMsiInstallerName() string {
 	arch := runtime.GOARCH
 	var msiArch string
 	if arch == "amd64" {
@@ -142,12 +142,12 @@ func getMsiInstallerName(version string) string {
 	return fmt.Sprintf("agentuity-%s.msi", msiArch)
 }
 
-func isAdmin() bool {
+func isAdmin(ctx context.Context) bool {
 	if runtime.GOOS != "windows" {
 		return false
 	}
 
-	cmd := exec.Command("powershell", "-Command", "([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)")
+	cmd := exec.CommandContext(ctx, "powershell", "-Command", "([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)")
 	output, err := cmd.Output()
 	if err != nil {
 		return false
@@ -161,7 +161,7 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 		exe, err := os.Executable()
 		if err == nil && strings.Contains(exe, "/homebrew/Cellar/agentuity/") {
 			logger.Info("Detected Homebrew installation, upgrading via brew")
-			return upgradeWithHomebrew(logger)
+			return upgradeWithHomebrew(ctx, logger)
 		}
 	}
 
@@ -176,7 +176,7 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 			return nil
 		}
 
-		return upgradeWithWindowsMsi(ctx, logger, release)
+		return upgradeWithWindowsMsi(ctx, release)
 	}
 
 	release, err := GetLatestRelease(ctx) // Using public function from version.go
@@ -251,10 +251,10 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 		return fmt.Errorf("checksum verification failed")
 	}
 
-	return replaceBinary(logger, assetPath, release)
+	return replaceBinary(ctx, logger, assetPath, release)
 }
 
-func replaceBinary(logger logger.Logger, assetPath, version string) error {
+func replaceBinary(ctx context.Context, logger logger.Logger, assetPath, version string) error {
 	currentExe, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("failed to get current executable path: %w", err)
@@ -292,7 +292,7 @@ func replaceBinary(logger logger.Logger, assetPath, version string) error {
 	}
 	defer os.RemoveAll(tempDir)
 
-	binaryPath := extractBinary(logger, assetPath, tempDir)
+	binaryPath := extractBinary(ctx, logger, assetPath, tempDir)
 	if binaryPath == "" {
 		return fmt.Errorf("failed to extract binary")
 	}
@@ -366,7 +366,7 @@ func checkWritePermission(filePath string) error {
 	return nil
 }
 
-func extractBinary(logger logger.Logger, assetPath, extractDir string) string {
+func extractBinary(ctx context.Context, logger logger.Logger, assetPath, extractDir string) string {
 	var extractErr error
 	var binaryPath string
 
@@ -424,7 +424,7 @@ func extractBinary(logger logger.Logger, assetPath, extractDir string) string {
 				}
 			}
 		} else {
-			cmd := exec.Command("tar", "-xzf", assetPath, "-C", extractDir)
+			cmd := exec.CommandContext(ctx, "tar", "-xzf", assetPath, "-C", extractDir)
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 
@@ -470,9 +470,9 @@ func extractBinary(logger logger.Logger, assetPath, extractDir string) string {
 	return binaryPath
 }
 
-func upgradeWithHomebrew(logger logger.Logger) error {
+func upgradeWithHomebrew(ctx context.Context, logger logger.Logger) error {
 	logger.Info("Updating Homebrew")
-	updateCmd := exec.Command("brew", "update")
+	updateCmd := exec.CommandContext(ctx, "brew", "update")
 	updateCmd.Stdout = os.Stdout
 	updateCmd.Stderr = os.Stderr
 	if err := updateCmd.Run(); err != nil {
@@ -480,7 +480,7 @@ func upgradeWithHomebrew(logger logger.Logger) error {
 	}
 
 	logger.Info("Upgrading agentuity")
-	upgradeCmd := exec.Command("brew", "upgrade", "agentuity")
+	upgradeCmd := exec.CommandContext(ctx, "brew", "upgrade", "agentuity")
 	upgradeCmd.Stdout = os.Stdout
 	upgradeCmd.Stderr = os.Stderr
 	if err := upgradeCmd.Run(); err != nil {
@@ -488,15 +488,15 @@ func upgradeWithHomebrew(logger logger.Logger) error {
 	}
 
 	exe, _ := os.Executable()
-	v, _ := exec.Command(exe, "version").Output()
+	v, _ := exec.CommandContext(ctx, exe, "version").Output()
 	version := strings.TrimSpace(string(v))
 
 	tui.ShowSuccess("Successfully upgraded to version %s via Homebrew", version)
 	return nil
 }
 
-func upgradeWithWindowsMsi(ctx context.Context, logger logger.Logger, version string) error {
-	if !isAdmin() {
+func upgradeWithWindowsMsi(ctx context.Context, version string) error {
+	if !isAdmin(ctx) {
 		return fmt.Errorf("administrator privileges required to upgrade MSI installation. Please run the command as administrator")
 	}
 
@@ -506,7 +506,7 @@ func upgradeWithWindowsMsi(ctx context.Context, logger logger.Logger, version st
 	}
 	defer os.RemoveAll(tempDir)
 
-	installerName := getMsiInstallerName(version)
+	installerName := getMsiInstallerName()
 	installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s/%s", version, installerName)
 	installerPath := filepath.Join(tempDir, installerName)
 
@@ -521,13 +521,12 @@ func upgradeWithWindowsMsi(ctx context.Context, logger logger.Logger, version st
 		return downloadErr
 	}
 
-	updateCmd := exec.Command("msiexec", "/update", installerPath, "/qn")
-
 	var installErr error
 	installAction := func() {
+		updateCmd := exec.CommandContext(ctx, "msiexec", "/update", installerPath, "/qn")
 		if err := updateCmd.Run(); err != nil {
 			tui.ShowWarning("Update approach failed, trying install with reinstall: %v", err)
-			installCmd := exec.Command("msiexec", "/i", installerPath, "/qn", "REINSTALLMODE=amus", "REINSTALL=ALL")
+			installCmd := exec.CommandContext(ctx, "msiexec", "/i", installerPath, "/qn", "REINSTALLMODE=amus", "REINSTALL=ALL")
 			if err := installCmd.Run(); err != nil {
 				installErr = fmt.Errorf("failed to run MSI installer: %w", err)
 			}
