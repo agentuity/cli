@@ -11,7 +11,7 @@ import (
 
 func TestFormatBuildError(t *testing.T) {
 	tempDir := t.TempDir()
-	
+
 	jsFilePath := filepath.Join(tempDir, "test.js")
 	jsContent := `function test() {
   const x = {
@@ -23,7 +23,7 @@ func TestFormatBuildError(t *testing.T) {
 	if err := os.WriteFile(jsFilePath, []byte(jsContent), 0644); err != nil {
 		t.Fatalf("Failed to create test JS file: %v", err)
 	}
-	
+
 	tsFilePath := filepath.Join(tempDir, "test.ts")
 	tsContent := `function test(): string {
   const x: any = {
@@ -37,9 +37,9 @@ func TestFormatBuildError(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		message     api.Message
-		wantContain []string
+		name           string
+		message        api.Message
+		wantContain    []string
 		wantNotContain []string
 	}{
 		{
@@ -114,13 +114,13 @@ func TestFormatBuildError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := FormatBuildError(tempDir, tt.message)
-			
+
 			for _, want := range tt.wantContain {
 				if !strings.Contains(result, want) {
 					t.Errorf("FormatBuildError() = %v, should contain %v", result, want)
 				}
 			}
-			
+
 			for _, notWant := range tt.wantNotContain {
 				if strings.Contains(result, notWant) {
 					t.Errorf("FormatBuildError() = %v, should not contain %v", result, notWant)

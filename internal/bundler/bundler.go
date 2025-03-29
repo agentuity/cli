@@ -125,12 +125,12 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 	})
 	if len(result.Errors) > 0 {
 		fmt.Println("\n" + tui.Warning("Build Failed") + "\n")
-		
+
 		for _, err := range result.Errors {
 			formattedError := FormatBuildError(dir, err)
 			fmt.Println(formattedError)
 		}
-		
+
 		os.Exit(2)
 		return nil // This line will never be reached due to os.Exit
 	}
