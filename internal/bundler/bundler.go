@@ -127,7 +127,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		fmt.Println("\n" + tui.Warning("Build Failed") + "\n")
 
 		for _, err := range result.Errors {
-			formattedError := FormatBuildError(dir, err)
+			formattedError := formatESBuildError(dir, err)
 			fmt.Println(formattedError)
 		}
 
