@@ -43,11 +43,23 @@ fi
 if [[ "$OS" == "Darwin" ]]; then
   OS="Darwin"
   EXTENSION="tar.gz"
-  INSTALL_DIR="/usr/local/bin"
+  if [[ -d "$HOME/.local/bin" ]] && [[ -w "$HOME/.local/bin" ]]; then
+    INSTALL_DIR="$HOME/.local/bin"
+  elif [[ -d "$HOME/bin" ]] && [[ -w "$HOME/bin" ]]; then
+    INSTALL_DIR="$HOME/bin"
+  else
+    INSTALL_DIR="/usr/local/bin"
+  fi
 elif [[ "$OS" == "Linux" ]]; then
   OS="Linux"
   EXTENSION="tar.gz"
-  INSTALL_DIR="/usr/local/bin"
+  if [[ -d "$HOME/.local/bin" ]] && [[ -w "$HOME/.local/bin" ]]; then
+    INSTALL_DIR="$HOME/.local/bin"
+  elif [[ -d "$HOME/bin" ]] && [[ -w "$HOME/bin" ]]; then
+    INSTALL_DIR="$HOME/bin"
+  else
+    INSTALL_DIR="/usr/local/bin"
+  fi
 elif [[ "$OS" == "MINGW"* ]] || [[ "$OS" == "MSYS"* ]] || [[ "$OS" == "CYGWIN"* ]]; then
   OS="Windows"
   EXTENSION="msi"
@@ -96,8 +108,31 @@ if [[ ! -d "$INSTALL_PATH" ]]; then
   mkdir -p "$INSTALL_PATH" || abort "Failed to create directory: $INSTALL_PATH"
 fi
 
+if [[ ! -d "$INSTALL_PATH" ]]; then
+  ohai "Creating install directory: $INSTALL_PATH"
+  mkdir -p "$INSTALL_PATH" || abort "Failed to create directory: $INSTALL_PATH. Try running with sudo or specify a different directory with --dir."
+fi
+
 if [[ ! -w "$INSTALL_PATH" ]]; then
-  abort "No write permission to $INSTALL_PATH. Try running with sudo or specify a different directory with --dir."
+  if [[ "$INSTALL_PATH" == "/usr/local/bin" ]]; then
+    ohai "No write permission to $INSTALL_PATH. Trying alternative locations..."
+    
+    if [[ -d "$HOME/.local/bin" ]] || mkdir -p "$HOME/.local/bin" 2>/dev/null; then
+      if [[ -w "$HOME/.local/bin" ]]; then
+        ohai "Using $HOME/.local/bin instead"
+        INSTALL_PATH="$HOME/.local/bin"
+      fi
+    elif [[ -d "$HOME/bin" ]] || mkdir -p "$HOME/bin" 2>/dev/null; then
+      if [[ -w "$HOME/bin" ]]; then
+        ohai "Using $HOME/bin instead"
+        INSTALL_PATH="$HOME/bin"
+      fi
+    else
+      abort "No write permission to $INSTALL_PATH. Try running with sudo or specify a different directory with --dir."
+    fi
+  else
+    abort "No write permission to $INSTALL_PATH. Try running with sudo or specify a different directory with --dir."
+  fi
 fi
 
 if [[ "$OS" == "Darwin" ]] && command -v brew >/dev/null 2>&1 && [[ "$NO_BREW" != "true" ]]; then
