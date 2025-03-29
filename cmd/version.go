@@ -61,7 +61,7 @@ Examples:
 		} else {
 			release, err := util.GetLatestRelease(ctx)
 			if err != nil {
-				errsystem.NewError(err).ShowErrorAndExit()
+				errsystem.New(errsystem.ErrGeneric, err).ShowErrorAndExit()
 			}
 			latestVersion := semver.MustParse(release)
 			currentVersion := semver.MustParse(Version)
@@ -107,7 +107,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		if err := util.UpgradeCLI(ctx, logger, force); err != nil {
-			errsystem.NewError(err).ShowErrorAndExit()
+			errsystem.New(errsystem.ErrGeneric, err).ShowErrorAndExit()
 		}
 	},
 }
