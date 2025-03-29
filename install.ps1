@@ -172,6 +172,18 @@ function Get-LatestReleaseVersion {
             "User-Agent" = $userAgent
         }
         
+        # Add GitHub token if available (for CI environments)
+        if ($env:GITHUB_TOKEN) {
+            Write-Step "Using authenticated GitHub API request"
+            $headers["Authorization"] = "token $env:GITHUB_TOKEN"
+        }
+        
+        # For CI testing, if a specific version is set in the environment, use it
+        if ($env:AGENTUITY_TEST_VERSION) {
+            Write-Step "Using test version from environment: $env:AGENTUITY_TEST_VERSION"
+            return $env:AGENTUITY_TEST_VERSION
+        }
+        
         $releaseUrl = "https://api.github.com/repos/agentuity/cli/releases/latest"
         $response = Invoke-RestMethod -Uri $releaseUrl -Headers $headers -Method Get
         
@@ -182,6 +194,13 @@ function Get-LatestReleaseVersion {
         return $response.tag_name
     }
     catch {
+        # In CI environment, if API call fails, use a fallback version for testing
+        if ($env:CI -eq "true") {
+            $fallbackVersion = "0.0.74"
+            Write-Warning "GitHub API request failed in CI environment. Using fallback version: $fallbackVersion"
+            return $fallbackVersion
+        }
+        
         Write-Error "Failed to fetch latest release information: $_" -Exit
     }
 }
