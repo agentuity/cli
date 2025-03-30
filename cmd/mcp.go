@@ -37,6 +37,14 @@ Examples:
   agentuity mcp list`,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
+		
+		fmt.Println()
+		fmt.Println(tui.Bold("Manual Installation:"))
+		fmt.Println("If you need to manually configure an MCP client, use this command:")
+		fmt.Println()
+		executable := getAgentuityCommand()
+		fmt.Printf("  %s\n", tui.Command(fmt.Sprintf("%s mcp run --stdio", executable)))
+		fmt.Println()
 	},
 }
 

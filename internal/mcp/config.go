@@ -223,6 +223,14 @@ func Install(ctx context.Context, logger logger.Logger) error {
 	if installed == 0 {
 		tui.ShowSuccess("All MCP clients are up-to-date")
 	}
+	
+	fmt.Println()
+	fmt.Println(tui.Bold("Manual Installation:"))
+	fmt.Println("If you need to manually configure an MCP client, use this command:")
+	fmt.Println()
+	fmt.Printf("  %s\n", tui.Command(fmt.Sprintf("%s mcp run --stdio", executable)))
+	fmt.Println()
+	
 	return nil
 }
 
