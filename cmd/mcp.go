@@ -43,7 +43,7 @@ Examples:
 		fmt.Println("If you need to manually configure an MCP client, use this command:")
 		fmt.Println()
 		executable := getAgentuityCommand()
-		fmt.Printf("  %s\n", tui.Command(fmt.Sprintf("%s mcp run --stdio", executable)))
+		fmt.Printf("  %s\n", tui.Command(fmt.Sprintf("%s", executable) + " mcp run --stdio"))
 		fmt.Println()
 	},
 }

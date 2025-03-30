@@ -228,7 +228,7 @@ func Install(ctx context.Context, logger logger.Logger) error {
 	fmt.Println(tui.Bold("Manual Installation:"))
 	fmt.Println("If you need to manually configure an MCP client, use this command:")
 	fmt.Println()
-	fmt.Printf("  %s\n", tui.Command(fmt.Sprintf("%s mcp run --stdio", executable)))
+	fmt.Printf("  %s\n", tui.Command(fmt.Sprintf("%s", executable) + " mcp run --stdio"))
 	fmt.Println()
 	
 	return nil
