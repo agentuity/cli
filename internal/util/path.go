@@ -15,5 +15,7 @@ func GetAgentuityCommand() string {
 }
 
 func GetFormattedMCPCommand() string {
-	return "/home/ubuntu/repos/cli/agentuity"
+	exe := GetAgentuityCommand()
+	
+	return exe
 }

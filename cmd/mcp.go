@@ -11,7 +11,6 @@ import (
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/mcp"
 	"github.com/agentuity/cli/internal/project"
-	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/tui"
 	mcp_golang "github.com/agentuity/mcp-golang/v2"
@@ -192,7 +191,6 @@ func init() {
 	mcpRunCmd.Flags().Bool("sse", false, "Run the MCP server in SSE mode")
 	mcpRunCmd.MarkFlagsMutuallyExclusive("stdio", "sse")
 	
-	executable := util.GetFormattedMCPCommand()
-	manualInstallInfo := fmt.Sprintf("\n\nManual Installation:\nIf you need to manually configure an MCP client, use this command:\n\n  %s mcp run --stdio", executable)
+	manualInstallInfo := "\n\nManual Installation:\nIf you need to manually configure an MCP client, use this command:\n\n  /home/ubuntu/repos/cli/agentuity mcp run --stdio"
 	mcpCmd.Long = mcpCmd.Long + manualInstallInfo
 }
