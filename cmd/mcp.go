@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/mcp"
 	"github.com/agentuity/cli/internal/project"
+	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/tui"
 	mcp_golang "github.com/agentuity/mcp-golang/v2"
@@ -43,12 +43,8 @@ Examples:
 		fmt.Println(tui.Bold("Manual Installation:"))
 		fmt.Println("If you need to manually configure an MCP client, use this command:")
 		fmt.Println()
-		executable := getAgentuityCommand()
-		cmdStr := fmt.Sprintf("  %s mcp run --stdio", executable)
-		if strings.HasPrefix(cmdStr, "  agentuity ") {
-			cmdStr = "  " + strings.TrimPrefix(cmdStr, "  agentuity ")
-		}
-		fmt.Println(cmdStr)
+		executable := util.GetFormattedMCPCommand()
+		fmt.Printf("  %s mcp run --stdio\n", executable)
 		fmt.Println()
 	},
 }
