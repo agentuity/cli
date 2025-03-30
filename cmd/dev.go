@@ -202,7 +202,7 @@ func displayLocalInstructions(port int, agents []project.AgentConfig, devModeUrl
 	fmt.Println(tui.Highlight(curlCommand))
 	fmt.Println()
 
-	fmt.Print(tui.Text("Or use the 💻 Live Mode in our app: "))
+	fmt.Print(tui.Text("Or use the 💻 Dev Mode in our app: "))
 	fmt.Println(tui.Link("%s", devModeUrl))
 
 	fmt.Println()
