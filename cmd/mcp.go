@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/agentuity/cli/internal/errsystem"
@@ -43,7 +44,11 @@ Examples:
 		fmt.Println("If you need to manually configure an MCP client, use this command:")
 		fmt.Println()
 		executable := getAgentuityCommand()
-		fmt.Printf("  %s\n", tui.Command(fmt.Sprintf("%s", executable) + " mcp run --stdio"))
+		cmdStr := fmt.Sprintf("  %s mcp run --stdio", executable)
+		if strings.HasPrefix(cmdStr, "  agentuity ") {
+			cmdStr = "  " + strings.TrimPrefix(cmdStr, "  agentuity ")
+		}
+		fmt.Println(cmdStr)
 		fmt.Println()
 	},
 }

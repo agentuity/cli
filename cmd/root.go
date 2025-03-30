@@ -183,3 +183,11 @@ func getAgentuityCommand() string {
 	}
 	return exe
 }
+
+func getFormattedMCPCommand() string {
+	exe := getAgentuityCommand()
+	if strings.HasPrefix(exe, "agentuity ") {
+		exe = strings.TrimPrefix(exe, "agentuity ")
+	}
+	return exe
+}
