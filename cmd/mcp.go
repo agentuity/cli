@@ -38,14 +38,6 @@ Examples:
   agentuity mcp list`,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
-		
-		fmt.Println()
-		fmt.Println(tui.Bold("Manual Installation:"))
-		fmt.Println("If you need to manually configure an MCP client, use this command:")
-		fmt.Println()
-		executable := util.GetFormattedMCPCommand()
-		fmt.Printf("  %s mcp run --stdio\n", executable)
-		fmt.Println()
 	},
 }
 
@@ -199,4 +191,8 @@ func init() {
 	mcpRunCmd.Flags().Bool("stdio", true, "Run the MCP server in Stdio mode")
 	mcpRunCmd.Flags().Bool("sse", false, "Run the MCP server in SSE mode")
 	mcpRunCmd.MarkFlagsMutuallyExclusive("stdio", "sse")
+	
+	executable := util.GetFormattedMCPCommand()
+	manualInstallInfo := fmt.Sprintf("\n\nManual Installation:\nIf you need to manually configure an MCP client, use this command:\n\n  %s mcp run --stdio", executable)
+	mcpCmd.Long = mcpCmd.Long + manualInstallInfo
 }
