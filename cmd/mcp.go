@@ -191,6 +191,6 @@ func init() {
 	mcpRunCmd.Flags().Bool("sse", false, "Run the MCP server in SSE mode")
 	mcpRunCmd.MarkFlagsMutuallyExclusive("stdio", "sse")
 	
-	manualInstallInfo := "\n\nManual Installation:\nIf you need to manually configure an MCP client, use this command:\n\n  /home/ubuntu/repos/cli/agentuity mcp run --stdio"
+	manualInstallInfo := "\n\nManual Installation:\nIf you need to manually configure an MCP client, use this command:\n\n  agentuity mcp run --stdio"
 	mcpCmd.Long = mcpCmd.Long + manualInstallInfo
 }

@@ -6,7 +6,9 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/agentuity/cli/internal/deployer"
@@ -174,5 +176,9 @@ func checkForUpgrade(ctx context.Context, logger logger.Logger) {
 }
 
 func getAgentuityCommand() string {
-	return util.GetAgentuityCommand()
+	exe, _ := os.Executable()
+	if !strings.Contains(exe, "agentuity") {
+		exe, _ = exec.LookPath("agentuity")
+	}
+	return exe
 }
