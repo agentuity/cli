@@ -351,7 +351,7 @@ func LoadTemplatesFromGithub(ctx context.Context, dir string) (Templates, error)
 
 	switch resp.StatusCode {
 	case http.StatusNotModified:
-		return loadTemplateFromDir(ctx, dir)
+		return loadTemplateFromDir(dir)
 	case http.StatusOK:
 		break
 	default:
@@ -385,10 +385,10 @@ func LoadTemplatesFromGithub(ctx context.Context, dir string) (Templates, error)
 		return nil, err
 	}
 
-	return loadTemplateFromDir(ctx, dir)
+	return loadTemplateFromDir(dir)
 }
 
-func loadTemplateFromDir(ctx context.Context, dir string) (Templates, error) {
+func loadTemplateFromDir(dir string) (Templates, error) {
 	reader, err := getEmbeddedFile(filepath.Join(dir, "runtimes.yaml"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open embedded runtimes file: %s", err)
@@ -402,16 +402,17 @@ func LoadTemplates(ctx context.Context, dir string) (Templates, error) {
 }
 
 func LoadLanguageTemplates(ctx context.Context, dir string, runtime string) (LanguageTemplates, error) {
-	reader, err := getEmbeddedFile(filepath.Join(dir, runtime, "templates.yaml"))
+	filename := filepath.Join(dir, runtime, "templates.yaml")
+	reader, err := getEmbeddedFile(filename)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load embedded file for %s: %s", runtime+"/templates.yaml", err)
+		return nil, fmt.Errorf("failed to load embedded file for %s: %s", filename, err)
 	}
 	if reader == nil {
-		return nil, fmt.Errorf("template %s not found", runtime+"/templates.yaml")
+		return nil, fmt.Errorf("template %s not found", filename)
 	}
 	templates := make(LanguageTemplates, 0)
 	if err := yaml.NewDecoder(reader).Decode(&templates); err != nil {
-		return nil, fmt.Errorf("failed to decode templates for %s: %s", runtime+"/templates.yaml", err)
+		return nil, fmt.Errorf("failed to decode templates for %s: %s", filename, err)
 	}
 	return templates, nil
 }
