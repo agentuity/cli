@@ -92,10 +92,6 @@ func init() {
 	rootCmd.PersistentFlags().MarkHidden("app-url")
 	viper.BindPFlag("overrides.app_url", rootCmd.PersistentFlags().Lookup("app-url"))
 
-	rootCmd.PersistentFlags().String("api-url", "https://api.agentuity.com", "The base url of the Agentuity API")
-	rootCmd.PersistentFlags().MarkHidden("api-url")
-	viper.BindPFlag("overrides.api_url", rootCmd.PersistentFlags().Lookup("api-url"))
-
 	rootCmd.PersistentFlags().String("websocket-url", "wss://api.agentuity.com", "The base url of the Agentuity WebSocket API")
 	rootCmd.PersistentFlags().MarkHidden("websocket-url")
 	viper.BindPFlag("overrides.websocket_url", rootCmd.PersistentFlags().Lookup("websocket-url"))
@@ -109,7 +105,6 @@ func init() {
 	viper.BindPFlag("auth.api_key", rootCmd.PersistentFlags().Lookup("api-key"))
 
 	viper.SetDefault("overrides.app_url", "https://app.agentuity.com")
-	viper.SetDefault("overrides.api_url", "https://api.agentuity.com")
 	viper.SetDefault("overrides.transport_url", "https://agentuity.ai")
 
 	cobra.OnInitialize(initConfig)
