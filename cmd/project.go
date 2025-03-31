@@ -733,21 +733,62 @@ Examples:
 			showNoProjects()
 			return
 		}
-		headers := []string{tui.Title("Project Id"), tui.Title("Name"), tui.Title("Description"), tui.Title("Organization")}
-		rows := [][]string{}
-		for _, project := range projects {
-			desc := project.Description
-			if desc == "" {
-				desc = emptyProjectDescription
+
+		orgProjects := make(map[string][]project.ProjectListData)
+		orgNames := make(map[string]string)
+		var orgs []string
+
+		for _, p := range projects {
+			if _, ok := orgProjects[p.OrgId]; !ok {
+				orgProjects[p.OrgId] = []project.ProjectListData{}
+				orgNames[p.OrgId] = p.OrgName
+				orgs = append(orgs, p.OrgId)
 			}
-			rows = append(rows, []string{
-				tui.Muted(project.ID),
-				tui.Bold(project.Name),
-				tui.Text(tui.MaxWidth(desc, 30)),
-				tui.Text(project.OrgName) + " " + tui.Muted("("+project.OrgId+")"),
-			})
+			orgProjects[p.OrgId] = append(orgProjects[p.OrgId], p)
 		}
-		tui.Table(headers, rows)
+
+		sort.Slice(orgs, func(i, j int) bool {
+			return orgNames[orgs[i]] < orgNames[orgs[j]]
+		})
+
+		if len(orgs) > 1 {
+			for _, orgId := range orgs {
+				fmt.Println()
+				fmt.Println(tui.Bold(orgNames[orgId]) + " " + tui.Muted("(" + orgId + ")"))
+				fmt.Println()
+
+				headers := []string{tui.Title("Project Id"), tui.Title("Name"), tui.Title("Description")}
+				rows := [][]string{}
+				for _, project := range orgProjects[orgId] {
+					desc := project.Description
+					if desc == "" {
+						desc = emptyProjectDescription
+					}
+					rows = append(rows, []string{
+						tui.Muted(project.ID),
+						tui.Bold(project.Name),
+						tui.Text(tui.MaxWidth(desc, 30)),
+					})
+				}
+				tui.Table(headers, rows)
+			}
+		} else {
+			headers := []string{tui.Title("Project Id"), tui.Title("Name"), tui.Title("Description"), tui.Title("Organization")}
+			rows := [][]string{}
+			for _, project := range projects {
+				desc := project.Description
+				if desc == "" {
+					desc = emptyProjectDescription
+				}
+				rows = append(rows, []string{
+					tui.Muted(project.ID),
+					tui.Bold(project.Name),
+					tui.Text(tui.MaxWidth(desc, 30)),
+					tui.Text(project.OrgName) + " " + tui.Muted("("+project.OrgId+")"),
+				})
+			}
+			tui.Table(headers, rows)
+		}
 	},
 }
 
