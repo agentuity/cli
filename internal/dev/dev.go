@@ -49,6 +49,15 @@ func findAvailablePort() (int, error) {
 }
 
 func FindAvailablePort(p project.ProjectContext) (int, error) {
+	if v, ok := os.LookupEnv("AGENTUITY_CLOUD_PORT"); ok && v != "" {
+		p, err := strconv.Atoi(v)
+		if err != nil {
+			return 0, err
+		}
+		if isPortAvailable(p) {
+			return p, nil
+		}
+	}
 	if v, ok := os.LookupEnv("PORT"); ok && v != "" {
 		p, err := strconv.Atoi(v)
 		if err != nil {
@@ -84,6 +93,7 @@ func CreateRunProjectCmd(log logger.Logger, theproject project.ProjectContext, l
 		projectServerCmd.Env = append(projectServerCmd.Env, "NODE_ENV=development")
 	}
 
+	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_PORT=%d", port))
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("PORT=%d", port))
 
 	projectServerCmd.Stdout = os.Stdout
