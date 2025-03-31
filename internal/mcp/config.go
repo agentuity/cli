@@ -223,6 +223,7 @@ func Install(ctx context.Context, logger logger.Logger) error {
 	if installed == 0 {
 		tui.ShowSuccess("All MCP clients are up-to-date")
 	}
+	
 	return nil
 }
 

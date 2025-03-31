@@ -34,7 +34,12 @@ For more information on the MCP protocol, see https://modelcontextprotocol.io/
 Examples:
   agentuity mcp install
   agentuity mcp uninstall
-  agentuity mcp list`,
+  agentuity mcp list
+
+Manual Installation:
+If you need to manually configure an MCP client, use this command:
+
+  agentuity mcp run --stdio`,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},

@@ -177,7 +177,6 @@ func checkForUpgrade(ctx context.Context, logger logger.Logger) {
 
 func getAgentuityCommand() string {
 	exe, _ := os.Executable()
-	// if the executable is not agentuity, then we need to find it
 	if !strings.Contains(exe, "agentuity") {
 		exe, _ = exec.LookPath("agentuity")
 	}
