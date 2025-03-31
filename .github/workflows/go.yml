@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2204
     steps:
     - uses: actions/checkout@v4
 
@@ -41,12 +41,12 @@ jobs:
     timeout-minutes: 10
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [blacksmith-4vcpu-ubuntu-2204, windows-latest]
     steps:
     - uses: actions/checkout@v4
     
     - name: Test Install Script (Linux)
-      if: matrix.os == 'ubuntu-latest'
+      if: matrix.os == 'blacksmith-4vcpu-ubuntu-2204'
       run: |
         chmod +x ./install.sh
         # Test with default options (latest version)
