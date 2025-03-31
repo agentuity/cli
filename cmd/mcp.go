@@ -34,7 +34,12 @@ For more information on the MCP protocol, see https://modelcontextprotocol.io/
 Examples:
   agentuity mcp install
   agentuity mcp uninstall
-  agentuity mcp list`,
+  agentuity mcp list
+
+Manual Installation:
+If you need to manually configure an MCP client, use this command:
+
+  agentuity mcp run --stdio`,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
@@ -190,7 +195,4 @@ func init() {
 	mcpRunCmd.Flags().Bool("stdio", true, "Run the MCP server in Stdio mode")
 	mcpRunCmd.Flags().Bool("sse", false, "Run the MCP server in SSE mode")
 	mcpRunCmd.MarkFlagsMutuallyExclusive("stdio", "sse")
-	
-	manualInstallInfo := "\n\nManual Installation:\nIf you need to manually configure an MCP client, use this command:\n\n  agentuity mcp run --stdio"
-	mcpCmd.Long = mcpCmd.Long + manualInstallInfo
 }
