@@ -7,27 +7,21 @@ on:
 
 permissions:
   contents: write
+  id-token: write
   packages: write
+  attestations: write
 
 jobs:
   release:
-    runs-on: blacksmith-16vcpu-ubuntu-2204
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: useblacksmith/setup-go@v6
-        with:
-          go-version: '1.24'
-
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y wixl
-
-      - name: Generate Error Codes
-        run: go generate ./...
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
@@ -43,3 +37,8 @@ jobs:
           MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
           MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
           MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-checksums: ./dist/checksums.txt
+          subject-checksums-type: sha256
