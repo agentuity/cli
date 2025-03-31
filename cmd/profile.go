@@ -47,7 +47,7 @@ func fetchProfiles() []profile {
 	var profiles []profile
 	files, _ := sys.ListDir(dir)
 	for _, file := range files {
-		if filepath.Ext(file) == ".yaml" {
+		if filepath.Ext(file) == ".yaml" && !strings.Contains(file, "templates/") {
 			buf, _ := os.ReadFile(file)
 			m := profileNameRegex.FindStringSubmatch(string(buf))
 			if len(m) > 0 {
