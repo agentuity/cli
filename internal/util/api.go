@@ -218,8 +218,7 @@ func GetURLs(logger logger.Logger) (string, string, string) {
 	appUrl := viper.GetString("overrides.app_url")
 	parsedAppUrl, err := url.Parse(appUrl)
 	if err != nil {
-		logger.Error("error parsing app url: %s", err)
-		os.Exit(1)
+		logger.Fatal("error parsing app url: %s", err)
 	}
 	parsedAppUrl.Path = "/api"
 	apiUrl := parsedAppUrl.String()
