@@ -156,6 +156,8 @@ Examples:
 		if !ci {
 			checkForUpgrade(ctx, logger)
 
+			loadTemplates(ctx, cmd)
+
 			var keys []string
 
 			if !context.NewProject {

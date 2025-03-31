@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/agentuity/cli/internal/deployer"
+	"github.com/agentuity/cli/internal/errsystem"
+	"github.com/agentuity/cli/internal/templates"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
 	"github.com/agentuity/go-common/tui"
@@ -53,6 +55,27 @@ func Execute() {
 	if err != nil {
 		os.Exit(1)
 	}
+}
+
+func loadTemplates(ctx context.Context, cmd *cobra.Command) templates.Templates {
+	tmplDir, err := getConfigTemplateDir(cmd)
+	if err != nil {
+		errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
+	}
+
+	var tmpls templates.Templates
+
+	tui.ShowSpinner("Loading templates...", func() {
+		tmpls, err = templates.LoadTemplates(ctx, tmplDir)
+		if err != nil {
+			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates")).ShowErrorAndExit()
+		}
+
+		if len(tmpls) == 0 {
+			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("No templates returned from load templates")).ShowErrorAndExit()
+		}
+	})
+	return tmpls
 }
 
 func init() {
