@@ -123,7 +123,7 @@ brews:
 
 msi:
   - id: agentuity
-    name: "agentuity-{{.MsiArch}}"
+    name: "agt-{{.MsiArch}}"
     wxs: ./installer.wsx
     ids:
       - agentuity
