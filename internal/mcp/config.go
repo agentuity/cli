@@ -132,7 +132,15 @@ func Detect(all bool) ([]MCPClientConfig, error) {
 			}
 			
 			for _, filepath := range filepaths {
-				if util.Exists(filepath) {
+				if filepath == "$PATH" {
+					if config.Command != "" {
+						_, err := exec.LookPath(config.Command)
+						if err == nil {
+							exists = true
+							break
+						}
+					}
+				} else if util.Exists(filepath) {
 					exists = true
 					break
 				}
@@ -280,9 +288,9 @@ func init() {
 		Command:        "cursor",
 		Transport:      "stdio",
 		Application: &MCPClientApplicationConfig{
-			MacOS:   []string{"/Applications/Cursor.app/Contents/MacOS/Cursor", "/usr/local/bin/cursor"},
-			Windows: []string{filepath.Join(util.GetAppSupportDir(filepath.Join("Programs", "cursor")), "Cursor.exe")},
-			Linux:   []string{"/usr/bin/cursor", "/usr/local/bin/cursor"},
+			MacOS:   []string{"/Applications/Cursor.app/Contents/MacOS/Cursor", "/usr/local/bin/cursor", "$PATH"},
+			Windows: []string{filepath.Join(util.GetAppSupportDir(filepath.Join("Programs", "cursor")), "Cursor.exe"), "$PATH"},
+			Linux:   []string{"/usr/bin/cursor", "/usr/local/bin/cursor", "$PATH"},
 		},
 	})
 	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
@@ -291,9 +299,9 @@ func init() {
 		Command:        "windsurf",
 		Transport:      "stdio",
 		Application: &MCPClientApplicationConfig{
-			MacOS:   []string{"/Applications/Windsurf.app/Contents/MacOS/Electron", "/usr/local/bin/windsurf"},
-			Windows: []string{filepath.Join(util.GetAppSupportDir(filepath.Join("Programs", "Windsurf")), "Windsurf.exe")},
-			Linux:   []string{"/usr/bin/windsurf", "/usr/local/bin/windsurf"},
+			MacOS:   []string{"/Applications/Windsurf.app/Contents/MacOS/Electron", "/usr/local/bin/windsurf", "$PATH"},
+			Windows: []string{filepath.Join(util.GetAppSupportDir(filepath.Join("Programs", "Windsurf")), "Windsurf.exe"), "$PATH"},
+			Linux:   []string{"/usr/bin/windsurf", "/usr/local/bin/windsurf", "$PATH"},
 		},
 	})
 	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
@@ -301,9 +309,9 @@ func init() {
 		ConfigLocation: filepath.Join(util.GetAppSupportDir("Claude"), "claude_desktop_config.json"),
 		Transport:      "stdio",
 		Application: &MCPClientApplicationConfig{
-			MacOS:   []string{"/Applications/Claude.app/Contents/MacOS/Claude", "/usr/local/bin/claude-desktop"},
-			Windows: []string{filepath.Join(util.GetAppSupportDir("Claude Desktop"), "Claude Desktop.exe")},
-			Linux:   []string{"/usr/bin/claude-desktop", "/usr/local/bin/claude-desktop"},
+			MacOS:   []string{"/Applications/Claude.app/Contents/MacOS/Claude", "/usr/local/bin/claude-desktop", "$PATH"},
+			Windows: []string{filepath.Join(util.GetAppSupportDir("Claude Desktop"), "Claude Desktop.exe"), "$PATH"},
+			Linux:   []string{"/usr/bin/claude-desktop", "/usr/local/bin/claude-desktop", "$PATH"},
 		},
 	})
 	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
@@ -312,9 +320,9 @@ func init() {
 		Command:        "claude",
 		Transport:      "stdio",
 		Application: &MCPClientApplicationConfig{
-			MacOS:   []string{"/Applications/Claude Code.app/Contents/MacOS/Claude Code", "/opt/homebrew/bin/claude", "/usr/local/bin/claude", "~/.npm-global/bin/claude"},
-			Windows: []string{filepath.Join(util.GetAppSupportDir("Claude Code"), "Claude Code.exe")},
-			Linux:   []string{"/usr/bin/claude", "/usr/local/bin/claude"},
+			MacOS:   []string{"/Applications/Claude Code.app/Contents/MacOS/Claude Code", "/opt/homebrew/bin/claude", "/usr/local/bin/claude", "~/.npm-global/bin/claude", "$PATH"},
+			Windows: []string{filepath.Join(util.GetAppSupportDir("Claude Code"), "Claude Code.exe"), "$PATH"},
+			Linux:   []string{"/usr/bin/claude", "/usr/local/bin/claude", "$PATH"},
 		},
 	})
 	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
@@ -323,9 +331,9 @@ func init() {
 		Command:        "cline",
 		Transport:      "stdio",
 		Application: &MCPClientApplicationConfig{
-			MacOS:   []string{"/Applications/Cline.app/Contents/MacOS/Cline", "/usr/local/bin/cline", "/opt/homebrew/bin/cline"},
-			Windows: []string{filepath.Join(util.GetAppSupportDir(filepath.Join("Programs", "Cline")), "Cline.exe")},
-			Linux:   []string{"/usr/bin/cline", "/usr/local/bin/cline"},
+			MacOS:   []string{"/Applications/Cline.app/Contents/MacOS/Cline", "/usr/local/bin/cline", "/opt/homebrew/bin/cline", "$PATH"},
+			Windows: []string{filepath.Join(util.GetAppSupportDir(filepath.Join("Programs", "Cline")), "Cline.exe"), "$PATH"},
+			Linux:   []string{"/usr/bin/cline", "/usr/local/bin/cline", "$PATH"},
 		},
 	})
 	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
@@ -333,9 +341,9 @@ func init() {
 		ConfigLocation: "$HOME/.config/augment/mcp.json",
 		Transport:      "stdio",
 		Application: &MCPClientApplicationConfig{
-			MacOS:   []string{"/Applications/Augment Code.app/Contents/MacOS/Augment Code", "/usr/local/bin/augment", "/opt/homebrew/bin/augment"},
-			Windows: []string{filepath.Join(util.GetAppSupportDir("Augment Code"), "Augment Code.exe")},
-			Linux:   []string{"/usr/bin/augment", "/usr/local/bin/augment"},
+			MacOS:   []string{"/Applications/Augment Code.app/Contents/MacOS/Augment Code", "/usr/local/bin/augment", "/opt/homebrew/bin/augment", "$PATH"},
+			Windows: []string{filepath.Join(util.GetAppSupportDir("Augment Code"), "Augment Code.exe"), "$PATH"},
+			Linux:   []string{"/usr/bin/augment", "/usr/local/bin/augment", "$PATH"},
 		},
 	})
 	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
@@ -343,9 +351,9 @@ func init() {
 		ConfigLocation: filepath.Join(util.GetAppSupportDir("Code"), "User", "mcp_config.json"),
 		Transport:      "stdio",
 		Application: &MCPClientApplicationConfig{
-			MacOS:   []string{"/Applications/Visual Studio Code.app/Contents/MacOS/Electron", "/usr/local/bin/code", "/opt/homebrew/bin/code"},
-			Windows: []string{filepath.Join(util.GetAppSupportDir(filepath.Join("Programs", "Microsoft VS Code")), "Code.exe")},
-			Linux:   []string{"/usr/bin/code", "/usr/local/bin/code"},
+			MacOS:   []string{"/Applications/Visual Studio Code.app/Contents/MacOS/Electron", "/usr/local/bin/code", "/opt/homebrew/bin/code", "$PATH"},
+			Windows: []string{filepath.Join(util.GetAppSupportDir(filepath.Join("Programs", "Microsoft VS Code")), "Code.exe"), "$PATH"},
+			Linux:   []string{"/usr/bin/code", "/usr/local/bin/code", "$PATH"},
 		},
 	})
 	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
@@ -354,9 +362,9 @@ func init() {
 		Command:        "zed",
 		Transport:      "stdio",
 		Application: &MCPClientApplicationConfig{
-			MacOS:   []string{"/Applications/Zed.app/Contents/MacOS/Zed", "/usr/local/bin/zed", "/opt/homebrew/bin/zed"},
-			Windows: []string{filepath.Join(util.GetAppSupportDir(filepath.Join("Programs", "Zed")), "Zed.exe")},
-			Linux:   []string{"/usr/bin/zed", "/usr/local/bin/zed"},
+			MacOS:   []string{"/Applications/Zed.app/Contents/MacOS/Zed", "/usr/local/bin/zed", "/opt/homebrew/bin/zed", "$PATH"},
+			Windows: []string{filepath.Join(util.GetAppSupportDir(filepath.Join("Programs", "Zed")), "Zed.exe"), "$PATH"},
+			Linux:   []string{"/usr/bin/zed", "/usr/local/bin/zed", "$PATH"},
 		},
 	})
 	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
@@ -365,9 +373,9 @@ func init() {
 		Command:        "anthropic",
 		Transport:      "stdio",
 		Application: &MCPClientApplicationConfig{
-			MacOS:   []string{"/usr/local/bin/anthropic", "/opt/homebrew/bin/anthropic"},
-			Windows: []string{filepath.Join(util.GetAppSupportDir(filepath.Join("Programs", "Anthropic")), "anthropic.exe")},
-			Linux:   []string{"/usr/bin/anthropic", "/usr/local/bin/anthropic"},
+			MacOS:   []string{"/usr/local/bin/anthropic", "/opt/homebrew/bin/anthropic", "$PATH"},
+			Windows: []string{filepath.Join(util.GetAppSupportDir(filepath.Join("Programs", "Anthropic")), "anthropic.exe"), "$PATH"},
+			Linux:   []string{"/usr/bin/anthropic", "/usr/local/bin/anthropic", "$PATH"},
 		},
 	})
 }
