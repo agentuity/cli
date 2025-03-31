@@ -298,4 +298,65 @@ func init() {
 			Windows: filepath.Join(util.GetAppSupportDir("Claude Desktop"), "Claude Desktop.exe"),
 		},
 	})
+	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
+		Name:           "Claude Code",
+		ConfigLocation: filepath.Join(util.GetAppSupportDir("Claude Code"), "mcp_config.json"),
+		Transport:      "stdio",
+		Application: &MCPClientApplicationConfig{
+			MacOS:   "/Applications/Claude Code.app/Contents/MacOS/Claude Code",
+			Windows: filepath.Join(util.GetAppSupportDir("Claude Code"), "Claude Code.exe"),
+		},
+	})
+	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
+		Name:           "Cline",
+		ConfigLocation: "$HOME/.config/cline/mcp.json",
+		Command:        "cline",
+		Transport:      "stdio",
+		Application: &MCPClientApplicationConfig{
+			MacOS:   "/Applications/Cline.app/Contents/MacOS/Cline",
+			Windows: filepath.Join(util.GetAppSupportDir(filepath.Join("Programs", "Cline")), "Cline.exe"),
+			Linux:   "/usr/bin/cline",
+		},
+	})
+	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
+		Name:           "Augment Code",
+		ConfigLocation: "$HOME/.config/augment/mcp.json",
+		Transport:      "stdio",
+		Application: &MCPClientApplicationConfig{
+			MacOS:   "/Applications/Augment Code.app/Contents/MacOS/Augment Code",
+			Windows: filepath.Join(util.GetAppSupportDir("Augment Code"), "Augment Code.exe"),
+		},
+	})
+	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
+		Name:           "VSCode",
+		ConfigLocation: filepath.Join(util.GetAppSupportDir("Code"), "User", "mcp_config.json"),
+		Transport:      "stdio",
+		Application: &MCPClientApplicationConfig{
+			MacOS:   "/Applications/Visual Studio Code.app/Contents/MacOS/Electron",
+			Windows: filepath.Join(util.GetAppSupportDir(filepath.Join("Programs", "Microsoft VS Code")), "Code.exe"),
+			Linux:   "/usr/bin/code",
+		},
+	})
+	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
+		Name:           "Zed",
+		ConfigLocation: "$HOME/.config/zed/mcp.json",
+		Command:        "zed",
+		Transport:      "stdio",
+		Application: &MCPClientApplicationConfig{
+			MacOS:   "/Applications/Zed.app/Contents/MacOS/Zed",
+			Windows: filepath.Join(util.GetAppSupportDir(filepath.Join("Programs", "Zed")), "Zed.exe"),
+			Linux:   "/usr/bin/zed",
+		},
+	})
+	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
+		Name:           "Anthropic Terminal",
+		ConfigLocation: "$HOME/.config/anthropic/terminal/mcp.json",
+		Command:        "anthropic",
+		Transport:      "stdio",
+		Application: &MCPClientApplicationConfig{
+			MacOS:   "/usr/local/bin/anthropic",
+			Windows: filepath.Join(util.GetAppSupportDir(filepath.Join("Programs", "Anthropic")), "anthropic.exe"),
+			Linux:   "/usr/bin/anthropic",
+		},
+	})
 }
