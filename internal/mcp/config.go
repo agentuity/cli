@@ -301,10 +301,12 @@ func init() {
 	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
 		Name:           "Claude Code",
 		ConfigLocation: filepath.Join(util.GetAppSupportDir("Claude Code"), "mcp_config.json"),
+		Command:        "claude",
 		Transport:      "stdio",
 		Application: &MCPClientApplicationConfig{
 			MacOS:   "/Applications/Claude Code.app/Contents/MacOS/Claude Code",
 			Windows: filepath.Join(util.GetAppSupportDir("Claude Code"), "Claude Code.exe"),
+			Linux:   "/usr/bin/claude",
 		},
 	})
 	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
