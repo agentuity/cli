@@ -773,7 +773,7 @@ Examples:
 				tui.Table(headers, rows)
 			}
 		} else {
-			headers := []string{tui.Title("Project Id"), tui.Title("Name"), tui.Title("Description"), tui.Title("Organization")}
+			headers := []string{tui.Title("Project Id"), tui.Title("Name"), tui.Title("Description")}
 			rows := [][]string{}
 			for _, project := range projects {
 				desc := project.Description
@@ -784,7 +784,6 @@ Examples:
 					tui.Muted(project.ID),
 					tui.Bold(project.Name),
 					tui.Text(tui.MaxWidth(desc, 30)),
-					tui.Text(project.OrgName) + " " + tui.Muted("("+project.OrgId+")"),
 				})
 			}
 			tui.Table(headers, rows)
