@@ -491,18 +491,7 @@ Examples:
 			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
 		}
 
-		var tmpls templates.Templates
-
-		tui.ShowSpinner("Loading templates...", func() {
-			tmpls, err = templates.LoadTemplates(ctx, tmplDir)
-			if err != nil {
-				errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates")).ShowErrorAndExit()
-			}
-
-			if len(tmpls) == 0 {
-				errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("No templates returned from load templates")).ShowErrorAndExit()
-			}
-		})
+		tmpls := loadTemplates(ctx, cmd)
 
 		var selectProvider string
 		var selectTemplate string
@@ -754,7 +743,7 @@ Examples:
 		if len(orgs) > 1 {
 			for _, orgId := range orgs {
 				fmt.Println()
-				fmt.Println(tui.Bold(orgNames[orgId]) + " " + tui.Muted("(" + orgId + ")"))
+				fmt.Println(tui.Bold(orgNames[orgId]) + " " + tui.Muted("("+orgId+")"))
 				fmt.Println()
 
 				headers := []string{tui.Title("Project Id"), tui.Title("Name"), tui.Title("Description")}
