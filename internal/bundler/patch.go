@@ -45,10 +45,10 @@ func generateEnvGuard(name string, inject string) string {
 func generateGatewayEnvGuard(apikey string, apikeyval string, apibase string, provider string) string {
 	return fmt.Sprintf(`{
 	const apikey = process.env.AGENTUITY_API_KEY;
-	const url = process.env.AGENTUITY_URL;
+	const url = process.env.AGENTUITY_TRANSPORT_URL;
 	if (url && apikey) {
 		process.env.%[1]s = %[2]s;
-		process.env.%[3]s = url + '/sdk/gateway/%[4]s';
+		process.env.%[3]s = url + '/gateway/%[4]s';
 		console.debug('Enabled Agentuity AI Gateway for %[4]s');
 	} else {
 	 %[5]s
