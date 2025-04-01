@@ -485,7 +485,7 @@ func upgradeWithHomebrew(ctx context.Context, logger logger.Logger) error {
 		return nil
 	}
 
-	logger.Info("Updating Homebrew")
+	logger.Debug("Updating Homebrew")
 	updateCmd := exec.CommandContext(ctx, "brew", "update")
 	updateCmd.Stdout = os.Stdout
 	updateCmd.Stderr = os.Stderr
