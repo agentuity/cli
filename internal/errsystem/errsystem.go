@@ -51,9 +51,9 @@ func New(code errorType, err error, opts ...option) *errSystem {
 	if user_id != "" {
 		opts = append(opts, WithUserId(user_id))
 	}
-	res.apiurl = viper.GetString("overrides.app_url")
+	res.apiurl = viper.GetString("overrides.api_url")
 	if res.apiurl == "" {
-		res.apiurl = "https://app.agentuity.com/api"
+		res.apiurl = "https://api.agentuity.com"
 	}
 	res.apiurl = util.TransformUrl(res.apiurl)
 	for _, opt := range opts {
