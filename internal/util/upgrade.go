@@ -160,15 +160,15 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 	if runtime.GOOS == "darwin" {
 		exe, err := os.Executable()
 		if err == nil {
-			if strings.Contains(exe, "/usr/local/Cellar/agentuity/") || 
-			   strings.Contains(exe, "/opt/homebrew/Cellar/agentuity/") ||
-			   strings.Contains(exe, "/homebrew/Cellar/agentuity/") {
+			if strings.Contains(exe, "/usr/local/Cellar/agentuity/") ||
+				strings.Contains(exe, "/opt/homebrew/Cellar/agentuity/") ||
+				strings.Contains(exe, "/homebrew/Cellar/agentuity/") {
 				logger.Info("Detected Homebrew installation, upgrading via brew")
 				return upgradeWithHomebrew(ctx, logger)
 			}
-			
-			if strings.Contains(exe, "/usr/local/bin/agentuity") || 
-			   strings.Contains(exe, "/opt/homebrew/bin/agentuity") {
+
+			if strings.Contains(exe, "/usr/local/bin/agentuity") ||
+				strings.Contains(exe, "/opt/homebrew/bin/agentuity") {
 				logger.Info("Detected Homebrew symlink, upgrading via brew")
 				return upgradeWithHomebrew(ctx, logger)
 			}
