@@ -12,7 +12,6 @@ import (
 	"path"
 	"regexp"
 	"runtime/debug"
-	"slices"
 	"strings"
 	"time"
 
@@ -216,19 +215,19 @@ func TransformUrl(urlString string) string {
 
 func GetURLs(logger logger.Logger) (string, string, string) {
 	appUrl := viper.GetString("overrides.app_url")
-	parsedAppUrl, err := url.Parse(appUrl)
-	if err != nil {
-		logger.Fatal("error parsing app url: %s", err)
-	}
-	parsedAppUrl.Path = "/api"
-	apiUrl := parsedAppUrl.String()
+	apiUrl := viper.GetString("overrides.api_url")
 	transportUrl := viper.GetString("overrides.transport_url")
-	devAPIURLS := []string{"http://localhost:3000/api", "https://app.agentuity.io/api"}
-
-	if apiUrl == "https://app.agentuity.com/api" && transportUrl != "https://agentuity.ai" {
+	if apiUrl == "https://api.agentuity.com" && appUrl != "https://app.agentuity.com" {
+		logger.Debug("switching app url to production since the api url is production")
+		appUrl = "https://app.agentuity.com"
+	} else if apiUrl == "https://api.agentuity.dev" && appUrl == "https://app.agentuity.com" {
+		logger.Debug("switching app url to dev since the api url is dev")
+		appUrl = "http://localhost:3000"
+	}
+	if apiUrl == "https://api.agentuity.com" && transportUrl != "https://agentuity.api" {
 		logger.Debug("switching transport url to production since the api url is production")
 		transportUrl = "https://agentuity.ai"
-	} else if slices.Contains(devAPIURLS, apiUrl) && transportUrl == "https://agentuity.ai" {
+	} else if apiUrl == "https://api.agentuity.dev" && transportUrl == "https://agentuity.ai" {
 		logger.Debug("switching transport url to dev since the api url is dev")
 		transportUrl = "http://localhost:3939"
 	}
