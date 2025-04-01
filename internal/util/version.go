@@ -40,7 +40,7 @@ func GetLatestRelease(ctx context.Context) (string, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
 		return "", err
 	}
-	return release.TagName, nil
+	return strings.TrimPrefix(release.TagName, "v"), nil
 }
 
 func CheckLatestRelease(ctx context.Context, logger logger.Logger) error {
