@@ -118,7 +118,7 @@ done
 
 if [[ ! -d "$INSTALL_PATH" ]]; then
   ohai "Creating install directory: $INSTALL_PATH"
-  mkdir -p "$INSTALL_PATH" || abort "Failed to create directory: $INSTALL_PATH"
+  mkdir -p "$INSTALL_PATH" 2>/dev/null || true  # Don't abort if mkdir fails
 fi
 
 if [[ "$OS" == "Darwin" ]] && command -v brew >/dev/null 2>&1 && [[ "$NO_BREW" != "true" ]]; then
@@ -147,12 +147,8 @@ if [[ "$OS" == "Darwin" ]] && command -v brew >/dev/null 2>&1 && [[ "$NO_BREW" !
   fi
 fi
 
-if [[ ! -d "$INSTALL_PATH" ]]; then
-  ohai "Creating install directory: $INSTALL_PATH"
-  mkdir -p "$INSTALL_PATH" || abort "Failed to create directory: $INSTALL_PATH. Try running with sudo or specify a different directory with --dir."
-fi
 
-if [[ ! -w "$INSTALL_PATH" ]]; then
+if [[ ! -d "$INSTALL_PATH" ]] || [[ ! -w "$INSTALL_PATH" ]]; then
   if [[ "$INSTALL_PATH" == "/usr/local/bin" ]]; then
     ohai "No write permission to $INSTALL_PATH. Trying alternative locations..."
     
@@ -167,7 +163,7 @@ if [[ ! -w "$INSTALL_PATH" ]]; then
         INSTALL_PATH="$HOME/bin"
       fi
     else
-      abort "No write permission to $INSTALL_PATH. Try running with sudo or specify a different directory with --dir."
+      abort "Could not find or create a writable installation directory. Try running with sudo or specify a different directory with --dir."
     fi
   else
     abort "No write permission to $INSTALL_PATH. Try running with sudo or specify a different directory with --dir."
