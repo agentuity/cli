@@ -471,6 +471,20 @@ func extractBinary(ctx context.Context, logger logger.Logger, assetPath, extract
 }
 
 func upgradeWithHomebrew(ctx context.Context, logger logger.Logger) error {
+	release, err := GetLatestRelease(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get latest release: %w", err)
+	}
+
+	exe, _ := os.Executable()
+	v, _ := exec.CommandContext(ctx, exe, "version").Output()
+	currentVersion := strings.TrimSpace(string(v))
+
+	if currentVersion == release {
+		tui.ShowSuccess("You are already on the latest version (%s)", currentVersion)
+		return nil
+	}
+
 	logger.Info("Updating Homebrew")
 	updateCmd := exec.CommandContext(ctx, "brew", "update")
 	updateCmd.Stdout = os.Stdout
@@ -487,11 +501,10 @@ func upgradeWithHomebrew(ctx context.Context, logger logger.Logger) error {
 		return fmt.Errorf("failed to upgrade via Homebrew: %w", err)
 	}
 
-	exe, _ := os.Executable()
-	v, _ := exec.CommandContext(ctx, exe, "version").Output()
-	version := strings.TrimSpace(string(v))
+	v, _ = exec.CommandContext(ctx, exe, "version").Output()
+	newVersion := strings.TrimSpace(string(v))
 
-	tui.ShowSuccess("Successfully upgraded to version %s via Homebrew", version)
+	tui.ShowSuccess("Successfully upgraded to version %s via Homebrew", newVersion)
 	return nil
 }
 
