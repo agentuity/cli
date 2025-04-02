@@ -481,9 +481,9 @@ func extractBinary(ctx context.Context, logger logger.Logger, assetPath, extract
 }
 
 func upgradeWithHomebrew(ctx context.Context, logger logger.Logger) error {
-	release, err := GetLatestRelease(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get latest release: %w", err)
+	release, rerr := GetLatestRelease(ctx)
+	if rerr != nil {
+		return fmt.Errorf("failed to get latest release: %w", rerr)
 	}
 
 	exe, _ := os.Executable()
