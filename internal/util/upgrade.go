@@ -543,7 +543,10 @@ func upgradeWithWindowsMsi(ctx context.Context, version string) error {
 	defer os.RemoveAll(tempDir)
 
 	installerName := getMsiInstallerName()
-	installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s/%s", version, installerName)
+	if strings.HasPrefix(version, "v") {
+		version = strings.TrimPrefix(version, "v")
+	}
+	installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/v%s/%s", version, installerName)
 	installerPath := filepath.Join(tempDir, installerName)
 
 	var downloadErr error
