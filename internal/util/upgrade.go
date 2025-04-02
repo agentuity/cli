@@ -208,8 +208,8 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 	}
 	defer os.RemoveAll(tempDir)
 
-	assetURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s/%s", release, assetName)
-	checksumURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s/%s", release, checksumFileName)
+	assetURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/v%s/%s", release, assetName)
+	checksumURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/v%s/%s", release, checksumFileName)
 
 	assetPath := filepath.Join(tempDir, assetName)
 	checksumPath := filepath.Join(tempDir, checksumFileName)
