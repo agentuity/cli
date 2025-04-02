@@ -163,13 +163,13 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 			if strings.Contains(exe, "/usr/local/Cellar/agentuity/") ||
 				strings.Contains(exe, "/opt/homebrew/Cellar/agentuity/") ||
 				strings.Contains(exe, "/homebrew/Cellar/agentuity/") {
-				logger.Info("Detected Homebrew installation, upgrading via brew")
+				logger.Debug("Detected Homebrew installation, upgrading via brew")
 				return upgradeWithHomebrew(ctx, logger)
 			}
 
 			if strings.Contains(exe, "/usr/local/bin/agentuity") ||
 				strings.Contains(exe, "/opt/homebrew/bin/agentuity") {
-				logger.Info("Detected Homebrew symlink, upgrading via brew")
+				logger.Debug("Detected Homebrew symlink, upgrading via brew")
 				return upgradeWithHomebrew(ctx, logger)
 			}
 		}
@@ -208,8 +208,8 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 	}
 	defer os.RemoveAll(tempDir)
 
-	assetURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s/%s", release, assetName)
-	checksumURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s/%s", release, checksumFileName)
+	assetURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/v%s/%s", release, assetName)
+	checksumURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/v%s/%s", release, checksumFileName)
 
 	assetPath := filepath.Join(tempDir, assetName)
 	checksumPath := filepath.Join(tempDir, checksumFileName)
@@ -481,9 +481,9 @@ func extractBinary(ctx context.Context, logger logger.Logger, assetPath, extract
 }
 
 func upgradeWithHomebrew(ctx context.Context, logger logger.Logger) error {
-	release, err := GetLatestRelease(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get latest release: %w", err)
+	release, rerr := GetLatestRelease(ctx)
+	if rerr != nil {
+		return fmt.Errorf("failed to get latest release: %w", rerr)
 	}
 
 	exe, _ := os.Executable()
@@ -495,24 +495,37 @@ func upgradeWithHomebrew(ctx context.Context, logger logger.Logger) error {
 		return nil
 	}
 
-	logger.Debug("Updating Homebrew")
-	updateCmd := exec.CommandContext(ctx, "brew", "update")
-	updateCmd.Stdout = os.Stdout
-	updateCmd.Stderr = os.Stderr
-	if err := updateCmd.Run(); err != nil {
-		return fmt.Errorf("failed to update Homebrew: %w", err)
+	var newVersion string
+	var err error
+
+	action := func() {
+		logger.Debug("Updating Homebrew")
+		updateCmd := exec.CommandContext(ctx, "brew", "update")
+		updateCmd.Stdout = os.Stdout
+		updateCmd.Stderr = os.Stderr
+		if lerr := updateCmd.Run(); lerr != nil {
+			err = fmt.Errorf("failed to update Homebrew: %w", lerr)
+			return
+		}
+
+		logger.Debug("Upgrading agentuity")
+		upgradeCmd := exec.CommandContext(ctx, "brew", "upgrade", "agentuity")
+		upgradeCmd.Stdout = os.Stdout
+		upgradeCmd.Stderr = os.Stderr
+		if lerr := upgradeCmd.Run(); lerr != nil {
+			err = fmt.Errorf("failed to upgrade via Homebrew: %w", lerr)
+			return
+		}
+
+		v, _ = exec.CommandContext(ctx, exe, "version").Output()
+		newVersion = strings.TrimSpace(string(v))
 	}
 
-	logger.Info("Upgrading agentuity")
-	upgradeCmd := exec.CommandContext(ctx, "brew", "upgrade", "agentuity")
-	upgradeCmd.Stdout = os.Stdout
-	upgradeCmd.Stderr = os.Stderr
-	if err := upgradeCmd.Run(); err != nil {
-		return fmt.Errorf("failed to upgrade via Homebrew: %w", err)
-	}
+	tui.ShowSpinner("Upgrading agentuity via Homebrew", action)
 
-	v, _ = exec.CommandContext(ctx, exe, "version").Output()
-	newVersion := strings.TrimSpace(string(v))
+	if err != nil {
+		return err
+	}
 
 	tui.ShowSuccess("Successfully upgraded to version %s via Homebrew", newVersion)
 	return nil
@@ -530,7 +543,10 @@ func upgradeWithWindowsMsi(ctx context.Context, version string) error {
 	defer os.RemoveAll(tempDir)
 
 	installerName := getMsiInstallerName()
-	installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s/%s", version, installerName)
+	if strings.HasPrefix(version, "v") {
+		version = strings.TrimPrefix(version, "v")
+	}
+	installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/v%s/%s", version, installerName)
 	installerPath := filepath.Join(tempDir, installerName)
 
 	var downloadErr error
