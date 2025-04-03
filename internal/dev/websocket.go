@@ -382,7 +382,7 @@ func processInputMessage(plogger logger.Logger, c *Websocket, m []byte, port int
 			msg := NewOutputMessage(inputMsg.ID, OutputPayload{
 				ContentType: "text/plain",
 				Payload:     []byte(err.Error()),
-				Trigger:     "manual",
+				Trigger:     "",
 			})
 			outputMessage = &msg
 		} else {
@@ -488,8 +488,7 @@ func processInputMessage(plogger logger.Logger, c *Websocket, m []byte, port int
 
 	output, lerr := isOutputPayload(body)
 	if lerr != nil {
-		logger.Error("failed to check if response is output payload: %s", lerr)
-		err = fmt.Errorf("failed to check if response is output payload: %w", lerr)
+		err = fmt.Errorf("the Agent produced an error")
 		return
 	}
 
