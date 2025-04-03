@@ -10,24 +10,40 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/go-common/logger"
+	"github.com/agentuity/go-common/telemetry"
 	"github.com/gorilla/websocket"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
+var propagator propagation.TraceContext
+
 type Websocket struct {
-	WebSocketId  string
+	webSocketId  string
 	conn         *websocket.Conn
 	OtelToken    string
 	OtelUrl      string
 	Project      project.ProjectContext
-	Done         chan struct{}
+	orgId        string
+	done         chan struct{}
 	apiKey       string
 	websocketUrl string
 	maxRetries   int
 	retryCount   int
+	parentCtx    context.Context
+	ctx          context.Context
+	logger       logger.Logger
+	cleanup      func()
+	tracer       trace.Tracer
+	version      string
 }
 
 type OutputPayload struct {
@@ -56,9 +72,13 @@ func isContextCanceled(ctx context.Context, err error) bool {
 	}
 }
 
+func (c *Websocket) Done() <-chan struct{} {
+	return c.done
+}
+
 func (c *Websocket) StartReadingMessages(ctx context.Context, logger logger.Logger, port int) {
 	go func() {
-		defer close(c.Done)
+		defer close(c.done)
 		for {
 			_, m, err := c.conn.ReadMessage()
 			if err != nil {
@@ -70,7 +90,7 @@ func (c *Websocket) StartReadingMessages(ctx context.Context, logger logger.Logg
 					logger.Debug("connection closed")
 					if c.retryCount < c.maxRetries {
 						logger.Info("attempting to reconnect, retry %d of %d", c.retryCount+1, c.maxRetries)
-						if err := c.reconnect(logger); err != nil {
+						if err := c.connect(logger, true); err != nil {
 							logger.Error("failed to reconnect: %s", err)
 							c.retryCount++
 							continue
@@ -83,7 +103,7 @@ func (c *Websocket) StartReadingMessages(ctx context.Context, logger logger.Logg
 				logger.Error("failed to read message: %s", err)
 				if c.retryCount < c.maxRetries {
 					logger.Info("attempting to reconnect, retry %d of %d", c.retryCount+1, c.maxRetries)
-					if err := c.reconnect(logger); err != nil {
+					if err := c.connect(logger, true); err != nil {
 						logger.Error("failed to reconnect: %s", err)
 						c.retryCount++
 						continue
@@ -123,7 +143,7 @@ func (c *Websocket) StartReadingMessages(ctx context.Context, logger logger.Logg
 				}
 				logger.Trace("sending agents: %+v", agents)
 
-				agentsMessage := NewAgentsMessage(c.WebSocketId, AgentsPayload{
+				agentsMessage := NewAgentsMessage(c.webSocketId, AgentsPayload{
 					ProjectID:   c.Project.Project.ProjectId,
 					ProjectName: c.Project.Project.Name,
 					Agents:      agents,
@@ -135,17 +155,22 @@ func (c *Websocket) StartReadingMessages(ctx context.Context, logger logger.Logg
 	}()
 }
 
-func (c *Websocket) reconnect(logger logger.Logger) error {
-	// Close existing connection if it exists
-	if c.conn != nil {
-		_ = c.conn.Close()
+func (c *Websocket) connect(logger logger.Logger, close bool) error {
+	if close {
+		// Close existing connection if it exists
+		if c.cleanup != nil {
+			c.cleanup()
+		}
+		if c.conn != nil {
+			c.conn.Close()
+		}
 	}
 
 	u, err := url.Parse(c.websocketUrl)
 	if err != nil {
 		return fmt.Errorf("failed to parse url: %s", err)
 	}
-	u.Path = fmt.Sprintf("/websocket/devmode/%s", c.WebSocketId)
+	u.Path = fmt.Sprintf("/websocket/devmode/%s", c.webSocketId)
 	u.RawQuery = url.Values{
 		"from": []string{"cli"},
 	}.Encode()
@@ -161,7 +186,7 @@ func (c *Websocket) reconnect(logger logger.Logger) error {
 	headers.Set("Authorization", fmt.Sprintf("Bearer %s", c.apiKey))
 
 	// connect to the websocket
-	logger.Trace("reconnecting to %s", urlString)
+	logger.Trace("connecting to %s", urlString)
 	var httpResponse *http.Response
 	c.conn, httpResponse, err = websocket.DefaultDialer.Dial(urlString, headers)
 	if err != nil {
@@ -183,25 +208,46 @@ func (c *Websocket) reconnect(logger logger.Logger) error {
 		return errsystem.New(errsystem.ErrAuthenticateOtelServer, nil, errsystem.WithUserMessage("Failed to get otel server url"))
 	}
 
-	logger.Info("successfully reconnected")
+	c.ctx, c.logger, c.cleanup, err = telemetry.NewWithAPIKey(c.parentCtx, "@agentuity/cli", c.OtelUrl, c.OtelToken, logger)
+	if err != nil {
+		return fmt.Errorf("failed to create OTLP telemetry trace: %w", err)
+	}
+
+	logger.Debug("successfully connected")
 	return nil
 }
 
-func NewWebsocket(logger logger.Logger, websocketId string, websocketUrl string, apiKey string, theproject project.ProjectContext) (*Websocket, error) {
-	self := Websocket{
-		WebSocketId:  websocketId,
-		Project:      theproject,
-		Done:         make(chan struct{}),
-		apiKey:       apiKey,
-		websocketUrl: websocketUrl,
+type WebsocketArgs struct {
+	Ctx          context.Context
+	Logger       logger.Logger
+	WebsocketId  string
+	WebsocketUrl string
+	APIKey       string
+	Project      project.ProjectContext
+	OrgId        string
+	Version      string
+}
+
+func NewWebsocket(args WebsocketArgs) (*Websocket, error) {
+	tracer := otel.Tracer("@agentuity/cli", trace.WithInstrumentationVersion(args.Version))
+	ws := Websocket{
+		parentCtx:    args.Ctx,
+		webSocketId:  args.WebsocketId,
+		Project:      args.Project,
+		done:         make(chan struct{}),
+		apiKey:       args.APIKey,
+		websocketUrl: args.WebsocketUrl,
 		maxRetries:   5,
 		retryCount:   0,
+		tracer:       tracer,
+		orgId:        args.OrgId,
+		version:      args.Version,
 	}
-	u, err := url.Parse(websocketUrl)
+	u, err := url.Parse(args.WebsocketUrl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse url: %s", err)
 	}
-	u.Path = fmt.Sprintf("/websocket/devmode/%s", websocketId)
+	u.Path = fmt.Sprintf("/websocket/devmode/%s", args.WebsocketId)
 	u.RawQuery = url.Values{
 		"from": []string{"cli"},
 	}.Encode()
@@ -212,34 +258,11 @@ func NewWebsocket(logger logger.Logger, websocketId string, websocketUrl string,
 		u.Scheme = "wss"
 	}
 
-	urlString := u.String()
-	headers := http.Header{}
-	headers.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
-
-	// connect to the websocket
-	logger.Trace("dialing %s", urlString)
-	var httpResponse *http.Response
-	self.conn, httpResponse, err = websocket.DefaultDialer.Dial(urlString, headers)
-	if err != nil {
-		if httpResponse != nil {
-			if httpResponse.StatusCode == 401 {
-				logger.Error("invalid api key")
-			}
-		}
-		return nil, fmt.Errorf("failed to dial: %s", err)
+	if err := ws.connect(args.Logger, false); err != nil {
+		return nil, err
 	}
 
-	// get the otel token and url from the headers
-	self.OtelToken = httpResponse.Header.Get("X-AGENTUITY-OTLP-BEARER-TOKEN")
-	if self.OtelToken == "" {
-		errsystem.New(errsystem.ErrAuthenticateOtelServer, nil, errsystem.WithUserMessage("Failed to authenticate with otel server"))
-	}
-	self.OtelUrl = httpResponse.Header.Get("X-AGENTUITY-OTLP-URL")
-	if self.OtelUrl == "" {
-		errsystem.New(errsystem.ErrAuthenticateOtelServer, nil, errsystem.WithUserMessage("Failed to get otel server url"))
-	}
-
-	return &self, nil
+	return &ws, nil
 }
 
 // Update SendMessage to accept the MessageType interface
@@ -260,11 +283,15 @@ func (c *Websocket) Close() error {
 	if err := c.conn.Close(); err != nil {
 		return err
 	}
+	if c.cleanup != nil {
+		c.cleanup()
+		c.cleanup = nil
+	}
 	return nil
 }
 
 func (c *Websocket) WebURL(appUrl string) string {
-	return fmt.Sprintf("%s/devmode/%s", appUrl, c.WebSocketId)
+	return fmt.Sprintf("%s/devmode/%s", appUrl, c.webSocketId)
 }
 
 type Message struct {
@@ -332,17 +359,84 @@ func NewAgentsMessage(id string, payload AgentsPayload) Message {
 	}
 }
 
-func processInputMessage(logger logger.Logger, c *Websocket, m []byte, port int) {
+func processInputMessage(plogger logger.Logger, c *Websocket, m []byte, port int) {
+	started := time.Now()
+	ctx, logger, span := telemetry.StartSpan(c.ctx, plogger, c.tracer, "TriggerRun",
+		trace.WithAttributes(
+			attribute.String("@agentuity/devmode", "true"),
+			attribute.String("trigger", "manual"),
+			attribute.String("@agentuity/deploymentId", c.webSocketId),
+		),
+		trace.WithSpanKind(trace.SpanKindConsumer),
+	)
+	defer span.End()
+
 	var inputMsg InputMessage
-	if err := json.Unmarshal(m, &inputMsg); err != nil {
-		logger.Error("failed to unmarshal agent message: %s", err)
+	var outputMessage *Message
+	var err error
+
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			msg := NewOutputMessage(inputMsg.ID, OutputPayload{
+				ContentType: "text/plain",
+				Payload:     []byte(err.Error()),
+				Trigger:     "manual",
+			})
+			outputMessage = &msg
+		} else {
+			span.SetStatus(codes.Ok, "")
+		}
+		if outputMessage != nil {
+			c.SendMessage(plogger, *outputMessage)
+		}
+		span.SetAttributes(
+			attribute.Int64("@agentuity/cpu_time", time.Since(started).Milliseconds()),
+		)
+		plogger.Info("processed sess_%s in %s", span.SpanContext().TraceID(), time.Since(started))
+	}()
+
+	if lerr := json.Unmarshal(m, &inputMsg); lerr != nil {
+		logger.Error("failed to unmarshal agent message: %s", lerr)
+		err = lerr
 		return
 	}
+
+	span.SetAttributes(
+		attribute.String("@agentuity/agentId", inputMsg.Payload.AgentID),
+		attribute.String("@agentuity/orgId", c.orgId),
+		attribute.String("@agentuity/projectId", c.Project.Project.ProjectId),
+		attribute.String("@agentuity/env", "development"),
+	)
+
+	spanContext := span.SpanContext()
+	traceState := spanContext.TraceState()
+	traceState, err = traceState.Insert("id", inputMsg.Payload.AgentID)
+	if err != nil {
+		logger.Error("failed to insert agent id into trace state: %s", err)
+		err = fmt.Errorf("failed to insert agent id into trace state: %w", err)
+		return
+	}
+	traceState, err = traceState.Insert("oid", c.orgId)
+	if err != nil {
+		logger.Error("failed to insert org id into trace state: %s", err)
+		err = fmt.Errorf("failed to insert org id into trace state: %w", err)
+		return
+	}
+	traceState, err = traceState.Insert("pid", c.Project.Project.ProjectId)
+	if err != nil {
+		logger.Error("failed to insert project id into trace state: %s", err)
+		err = fmt.Errorf("failed to insert project id into trace state: %w", err)
+		return
+	}
+	ctx = trace.ContextWithSpanContext(ctx, spanContext.WithTraceState(traceState))
 
 	c.Project.Logger.Debug("input message: %+v", inputMsg)
 
 	if c.Project.Project.Development == nil {
 		logger.Error("development is not enabled for this project")
+		err = errors.New("development is not enabled for this project")
 		return
 	}
 
@@ -355,41 +449,54 @@ func processInputMessage(logger logger.Logger, c *Websocket, m []byte, port int)
 		"trigger":     "manual",
 	}
 
-	jsonPayload, err := json.Marshal(payload)
-	if err != nil {
-		logger.Error("failed to marshal payload: %s", err)
+	jsonPayload, lerr := json.Marshal(payload)
+	if lerr != nil {
+		logger.Error("failed to marshal payload: %s", lerr)
+		err = fmt.Errorf("failed to marshal payload: %w", lerr)
 		return
 	}
 	logger.Debug("sending payload: %s to %s", string(jsonPayload), url)
 
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonPayload))
-	if err != nil {
-		logger.Error("failed to post to agent: %s", err)
+	req, lerr := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonPayload))
+	if lerr != nil {
+		logger.Error("failed to create request: %s", lerr)
+		err = fmt.Errorf("failed to create HTTP request: %w", lerr)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "Agentuity CLI/"+c.version)
+	propagator.Inject(ctx, propagation.HeaderCarrier(req.Header))
+
+	logger.Debug("sending request to %s with trace id: %s", url, spanContext.TraceID())
+
+	resp, lerr := http.DefaultClient.Do(req)
+	if lerr != nil {
+		logger.Error("failed to post to agent: %s", lerr)
+		err = fmt.Errorf("failed to post to agent: %w", lerr)
 		return
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		logger.Error("failed to read response body: %s", err)
+	body, lerr := io.ReadAll(resp.Body)
+	if lerr != nil {
+		logger.Error("failed to read response body: %s", lerr)
+		err = fmt.Errorf("failed to read response body: %w", lerr)
 		return
 	}
 
 	logger.Debug("response: %s (status code: %d)", string(body), resp.StatusCode)
 
-	output, err := isOutputPayload(body)
-	if err != nil {
-		logger.Error("failed to check if response is output payload: %s", err)
+	output, lerr := isOutputPayload(body)
+	if lerr != nil {
+		logger.Error("failed to check if response is output payload: %s", lerr)
+		err = fmt.Errorf("failed to check if response is output payload: %w", lerr)
 		return
 	}
 
-	outputMessage := NewOutputMessage(inputMsg.ID, OutputPayload{
+	msg := NewOutputMessage(inputMsg.ID, OutputPayload{
 		ContentType: output.ContentType,
 		Payload:     output.Payload,
 		Trigger:     output.Trigger,
 	})
-
-	if err := c.SendMessage(logger, outputMessage); err != nil {
-		logger.Error("failed to send output message: %s", err)
-	}
+	outputMessage = &msg
 }
