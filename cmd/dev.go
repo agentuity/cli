@@ -73,7 +73,16 @@ Examples:
 			websocketId = cstr.NewHash(orgId, userId)
 		}
 
-		websocketConn, err := dev.NewWebsocket(log, websocketId, websocketUrl, apiKey, theproject)
+		websocketConn, err := dev.NewWebsocket(dev.WebsocketArgs{
+			Ctx:          ctx,
+			Logger:       log,
+			WebsocketId:  websocketId,
+			WebsocketUrl: websocketUrl,
+			APIKey:       apiKey,
+			Project:      theproject,
+			Version:      Version,
+			OrgId:        orgId,
+		})
 		if err != nil {
 			log.Fatal("failed to create live dev connection: %s", err)
 		}
@@ -93,7 +102,7 @@ Examples:
 			started := time.Now()
 			tui.ShowSpinner("Building project ...", func() {
 				if err := bundler.Bundle(bundler.BundleContext{
-					Context:    context.Background(),
+					Context:    ctx,
 					Logger:     log,
 					ProjectDir: dir,
 					Production: false,
@@ -154,7 +163,7 @@ Examples:
 		}()
 
 		select {
-		case <-websocketConn.Done:
+		case <-websocketConn.Done():
 			log.Info("live dev connection closed, shutting down")
 			dev.KillProjectServer(projectServerCmd)
 			watcher.Close(log)
