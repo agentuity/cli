@@ -484,6 +484,11 @@ func processInputMessage(plogger logger.Logger, c *Websocket, m []byte, port int
 		return
 	}
 
+	if resp.StatusCode != 200 {
+		err = fmt.Errorf("the Agent produced an error: %s", string(body))
+		return
+	}
+
 	logger.Debug("response: %s (status code: %d)", string(body), resp.StatusCode)
 
 	output, lerr := isOutputPayload(body)
