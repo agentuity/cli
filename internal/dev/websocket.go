@@ -172,7 +172,8 @@ func (c *Websocket) connect(logger logger.Logger, close bool) error {
 	}
 	u.Path = fmt.Sprintf("/websocket/devmode/%s", c.webSocketId)
 	u.RawQuery = url.Values{
-		"from": []string{"cli"},
+		"from":      []string{"cli"},
+		"projectId": []string{c.Project.Project.ProjectId},
 	}.Encode()
 
 	if u.Scheme == "http" {
@@ -295,9 +296,10 @@ func (c *Websocket) WebURL(appUrl string) string {
 }
 
 type Message struct {
-	ID      string         `json:"id"`
-	Type    string         `json:"type"`
-	Payload map[string]any `json:"payload"`
+	ID        string         `json:"id"`
+	Type      string         `json:"type"`
+	Payload   map[string]any `json:"payload"`
+	ProjectId string         `json:"projectId"`
 }
 
 // messages send by server to CLI
@@ -315,7 +317,7 @@ type InputMessage struct {
 }
 
 // messages send by CLI to the server
-func NewOutputMessage(id string, payload struct {
+func NewOutputMessage(id string, projectId string, payload struct {
 	ContentType string `json:"contentType"`
 	Payload     []byte `json:"payload"`
 	Trigger     string `json:"trigger"`
@@ -326,9 +328,10 @@ func NewOutputMessage(id string, payload struct {
 		"trigger":     payload.Trigger,
 	}
 	return Message{
-		ID:      id,
-		Type:    "output",
-		Payload: payloadMap,
+		ID:        id,
+		Type:      "output",
+		Payload:   payloadMap,
+		ProjectId: projectId,
 	}
 
 }
@@ -379,7 +382,7 @@ func processInputMessage(plogger logger.Logger, c *Websocket, m []byte, port int
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
-			msg := NewOutputMessage(inputMsg.ID, OutputPayload{
+			msg := NewOutputMessage(inputMsg.ID, c.Project.Project.ProjectId, OutputPayload{
 				ContentType: "text/plain",
 				Payload:     []byte(err.Error()),
 				Trigger:     "",
@@ -497,7 +500,7 @@ func processInputMessage(plogger logger.Logger, c *Websocket, m []byte, port int
 		return
 	}
 
-	msg := NewOutputMessage(inputMsg.ID, OutputPayload{
+	msg := NewOutputMessage(inputMsg.ID, c.Project.Project.ProjectId, OutputPayload{
 		ContentType: output.ContentType,
 		Payload:     output.Payload,
 		Trigger:     output.Trigger,
