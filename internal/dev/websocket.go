@@ -467,10 +467,6 @@ func processInputMessage(plogger logger.Logger, c *Websocket, m []byte, port int
 	req.Header.Set("User-Agent", "Agentuity CLI/"+c.version)
 	propagator.Inject(ctx, propagation.HeaderCarrier(req.Header))
 
-	for k, v := range req.Header {
-		logger.Trace("request header: %s: %s", k, v)
-	}
-
 	logger.Debug("sending request to %s with trace id: %s", url, spanContext.TraceID())
 
 	resp, lerr := http.DefaultClient.Do(req)
@@ -480,10 +476,6 @@ func processInputMessage(plogger logger.Logger, c *Websocket, m []byte, port int
 		return
 	}
 	defer resp.Body.Close()
-
-	for k, v := range resp.Header {
-		logger.Trace("response header: %s: %s", k, v)
-	}
 
 	body, lerr := io.ReadAll(resp.Body)
 	if lerr != nil {
