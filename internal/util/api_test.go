@@ -404,7 +404,11 @@ func TestGetURLs(t *testing.T) {
 			require.NoError(t, err)
 
 			originalTestInside := testInside
-			testInside = false
+			if test.name == "dev_API_with_prod_app" || test.name == "dev_URLs_already_correct" {
+				testInside = true
+			} else {
+				testInside = false
+			}
 			defer func() { testInside = originalTestInside }()
 			
 			mockLogger := &mockLogger{}
