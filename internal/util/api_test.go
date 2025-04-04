@@ -7,12 +7,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/agentuity/go-common/logger"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -167,48 +167,20 @@ func TestDoWithErrorResponses(t *testing.T) {
 			} else if strings.Contains(r.URL.Path, "/422") {
 				statusCode = 422
 				w.Header().Set("Content-Type", "application/json")
-				response := APIResponse{
-					Success: false,
-					Message: "Validation failed",
-					Code:    "UPGRADE_REQUIRED",
-				}
-				json.NewEncoder(w).Encode(response)
+				w.WriteHeader(statusCode)
+				fmt.Fprint(w, `{"success":false,"message":"Validation failed","code":"UPGRADE_REQUIRED"}`)
 				return
 			} else if strings.Contains(r.URL.Path, "/validation") {
 				statusCode = 422
 				w.Header().Set("Content-Type", "application/json")
-				response := APIResponse{
-					Success: false,
-					Error: struct {
-						Issues []struct {
-							Code    string   `json:"code"`
-							Message string   `json:"message"`
-							Path    []string `json:"path"`
-						} `json:"issues"`
-					}{
-						Issues: []struct {
-							Code    string   `json:"code"`
-							Message string   `json:"message"`
-							Path    []string `json:"path"`
-						}{
-							{
-								Code:    "invalid_type",
-								Message: "Expected string, received number",
-								Path:    []string{"name"},
-							},
-						},
-					},
-				}
-				json.NewEncoder(w).Encode(response)
+				w.WriteHeader(statusCode)
+				fmt.Fprint(w, `{"success":false,"error":{"issues":[{"code":"invalid_type","message":"Expected string, received number","path":["name"]}]}}`)
 				return
 			} else if strings.Contains(r.URL.Path, "/message") {
 				statusCode = 400
 				w.Header().Set("Content-Type", "application/json")
-				response := APIResponse{
-					Success: false,
-					Message: "Bad request message",
-				}
-				json.NewEncoder(w).Encode(response)
+				w.WriteHeader(statusCode)
+				fmt.Fprint(w, `{"success":false,"message":"Bad request message"}`)
 				return
 			}
 
@@ -335,6 +307,143 @@ func TestUserAgent(t *testing.T) {
 		userAgent := UserAgent()
 		assert.NotEmpty(t, userAgent)
 		assert.Contains(t, userAgent, "Agentuity CLI/")
+	})
+}
+
+func TestGetURLs(t *testing.T) {
+	// Create a temporary config file
+	tempDir := t.TempDir()
+	configFile := tempDir + "/config.json"
+
+	// Save original environment
+	originalConfigFile := os.Getenv("AGENTUITY_CONFIG")
+	defer os.Setenv("AGENTUITY_CONFIG", originalConfigFile)
+
+	// Set environment to use our test config
+	os.Setenv("AGENTUITY_CONFIG", configFile)
+
+	originalTestInside := testInside
+	defer func() { testInside = originalTestInside }()
+	
+	testInside = false
+
+	tests := []struct {
+		name              string
+		apiUrl            string
+		appUrl            string
+		transportUrl      string
+		expectedApi       string
+		expectedApp       string
+		expectedTransport string
+	}{
+		{
+			name:              "production URLs",
+			apiUrl:            "https://api.agentuity.com",
+			appUrl:            "https://other.example.com",
+			transportUrl:      "https://other.transport.com",
+			expectedApi:       "https://api.agentuity.com",
+			expectedApp:       "https://app.agentuity.com",
+			expectedTransport: "https://agentuity.ai",
+		},
+		{
+			name:              "production URLs already correct",
+			apiUrl:            "https://api.agentuity.com",
+			appUrl:            "https://app.agentuity.com",
+			transportUrl:      "https://agentuity.ai",
+			expectedApi:       "https://api.agentuity.com",
+			expectedApp:       "https://app.agentuity.com",
+			expectedTransport: "https://agentuity.ai",
+		},
+		{
+			name:              "dev API with prod app",
+			apiUrl:            "https://api.agentuity.dev",
+			appUrl:            "https://app.agentuity.com",
+			transportUrl:      "https://agentuity.ai",
+			expectedApi:       "http://host.docker.internal:3012",
+			expectedApp:       "http://host.docker.internal:3000",
+			expectedTransport: "http://host.docker.internal:3939",
+		},
+		{
+			name:              "dev URLs already correct",
+			apiUrl:            "https://api.agentuity.dev",
+			appUrl:            "http://localhost:3000",
+			transportUrl:      "http://localhost:3939",
+			expectedApi:       "http://host.docker.internal:3012",
+			expectedApp:       "http://host.docker.internal:3000",
+			expectedTransport: "http://host.docker.internal:3939",
+		},
+		{
+			name:              "custom URLs",
+			apiUrl:            "https://custom-api.example.com",
+			appUrl:            "https://custom-app.example.com",
+			transportUrl:      "https://custom-transport.example.com",
+			expectedApi:       "https://custom-api.example.com",
+			expectedApp:       "https://custom-app.example.com",
+			expectedTransport: "https://custom-transport.example.com",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Create config file with test values
+			configContent := fmt.Sprintf(`{
+				"overrides": {
+					"api_url": "%s",
+					"app_url": "%s",
+					"transport_url": "%s"
+				}
+			}`, test.apiUrl, test.appUrl, test.transportUrl)
+
+			err := os.WriteFile(configFile, []byte(configContent), 0644)
+			require.NoError(t, err)
+
+			// Reset viper config
+			viper.Reset()
+			viper.SetConfigFile(configFile)
+			err = viper.ReadInConfig()
+			require.NoError(t, err)
+
+			originalTestInside := testInside
+			testInside = false
+			defer func() { testInside = originalTestInside }()
+			
+			mockLogger := &mockLogger{}
+			apiUrl, appUrl, transportUrl := GetURLs(mockLogger)
+
+			assert.Equal(t, test.expectedApi, apiUrl)
+			assert.Equal(t, test.expectedApp, appUrl)
+			assert.Equal(t, test.expectedTransport, transportUrl)
+		})
+	}
+
+	// Test with container environment
+	t.Run("inside container", func(t *testing.T) {
+		configContent := `{
+			"overrides": {
+				"api_url": "https://api.agentuity.dev",
+				"app_url": "http://localhost:3000",
+				"transport_url": "http://localhost:3939"
+			}
+		}`
+
+		err := os.WriteFile(configFile, []byte(configContent), 0644)
+		require.NoError(t, err)
+
+		viper.Reset()
+		viper.SetConfigFile(configFile)
+		err = viper.ReadInConfig()
+		require.NoError(t, err)
+
+		originalTestInside := testInside
+		testInside = true
+		defer func() { testInside = originalTestInside }()
+		
+		mockLogger := &mockLogger{}
+		apiUrl, appUrl, transportUrl := GetURLs(mockLogger)
+
+		assert.Equal(t, "http://host.docker.internal:3012", apiUrl)
+		assert.Equal(t, "http://host.docker.internal:3000", appUrl)
+		assert.Equal(t, "http://host.docker.internal:3939", transportUrl)
 	})
 }
 
