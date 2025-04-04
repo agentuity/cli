@@ -189,6 +189,10 @@ func ReadFileLines(filename string, startLine, endLine int) ([]string, error) {
 }
 
 func GetRelativePath(basePath, absolutePath string) string {
+	if filepath.VolumeName(basePath) != filepath.VolumeName(absolutePath) && filepath.VolumeName(absolutePath) != "" {
+		return filepath.ToSlash(absolutePath)
+	}
+	
 	rel, err := filepath.Rel(basePath, absolutePath)
 	if err != nil {
 		return absolutePath
