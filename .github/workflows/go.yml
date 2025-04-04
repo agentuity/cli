@@ -12,7 +12,11 @@ permissions:
 
 jobs:
   build:
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    name: Build and Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [blacksmith-4vcpu-ubuntu-2204, windows-latest, macos-latest]
     steps:
     - uses: actions/checkout@v4
 
@@ -185,4 +189,4 @@ jobs:
           Write-Host "Installation verification failed"
           exit 1
         }
-      shell: pwsh                                                                                                                                                                                        
+      shell: pwsh                                                                                                                                                                                                                                                                                                                                                                                
