@@ -16,6 +16,7 @@ import (
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/go-common/logger"
 	"github.com/agentuity/go-common/telemetry"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -141,9 +142,7 @@ func (c *Websocket) StartReadingMessages(ctx context.Context, logger logger.Logg
 						Description: agent.Description,
 					})
 				}
-				logger.Trace("sending agents: %+v", agents)
-
-				agentsMessage := NewAgentsMessage(c.webSocketId, AgentsPayload{
+				agentsMessage := NewAgentsMessage(c.webSocketId, c.Project.Project.ProjectId, AgentsPayload{
 					ProjectID:   c.Project.Project.ProjectId,
 					ProjectName: c.Project.Project.Name,
 					Agents:      agents,
@@ -172,7 +171,8 @@ func (c *Websocket) connect(logger logger.Logger, close bool) error {
 	}
 	u.Path = fmt.Sprintf("/websocket/devmode/%s", c.webSocketId)
 	u.RawQuery = url.Values{
-		"from": []string{"cli"},
+		"from":      []string{"cli"},
+		"projectId": []string{c.Project.Project.ProjectId},
 	}.Encode()
 
 	if u.Scheme == "http" {
@@ -267,7 +267,6 @@ func NewWebsocket(args WebsocketArgs) (*Websocket, error) {
 
 // Update SendMessage to accept the MessageType interface
 func (c *Websocket) SendMessage(logger logger.Logger, msg Message) error {
-	logger.Trace("sending message: %+v", msg)
 	buf, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -280,7 +279,10 @@ func (c *Websocket) SendMessage(logger logger.Logger, msg Message) error {
 }
 
 func (c *Websocket) Close() error {
-	if err := c.conn.Close(); err != nil {
+	c.SendMessage(c.logger, NewCloseMessage(uuid.New().String(), c.Project.Project.ProjectId))
+	closeHandler := c.conn.CloseHandler()
+	if err := closeHandler(1000, "User requested shutdown"); err != nil {
+		c.logger.Error("failed to close connection: %s", err)
 		return err
 	}
 	if c.cleanup != nil {
@@ -295,9 +297,10 @@ func (c *Websocket) WebURL(appUrl string) string {
 }
 
 type Message struct {
-	ID      string         `json:"id"`
-	Type    string         `json:"type"`
-	Payload map[string]any `json:"payload"`
+	ID        string         `json:"id"`
+	Type      string         `json:"type"`
+	Payload   map[string]any `json:"payload"`
+	ProjectId string         `json:"projectId"`
 }
 
 // messages send by server to CLI
@@ -315,7 +318,7 @@ type InputMessage struct {
 }
 
 // messages send by CLI to the server
-func NewOutputMessage(id string, payload struct {
+func NewOutputMessage(id string, projectId string, payload struct {
 	ContentType string `json:"contentType"`
 	Payload     []byte `json:"payload"`
 	Trigger     string `json:"trigger"`
@@ -326,11 +329,22 @@ func NewOutputMessage(id string, payload struct {
 		"trigger":     payload.Trigger,
 	}
 	return Message{
-		ID:      id,
-		Type:    "output",
-		Payload: payloadMap,
+		ID:        id,
+		Type:      "output",
+		Payload:   payloadMap,
+		ProjectId: projectId,
 	}
 
+}
+
+func NewCloseMessage(id string, projectId string) Message {
+	payloadMap := map[string]any{}
+	return Message{
+		ID:        id,
+		Type:      "close",
+		Payload:   payloadMap,
+		ProjectId: projectId,
+	}
 }
 
 type Agent struct {
@@ -345,17 +359,18 @@ type AgentsPayload struct {
 	ProjectName string  `json:"projectName"`
 }
 
-func NewAgentsMessage(id string, payload AgentsPayload) Message {
+func NewAgentsMessage(id string, projectId string, payload AgentsPayload) Message {
 	payloadMap := map[string]any{
 		"agents":      payload.Agents,
-		"projectId":   payload.ProjectID,
+		"projectId":   projectId,
 		"projectName": payload.ProjectName,
 	}
 
 	return Message{
-		ID:      id,
-		Type:    "agents",
-		Payload: payloadMap,
+		ID:        id,
+		Type:      "agents",
+		ProjectId: projectId,
+		Payload:   payloadMap,
 	}
 }
 
@@ -379,7 +394,7 @@ func processInputMessage(plogger logger.Logger, c *Websocket, m []byte, port int
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
-			msg := NewOutputMessage(inputMsg.ID, OutputPayload{
+			msg := NewOutputMessage(inputMsg.ID, c.Project.Project.ProjectId, OutputPayload{
 				ContentType: "text/plain",
 				Payload:     []byte(err.Error()),
 				Trigger:     "",
@@ -497,7 +512,7 @@ func processInputMessage(plogger logger.Logger, c *Websocket, m []byte, port int
 		return
 	}
 
-	msg := NewOutputMessage(inputMsg.ID, OutputPayload{
+	msg := NewOutputMessage(inputMsg.ID, c.Project.Project.ProjectId, OutputPayload{
 		ContentType: output.ContentType,
 		Payload:     output.Payload,
 		Trigger:     output.Trigger,
