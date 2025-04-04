@@ -2,7 +2,6 @@ package util
 
 import (
 	"context"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
