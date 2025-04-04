@@ -16,6 +16,7 @@ import (
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/go-common/logger"
 	"github.com/agentuity/go-common/telemetry"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -141,9 +142,7 @@ func (c *Websocket) StartReadingMessages(ctx context.Context, logger logger.Logg
 						Description: agent.Description,
 					})
 				}
-				logger.Trace("sending agents: %+v", agents)
-
-				agentsMessage := NewAgentsMessage(c.webSocketId, AgentsPayload{
+				agentsMessage := NewAgentsMessage(c.webSocketId, c.Project.Project.ProjectId, AgentsPayload{
 					ProjectID:   c.Project.Project.ProjectId,
 					ProjectName: c.Project.Project.Name,
 					Agents:      agents,
@@ -268,7 +267,6 @@ func NewWebsocket(args WebsocketArgs) (*Websocket, error) {
 
 // Update SendMessage to accept the MessageType interface
 func (c *Websocket) SendMessage(logger logger.Logger, msg Message) error {
-	logger.Trace("sending message: %+v", msg)
 	buf, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -281,7 +279,10 @@ func (c *Websocket) SendMessage(logger logger.Logger, msg Message) error {
 }
 
 func (c *Websocket) Close() error {
-	if err := c.conn.Close(); err != nil {
+	c.SendMessage(c.logger, NewCloseMessage(uuid.New().String(), c.Project.Project.ProjectId))
+	closeHandler := c.conn.CloseHandler()
+	if err := closeHandler(1000, "User requested shutdown"); err != nil {
+		c.logger.Error("failed to close connection: %s", err)
 		return err
 	}
 	if c.cleanup != nil {
@@ -336,6 +337,16 @@ func NewOutputMessage(id string, projectId string, payload struct {
 
 }
 
+func NewCloseMessage(id string, projectId string) Message {
+	payloadMap := map[string]any{}
+	return Message{
+		ID:        id,
+		Type:      "close",
+		Payload:   payloadMap,
+		ProjectId: projectId,
+	}
+}
+
 type Agent struct {
 	Name        string `json:"name"`
 	ID          string `json:"id"`
@@ -348,17 +359,18 @@ type AgentsPayload struct {
 	ProjectName string  `json:"projectName"`
 }
 
-func NewAgentsMessage(id string, payload AgentsPayload) Message {
+func NewAgentsMessage(id string, projectId string, payload AgentsPayload) Message {
 	payloadMap := map[string]any{
 		"agents":      payload.Agents,
-		"projectId":   payload.ProjectID,
+		"projectId":   projectId,
 		"projectName": payload.ProjectName,
 	}
 
 	return Message{
-		ID:      id,
-		Type:    "agents",
-		Payload: payloadMap,
+		ID:        id,
+		Type:      "agents",
+		ProjectId: projectId,
+		Payload:   payloadMap,
 	}
 }
 
