@@ -324,7 +324,7 @@ func TestGetURLs(t *testing.T) {
 
 	originalTestInside := testInside
 	defer func() { testInside = originalTestInside }()
-	
+
 	testInside = false
 
 	tests := []struct {
@@ -405,12 +405,12 @@ func TestGetURLs(t *testing.T) {
 
 			originalTestInside := testInside
 			if test.name == "dev_API_with_prod_app" || test.name == "dev_URLs_already_correct" {
-				testInside = true
+				testInside = true // Simulate container environment
 			} else {
 				testInside = false
 			}
 			defer func() { testInside = originalTestInside }()
-			
+
 			mockLogger := &mockLogger{}
 			apiUrl, appUrl, transportUrl := GetURLs(mockLogger)
 
@@ -439,9 +439,9 @@ func TestGetURLs(t *testing.T) {
 		require.NoError(t, err)
 
 		originalTestInside := testInside
-		testInside = true
+		testInside = true // Simulate container environment
 		defer func() { testInside = originalTestInside }()
-		
+
 		mockLogger := &mockLogger{}
 		apiUrl, appUrl, transportUrl := GetURLs(mockLogger)
 
