@@ -214,7 +214,7 @@ func TestGetRelativePath(t *testing.T) {
 		{"same directory", "/base/dir", "/base/dir/file.txt", "file.txt"},
 		{"subdirectory", "/base/dir", "/base/dir/sub/file.txt", "sub/file.txt"},
 		{"parent directory", "/base/dir/sub", "/base/dir/file.txt", "../file.txt"},
-		{"different drive windows", "C:\\base\\dir", "D:\\other\\file.txt", "D:/other/file.txt"},
+		{"different drive windows", "C:\\base\\dir", "D:\\other\\file.txt", "D:\\other\\file.txt"},
 		{"invalid base", "invalid", "/base/dir/file.txt", "/base/dir/file.txt"},
 	}
 
