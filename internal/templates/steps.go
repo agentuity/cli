@@ -2,6 +2,7 @@ package templates
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/agentuity/cli/internal/util"
 )
@@ -38,13 +40,50 @@ var _ Step = (*CommandStep)(nil)
 
 func (s *CommandStep) Run(ctx TemplateContext) error {
 	ctx.Logger.Debug("Running command: %s with args: %s", s.Command, strings.Join(s.Args, " "))
-	cmd := exec.CommandContext(ctx.Context, s.Command, s.Args...)
+
+	timeoutCtx, cancel := context.WithTimeout(ctx.Context, 1*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(timeoutCtx, s.Command, s.Args...)
 	cmd.Dir = ctx.ProjectDir
 	cmd.Stdin = nil
+
 	out, err := cmd.CombinedOutput()
 	if err != nil {
+		if s.Command == "uv" && len(s.Args) >= 3 && s.Args[0] == "add" {
+			exitErr, ok := err.(*exec.ExitError)
+			if ok && exitErr.ExitCode() == 130 {
+				packages := s.Args[2:]
+				ctx.Logger.Debug("Command interrupted with SIGINT (130), trying alternative installation methods for: %v", packages)
+
+				altCmd := exec.CommandContext(ctx.Context, "uv", "pip", "install")
+				altCmd.Args = append(altCmd.Args, packages...)
+				altCmd.Dir = ctx.ProjectDir
+				altOut, altErr := altCmd.CombinedOutput()
+
+				if altErr == nil {
+					ctx.Logger.Debug("Successfully installed packages with uv pip: %s", strings.TrimSpace(string(altOut)))
+					return nil
+				}
+
+				ctx.Logger.Debug("Failed to install with uv pip, trying with pip: %v", altErr)
+				pipCmd := exec.CommandContext(ctx.Context, "pip", "install")
+				pipCmd.Args = append(pipCmd.Args, packages...)
+				pipCmd.Dir = ctx.ProjectDir
+				pipOut, pipErr := pipCmd.CombinedOutput()
+
+				if pipErr == nil {
+					ctx.Logger.Debug("Successfully installed packages with pip: %s", strings.TrimSpace(string(pipOut)))
+					return nil
+				}
+
+				return fmt.Errorf("failed to install packages %v with multiple methods: original error: %v, pip error: %v (%s)",
+					packages, err, pipErr, string(pipOut))
+			}
+		}
+
 		return fmt.Errorf("failed to run command: %s with args: %s: %s (%s)", s.Command, strings.Join(s.Args, " "), err, string(out))
 	}
+
 	buf := strings.TrimSpace(string(out))
 	if buf != "" {
 		ctx.Logger.Debug("Command output: %s", buf)
