@@ -41,7 +41,7 @@ var _ Step = (*CommandStep)(nil)
 func (s *CommandStep) Run(ctx TemplateContext) error {
 	ctx.Logger.Debug("Running command: %s with args: %s", s.Command, strings.Join(s.Args, " "))
 
-	timeoutCtx, cancel := context.WithTimeout(ctx.Context, 5*time.Minute)
+	timeoutCtx, cancel := context.WithTimeout(ctx.Context, 1*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(timeoutCtx, s.Command, s.Args...)
 	cmd.Dir = ctx.ProjectDir
