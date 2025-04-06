@@ -28,11 +28,6 @@ var (
 			Align(lipgloss.Center).
 			Padding(0).MarginBottom(1)
 
-	titleDescriptionStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.AdaptiveColor{Light: "#666666", Dark: "#626262"}).
-				Width(100).
-				Align(lipgloss.Center)
-
 	itemStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.AdaptiveColor{Light: "#000000", Dark: "#FFFFFF"})
 
@@ -409,7 +404,6 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Update styles that depend on window width
 		titleStyle = titleStyle.Width(m.width)
-		titleDescriptionStyle = titleDescriptionStyle.Width(m.width)
 		helpStyle = helpStyle.Width(m.width)
 
 		if !m.ready {
@@ -762,6 +756,43 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.viewport.HalfViewDown()
 				m.updateCursorFromScroll()
 			}
+
+		case "tab", "shift+tab":
+			if m.step == 2 {
+				if msg.String() == "shift+tab" {
+					// Shift+Tab: Move backward
+					if m.description.Focused() {
+						m.description.Blur()
+						m.projectName.Focus()
+					}
+				} else {
+					// Tab: Move forward
+					if m.projectName.Focused() && m.nameValidated && !m.checkingName {
+						m.projectName.Blur()
+						m.description.Focus()
+					}
+				}
+			} else if m.step == 3 {
+				if msg.String() == "shift+tab" {
+					// Shift+Tab: Move backward
+					if m.agentDesc.Focused() {
+						m.agentDesc.Blur()
+						m.agentName.Focus()
+					} else if !m.agentName.Focused() && !m.agentDesc.Focused() {
+						// If on auth options, move back to description
+						m.agentDesc.Focus()
+					}
+				} else {
+					// Tab: Move forward
+					if m.agentName.Focused() {
+						m.agentName.Blur()
+						m.agentDesc.Focus()
+					} else if m.agentDesc.Focused() {
+						// Move to auth options
+						m.agentDesc.Blur()
+					}
+				}
+			}
 		}
 	}
 
@@ -936,7 +967,6 @@ func (m projectFormModel) View() string {
 
 	// Fixed title bar - Always rendered first and never included in scrollable content
 	s.WriteString(titleStyle.Render("⨺ Create New Agentuity Project"))
-	s.WriteString(titleDescriptionStyle.Render("Create a new project with your selected runtime and framework"))
 	s.WriteString("\n")
 
 	// Build content
