@@ -525,7 +525,18 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.stepCursors[m.step] = m.cursor
 			m.step++
-			m.cursor = m.stepCursors[m.step]
+			// Validate the stored cursor position against template list length
+			if templates, ok := m.templates[m.runtime]; ok {
+				if savedCursor, exists := m.stepCursors[m.step]; exists && savedCursor < len(templates) {
+					m.cursor = savedCursor
+				} else {
+					m.cursor = 0
+					m.stepCursors[m.step] = 0
+				}
+			} else {
+				m.cursor = 0
+				m.stepCursors[m.step] = 0
+			}
 			m.depsError = ""
 		}
 
