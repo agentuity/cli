@@ -167,6 +167,7 @@ type projectFormModel struct {
 	cursor          int
 	stepCursors     map[int]int
 	runtime         string
+	runtimeName     string
 	template        string
 	projectName     textinput.Model
 	description     textinput.Model
@@ -431,16 +432,16 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		switch msg.Type {
-		case tea.MouseWheelUp:
+		switch msg.String() {
+		case "MouseWheelUp":
 			m.viewport.LineUp(1)
 			// Update cursor based on scroll position if needed
 			m.updateCursorFromScroll()
-		case tea.MouseWheelDown:
+		case "MouseWheelDown":
 			m.viewport.LineDown(1)
 			// Update cursor based on scroll position if needed
 			m.updateCursorFromScroll()
-		case tea.MouseLeft:
+		case "MouseLeft":
 			m.mouseY = msg.Y
 			// Convert mouse Y to list index considering scroll position
 			clickedIndex := (msg.Y - 6 + m.viewport.YOffset) / m.itemHeight
@@ -452,6 +453,7 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if m.runtime == m.choices[clickedIndex].ID {
 						m.stepCursors[m.step] = m.cursor
 						m.runtime = m.choices[m.cursor].ID
+						m.runtimeName = m.choices[m.cursor].Name
 						m.step++
 						m.cursor = m.stepCursors[m.step]
 					}
@@ -559,6 +561,7 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// Update the selection based on the restored cursor position
 					if m.step == 0 {
 						m.runtime = m.choices[m.cursor].ID
+						m.runtimeName = m.choices[m.cursor].Name
 					} else if m.step == 1 {
 						if templates, ok := m.templates[m.runtime]; ok {
 							m.template = templates[m.cursor].Name
@@ -568,6 +571,7 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.cursor = 0
 					if m.step == 0 {
 						m.runtime = ""
+						m.runtimeName = ""
 					} else if m.step == 1 {
 						m.template = ""
 					}
@@ -587,6 +591,7 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Only advance if current step is valid
 				if m.step == 0 && m.cursor < len(m.choices) {
 					m.runtime = m.choices[m.cursor].ID
+					m.runtimeName = m.choices[m.cursor].Name
 					cmds = append(cmds, queueCheckDependencies(&m))
 				} else if m.step == 1 && m.cursor < len(m.templates[m.runtime]) {
 					// Store current cursor position before moving forward
@@ -691,6 +696,7 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if m.step == 0 {
 				m.runtime = m.choices[m.cursor].ID
+				m.runtimeName = m.choices[m.cursor].Name
 				cmds = append(cmds, queueCheckDependencies(&m))
 			} else if m.step == 1 {
 				// Store current cursor position before moving forward
@@ -996,7 +1002,7 @@ func (m projectFormModel) View() string {
 			}
 		} else {
 			title = "Select Template:"
-			description = "Choose a framework template for your " + m.runtime + " project"
+			description = "Choose a framework template for your " + m.runtimeName + " project"
 			if templates, ok := m.templates[m.runtime]; ok {
 				for i, template := range templates {
 					items = append(items, struct {
