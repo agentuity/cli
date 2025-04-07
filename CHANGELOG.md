@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.86] - 2025-04-07
+
+### Added
+- Add Clone Repo step ([#171](https://github.com/agentuity/cli/pull/171))
+- Add Agent Welcome on DevMode ([#172](https://github.com/agentuity/cli/pull/172))
+
+### Changed
+- Totally re-write the TUI for the new project ([#170](https://github.com/agentuity/cli/pull/170))
+- Better upgrade handling ([#174](https://github.com/agentuity/cli/pull/174))
+
+### Fixed
+- Fix crewai installation issue (exit status 130) ([#169](https://github.com/agentuity/cli/pull/169))
+- Make sure command is executed with a context ([#173](https://github.com/agentuity/cli/pull/173))
+
 ## [v0.0.74] - 2025-03-25
 
 ### Added
