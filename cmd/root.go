@@ -57,8 +57,8 @@ func Execute() {
 	}
 }
 
-func loadTemplates(ctx context.Context, cmd *cobra.Command) templates.Templates {
-	tmplDir, err := getConfigTemplateDir(cmd)
+func loadTemplates(ctx context.Context, cmd *cobra.Command) (templates.Templates, string) {
+	tmplDir, custom, err := getConfigTemplateDir(cmd)
 	if err != nil {
 		errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
 	}
@@ -66,7 +66,7 @@ func loadTemplates(ctx context.Context, cmd *cobra.Command) templates.Templates 
 	var tmpls templates.Templates
 
 	tui.ShowSpinner("Loading templates...", func() {
-		tmpls, err = templates.LoadTemplates(ctx, tmplDir)
+		tmpls, err = templates.LoadTemplates(ctx, tmplDir, custom)
 		if err != nil {
 			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates")).ShowErrorAndExit()
 		}
@@ -75,7 +75,7 @@ func loadTemplates(ctx context.Context, cmd *cobra.Command) templates.Templates 
 			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("No templates returned from load templates")).ShowErrorAndExit()
 		}
 	})
-	return tmpls
+	return tmpls, tmplDir
 }
 
 func init() {

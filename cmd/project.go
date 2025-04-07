@@ -358,12 +358,7 @@ Examples:
 		var templateName string
 		var provider *templates.Template
 
-		tmplDir, err := getConfigTemplateDir(cmd)
-		if err != nil {
-			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
-		}
-
-		tmpls := loadTemplates(ctx, cmd)
+		tmpls, tmplDir := loadTemplates(ctx, cmd)
 
 		// check for preferences in config
 		if providerArg == "" {
@@ -764,21 +759,21 @@ Examples:
 	},
 }
 
-func getConfigTemplateDir(cmd *cobra.Command) (string, error) {
+func getConfigTemplateDir(cmd *cobra.Command) (string, bool, error) {
 	if cmd.Flags().Changed("templates-dir") {
 		dir, _ := cmd.Flags().GetString("templates-dir")
 		if !util.Exists(dir) {
-			return "", fmt.Errorf("templates directory %s does not exist", dir)
+			return "", false, fmt.Errorf("templates directory %s does not exist", dir)
 		}
-		return dir, nil
+		return dir, true, nil
 	}
 	dir := filepath.Join(filepath.Dir(cfgFile), "templates")
 	if !util.Exists(dir) {
 		if err := os.MkdirAll(dir, 0700); err != nil {
-			return "", err
+			return "", false, err
 		}
 	}
-	return dir, nil
+	return dir, false, nil
 }
 
 func init() {
