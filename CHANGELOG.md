@@ -19,6 +19,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix crewai installation issue (exit status 130) ([#169](https://github.com/agentuity/cli/pull/169))
 - Make sure command is executed with a context ([#173](https://github.com/agentuity/cli/pull/173))
 
+## [v0.0.85] - 2025-04-05
+
+### Added
+- Added project id on messages for devmode ([#167](https://github.com/agentuity/cli/pull/167))
+
+## [v0.0.84] - 2025-04-03
+
+### Fixed
+- Fixed bundler version not having the right cli version ([#165](https://github.com/agentuity/cli/pull/165))
+
+## [v0.0.83] - 2025-04-01
+
+### Changed
+- Devmode fixes and improvements ([#164](https://github.com/agentuity/cli/pull/164))
+
+## [v0.0.82] - 2025-03-30
+
+### Fixed
+- Small improvement for homebrew upgrade and fix upgrade url prefix ([#163](https://github.com/agentuity/cli/pull/163))
+
+## [v0.0.81] - 2025-03-28
+
+### Changed
+- Use transport url for transport url ([#162](https://github.com/agentuity/cli/pull/162))
+
+## [v0.0.80] - 2025-03-27
+
+### Changed
+- Use windows-latest instead of windows for build environment
+
+## [v0.0.79] - 2025-03-26
+
+### Fixed
+- Fix version comparison in upgrade command to handle v prefix ([#158](https://github.com/agentuity/cli/pull/158))
+
+## [v0.0.78] - 2025-03-26
+
+### Added
+- Add the new env AGENTUITY_TRANSPORT_URL for the bundler and use the new gateway URL ([#155](https://github.com/agentuity/cli/pull/155))
+
+## [v0.0.77] - 2025-03-26
+
+### Changed
+- Use app/api url for api url ([#152](https://github.com/agentuity/cli/pull/152))
+
+## [v0.0.76] - 2025-03-26
+
+### Changed
+- Use a different key for authentication
+
+## [v0.0.75] - 2025-03-26
+
+### Changed
+- Try and use github runner for builds
+
 ## [v0.0.74] - 2025-03-25
 
 ### Added
