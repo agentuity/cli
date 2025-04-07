@@ -71,7 +71,7 @@ func (r *Requirement) upgradeBrew(brew string, formula string) error {
 	c.Stderr = io.Discard
 	util.ProcessSetup(c)
 	if err := c.Run(); err != nil {
-		return fmt.Errorf("failed to update brew: %s", err)
+		return fmt.Errorf("failed to update brew: %w", err)
 	}
 	c = exec.Command(brew, "upgrade", formula)
 	c.Stdin = nil
@@ -168,7 +168,7 @@ func (t *Template) NewProject(ctx TemplateContext) (*TemplateRules, error) {
 	}
 	if !util.Exists(ctx.ProjectDir) {
 		if err := os.MkdirAll(ctx.ProjectDir, 0755); err != nil {
-			return nil, fmt.Errorf("failed to create directory %s: %s", ctx.ProjectDir, err)
+			return nil, fmt.Errorf("failed to create directory %s: %w", ctx.ProjectDir, err)
 		}
 		ctx.Logger.Debug("created directory %s", ctx.ProjectDir)
 	}
@@ -202,17 +202,17 @@ func (t *Template) AddGitHubAction(ctx TemplateContext) error {
 	name := filepath.Join(ctx.TemplateDir, "common", "github", t.Identifier+".yaml")
 	reader, err := getEmbeddedFile(name)
 	if err != nil {
-		return fmt.Errorf("failed to load embedded file for %s: %s", name, err)
+		return fmt.Errorf("failed to load embedded file for %s: %w", name, err)
 	}
 	defer reader.Close()
 	buf, err := io.ReadAll(reader)
 	outdir := filepath.Join(ctx.ProjectDir, ".github", "workflows")
 	if err := os.MkdirAll(outdir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory %s: %s", outdir, err)
+		return fmt.Errorf("failed to create directory %s: %w", outdir, err)
 	}
 	outfile := filepath.Join(outdir, "agentuity.yaml")
 	if err := os.WriteFile(outfile, buf, 0644); err != nil {
-		return fmt.Errorf("failed to write file %s: %s", outfile, err)
+		return fmt.Errorf("failed to write file %s: %w", outfile, err)
 	}
 	return nil
 }
@@ -391,7 +391,7 @@ func LoadTemplatesFromGithub(ctx context.Context, dir string) (Templates, error)
 func loadTemplateFromDir(dir string) (Templates, error) {
 	reader, err := getEmbeddedFile(filepath.Join(dir, "runtimes.yaml"))
 	if err != nil {
-		return nil, fmt.Errorf("failed to open embedded runtimes file: %s", err)
+		return nil, fmt.Errorf("failed to open embedded runtimes file: %w", err)
 	}
 	return loadTemplates(reader)
 }
@@ -408,14 +408,14 @@ func LoadLanguageTemplates(ctx context.Context, dir string, runtime string) (Lan
 	filename := filepath.Join(dir, runtime, "templates.yaml")
 	reader, err := getEmbeddedFile(filename)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load embedded file for %s: %s", filename, err)
+		return nil, fmt.Errorf("failed to load embedded file for %s: %w", filename, err)
 	}
 	if reader == nil {
 		return nil, fmt.Errorf("template %s not found", filename)
 	}
 	templates := make(LanguageTemplates, 0)
 	if err := yaml.NewDecoder(reader).Decode(&templates); err != nil {
-		return nil, fmt.Errorf("failed to decode templates for %s: %s", filename, err)
+		return nil, fmt.Errorf("failed to decode templates for %s: %w", filename, err)
 	}
 	return templates, nil
 }
