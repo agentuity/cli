@@ -70,16 +70,21 @@ func showUpgradeNotice(ctx context.Context, logger logger.Logger, version string
 		answer := tui.Ask(logger, tui.Bold(fmt.Sprintf("Agentuity version %s is available. Would you like to upgrade? [Y/n] ", version)), true)
 		fmt.Println()
 		if answer {
+			var success bool
 			action := func() {
-				exec.CommandContext(ctx, exe, "update").Run()
-				v, _ := exec.CommandContext(ctx, exe, "version").Output()
-				if strings.TrimSpace(string(v)) == version {
-					tui.ShowSuccess("Upgraded to %s", version)
+				c := exec.CommandContext(ctx, exe, "update", "--force")
+				c.Stdout = os.Stdout
+				c.Stderr = os.Stderr
+				c.Stdin = os.Stdin
+				if err := c.Run(); err != nil {
 					return
 				}
-				tui.ShowWarning("Failed to upgrade. Please see https://agentuity.dev/CLI/installation for instructions to upgrade manually.")
+				success = true
 			}
-			tui.ShowSpinner("Upgrading...", action)
+			action()
+			if !success {
+				tui.ShowWarning("Please see https://agentuity.dev/CLI/installation for instructions to upgrade manually.")
+			}
 		}
 		return
 	}
