@@ -397,8 +397,8 @@ func loadTemplateFromDir(dir string) (Templates, error) {
 }
 
 // LoadTemplates returns all the templates available
-func LoadTemplates(ctx context.Context, dir string) (Templates, error) {
-	if util.Exists(dir) && util.Exists(filepath.Join(dir, "runtimes.yaml")) {
+func LoadTemplates(ctx context.Context, dir string, custom bool) (Templates, error) {
+	if custom && util.Exists(dir) && util.Exists(filepath.Join(dir, "runtimes.yaml")) {
 		return loadTemplateFromDir(dir)
 	}
 	return LoadTemplatesFromGithub(ctx, dir)
