@@ -41,9 +41,9 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		var install *exec.Cmd
 		switch theproject.Bundler.Runtime {
 		case "nodejs":
-			install = exec.Command("npm", "install", "--no-save", "--no-audit", "--no-fund", "--include=prod")
+			install = exec.CommandContext(ctx.Context, "npm", "install", "--no-save", "--no-audit", "--no-fund", "--include=prod")
 		case "bunjs":
-			install = exec.Command("bun", "install", "--production", "--no-save", "--silent", "--no-progress", "--no-summary")
+			install = exec.CommandContext(ctx.Context, "bun", "install", "--production", "--no-save", "--silent", "--no-progress", "--no-summary")
 		default:
 			return fmt.Errorf("unsupported runtime: %s", theproject.Bundler.Runtime)
 		}
@@ -51,7 +51,12 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		install.Dir = dir
 		out, err := install.CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("failed to install dependencies: %w. %s", err, string(out))
+			if install.ProcessState == nil || install.ProcessState.ExitCode() != 0 {
+				if install.ProcessState != nil {
+					return fmt.Errorf("failed to install dependencies (exit code %d): %w. %s", install.ProcessState.ExitCode(), err, string(out))
+				}
+				return fmt.Errorf("failed to install dependencies: %w. %s", err, string(out))
+			}
 		}
 		ctx.Logger.Debug("installed dependencies: %s", strings.TrimSpace(string(out)))
 	}
@@ -149,9 +154,9 @@ func bundlePython(ctx BundleContext, dir string, outdir string, theproject *proj
 		var install *exec.Cmd
 		switch theproject.Bundler.Runtime {
 		case "uv":
-			install = exec.Command("uv", "sync", "--no-dev", "--frozen", "--quiet", "--no-progress")
+			install = exec.CommandContext(ctx.Context, "uv", "sync", "--no-dev", "--frozen", "--quiet", "--no-progress")
 		case "pip":
-			install = exec.Command("uv", "pip", "install", "--quiet", "--no-progress")
+			install = exec.CommandContext(ctx.Context, "uv", "pip", "install", "--quiet", "--no-progress")
 		case "poetry":
 			return fmt.Errorf("poetry is not supported yet")
 		default:
@@ -161,7 +166,12 @@ func bundlePython(ctx BundleContext, dir string, outdir string, theproject *proj
 		install.Dir = dir
 		out, err := install.CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("failed to install dependencies: %w. %s", err, string(out))
+			if install.ProcessState == nil || install.ProcessState.ExitCode() != 0 {
+				if install.ProcessState != nil {
+					return fmt.Errorf("failed to install dependencies (exit code %d): %w. %s", install.ProcessState.ExitCode(), err, string(out))
+				}
+				return fmt.Errorf("failed to install dependencies: %w. %s", err, string(out))
+			}
 		}
 		ctx.Logger.Debug("installed dependencies: %s", strings.TrimSpace(string(out)))
 	}

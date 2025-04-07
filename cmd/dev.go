@@ -93,7 +93,7 @@ Examples:
 			log.Fatal("failed to find available port: %s", err)
 		}
 
-		projectServerCmd, err := dev.CreateRunProjectCmd(log, theproject, websocketConn, dir, orgId, port)
+		projectServerCmd, err := dev.CreateRunProjectCmd(ctx, log, theproject, websocketConn, dir, orgId, port)
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 		}
@@ -151,7 +151,7 @@ Examples:
 				// If it was a deliberate restart, start the new process here
 				if isDeliberateRestart {
 					isDeliberateRestart = false
-					projectServerCmd, err = dev.CreateRunProjectCmd(log, theproject, websocketConn, dir, orgId, port)
+					projectServerCmd, err = dev.CreateRunProjectCmd(ctx, log, theproject, websocketConn, dir, orgId, port)
 					if err != nil {
 						errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 					}
