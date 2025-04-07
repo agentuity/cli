@@ -121,6 +121,7 @@ type ProjectForm struct {
 	Templates           templates.Templates             `json:"-"`
 	ValidateProjectName func(name string) (bool, error) `json:"-"`
 	AgentuityCommand    string                          `json:"-"`
+	Provider            *templates.Template             `json:"-"`
 }
 
 // CheckDependencies checks if all required dependencies for the given runtime template are met.
@@ -1235,11 +1236,17 @@ func ShowProjectUI(initial ProjectForm) ProjectForm {
 		os.Exit(1)
 	}
 
+	var provider *templates.Template
 	for _, t := range initial.Templates {
-		if t.Identifier == finalModel.runtime && t.Name == finalModel.template {
+		if t.Identifier == finalModel.runtime {
 			finalModel.runtime = t.Name
+			provider = &t
 			break
 		}
+	}
+
+	if provider == nil {
+		panic(fmt.Sprintf("provider not found: %s", finalModel.runtime))
 	}
 
 	return ProjectForm{
@@ -1251,6 +1258,7 @@ func ShowProjectUI(initial ProjectForm) ProjectForm {
 		AgentDescription: finalModel.agentDesc.Value(),
 		AgentAuthType:    finalModel.agentAuthType,
 		DeploymentType:   finalModel.deploymentType,
+		Provider:         provider,
 	}
 }
 

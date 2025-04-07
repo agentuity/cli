@@ -393,7 +393,8 @@ Examples:
 
 		if provider != nil && templateArg != "" {
 			if ok := templates.IsValidRuntimeTemplateName(ctx, tmplDir, provider.Identifier, templateArg); !ok {
-				logger.Fatal("invalid template name %s for %s", templateArg, provider.Name)
+				logger.Info("invalid template name %s for %s", templateArg, provider.Name)
+				templateArg = ""
 			}
 			templateName = templateArg
 		}
@@ -453,6 +454,7 @@ Examples:
 				githubAction = resp.DeploymentType
 				templateName = resp.Template
 				providerName = resp.Runtime
+				provider = resp.Provider
 			}
 		}
 
