@@ -520,10 +520,16 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			m.depsError = msg.err.Error()
 		} else {
-			m.stepCursors[m.step] = m.cursor
 			m.step++
-			// Validate the stored cursor position against template list length
 			if templates, ok := m.templates[m.runtime]; ok {
+				if m.form.Template != "" {
+					for i, t := range templates {
+						if t.Name == m.form.Template {
+							m.stepCursors[m.step] = i
+							break
+						}
+					}
+				}
 				if savedCursor, exists := m.stepCursors[m.step]; exists && savedCursor < len(templates) {
 					m.cursor = savedCursor
 				} else {
@@ -1012,7 +1018,7 @@ func (m projectFormModel) View() string {
 					}{
 						name:     template.Name,
 						desc:     template.Description,
-						selected: m.cursor == i,
+						selected: m.stepCursors[m.step] == i,
 					})
 				}
 			}
