@@ -1,10 +1,12 @@
 package templates
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -394,6 +396,103 @@ func (s *CopyDirAction) Run(ctx TemplateContext) error {
 	return nil
 }
 
+type CloneRepoAction struct {
+	Repo   string
+	Branch string
+	Todir  string
+}
+
+var _ Step = (*CloneRepoAction)(nil)
+
+func (s *CloneRepoAction) Run(ctx TemplateContext) error {
+	var url string
+	if s.Branch == "" {
+		url = fmt.Sprintf("https://api.github.com/repos/%s/zipball", s.Repo)
+	} else {
+		url = fmt.Sprintf("https://api.github.com/repos/%s/zipball/%s", s.Repo, s.Branch)
+	}
+	req, err := http.NewRequestWithContext(ctx.Context, "GET", url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", util.UserAgent())
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to clone repo %s: %s", s.Repo, resp.Status)
+	}
+
+	if !util.Exists(s.Todir) {
+		if err := os.MkdirAll(s.Todir, 0755); err != nil {
+			return fmt.Errorf("failed to create directory: %s", err)
+		}
+	}
+	tmpFile, err := os.CreateTemp("", "temp.zip")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %s", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	_, err = io.Copy(tmpFile, resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to copy zipball: %s", err)
+	}
+	tmpFile.Close()
+
+	zipReader, err := zip.OpenReader(tmpFile.Name())
+	if err != nil {
+		return err
+	}
+	defer zipReader.Close()
+
+	var trimDir string
+
+	for _, file := range zipReader.File {
+		if strings.Contains(file.Name, "..") {
+			ctx.Logger.Warn("skipping invalid zip file: %s", file.Name)
+			continue
+		}
+		isDir := file.FileInfo().IsDir()
+		if trimDir == "" && isDir {
+			trimDir = file.Name
+			continue
+		}
+		if strings.HasPrefix(file.Name, ".git") {
+			continue
+		}
+		destFile := filepath.Join(s.Todir, strings.TrimPrefix(file.Name, trimDir))
+		if isDir {
+			if err := os.MkdirAll(destFile, 0755); err != nil {
+				return fmt.Errorf("failed to create directory: %s", err)
+			}
+		} else {
+			rc, err := file.Open()
+			if err != nil {
+				return fmt.Errorf("failed to open file: %s", err)
+			}
+			defer rc.Close()
+			out, err := os.Create(destFile)
+			if err != nil {
+				return fmt.Errorf("failed to create file: %s", err)
+			}
+			defer out.Close()
+			_, err = io.Copy(out, rc)
+			if err != nil {
+				return fmt.Errorf("failed to copy file: %s", err)
+			}
+			rc.Close()
+			ctx.Logger.Debug("unzipped file: %s", destFile)
+		}
+	}
+
+	return nil
+}
+
 func anyToStringArray(ctx TemplateContext, val []any) []string {
 	var result []string
 	for _, v := range val {
@@ -532,6 +631,23 @@ func resolveStep(ctx TemplateContext, step any) (Step, bool) {
 					filter = ctx.Interpolate(val).(string)
 				}
 				return &CopyDirAction{From: from, To: to, Filter: filter}, true
+			case "clone_repo":
+				var repo string
+				if val, ok := kv["repo"].(string); ok {
+					repo = ctx.Interpolate(val).(string)
+				}
+				if repo == "" {
+					panic("repo is required")
+				}
+				todir := ctx.ProjectDir
+				if val, ok := kv["to"].(string); ok {
+					todir = filepath.Join(ctx.ProjectDir, ctx.Interpolate(val).(string))
+				}
+				var branch string
+				if val, ok := kv["branch"].(string); ok {
+					branch = ctx.Interpolate(val).(string)
+				}
+				return &CloneRepoAction{Repo: repo, Branch: branch, Todir: todir}, true
 			default:
 				panic(fmt.Sprintf("unknown step action: %s", action))
 			}
