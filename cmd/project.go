@@ -188,7 +188,7 @@ func promptForOrganization(ctx context.Context, logger logger.Logger, cmd *cobra
 	if len(orgs) == 1 {
 		orgId = orgs[0].OrgId
 	} else {
-		hasCLIFlag := cmd.Flags().Lookup("org-id") != nil
+		hasCLIFlag := cmd.Flags().Changed("org-id")
 		prefOrgId, _ := cmd.Flags().GetString("org-id")
 		if prefOrgId == "" {
 			prefOrgId = viper.GetString("preferences.orgId")
