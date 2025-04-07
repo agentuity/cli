@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/agentuity/cli/internal/errsystem"
@@ -77,6 +78,34 @@ func (c *Websocket) Done() <-chan struct{} {
 	return c.done
 }
 
+func (c *Websocket) getAgentWelcome(ctx context.Context, port int) (map[string]Welcome, error) {
+	url := fmt.Sprintf("http://localhost:%d/welcome", port)
+	for i := 0; i < 5; i++ {
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			if strings.Contains(err.Error(), "connection refused") {
+				time.Sleep(time.Millisecond * time.Duration(100*i+1))
+				continue
+			}
+			return nil, err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode == 404 {
+			return nil, nil // this is ok, just means no agents have inspect
+		}
+		res := make(map[string]Welcome)
+		if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+			return nil, err
+		}
+		return res, nil
+	}
+	return nil, fmt.Errorf("failed to inspect agents after 5 attempts")
+}
+
 func (c *Websocket) StartReadingMessages(ctx context.Context, logger logger.Logger, port int) {
 	go func() {
 		defer close(c.done)
@@ -141,6 +170,16 @@ func (c *Websocket) StartReadingMessages(ctx context.Context, logger logger.Logg
 						ID:          agent.ID,
 						Description: agent.Description,
 					})
+				}
+				welcome, err := c.getAgentWelcome(ctx, port)
+				if err != nil {
+					logger.Error("failed to inspect agents: %s", err)
+					continue
+				}
+				for i, agent := range agents {
+					if val, ok := welcome[agent.ID]; ok {
+						agents[i].Welcome = &val
+					}
 				}
 				agentsMessage := NewAgentsMessage(c.webSocketId, c.Project.Project.ProjectId, AgentsPayload{
 					ProjectID:   c.Project.Project.ProjectId,
@@ -347,10 +386,19 @@ func NewCloseMessage(id string, projectId string) Message {
 	}
 }
 
+type Welcome struct {
+	Message string `json:"welcome"`
+	Prompts []struct {
+		Data        string `json:"data"`
+		ContentType string `json:"contentType"`
+	} `json:"prompts,omitempty"`
+}
+
 type Agent struct {
-	Name        string `json:"name"`
-	ID          string `json:"id"`
-	Description string `json:"description"`
+	Name        string   `json:"name"`
+	ID          string   `json:"id"`
+	Description string   `json:"description"`
+	Welcome     *Welcome `json:"welcome,omitempty"`
 }
 
 type AgentsPayload struct {
