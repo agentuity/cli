@@ -48,8 +48,8 @@ func (r *Requirement) hasCommand(cmd string) (string, bool) {
 	return lookup, true
 }
 
-func (r *Requirement) checkForBrew(brew string, formula string) bool {
-	c := exec.Command(brew, "info", formula)
+func (r *Requirement) checkForBrew(ctx context.Context, brew string, formula string) bool {
+	c := exec.CommandContext(ctx, brew, "info", formula)
 	c.Stdin = nil
 	c.Stdout = io.Discard
 	c.Stderr = io.Discard
@@ -64,8 +64,8 @@ func (r *Requirement) checkForBrew(brew string, formula string) bool {
 	return true
 }
 
-func (r *Requirement) upgradeBrew(brew string, formula string) error {
-	c := exec.Command(brew, "update")
+func (r *Requirement) upgradeBrew(ctx context.Context, brew string, formula string) error {
+	c := exec.CommandContext(ctx, brew, "update")
 	c.Stdin = nil
 	c.Stdout = io.Discard
 	c.Stderr = io.Discard
@@ -73,15 +73,15 @@ func (r *Requirement) upgradeBrew(brew string, formula string) error {
 	if err := c.Run(); err != nil {
 		return fmt.Errorf("failed to update brew: %w", err)
 	}
-	c = exec.Command(brew, "upgrade", formula)
+	c = exec.CommandContext(ctx, brew, "upgrade", formula)
 	c.Stdin = nil
 	c.Stdout = io.Discard
 	c.Stderr = io.Discard
 	return c.Run()
 }
 
-func (r *Requirement) installBrew(brew string, formula string) error {
-	c := exec.Command(brew, "install", formula)
+func (r *Requirement) installBrew(ctx context.Context, brew string, formula string) error {
+	c := exec.CommandContext(ctx, brew, "install", formula)
 	c.Stdin = os.Stdin
 	c.Stdout = io.Discard
 	c.Stderr = io.Discard
@@ -93,7 +93,7 @@ func (r *Requirement) TryInstall(ctx TemplateContext) error {
 	if r.Selfupdate != nil {
 		if cmd, ok := r.hasCommand(r.Selfupdate.Command); ok {
 			ctx.Logger.Debug("self-upgrading %s", r.Command)
-			c := exec.Command(cmd, r.Selfupdate.Args...)
+			c := exec.CommandContext(ctx.Context, cmd, r.Selfupdate.Args...)
 			c.Stdin = os.Stdin
 			c.Stdout = io.Discard
 			c.Stderr = io.Discard
@@ -105,12 +105,12 @@ func (r *Requirement) TryInstall(ctx TemplateContext) error {
 		ctx.Logger.Debug("checking for brew")
 		if brew, ok := r.hasCommand("brew"); ok {
 			ctx.Logger.Debug("brew found: %s", brew)
-			if r.checkForBrew(brew, r.Brew) {
+			if r.checkForBrew(ctx.Context, brew, r.Brew) {
 				ctx.Logger.Debug("trying to upgrade: %s", r.Brew)
-				return r.upgradeBrew(brew, r.Brew)
+				return r.upgradeBrew(ctx.Context, brew, r.Brew)
 			}
 			ctx.Logger.Debug("trying to install formula: %s", r.Brew)
-			return r.installBrew(brew, r.Brew)
+			return r.installBrew(ctx.Context, brew, r.Brew)
 		}
 	}
 	if r.URL != "" {
@@ -126,7 +126,7 @@ func (r *Requirement) Matches(ctx TemplateContext) bool {
 
 	if command, ok := r.hasCommand(r.Command); ok {
 		ctx.Logger.Debug("checking version of %s", command)
-		c := exec.Command(command, r.Args...)
+		c := exec.CommandContext(ctx.Context, command, r.Args...)
 		util.ProcessSetup(c)
 		out, err := c.Output()
 		if err != nil {
