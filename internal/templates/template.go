@@ -117,12 +117,12 @@ type LanguageTemplates []ProjectTemplate
 func LoadTemplateRuleForIdentifier(templateDir, identifier string) (*TemplateRules, error) {
 	reader, err := getEmbeddedFile(filepath.Join(templateDir, identifier, "rules.yaml"))
 	if err != nil {
-		return nil, fmt.Errorf("failed to load embedded file for %s: %s", identifier+"/rules.yaml", err)
+		return nil, fmt.Errorf("failed to load embedded file for %s: %w", identifier+"/rules.yaml", err)
 	}
 	defer reader.Close()
 	var rules TemplateRules
 	if err := yaml.NewDecoder(reader).Decode(&rules); err != nil {
-		return nil, fmt.Errorf("failed to decode rules for %s: %s", identifier+"/rules.yaml", err)
+		return nil, fmt.Errorf("failed to decode rules for %s: %w", identifier+"/rules.yaml", err)
 	}
 	return &rules, nil
 }
