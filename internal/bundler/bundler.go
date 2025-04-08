@@ -150,7 +150,7 @@ var (
 
 func bundlePython(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
 
-	if ctx.Install {
+	if ctx.Install || !util.Exists(filepath.Join(dir, ".venv", "lib")) {
 		var install *exec.Cmd
 		switch theproject.Bundler.Runtime {
 		case "uv":
