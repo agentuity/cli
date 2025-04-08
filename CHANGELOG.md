@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.87] - 2025-04-08
+
+### Fixed
+- Fix regression in step 2 (new project) related to cursor selection ([234b330](https://github.com/agentuity/cli/commit/234b3307d1fd96005d4f656ab319d438e7b60626))
+
 ## [v0.0.86] - 2025-04-07
 
 ### Added
@@ -227,4 +232,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.87]: https://github.com/agentuity/cli/compare/v0.0.86...v0.0.87
 [v0.0.73]: https://github.com/agentuity/cli/compare/v0.0.72...v0.0.73
