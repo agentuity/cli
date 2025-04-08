@@ -1018,7 +1018,7 @@ func (m projectFormModel) View() string {
 					}{
 						name:     template.Name,
 						desc:     template.Description,
-						selected: m.stepCursors[m.step] == i,
+						selected: m.cursor == i,
 					})
 				}
 			}
