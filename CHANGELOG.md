@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.88] - 2025-04-08
+
+### Added
+- Webhook instructions ([#179](https://github.com/agentuity/cli/pull/179))
+
+### Changed
+- Proxy GitHub public APIs ([#180](https://github.com/agentuity/cli/pull/180))
+- Small improvements on devmode
+
+### Fixed
+- Make it clear that the webhook is a POST ([#178](https://github.com/agentuity/cli/pull/178))
+- If node_modules or .venv/lib directory are missing when bundling, force install ([#177](https://github.com/agentuity/cli/pull/177))
+
 ## [v0.0.87] - 2025-04-08
 
 ### Fixed
@@ -232,5 +245,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.88]: https://github.com/agentuity/cli/compare/v0.0.87...v0.0.88
 [v0.0.87]: https://github.com/agentuity/cli/compare/v0.0.86...v0.0.87
 [v0.0.73]: https://github.com/agentuity/cli/compare/v0.0.72...v0.0.73
