@@ -16,18 +16,19 @@ import (
 )
 
 func KillProjectServer(projectServerCmd *exec.Cmd) {
-	projectServerCmd.Process.Signal(syscall.SIGTERM)
-	ch := make(chan struct{})
+	ch := make(chan struct{}, 1)
 	go func() {
 		projectServerCmd.Wait()
 		ch <- struct{}{}
 	}()
+	syscall.Kill(-projectServerCmd.Process.Pid, syscall.SIGTERM)
 	select {
 	case <-ch:
-		break
-	case <-time.After(time.Second * 10):
+		return
+	case <-time.After(time.Second * 5):
 		// this will kill the process group not just the parent process
 		util.ProcessKill(projectServerCmd)
+		close(ch)
 	}
 }
 
