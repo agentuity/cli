@@ -178,7 +178,7 @@ trap cleanup EXIT
 
 if [[ "$VERSION" == "latest" ]]; then
   ohai "Fetching latest release information..."
-  RELEASE_URL="https://api.github.com/repos/agentuity/cli/releases/latest"
+  RELEASE_URL="https://agentuity.sh/release/cli"
   VERSION=$(curl -s $RELEASE_URL | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
   if [[ -z "$VERSION" ]]; then
     abort "Failed to fetch latest version information"
