@@ -323,6 +323,7 @@ func LoadTemplatesFromGithub(ctx context.Context, dir string) (Templates, error)
 	etag = resp.Header.Get("ETag")
 	if etag != "" {
 		viper.Set("templates.etag", etag)
+		viper.Set("templates.release", "") // just reset it since we don't use this anymore
 		viper.WriteConfig()
 	}
 
