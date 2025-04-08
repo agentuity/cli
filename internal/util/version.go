@@ -19,12 +19,10 @@ func GetLatestRelease(ctx context.Context) (string, error) {
 	if Version == "dev" {
 		return Version, nil
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/repos/agentuity/cli/releases/latest", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://agentuity.sh/release/cli", nil)
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	req.Header.Set("User-Agent", UserAgent())
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

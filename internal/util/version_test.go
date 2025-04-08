@@ -25,9 +25,7 @@ func TestGetLatestRelease(t *testing.T) {
 		Version = "0.1.0"
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			assert.Equal(t, "/repos/agentuity/cli/releases/latest", r.URL.Path)
-			assert.Equal(t, "application/vnd.github+json", r.Header.Get("Accept"))
-			assert.Equal(t, "2022-11-28", r.Header.Get("X-GitHub-Api-Version"))
+			assert.Equal(t, "/release/cli", r.URL.Path)
 			assert.Contains(t, r.Header.Get("User-Agent"), "Agentuity CLI/")
 
 			w.Header().Set("Content-Type", "application/json")
@@ -81,7 +79,7 @@ type testTransport struct {
 }
 
 func (t *testTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req.URL.Host == "api.github.com" {
+	if req.URL.Host == "agentuity.sh" {
 		req.URL.Scheme = "http"
 		req.URL.Host = t.server.Listener.Addr().String()
 	}

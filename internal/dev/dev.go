@@ -21,7 +21,7 @@ func KillProjectServer(projectServerCmd *exec.Cmd) {
 		projectServerCmd.Wait()
 		ch <- struct{}{}
 	}()
-	syscall.Kill(-projectServerCmd.Process.Pid, syscall.SIGTERM)
+	projectServerCmd.Process.Signal(syscall.SIGTERM)
 	select {
 	case <-ch:
 		return
