@@ -37,7 +37,7 @@ type BundleContext struct {
 
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
 
-	if ctx.Install {
+	if ctx.Install || !util.Exists(filepath.Join(dir, "node_modules")) {
 		var install *exec.Cmd
 		switch theproject.Bundler.Runtime {
 		case "nodejs":
