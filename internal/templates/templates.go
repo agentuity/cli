@@ -3,7 +3,6 @@ package templates
 import (
 	"archive/zip"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -228,39 +227,7 @@ func loadTemplates(reader io.Reader) (Templates, error) {
 	return templates, nil
 }
 
-type Release struct {
-	ZipballURL string `json:"zipball_url"`
-	TagName    string `json:"tag_name"`
-}
-
-const githubTemplatesLatest = "https://api.github.com/repos/agentuity/templates/releases/latest"
-
-func getLatestRelease(ctx context.Context) (string, string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", githubTemplatesLatest, nil)
-	if err != nil {
-		return "", "", err
-	}
-	req.Header.Set("User-Agent", util.UserAgent())
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", "", fmt.Errorf("failed to get latest release: %s", resp.Status)
-	}
-
-	var release Release
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return "", "", err
-	}
-
-	return release.TagName, release.ZipballURL, nil
-}
-
+const githubTemplatesLatest = "https://agentuity.sh/templates.zip"
 const markerFileName = ".marker"
 
 func unzip(src, dest string) error {
@@ -330,17 +297,12 @@ func unzip(src, dest string) error {
 // If the templates have changed, it will download the new templates and return them
 func LoadTemplatesFromGithub(ctx context.Context, dir string) (Templates, error) {
 	etag := viper.GetString("templates.etag")
-	release := viper.GetString("templates.release")
-	tagName, zipballURL, err := getLatestRelease(ctx)
-	if err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequestWithContext(ctx, "GET", zipballURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", githubTemplatesLatest, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", util.UserAgent())
-	if etag != "" && release == tagName && util.Exists(filepath.Join(dir, markerFileName)) {
+	if etag != "" && util.Exists(filepath.Join(dir, markerFileName)) {
 		req.Header.Set("If-None-Match", etag)
 	}
 	resp, err := http.DefaultClient.Do(req)
@@ -361,7 +323,6 @@ func LoadTemplatesFromGithub(ctx context.Context, dir string) (Templates, error)
 	etag = resp.Header.Get("ETag")
 	if etag != "" {
 		viper.Set("templates.etag", etag)
-		viper.Set("templates.release", tagName)
 		viper.WriteConfig()
 	}
 
