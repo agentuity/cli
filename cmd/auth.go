@@ -181,14 +181,8 @@ Examples:
 		tui.ShowBanner("Signup for Agentuity", body, false)
 		fmt.Println()
 
-		code := tui.Input(logger, "Enter Code", "Enter the code you received upon signup completion")
-		if code == "" {
-			tui.ShowError("Code is required")
-			os.Exit(1)
-		}
-
 		action := func() {
-			userId, apiKey, expires, err := auth.VerifySignupOTP(ctx, logger, apiUrl, code)
+			userId, apiKey, expires, err := auth.VerifySignupOTP(ctx, logger, apiUrl, otp)
 			if err != nil {
 				errsystem.New(errsystem.ErrAuthenticateUser, err,
 					errsystem.WithContextMessage("Failed to verify signup OTP")).ShowErrorAndExit()
@@ -203,7 +197,7 @@ Examples:
 			}
 		}
 
-		tui.ShowSpinner("Verifying code...", action)
+		tui.ShowSpinner("Waiting for signup to complete...", action)
 
 		tui.ClearScreen()
 		initScreenWithLogo()
