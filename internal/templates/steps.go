@@ -1,14 +1,18 @@
 package templates
 
 import (
+	"archive/zip"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/agentuity/cli/internal/util"
 )
@@ -38,13 +42,50 @@ var _ Step = (*CommandStep)(nil)
 
 func (s *CommandStep) Run(ctx TemplateContext) error {
 	ctx.Logger.Debug("Running command: %s with args: %s", s.Command, strings.Join(s.Args, " "))
-	cmd := exec.CommandContext(ctx.Context, s.Command, s.Args...)
+
+	timeoutCtx, cancel := context.WithTimeout(ctx.Context, 1*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(timeoutCtx, s.Command, s.Args...)
 	cmd.Dir = ctx.ProjectDir
 	cmd.Stdin = nil
+
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to run command: %s with args: %s: %s (%s)", s.Command, strings.Join(s.Args, " "), err, string(out))
+		if s.Command == "uv" && len(s.Args) >= 3 && s.Args[0] == "add" {
+			exitErr, ok := err.(*exec.ExitError)
+			if ok && exitErr.ExitCode() == 130 {
+				packages := s.Args[2:]
+				ctx.Logger.Debug("Command interrupted with SIGINT (130), trying alternative installation methods for: %v", packages)
+
+				altCmd := exec.CommandContext(ctx.Context, "uv", "pip", "install")
+				altCmd.Args = append(altCmd.Args, packages...)
+				altCmd.Dir = ctx.ProjectDir
+				altOut, altErr := altCmd.CombinedOutput()
+
+				if altErr == nil {
+					ctx.Logger.Debug("Successfully installed packages with uv pip: %s", strings.TrimSpace(string(altOut)))
+					return nil
+				}
+
+				ctx.Logger.Debug("Failed to install with uv pip, trying with pip: %v", altErr)
+				pipCmd := exec.CommandContext(ctx.Context, "pip", "install")
+				pipCmd.Args = append(pipCmd.Args, packages...)
+				pipCmd.Dir = ctx.ProjectDir
+				pipOut, pipErr := pipCmd.CombinedOutput()
+
+				if pipErr == nil {
+					ctx.Logger.Debug("Successfully installed packages with pip: %s", strings.TrimSpace(string(pipOut)))
+					return nil
+				}
+
+				return fmt.Errorf("failed to install packages %v with multiple methods: original error: %w, pip error: %v (%s)",
+					packages, err, pipErr, string(pipOut))
+			}
+		}
+
+		return fmt.Errorf("failed to run command: %s with args: %s: %w (%s)", s.Command, strings.Join(s.Args, " "), err, string(out))
 	}
+
 	buf := strings.TrimSpace(string(out))
 	if buf != "" {
 		ctx.Logger.Debug("Command output: %s", buf)
@@ -67,7 +108,7 @@ func (s *DeleteFileActionStep) Run(ctx TemplateContext) error {
 		}
 		ctx.Logger.Debug("deleting file: %s", filename)
 		if err := os.Remove(filename); err != nil {
-			return fmt.Errorf("failed to delete file: %s", err)
+			return fmt.Errorf("failed to delete file: %w", err)
 		}
 	}
 	return nil
@@ -97,11 +138,11 @@ func (s *ModifyPackageJsonStep) Run(ctx TemplateContext) error {
 	}
 	pkgjson, err := os.ReadFile(packageJsonPath)
 	if err != nil {
-		return fmt.Errorf("failed to read package.json: %s", err)
+		return fmt.Errorf("failed to read package.json: %w", err)
 	}
 	packageJsonMap, err := util.NewOrderedMapFromJSON(util.PackageJsonKeysOrder, pkgjson)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal package.json: %s", err)
+		return fmt.Errorf("failed to unmarshal package.json: %w", err)
 	}
 	for _, script := range s.Script {
 		var scripts map[string]any
@@ -133,11 +174,11 @@ func (s *ModifyPackageJsonStep) Run(ctx TemplateContext) error {
 	}
 	packageJson, err := packageJsonMap.ToJSON()
 	if err != nil {
-		return fmt.Errorf("failed to marshal package.json: %s", err)
+		return fmt.Errorf("failed to marshal package.json: %w", err)
 	}
 	ctx.Logger.Debug("Writing package.json: %s", packageJsonPath)
 	if err := os.WriteFile(packageJsonPath, packageJson, 0644); err != nil {
-		return fmt.Errorf("failed to write package.json: %s", err)
+		return fmt.Errorf("failed to write package.json: %w", err)
 	}
 	return nil
 }
@@ -156,11 +197,11 @@ func (s *ModifyTsConfigStep) Run(ctx TemplateContext) error {
 	}
 	tsconfig, err := os.ReadFile(tsconfigPath)
 	if err != nil {
-		return fmt.Errorf("failed to read tsconfig.json: %s", err)
+		return fmt.Errorf("failed to read tsconfig.json: %w", err)
 	}
 	tsconfigMap, err := util.NewOrderedMapFromJSON(util.PackageJsonKeysOrder, tsconfig)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal tsconfig.json: %s", err)
+		return fmt.Errorf("failed to unmarshal tsconfig.json: %w", err)
 	}
 	var compilerOptions map[string]any
 	if val, ok := tsconfigMap.Data["compilerOptions"].(map[string]any); ok {
@@ -177,11 +218,11 @@ func (s *ModifyTsConfigStep) Run(ctx TemplateContext) error {
 	tsconfigMap.Data["compilerOptions"] = compilerOptions
 	tsbuf, err := tsconfigMap.ToJSON()
 	if err != nil {
-		return fmt.Errorf("failed to marshal tsconfig.json: %s", err)
+		return fmt.Errorf("failed to marshal tsconfig.json: %w", err)
 	}
 	ctx.Logger.Debug("Writing tsconfig: %s", tsconfigPath)
 	if err := os.WriteFile(tsconfigPath, tsbuf, 0644); err != nil {
-		return fmt.Errorf("failed to write tsconfig.json: %s", err)
+		return fmt.Errorf("failed to write tsconfig.json: %w", err)
 	}
 	return nil
 }
@@ -200,14 +241,14 @@ func (s *AppendFileStep) Run(ctx TemplateContext) error {
 	}
 	buf, err := os.ReadFile(filename)
 	if err != nil {
-		return fmt.Errorf("failed to read gitignore: %s", err)
+		return fmt.Errorf("failed to read gitignore: %w", err)
 	}
 
 	newbuf := append(buf, []byte(s.Content)...)
 
 	ctx.Logger.Debug("Writing %s", filename)
 	if err := os.WriteFile(filename, newbuf, 0644); err != nil {
-		return fmt.Errorf("failed to write gitignore: %s", err)
+		return fmt.Errorf("failed to write gitignore: %w", err)
 	}
 	return nil
 }
@@ -226,7 +267,7 @@ func (s *CreateFileAction) Run(ctx TemplateContext) error {
 	dir := filepath.Dir(filename)
 	if !util.Exists(dir) {
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("failed to create directory: %s", err)
+			return fmt.Errorf("failed to create directory: %w", err)
 		}
 	}
 	ctx.Logger.Debug("Creating file: %s", filename)
@@ -234,21 +275,21 @@ func (s *CreateFileAction) Run(ctx TemplateContext) error {
 	if s.Template != "" {
 		fr, err := getEmbeddedFile(filepath.Join(ctx.TemplateDir, s.Template))
 		if err != nil {
-			return fmt.Errorf("failed to get embedded file: %s", err)
+			return fmt.Errorf("failed to get embedded file: %w", err)
 		}
 		defer fr.Close()
 		tbuf, err := io.ReadAll(fr)
 		if err != nil {
-			return fmt.Errorf("failed to read embedded file: %s", err)
+			return fmt.Errorf("failed to read embedded file: %w", err)
 		}
 		tmpl := template.New(s.Template)
 		tmpl, err = funcTemplates(tmpl).Parse(string(tbuf))
 		if err != nil {
-			return fmt.Errorf("failed to parse template: %s", err)
+			return fmt.Errorf("failed to parse template: %w", err)
 		}
 		var buf bytes.Buffer
 		if err := tmpl.Execute(&buf, ctx); err != nil {
-			return fmt.Errorf("failed to execute template: %s", err)
+			return fmt.Errorf("failed to execute template: %w", err)
 		}
 		output = buf.Bytes()
 	} else if s.Content != "" {
@@ -269,7 +310,7 @@ func (s *CreateFileAction) Run(ctx TemplateContext) error {
 		return fmt.Errorf("no content to write to file: %s", filename)
 	}
 	if err := os.WriteFile(filename, output, 0644); err != nil {
-		return fmt.Errorf("failed to write file: %s", err)
+		return fmt.Errorf("failed to write file: %w", err)
 	}
 	return nil
 }
@@ -284,23 +325,23 @@ var _ Step = (*CopyFileAction)(nil)
 func (s *CopyFileAction) Run(ctx TemplateContext) error {
 	from, err := getEmbeddedFile(filepath.Join(ctx.TemplateDir, s.From))
 	if err != nil {
-		return fmt.Errorf("failed to get embedded file: %s", err)
+		return fmt.Errorf("failed to get embedded file: %w", err)
 	}
 	defer from.Close()
 	buf, err := io.ReadAll(from)
 	if err != nil {
-		return fmt.Errorf("failed to read embedded file: %s", err)
+		return fmt.Errorf("failed to read embedded file: %w", err)
 	}
 	to := filepath.Join(ctx.ProjectDir, localizePath(s.To))
 	dir := filepath.Dir(to)
 	if !util.Exists(dir) {
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("failed to create directory: %s", err)
+			return fmt.Errorf("failed to create directory: %w", err)
 		}
 	}
 	ctx.Logger.Debug("Copying file: %s to %s", s.From, s.To)
 	if err := os.WriteFile(to, buf, 0644); err != nil {
-		return fmt.Errorf("failed to write file: %s", err)
+		return fmt.Errorf("failed to write file: %w", err)
 	}
 	return nil
 }
@@ -317,12 +358,12 @@ func (s *CopyDirAction) Run(ctx TemplateContext) error {
 	filename := embeddedPath(s.From)
 	from, err := getEmbeddedDir(filepath.Join(ctx.TemplateDir, filename))
 	if err != nil {
-		return fmt.Errorf("failed to get embedded file: %s", err)
+		return fmt.Errorf("failed to get embedded file: %w", err)
 	}
 	dir := filepath.Join(ctx.ProjectDir, localizePath(s.To))
 	if !util.Exists(dir) {
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("failed to create directory: %s", err)
+			return fmt.Errorf("failed to create directory: %w", err)
 		}
 		ctx.Logger.Debug("Created directory: %s", dir)
 	}
@@ -330,7 +371,7 @@ func (s *CopyDirAction) Run(ctx TemplateContext) error {
 		if s.Filter != "" {
 			matched, err := filepath.Match(s.Filter, file.Name())
 			if err != nil {
-				return fmt.Errorf("failed to match filter: %s", err)
+				return fmt.Errorf("failed to match filter: %w", err)
 			}
 			if !matched {
 				continue
@@ -339,19 +380,116 @@ func (s *CopyDirAction) Run(ctx TemplateContext) error {
 		name := filepath.Join(ctx.TemplateDir, s.From, file.Name())
 		r, err := getEmbeddedFile(name)
 		if err != nil {
-			return fmt.Errorf("failed to get embedded file: %s", err)
+			return fmt.Errorf("failed to get embedded file: %w", err)
 		}
 		defer r.Close()
 		buf, err := io.ReadAll(r)
 		if err != nil {
-			return fmt.Errorf("failed to read embedded file: %s", err)
+			return fmt.Errorf("failed to read embedded file: %w", err)
 		}
 		to := filepath.Join(dir, localizePath(file.Name()))
 		if err := os.WriteFile(to, buf, 0644); err != nil {
-			return fmt.Errorf("failed to write file: %s", err)
+			return fmt.Errorf("failed to write file: %w", err)
 		}
 		ctx.Logger.Debug("Copied file: %s to %s", name, to)
 	}
+	return nil
+}
+
+type CloneRepoAction struct {
+	Repo   string
+	Branch string
+	Todir  string
+}
+
+var _ Step = (*CloneRepoAction)(nil)
+
+func (s *CloneRepoAction) Run(ctx TemplateContext) error {
+	var url string
+	if s.Branch == "" {
+		url = fmt.Sprintf("https://api.github.com/repos/%s/zipball", s.Repo)
+	} else {
+		url = fmt.Sprintf("https://api.github.com/repos/%s/zipball/%s", s.Repo, s.Branch)
+	}
+	req, err := http.NewRequestWithContext(ctx.Context, "GET", url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", util.UserAgent())
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to clone repo %s: %s", s.Repo, resp.Status)
+	}
+
+	if !util.Exists(s.Todir) {
+		if err := os.MkdirAll(s.Todir, 0755); err != nil {
+			return fmt.Errorf("failed to create directory: %w", err)
+		}
+	}
+	tmpFile, err := os.CreateTemp("", "temp.zip")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	_, err = io.Copy(tmpFile, resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to copy zipball: %w", err)
+	}
+	tmpFile.Close()
+
+	zipReader, err := zip.OpenReader(tmpFile.Name())
+	if err != nil {
+		return err
+	}
+	defer zipReader.Close()
+
+	var trimDir string
+
+	for _, file := range zipReader.File {
+		if strings.Contains(file.Name, "..") {
+			ctx.Logger.Warn("skipping invalid zip file: %s", file.Name)
+			continue
+		}
+		isDir := file.FileInfo().IsDir()
+		if trimDir == "" && isDir {
+			trimDir = file.Name
+			continue
+		}
+		if strings.HasPrefix(file.Name, ".git") {
+			continue
+		}
+		destFile := filepath.Join(s.Todir, strings.TrimPrefix(file.Name, trimDir))
+		if isDir {
+			if err := os.MkdirAll(destFile, 0755); err != nil {
+				return fmt.Errorf("failed to create directory: %w", err)
+			}
+		} else {
+			rc, err := file.Open()
+			if err != nil {
+				return fmt.Errorf("failed to open file: %w", err)
+			}
+			defer rc.Close()
+			out, err := os.Create(destFile)
+			if err != nil {
+				return fmt.Errorf("failed to create file: %w", err)
+			}
+			defer out.Close()
+			_, err = io.Copy(out, rc)
+			if err != nil {
+				return fmt.Errorf("failed to copy file: %w", err)
+			}
+			rc.Close()
+			ctx.Logger.Debug("unzipped file: %s", destFile)
+		}
+	}
+
 	return nil
 }
 
@@ -493,6 +631,23 @@ func resolveStep(ctx TemplateContext, step any) (Step, bool) {
 					filter = ctx.Interpolate(val).(string)
 				}
 				return &CopyDirAction{From: from, To: to, Filter: filter}, true
+			case "clone_repo":
+				var repo string
+				if val, ok := kv["repo"].(string); ok {
+					repo = ctx.Interpolate(val).(string)
+				}
+				if repo == "" {
+					panic("repo is required")
+				}
+				todir := ctx.ProjectDir
+				if val, ok := kv["to"].(string); ok {
+					todir = filepath.Join(ctx.ProjectDir, ctx.Interpolate(val).(string))
+				}
+				var branch string
+				if val, ok := kv["branch"].(string); ok {
+					branch = ctx.Interpolate(val).(string)
+				}
+				return &CloneRepoAction{Repo: repo, Branch: branch, Todir: todir}, true
 			default:
 				panic(fmt.Sprintf("unknown step action: %s", action))
 			}

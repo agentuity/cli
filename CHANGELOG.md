@@ -5,6 +5,93 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.88] - 2025-04-08
+
+### Added
+- Webhook instructions ([#179](https://github.com/agentuity/cli/pull/179))
+
+### Changed
+- Proxy GitHub public APIs ([#180](https://github.com/agentuity/cli/pull/180))
+- Small improvements on devmode
+
+### Fixed
+- Make it clear that the webhook is a POST ([#178](https://github.com/agentuity/cli/pull/178))
+- If node_modules or .venv/lib directory are missing when bundling, force install ([#177](https://github.com/agentuity/cli/pull/177))
+
+## [v0.0.87] - 2025-04-08
+
+### Fixed
+- Fix regression in step 2 (new project) related to cursor selection ([234b330](https://github.com/agentuity/cli/commit/234b3307d1fd96005d4f656ab319d438e7b60626))
+
+## [v0.0.86] - 2025-04-07
+
+### Added
+- Add Clone Repo step ([#171](https://github.com/agentuity/cli/pull/171))
+- Add Agent Welcome on DevMode ([#172](https://github.com/agentuity/cli/pull/172))
+
+### Changed
+- Totally re-write the TUI for the new project ([#170](https://github.com/agentuity/cli/pull/170))
+- Better upgrade handling ([#174](https://github.com/agentuity/cli/pull/174))
+
+### Fixed
+- Fix crewai installation issue (exit status 130) ([#169](https://github.com/agentuity/cli/pull/169))
+- Make sure command is executed with a context ([#173](https://github.com/agentuity/cli/pull/173))
+
+## [v0.0.85] - 2025-04-05
+
+### Added
+- Added project id on messages for devmode ([#167](https://github.com/agentuity/cli/pull/167))
+
+## [v0.0.84] - 2025-04-03
+
+### Fixed
+- Fixed bundler version not having the right cli version ([#165](https://github.com/agentuity/cli/pull/165))
+
+## [v0.0.83] - 2025-04-01
+
+### Changed
+- Devmode fixes and improvements ([#164](https://github.com/agentuity/cli/pull/164))
+
+## [v0.0.82] - 2025-03-30
+
+### Fixed
+- Small improvement for homebrew upgrade and fix upgrade url prefix ([#163](https://github.com/agentuity/cli/pull/163))
+
+## [v0.0.81] - 2025-03-28
+
+### Changed
+- Use transport url for transport url ([#162](https://github.com/agentuity/cli/pull/162))
+
+## [v0.0.80] - 2025-03-27
+
+### Changed
+- Use windows-latest instead of windows for build environment
+
+## [v0.0.79] - 2025-03-26
+
+### Fixed
+- Fix version comparison in upgrade command to handle v prefix ([#158](https://github.com/agentuity/cli/pull/158))
+
+## [v0.0.78] - 2025-03-26
+
+### Added
+- Add the new env AGENTUITY_TRANSPORT_URL for the bundler and use the new gateway URL ([#155](https://github.com/agentuity/cli/pull/155))
+
+## [v0.0.77] - 2025-03-26
+
+### Changed
+- Use app/api url for api url ([#152](https://github.com/agentuity/cli/pull/152))
+
+## [v0.0.76] - 2025-03-26
+
+### Changed
+- Use a different key for authentication
+
+## [v0.0.75] - 2025-03-26
+
+### Changed
+- Try and use github runner for builds
+
 ## [v0.0.74] - 2025-03-25
 
 ### Added
@@ -158,4 +245,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.88]: https://github.com/agentuity/cli/compare/v0.0.87...v0.0.88
+[v0.0.87]: https://github.com/agentuity/cli/compare/v0.0.86...v0.0.87
 [v0.0.73]: https://github.com/agentuity/cli/compare/v0.0.72...v0.0.73

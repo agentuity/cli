@@ -241,6 +241,8 @@ var agentCreateCmd = &cobra.Command{
 
 		checkForUpgrade(ctx, logger)
 
+		loadTemplates(ctx, cmd)
+
 		var err error
 		remoteAgents, err = getAgentList(logger, apiUrl, apikey, theproject)
 		if err != nil {
@@ -291,7 +293,7 @@ var agentCreateCmd = &cobra.Command{
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to create Agent")).ShowErrorAndExit()
 			}
 
-			tmpdir, err := getConfigTemplateDir(cmd)
+			tmpdir, _, err := getConfigTemplateDir(cmd)
 			if err != nil {
 				errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
 			}
@@ -363,7 +365,7 @@ func reconcileAgentList(logger logger.Logger, cmd *cobra.Command, apiUrl string,
 		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent list")).ShowErrorAndExit()
 	}
 
-	tmpdir, err := getConfigTemplateDir(cmd)
+	tmpdir, _, err := getConfigTemplateDir(cmd)
 	if err != nil {
 		errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
 	}

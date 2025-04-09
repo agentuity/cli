@@ -19,12 +19,10 @@ func GetLatestRelease(ctx context.Context) (string, error) {
 	if Version == "dev" {
 		return Version, nil
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/repos/agentuity/cli/releases/latest", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://agentuity.sh/release/cli", nil)
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	req.Header.Set("User-Agent", UserAgent())
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -40,7 +38,7 @@ func GetLatestRelease(ctx context.Context) (string, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
 		return "", err
 	}
-	return release.TagName, nil
+	return strings.TrimPrefix(release.TagName, "v"), nil
 }
 
 func CheckLatestRelease(ctx context.Context, logger logger.Logger) error {
@@ -70,16 +68,21 @@ func showUpgradeNotice(ctx context.Context, logger logger.Logger, version string
 		answer := tui.Ask(logger, tui.Bold(fmt.Sprintf("Agentuity version %s is available. Would you like to upgrade? [Y/n] ", version)), true)
 		fmt.Println()
 		if answer {
+			var success bool
 			action := func() {
-				exec.CommandContext(ctx, exe, "update").Run()
-				v, _ := exec.CommandContext(ctx, exe, "version").Output()
-				if strings.TrimSpace(string(v)) == version {
-					tui.ShowSuccess("Upgraded to %s", version)
+				c := exec.CommandContext(ctx, exe, "update", "--force")
+				c.Stdout = os.Stdout
+				c.Stderr = os.Stderr
+				c.Stdin = os.Stdin
+				if err := c.Run(); err != nil {
 					return
 				}
-				tui.ShowWarning("Failed to upgrade. Please see https://agentuity.dev/CLI/installation for instructions to upgrade manually.")
+				success = true
 			}
-			tui.ShowSpinner("Upgrading...", action)
+			action()
+			if !success {
+				tui.ShowWarning("Please see https://agentuity.dev/CLI/installation for instructions to upgrade manually.")
+			}
 		}
 		return
 	}

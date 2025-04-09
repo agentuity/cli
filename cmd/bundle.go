@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/agentuity/cli/internal/bundler"
@@ -37,9 +39,11 @@ Examples:
 		production, _ := cmd.Flags().GetBool("production")
 		install, _ := cmd.Flags().GetBool("install")
 		deploy, _ := cmd.Flags().GetBool("deploy")
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
 
 		if err := bundler.Bundle(bundler.BundleContext{
-			Context:    context.Background(),
+			Context:    ctx,
 			Logger:     projectContext.Logger,
 			ProjectDir: projectContext.Dir,
 			Production: production,
@@ -76,7 +80,7 @@ Examples:
 			if err != nil {
 				projectContext.Logger.Fatal("Failed to get current working directory: %s", err)
 			}
-			c := exec.Command(bin, args...)
+			c := exec.CommandContext(ctx, bin, args...)
 			util.ProcessSetup(c)
 			c.Dir = cwd
 			c.Stdin = nil

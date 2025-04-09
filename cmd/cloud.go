@@ -156,6 +156,8 @@ Examples:
 		if !ci {
 			checkForUpgrade(ctx, logger)
 
+			loadTemplates(ctx, cmd)
+
 			var keys []string
 
 			if !context.NewProject {
@@ -601,7 +603,7 @@ Examples:
 							body2 += tui.Body("· Run ") + tui.Command("agent apikey "+theproject.Agents[0].ID) + tui.Body("\n  to fetch the Webhook API key for this webhook")
 							body2 += "\n\n"
 						}
-						body2 += tui.Body(fmt.Sprintf("· Send %s webhook request to\n  ", theproject.Agents[0].Name) + tui.Link("%s/webhook/%s", transportUrl, strings.Replace(theproject.Agents[0].ID, "agent_", "", 1)))
+						body2 += tui.Body(fmt.Sprintf("· Send %s webhook POST request to\n  ", theproject.Agents[0].Name) + tui.Link("%s/webhook/%s", transportUrl, strings.Replace(theproject.Agents[0].ID, "agent_", "", 1)))
 					}
 
 					tui.ShowBanner("Your project was deployed successfully!", body+body2, true)

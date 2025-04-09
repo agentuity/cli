@@ -1,6 +1,10 @@
 package util
 
-import "golang.org/x/exp/rand"
+import (
+	"time"
+
+	"golang.org/x/exp/rand"
+)
 
 const alphaNumChars = "abcdefghjklmnpqrstuvwxyz23456789"
 
@@ -12,4 +16,8 @@ func RandStringBytes(n int) string {
 		b[i] = alphaNumChars[rand.Intn(l)]
 	}
 	return string(b)
+}
+
+func init() {
+	rand.Seed(uint64(time.Now().UnixNano()))
 }
