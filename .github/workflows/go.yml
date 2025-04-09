@@ -80,14 +80,14 @@ jobs:
       if: matrix.os == 'macos-latest'
       run: |
         chmod +x ./install.sh
-        # Test with default options (latest version)
-        ./install.sh -d /tmp/agentuity-test
+        # Test with default options (latest version) - use --no-brew to skip Homebrew
+        ./install.sh -d /tmp/agentuity-test --no-brew
         # Verify installation
         /tmp/agentuity-test/agentuity --version
         
         # Test installing over existing installation to verify segfault fix
         echo "Testing installation over existing binary to verify segfault fix..."
-        ./install.sh -d /tmp/agentuity-test
+        ./install.sh -d /tmp/agentuity-test --no-brew
         # Verify installation still works after reinstall
         /tmp/agentuity-test/agentuity --version
         
@@ -207,4 +207,4 @@ jobs:
           Write-Host "Installation verification failed"
           exit 1
         }
-      shell: pwsh                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+      shell: pwsh                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
