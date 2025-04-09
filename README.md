@@ -45,6 +45,25 @@ If you have already installed the CLI, you can upgrade to the latest version usi
 agentuity upgrade
 ```
 
+You can check the current version with:
+
+```bash
+agentuity version
+```
+
+You can check if there is a newer version:
+
+```bash
+agentuity version check
+```
+
+Use the `--upgrade` flag to automatically upgrade if a newer version is found:
+
+```bash
+agentuity version check --upgrade
+```
+
+
 ## Usage
 
 ```bash
