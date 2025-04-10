@@ -35,12 +35,12 @@ Examples:
 	Hidden:  true,
 	Run: func(cmd *cobra.Command, args []string) {
 		started := time.Now()
-		projectContext := project.EnsureProject(cmd)
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		projectContext := project.EnsureProject(ctx, cmd)
 		production, _ := cmd.Flags().GetBool("production")
 		install, _ := cmd.Flags().GetBool("install")
 		deploy, _ := cmd.Flags().GetBool("deploy")
-		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-		defer cancel()
 
 		if err := bundler.Bundle(bundler.BundleContext{
 			Context:    ctx,
