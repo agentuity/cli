@@ -48,7 +48,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		apiKey, userId := util.EnsureLoggedIn(ctx, log)
+		apiKey, userId := util.EnsureLoggedIn(ctx, log, cmd)
 		theproject := project.EnsureProject(ctx, cmd)
 		dir := theproject.Dir
 		isDeliberateRestart := false

@@ -485,9 +485,9 @@ func EnsureProject(ctx context.Context, cmd *cobra.Command) ProjectContext {
 	var token string
 	// if the --api-key flag is used, we only need to verify the api key
 	if cmd.Flags().Changed("api-key") {
-		token = util.EnsureLoggedInWithOnlyAPIKey(ctx, logger)
+		token = util.EnsureLoggedInWithOnlyAPIKey(ctx, logger, cmd)
 	} else {
-		token, _ = util.EnsureLoggedIn(ctx, logger)
+		token, _ = util.EnsureLoggedIn(ctx, logger, cmd)
 	}
 	p := LoadProject(logger, dir, apiUrl, appUrl, transportUrl, token)
 	if !p.NewProject && Version != "" && Version != "dev" && p.Project.Version != "" {
@@ -511,7 +511,7 @@ func TryProject(ctx context.Context, cmd *cobra.Command) ProjectContext {
 	var token string
 	// if the --api-key flag is used, we only need to verify the api key
 	if cmd.Flags().Changed("api-key") {
-		token = util.EnsureLoggedInWithOnlyAPIKey(ctx, logger)
+		token = util.EnsureLoggedInWithOnlyAPIKey(ctx, logger, cmd)
 	} else {
 		apikey, _, ok := util.TryLoggedIn()
 		if ok {

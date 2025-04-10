@@ -272,12 +272,12 @@ Examples:
   agentuity project create "My Project" "Project description" "My Agent" "Agent description" --auth bearer
   agentuity create --runtime nodejs --template "OpenAI SDK for Typescript"`,
 	Aliases: []string{"new"},
-	Args:    cobra.MaximumNArgs(6),
+	Args:    cobra.MaximumNArgs(4),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		logger := env.NewLogger(cmd)
-		apikey, _ := util.EnsureLoggedIn(ctx, logger)
+		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, appUrl, _ := util.GetURLs(logger)
 
 		initScreenWithLogo()
@@ -584,7 +584,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		logger := env.NewLogger(cmd)
-		apikey, _ := util.EnsureLoggedIn(ctx, logger)
+		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 
 		var projects []project.ProjectListData
@@ -680,7 +680,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		logger := env.NewLogger(cmd)
-		apikey, _ := util.EnsureLoggedIn(ctx, logger)
+		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 		var projects []project.ProjectListData
 		action := func() {

@@ -131,7 +131,7 @@ Examples:
 		apiUrl, _, _ := util.GetURLs(logger)
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
-		apiKey, userId := util.EnsureLoggedIn(ctx, logger)
+		apiKey, userId := util.EnsureLoggedIn(ctx, logger, cmd)
 		user, err := auth.GetUser(ctx, logger, apiUrl, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrAuthenticateUser, err,
@@ -139,7 +139,7 @@ Examples:
 		}
 		if user == nil {
 			auth.Logout()
-			util.ShowLogin(ctx, logger)
+			util.ShowLogin(ctx, logger, cmd)
 			os.Exit(1)
 		}
 		var orgs []string
