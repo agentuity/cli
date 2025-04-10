@@ -277,7 +277,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		logger := env.NewLogger(cmd)
-		apikey, _ := util.EnsureLoggedIn()
+		apikey, _ := util.EnsureLoggedIn(ctx, logger)
 		apiUrl, appUrl, _ := util.GetURLs(logger)
 
 		initScreenWithLogo()
@@ -584,7 +584,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		logger := env.NewLogger(cmd)
-		apikey, _ := util.EnsureLoggedIn()
+		apikey, _ := util.EnsureLoggedIn(ctx, logger)
 		apiUrl, _, _ := util.GetURLs(logger)
 
 		var projects []project.ProjectListData
@@ -680,7 +680,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		logger := env.NewLogger(cmd)
-		apikey, _ := util.EnsureLoggedIn()
+		apikey, _ := util.EnsureLoggedIn(ctx, logger)
 		apiUrl, _, _ := util.GetURLs(logger)
 		var projects []project.ProjectListData
 		action := func() {
@@ -754,7 +754,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		logger := env.NewLogger(cmd)
-		context := project.EnsureProject(cmd)
+		context := project.EnsureProject(ctx, cmd)
 		ShowNewProjectImport(ctx, logger, cmd, context.APIURL, context.Token, "", context.Project, context.Dir, true)
 	},
 }

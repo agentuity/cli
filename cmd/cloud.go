@@ -135,8 +135,10 @@ Examples:
   agentuity cloud deploy --dir /path/to/project`,
 	Run: func(cmd *cobra.Command, args []string) {
 		parentCtx := context.Background()
-		context := project.EnsureProject(cmd)
-		logger := context.Logger
+		ctx, cancel := signal.NotifyContext(parentCtx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		logger := env.NewLogger(cmd)
+		context := project.EnsureProject(ctx, cmd)
 		theproject := context.Project
 		dir := context.Dir
 		apiUrl := context.APIURL
@@ -144,8 +146,6 @@ Examples:
 		transportUrl := context.TransportURL
 		token := context.Token
 		ci, _ := cmd.Flags().GetBool("ci")
-		ctx, cancel := signal.NotifyContext(parentCtx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-		defer cancel()
 
 		deploymentConfig := project.NewDeploymentConfig()
 		client := util.NewAPIClient(ctx, logger, apiUrl, token)

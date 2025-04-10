@@ -118,8 +118,8 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		context := project.EnsureProject(cmd)
-		logger := context.Logger
+		logger := env.NewLogger(cmd)
+		context := project.EnsureProject(ctx, cmd)
 		dir := context.Dir
 		apiUrl := context.APIURL
 		apiKey := context.Token
@@ -297,7 +297,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		context := project.EnsureProject(cmd)
+		context := project.EnsureProject(ctx, cmd)
 		logger := context.Logger
 		theproject := context.Project
 		apiUrl := context.APIURL
@@ -371,7 +371,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		context := project.EnsureProject(cmd)
+		context := project.EnsureProject(ctx, cmd)
 		logger := context.Logger
 		theproject := context.Project
 		apiUrl := context.APIURL
@@ -435,7 +435,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		context := project.EnsureProject(cmd)
+		context := project.EnsureProject(ctx, cmd)
 		logger := context.Logger
 		theproject := context.Project
 		apiUrl := context.APIURL

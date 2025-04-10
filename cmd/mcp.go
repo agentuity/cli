@@ -155,7 +155,7 @@ Examples:
 		} else {
 			logger.Fatal("SSE mode is not yet supported")
 		}
-		project := project.TryProject(cmd)
+		project := project.TryProject(ctx, cmd)
 		server := mcp_golang.NewServer(t)
 		mcpContext := mcp.MCPContext{
 			Context:      ctx,

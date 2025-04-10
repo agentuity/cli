@@ -129,15 +129,17 @@ Examples:
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
-		apiKey, userId := util.EnsureLoggedIn()
-		user, err := auth.GetUser(context.Background(), logger, apiUrl, apiKey)
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		apiKey, userId := util.EnsureLoggedIn(ctx, logger)
+		user, err := auth.GetUser(ctx, logger, apiUrl, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrAuthenticateUser, err,
 				errsystem.WithContextMessage("Failed to get user")).ShowErrorAndExit()
 		}
 		if user == nil {
 			auth.Logout()
-			util.ShowLogin()
+			util.ShowLogin(ctx, logger)
 			os.Exit(1)
 		}
 		var orgs []string

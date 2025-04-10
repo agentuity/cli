@@ -42,7 +42,9 @@ var agentDeleteCmd = &cobra.Command{
 	Aliases: []string{"rm", "del"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		theproject := project.EnsureProject(cmd)
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		theproject := project.EnsureProject(ctx, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 
 		if !tui.HasTTY && len(args) == 0 {
@@ -223,7 +225,7 @@ var agentCreateCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		logger := env.NewLogger(cmd)
-		theproject := project.EnsureProject(cmd)
+		theproject := project.EnsureProject(ctx, cmd)
 		apikey := theproject.Token
 		apiUrl, _, _ := util.GetURLs(logger)
 
@@ -532,7 +534,9 @@ var agentListCmd = &cobra.Command{
 	Aliases: []string{"ls"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		project := project.EnsureProject(cmd)
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		project := project.EnsureProject(ctx, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 
 		// perform the reconcilation
@@ -579,7 +583,9 @@ Examples:
 	Aliases: []string{"key"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		project := project.EnsureProject(cmd)
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		project := project.EnsureProject(ctx, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 
 		// perform the reconcilation
