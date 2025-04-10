@@ -102,6 +102,7 @@ func CreateRunProjectCmd(ctx context.Context, log logger.Logger, theproject proj
 	projectServerCmd.Stdout = os.Stdout
 	projectServerCmd.Stderr = os.Stderr
 	projectServerCmd.Stdin = os.Stdin
+	projectServerCmd.Dir = dir
 
 	util.ProcessSetup(projectServerCmd)
 
