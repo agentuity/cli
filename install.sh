@@ -282,6 +282,10 @@ fi
 
 ohai "Installing to $INSTALL_PATH..."
 if [[ -f "$TMP_DIR/agentuity" ]]; then
+  if [[ "$OS" == "Darwin" ]] && [[ -f "$INSTALL_PATH/agentuity" ]]; then
+    ohai "Removing existing binary to avoid macOS quarantine issues..."
+    rm -f "$INSTALL_PATH/agentuity" || abort "Failed to remove existing binary from $INSTALL_PATH"
+  fi
   cp "$TMP_DIR/agentuity" "$INSTALL_PATH/" || abort "Failed to copy binary to $INSTALL_PATH"
   chmod +x "$INSTALL_PATH/agentuity" || abort "Failed to make binary executable"
 else
