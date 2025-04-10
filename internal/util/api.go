@@ -265,6 +265,7 @@ func run(ctx context.Context, c *cobra.Command, command string, args ...string) 
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Env = os.Environ()
 	err = cmd.Run()
 	if err != nil {
 		tui.ShowError("Failed to run command: %s", err)
