@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
@@ -51,6 +52,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		install.Dir = dir
 		out, err := install.CombinedOutput()
 		if err != nil {
+			ctx.Logger.Trace("install command: %s returned: %s, err: %s", strings.Join(install.Args, " "), string(out), err)
 			if install.ProcessState == nil || install.ProcessState.ExitCode() != 0 {
 				if install.ProcessState != nil {
 					return fmt.Errorf("failed to install dependencies (exit code %d): %w. %s", install.ProcessState.ExitCode(), err, string(out))
@@ -105,6 +107,8 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 	}
 	defines["process.env.AGENTUITY_CLOUD_AGENTS_JSON"] = fmt.Sprintf("'%s'", cstr.JSONStringify(agents))
 
+	ctx.Logger.Debug("starting build")
+	started := time.Now()
 	result := api.Build(api.BuildOptions{
 		EntryPoints:    entryPoints,
 		Bundle:         true,
@@ -129,6 +133,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 			"js": jsheader + jsshim,
 		},
 	})
+	ctx.Logger.Debug("finished build in %v", time.Since(started))
 	if len(result.Errors) > 0 {
 		fmt.Println("\n" + tui.Warning("Build Failed") + "\n")
 
@@ -223,7 +228,9 @@ func Bundle(ctx BundleContext) error {
 	}
 	dir := ctx.ProjectDir
 	outdir := filepath.Join(dir, ".agentuity")
+	ctx.Logger.Debug("bundling project %s to %s", dir, outdir)
 	if sys.Exists(outdir) {
+		ctx.Logger.Debug("removing existing directory: %s", outdir)
 		if err := os.RemoveAll(outdir); err != nil {
 			return fmt.Errorf("failed to remove .agentuity directory: %w", err)
 		}
