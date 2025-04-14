@@ -106,6 +106,12 @@ func (c *APIClient) Do(method, pathParam string, payload interface{}, response i
 		return NewAPIError(c.baseURL, method, 0, "", fmt.Errorf("error parsing base url: %w", err), traceID)
 	}
 
+	i := strings.Index(pathParam, "?")
+	if i != -1 {
+		u.RawQuery = pathParam[i+1:]
+		pathParam = pathParam[:i]
+	}
+
 	basePath := u.Path
 	if pathParam == "" {
 		u.Path = basePath
