@@ -275,6 +275,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.92]: https://github.com/agentuity/cli/compare/v0.0.91...v0.0.92
 [v0.0.91]: https://github.com/agentuity/cli/compare/v0.0.90...v0.0.91
 [v0.0.90]: https://github.com/agentuity/cli/compare/v0.0.89...v0.0.90
 [v0.0.89]: https://github.com/agentuity/cli/compare/v0.0.88...v0.0.89
@@ -311,4 +312,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.0.58]: https://github.com/agentuity/cli/compare/v0.0.57...v0.0.58
 [v0.0.57]: https://github.com/agentuity/cli/compare/v0.0.56...v0.0.57
 [v0.0.56]: https://github.com/agentuity/cli/compare/v0.0.55...v0.0.56
-[v0.0.92]: https://github.com/agentuity/cli/compare/v0.0.91...v0.0.92
