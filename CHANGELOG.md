@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.92] - 2025-04-15
+
+### Fixed
+- Fix the Git URL to rewrite to https ([#190](https://github.com/agentuity/cli/pull/190))
+
+### Changed
+- Add hyperlinks to older release versions in CHANGELOG.md ([#191](https://github.com/agentuity/cli/pull/191))
+- Update changelog for v0.0.91 ([#189](https://github.com/agentuity/cli/pull/189))
+
 ## [v0.0.91] - 2025-04-14
 
 ### Fixed
@@ -266,6 +275,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.92]: https://github.com/agentuity/cli/compare/v0.0.91...v0.0.92
 [v0.0.91]: https://github.com/agentuity/cli/compare/v0.0.90...v0.0.91
 [v0.0.90]: https://github.com/agentuity/cli/compare/v0.0.89...v0.0.90
 [v0.0.89]: https://github.com/agentuity/cli/compare/v0.0.88...v0.0.89
