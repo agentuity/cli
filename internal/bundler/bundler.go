@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
@@ -37,13 +38,13 @@ type BundleContext struct {
 
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
 
-	if ctx.Install {
+	if ctx.Install || !util.Exists(filepath.Join(dir, "node_modules")) {
 		var install *exec.Cmd
 		switch theproject.Bundler.Runtime {
 		case "nodejs":
-			install = exec.Command("npm", "install", "--no-save", "--no-audit", "--no-fund", "--include=prod")
+			install = exec.CommandContext(ctx.Context, "npm", "install", "--no-save", "--no-audit", "--no-fund", "--include=prod")
 		case "bunjs":
-			install = exec.Command("bun", "install", "--production", "--no-save", "--silent", "--no-progress", "--no-summary")
+			install = exec.CommandContext(ctx.Context, "bun", "install", "--production", "--no-save", "--silent", "--no-progress", "--no-summary")
 		default:
 			return fmt.Errorf("unsupported runtime: %s", theproject.Bundler.Runtime)
 		}
@@ -51,7 +52,13 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		install.Dir = dir
 		out, err := install.CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("failed to install dependencies: %w. %s", err, string(out))
+			ctx.Logger.Trace("install command: %s returned: %s, err: %s", strings.Join(install.Args, " "), string(out), err)
+			if install.ProcessState == nil || install.ProcessState.ExitCode() != 0 {
+				if install.ProcessState != nil {
+					return fmt.Errorf("failed to install dependencies (exit code %d): %w. %s", install.ProcessState.ExitCode(), err, string(out))
+				}
+				return fmt.Errorf("failed to install dependencies: %w. %s", err, string(out))
+			}
 		}
 		ctx.Logger.Debug("installed dependencies: %s", strings.TrimSpace(string(out)))
 	}
@@ -100,6 +107,8 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 	}
 	defines["process.env.AGENTUITY_CLOUD_AGENTS_JSON"] = fmt.Sprintf("'%s'", cstr.JSONStringify(agents))
 
+	ctx.Logger.Debug("starting build")
+	started := time.Now()
 	result := api.Build(api.BuildOptions{
 		EntryPoints:    entryPoints,
 		Bundle:         true,
@@ -124,6 +133,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 			"js": jsheader + jsshim,
 		},
 	})
+	ctx.Logger.Debug("finished build in %v", time.Since(started))
 	if len(result.Errors) > 0 {
 		fmt.Println("\n" + tui.Warning("Build Failed") + "\n")
 
@@ -145,13 +155,13 @@ var (
 
 func bundlePython(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
 
-	if ctx.Install {
+	if ctx.Install || !util.Exists(filepath.Join(dir, ".venv", "lib")) {
 		var install *exec.Cmd
 		switch theproject.Bundler.Runtime {
 		case "uv":
-			install = exec.Command("uv", "sync", "--no-dev", "--frozen", "--quiet", "--no-progress")
+			install = exec.CommandContext(ctx.Context, "uv", "sync", "--no-dev", "--frozen", "--quiet", "--no-progress")
 		case "pip":
-			install = exec.Command("uv", "pip", "install", "--quiet", "--no-progress")
+			install = exec.CommandContext(ctx.Context, "uv", "pip", "install", "--quiet", "--no-progress")
 		case "poetry":
 			return fmt.Errorf("poetry is not supported yet")
 		default:
@@ -161,7 +171,12 @@ func bundlePython(ctx BundleContext, dir string, outdir string, theproject *proj
 		install.Dir = dir
 		out, err := install.CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("failed to install dependencies: %w. %s", err, string(out))
+			if install.ProcessState == nil || install.ProcessState.ExitCode() != 0 {
+				if install.ProcessState != nil {
+					return fmt.Errorf("failed to install dependencies (exit code %d): %w. %s", install.ProcessState.ExitCode(), err, string(out))
+				}
+				return fmt.Errorf("failed to install dependencies: %w. %s", err, string(out))
+			}
 		}
 		ctx.Logger.Debug("installed dependencies: %s", strings.TrimSpace(string(out)))
 	}
@@ -213,7 +228,9 @@ func Bundle(ctx BundleContext) error {
 	}
 	dir := ctx.ProjectDir
 	outdir := filepath.Join(dir, ".agentuity")
+	ctx.Logger.Debug("bundling project %s to %s", dir, outdir)
 	if sys.Exists(outdir) {
+		ctx.Logger.Debug("removing existing directory: %s", outdir)
 		if err := os.RemoveAll(outdir); err != nil {
 			return fmt.Errorf("failed to remove .agentuity directory: %w", err)
 		}

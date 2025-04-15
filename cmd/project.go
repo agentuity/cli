@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -17,13 +16,11 @@ import (
 	"github.com/agentuity/cli/internal/organization"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/templates"
+	"github.com/agentuity/cli/internal/ui"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
 	"github.com/agentuity/go-common/tui"
-	"github.com/charmbracelet/bubbles/list"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -191,11 +188,12 @@ func promptForOrganization(ctx context.Context, logger logger.Logger, cmd *cobra
 	if len(orgs) == 1 {
 		orgId = orgs[0].OrgId
 	} else {
+		hasCLIFlag := cmd.Flags().Changed("org-id")
 		prefOrgId, _ := cmd.Flags().GetString("org-id")
 		if prefOrgId == "" {
 			prefOrgId = viper.GetString("preferences.orgId")
 		}
-		if tui.HasTTY {
+		if tui.HasTTY && !hasCLIFlag {
 			var opts []tui.Option
 			for _, org := range orgs {
 				opts = append(opts, tui.Option{ID: org.OrgId, Text: org.Name, Selected: prefOrgId == org.OrgId})
@@ -205,7 +203,7 @@ func promptForOrganization(ctx context.Context, logger logger.Logger, cmd *cobra
 			viper.WriteConfig() // remember the preference
 		} else {
 			for _, org := range orgs {
-				if org.OrgId == prefOrgId {
+				if org.OrgId == prefOrgId || org.Name == prefOrgId {
 					return org.OrgId
 				}
 			}
@@ -221,91 +219,6 @@ var invalidProjectNames = []any{
 	"agentuity",
 }
 
-var docStyle = lipgloss.NewStyle().Margin(1, 2)
-
-type listItemProvider struct {
-	title, desc, id string
-	object          any
-	selected        bool
-}
-
-func (i listItemProvider) Title() string       { return i.title }
-func (i listItemProvider) Description() string { return i.desc }
-func (i listItemProvider) FilterValue() string { return i.title }
-func (i listItemProvider) ID() string          { return i.id }
-
-type projectSelectionModel struct {
-	list      list.Model
-	cancelled bool
-}
-
-func (m *projectSelectionModel) Init() tea.Cmd {
-	return nil
-}
-
-func (m *projectSelectionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		if msg.String() == "ctrl+c" || msg.String() == "q" || msg.String() == "esc" {
-			m.cancelled = true
-			return m, tea.Quit
-		}
-		if msg.String() == "enter" {
-			return m, tea.Quit
-		}
-	case tea.WindowSizeMsg:
-		h, v := docStyle.GetFrameSize()
-		m.list.SetSize(msg.Width-h, msg.Height-v)
-	}
-
-	var cmd tea.Cmd
-	m.list, cmd = m.list.Update(msg)
-	return m, cmd
-}
-
-func (m *projectSelectionModel) View() string {
-	return docStyle.Render(m.list.View())
-}
-
-func showItemSelector(title string, items []list.Item) list.Item {
-
-	selectedIndex := -1
-
-	for i, item := range items {
-		var p = item.(listItemProvider)
-		p.desc = lipgloss.NewStyle().SetString(p.desc).Width(60).AlignHorizontal(lipgloss.Left).Render()
-		items[i] = p
-		if p.selected {
-			selectedIndex = i
-		}
-	}
-
-	delegate := list.NewDefaultDelegate()
-	delegate.SetHeight(4)
-
-	m := projectSelectionModel{list: list.New(items, delegate, 0, 0)}
-	m.list.Title = title
-	m.list.Styles.Title = lipgloss.NewStyle().Foreground(tui.TitleColor())
-
-	if selectedIndex != -1 {
-		m.list.Select(selectedIndex)
-	}
-
-	p := tea.NewProgram(&m, tea.WithAltScreen())
-
-	if _, err := p.Run(); err != nil {
-		fmt.Println("Error running program:", err)
-		os.Exit(1)
-	}
-
-	if m.cancelled {
-		fmt.Println("Cancelled")
-		os.Exit(1)
-	}
-
-	return items[m.list.Index()]
-}
-
 func gitCommand(ctx context.Context, projectDir string, git string, args ...string) error {
 	c := exec.CommandContext(ctx, git, args...)
 	util.ProcessSetup(c)
@@ -313,38 +226,31 @@ func gitCommand(ctx context.Context, projectDir string, git string, args ...stri
 	return c.Run()
 }
 
-func projectGitFlow(ctx context.Context, logger logger.Logger, provider *templates.Template, tmplContext templates.TemplateContext) {
+func projectGitFlow(ctx context.Context, provider *templates.Template, tmplContext templates.TemplateContext, githubAction string) {
 	git, err := exec.LookPath("git")
 	if err != nil {
 		return
 	}
-	if tui.HasTTY {
-		opts := []tui.Option{
-			{ID: "action", Text: tui.PadRight("GitHub Action", 20, " ") + tui.Muted("Use GitHub Action Workflow to automatically deploy")},
-			{ID: "app", Text: tui.PadRight("GitHub App", 20, " ") + tui.Muted("Connect the Agentuity GitHub App to automatically deploy")},
-			{ID: "none", Text: tui.PadRight("None", 20, " ") + tui.Muted("I'm not using GitHub or will setup later"), Selected: true},
+	switch githubAction {
+	case "none":
+	case "github-action":
+		if err := provider.AddGitHubAction(tmplContext); err != nil {
+			errsystem.New(errsystem.ErrAddingGithubActionWorkflowProject, err, errsystem.WithContextMessage("Failed to add GitHub Action Workflow to the project")).ShowErrorAndExit()
 		}
-		choice := tui.Select(logger, "Are you using GitHub for this project?", "You can always configure later in the dashboard", opts)
-		switch choice {
-		case "none":
-		case "action":
-			if err := provider.AddGitHubAction(tmplContext); err != nil {
-				errsystem.New(errsystem.ErrAddingGithubActionWorkflowProject, err, errsystem.WithContextMessage("Failed to add GitHub Action Workflow to the project")).ShowErrorAndExit()
-			}
-			body := tui.Paragraph(
-				tui.Secondary("✓ Added GitHub Action Workflow to the project."),
-				tui.Secondary("Access the Project API Key from the dashboard in and set it as a secret"),
-				tui.Secondary("named ")+tui.Warning("AGENTUITY_API_KEY")+tui.Secondary(" in your GitHub repository."),
-			)
-			tui.ShowBanner("GitHub Action", body, false)
-		case "app":
-			body := tui.Paragraph(
-				tui.Secondary("After pushing your code to GitHub, visit the dashboard to connect"),
-				tui.Secondary("your repository to the GitHub App for automatic deployments."),
-			)
-			tui.ShowBanner("GitHub App", body, false)
-		}
+		body := tui.Paragraph(
+			tui.Secondary("✓ Added GitHub Action Workflow to the project."),
+			tui.Secondary("Access the Project API Key from the dashboard in and set it as a secret"),
+			tui.Secondary("named ")+tui.Warning("AGENTUITY_API_KEY")+tui.Secondary(" in your GitHub repository."),
+		)
+		tui.ShowBanner("GitHub Action", body, false)
+	case "github-app":
+		body := tui.Paragraph(
+			tui.Secondary("After pushing your code to GitHub, visit the dashboard to connect"),
+			tui.Secondary("your repository to the GitHub App for automatic deployments."),
+		)
+		tui.ShowBanner("GitHub App", body, false)
 	}
+
 	gitCommand(ctx, tmplContext.ProjectDir, git, "init")
 	gitCommand(ctx, tmplContext.ProjectDir, git, "add", ".")
 	gitCommand(ctx, tmplContext.ProjectDir, git, "commit", "-m", "[chore] Initial commit 🤖")
@@ -352,7 +258,7 @@ func projectGitFlow(ctx context.Context, logger logger.Logger, provider *templat
 }
 
 var projectNewCmd = &cobra.Command{
-	Use:   "create [name] [description] [agent-name] [agent-description] [auth-type]",
+	Use:   "create [name] [description] [agent-name] [agent-description]",
 	Short: "Create a new project",
 	Long: `Create a new project with the specified name, description, and initial agent.
 
@@ -361,24 +267,17 @@ Arguments:
   [description]         A description of what the project does
   [agent-name]          The name of the initial agent
   [agent-description]   A description of what the agent does
-  [auth-type]           The authentication type for the agent (bearer or none)
-
-Flags:
-  --dir        The directory for the project
-  --provider   The provider template to use for the project
-  --template   The template to use for the project
-	--force      Force the creation of the project even if the directory already exists
 
 Examples:
-  agentuity project create "My Project" "Project description" "My Agent" "Agent description" bearer
-  agentuity create --provider nodejs --template express`,
+  agentuity project create "My Project" "Project description" "My Agent" "Agent description" --auth bearer
+  agentuity create --runtime nodejs --template "OpenAI SDK for Typescript"`,
 	Aliases: []string{"new"},
-	Args:    cobra.MaximumNArgs(5),
+	Args:    cobra.MaximumNArgs(4),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		logger := env.NewLogger(cmd)
-		apikey, _ := util.EnsureLoggedIn()
+		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, appUrl, _ := util.GetURLs(logger)
 
 		initScreenWithLogo()
@@ -435,7 +334,7 @@ Examples:
 
 		orgId := promptForOrganization(ctx, logger, cmd, apiUrl, apikey)
 
-		var name, description, agentName, agentDescription, authType string
+		var name, description, agentName, agentDescription, authType, githubAction string
 
 		if len(args) > 0 {
 			name = args[0]
@@ -450,12 +349,118 @@ Examples:
 			agentDescription = args[3]
 		}
 
-		name, description = promptForProjectDetail(ctx, logger, apiUrl, apikey, name, description)
+		authType, _ = cmd.Flags().GetString("auth")
+		githubAction, _ = cmd.Flags().GetString("action")
+		providerArg, _ := cmd.Flags().GetString("runtime")
+		templateArg, _ := cmd.Flags().GetString("template")
+
+		var providerName string
+		var templateName string
+		var provider *templates.Template
+
+		tmpls, tmplDir := loadTemplates(ctx, cmd)
+
+		// check for preferences in config
+		if providerArg == "" {
+			providerArg = viper.GetString("preferences.provider")
+		}
+		if templateArg == "" {
+			templateArg = viper.GetString("preferences.template")
+		}
+
+		if providerArg != "" {
+			providerName = providerArg
+			var found bool
+			for _, tmpl := range tmpls {
+				if tmpl.Identifier == providerName {
+					found = true
+					provider = &tmpl
+					break
+				}
+				if found {
+					break
+				}
+			}
+			if !found {
+				providerName = ""
+			}
+		}
+
+		if provider != nil && templateArg != "" {
+			if ok := templates.IsValidRuntimeTemplateName(ctx, tmplDir, provider.Identifier, templateArg); !ok {
+				logger.Info("invalid template name %s for %s", templateArg, provider.Name)
+				templateArg = ""
+			}
+			templateName = templateArg
+		}
+
+		if !tui.HasTTY {
+			if name == "" {
+				logger.Fatal("no project name provided and no TTY detected. Please provide a project name using the arguments from the command line")
+			}
+		} else {
+
+			var skipTUI bool
+
+			validateProjectName := func(name string) (bool, error) {
+				for _, invalid := range invalidProjectNames {
+					if s, ok := invalid.(string); ok {
+						if name == s {
+							return false, fmt.Errorf("%s is not a valid project name", name)
+						}
+					}
+				}
+				return true, nil
+			}
+
+			if providerName != "" && templateName != "" && name != "" && agentName != "" {
+				ok, err := validateProjectName(name)
+				if err != nil {
+					logger.Fatal("%s", err)
+				}
+				skipTUI = ok
+			}
+
+			if !skipTUI {
+				resp := ui.ShowProjectUI(ui.ProjectForm{
+					Context:             ctx,
+					Logger:              logger,
+					TemplateDir:         tmplDir,
+					Templates:           tmpls,
+					AgentuityCommand:    getAgentuityCommand(),
+					Runtime:             providerName,
+					Template:            templateName,
+					ProjectName:         name,
+					Description:         description,
+					AgentName:           agentName,
+					AgentDescription:    agentDescription,
+					AgentAuthType:       authType,
+					DeploymentType:      githubAction,
+					ValidateProjectName: validateProjectName,
+				})
+				name = resp.ProjectName
+				description = resp.Description
+				agentName = resp.AgentName
+				if agentName == "" {
+					agentName = "my agent"
+				}
+				agentDescription = resp.AgentDescription
+				authType = resp.AgentAuthType
+				githubAction = resp.DeploymentType
+				templateName = resp.Template
+				providerName = resp.Runtime
+				provider = resp.Provider
+			}
+		}
 
 		projectDir := filepath.Join(cwd, util.SafeFilename(name))
 		dir, _ := cmd.Flags().GetString("dir")
 		if dir != "" {
-			projectDir = dir
+			absDir, err := filepath.Abs(dir)
+			if err != nil {
+				errsystem.New(errsystem.ErrListFilesAndDirectories, err, errsystem.WithContextMessage("Failed to get absolute path")).ShowErrorAndExit()
+			}
+			projectDir = absDir
 		} else {
 			projectDir = tui.InputWithPlaceholder(logger, "What directory should the project be created in?", "The directory to create the project in", projectDir)
 		}
@@ -479,117 +484,6 @@ Examples:
 			initScreenWithLogo()
 		}
 
-		var providerName string
-		var templateName string
-		var provider *templates.Template
-
-		providerArg, _ := cmd.Flags().GetString("provider")
-		templateArg, _ := cmd.Flags().GetString("template")
-
-		tmplDir, err := getConfigTemplateDir(cmd)
-		if err != nil {
-			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
-		}
-
-		var tmpls templates.Templates
-
-		tui.ShowSpinner("Loading templates...", func() {
-			tmpls, err = templates.LoadTemplates(ctx, tmplDir)
-			if err != nil {
-				errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates")).ShowErrorAndExit()
-			}
-
-			if len(tmpls) == 0 {
-				errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("No templates returned from load templates")).ShowErrorAndExit()
-			}
-		})
-
-		var selectProvider string
-		var selectTemplate string
-
-		// check for preferences in config
-		if providerArg == "" {
-			selectProvider = viper.GetString("preferences.provider")
-		}
-		if templateArg == "" {
-			selectTemplate = viper.GetString("preferences.template")
-		}
-
-		if providerArg != "" {
-			providerName = providerArg
-			var found bool
-			for _, tmpl := range tmpls {
-				if tmpl.Identifier == providerName {
-					found = true
-					provider = &tmpl
-					break
-				}
-				if found {
-					break
-				}
-			}
-			if !found {
-				providerName = ""
-			}
-		}
-
-		if provider != nil && templateArg != "" {
-			if ok := templates.IsValidRuntimeTemplateName(ctx, tmplDir, provider.Identifier, templateArg); !ok {
-				logger.Fatal("invalid template name %s for %s", templateArg, provider.Name)
-			}
-			templateName = templateArg
-		}
-
-		if providerName == "" {
-			if !tui.HasTTY {
-				logger.Fatal("no provider provided and no TTY detected. Please select a provider using the --provider flag")
-				os.Exit(1)
-			}
-
-			var items []list.Item
-
-			for _, tmpls := range tmpls {
-				items = append(items, listItemProvider{
-					id:       tmpls.Identifier,
-					title:    tmpls.Name,
-					desc:     tmpls.Description,
-					object:   &tmpls,
-					selected: selectProvider == tmpls.Identifier,
-				})
-			}
-
-			sort.Slice(items, func(i, j int) bool {
-				return items[i].(listItemProvider).title < items[j].(listItemProvider).title
-			})
-
-			provider = showItemSelector("Select the project runtime", items).(listItemProvider).object.(*templates.Template)
-		}
-
-		if templateName == "" {
-			if !tui.HasTTY {
-				logger.Fatal("no template provided and no TTY detected. Please select a template using the --template flag")
-				os.Exit(1)
-			}
-
-			templates, err := templates.LoadLanguageTemplates(ctx, tmplDir, provider.Identifier)
-			if err != nil {
-				errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from template provider")).ShowErrorAndExit()
-			}
-
-			var tmplTemplates []list.Item
-			for _, t := range templates {
-				tmplTemplates = append(tmplTemplates, listItemProvider{
-					id:       t.Name,
-					title:    t.Name,
-					desc:     t.Description,
-					object:   &t,
-					selected: t.Name == selectTemplate,
-				})
-			}
-			templateId := showItemSelector("Select a project template", tmplTemplates)
-			templateName = templateId.(listItemProvider).id
-		}
-
 		if util.Exists(projectDir) {
 			if !tui.Ask(logger, tui.Paragraph("The directory "+tui.Bold(projectDir)+" already exists.", "Are you sure you want to overwrite files here?"), true) {
 				return
@@ -600,20 +494,12 @@ Examples:
 			}
 		}
 
-		if agentName == "" {
-			if !tui.HasTTY {
-				logger.Fatal("no agent name provided and no TTY detected. Please provide an agent name using the arguments from the command line")
-				os.Exit(1)
-			}
-			agentName, agentDescription, authType = getAgentInfoFlow(logger, nil, agentName, agentDescription, authType)
-		}
-
 		format, _ := cmd.Flags().GetString("format")
 
 		var projectData *project.ProjectData
 
 		tmplContext := templates.TemplateContext{
-			Context:          context.Background(),
+			Context:          ctx,
 			Logger:           logger,
 			Name:             name,
 			Description:      description,
@@ -624,20 +510,6 @@ Examples:
 			TemplateDir:      tmplDir,
 			AgentuityCommand: getAgentuityCommand(),
 		}
-
-		tui.ShowSpinner("checking dependencies ...", func() {
-			if !provider.Matches(tmplContext) {
-				if err := provider.Install(tmplContext); err != nil {
-					var requirementsErr *templates.ErrRequirementsNotMet
-					if errors.As(err, &requirementsErr) {
-						tui.CancelSpinner()
-						tui.ShowBanner("Missing Requirement", requirementsErr.Message, false)
-						os.Exit(1)
-					}
-					errsystem.New(errsystem.ErrInstallDependencies, err, errsystem.WithContextMessage("Failed to install dependencies")).ShowErrorAndExit()
-				}
-			}
-		})
 
 		tui.ShowSpinner("creating project ...", func() {
 			rules, err := provider.NewProject(tmplContext)
@@ -666,7 +538,7 @@ Examples:
 		})
 
 		// run the git flow
-		projectGitFlow(ctx, logger, provider, tmplContext)
+		projectGitFlow(ctx, provider, tmplContext, githubAction)
 
 		if format == "json" {
 			json.NewEncoder(os.Stdout).Encode(projectData)
@@ -712,7 +584,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		logger := env.NewLogger(cmd)
-		apikey, _ := util.EnsureLoggedIn()
+		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 
 		var projects []project.ProjectListData
@@ -754,7 +626,7 @@ Examples:
 		if len(orgs) > 1 {
 			for _, orgId := range orgs {
 				fmt.Println()
-				fmt.Println(tui.Bold(orgNames[orgId]) + " " + tui.Muted("(" + orgId + ")"))
+				fmt.Println(tui.Bold(orgNames[orgId]) + " " + tui.Muted("("+orgId+")"))
 				fmt.Println()
 
 				headers := []string{tui.Title("Project Id"), tui.Title("Name"), tui.Title("Description")}
@@ -808,7 +680,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		logger := env.NewLogger(cmd)
-		apikey, _ := util.EnsureLoggedIn()
+		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 		var projects []project.ProjectListData
 		action := func() {
@@ -882,26 +754,26 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		logger := env.NewLogger(cmd)
-		context := project.EnsureProject(cmd)
+		context := project.EnsureProject(ctx, cmd)
 		ShowNewProjectImport(ctx, logger, cmd, context.APIURL, context.Token, "", context.Project, context.Dir, true)
 	},
 }
 
-func getConfigTemplateDir(cmd *cobra.Command) (string, error) {
+func getConfigTemplateDir(cmd *cobra.Command) (string, bool, error) {
 	if cmd.Flags().Changed("templates-dir") {
 		dir, _ := cmd.Flags().GetString("templates-dir")
 		if !util.Exists(dir) {
-			return "", fmt.Errorf("templates directory %s does not exist", dir)
+			return "", false, fmt.Errorf("templates directory %s does not exist", dir)
 		}
-		return dir, nil
+		return dir, true, nil
 	}
 	dir := filepath.Join(filepath.Dir(cfgFile), "templates")
 	if !util.Exists(dir) {
 		if err := os.MkdirAll(dir, 0700); err != nil {
-			return "", err
+			return "", false, err
 		}
 	}
-	return dir, nil
+	return dir, false, nil
 }
 
 func init() {
@@ -921,8 +793,10 @@ func init() {
 		cmd.Flags().String("format", "text", "The format to use for the output. Can be either 'text' or 'json'")
 	}
 
-	projectNewCmd.Flags().StringP("provider", "p", "", "The provider template to use for the project")
+	projectNewCmd.Flags().StringP("runtime", "r", "", "The runtime to use for the project")
 	projectNewCmd.Flags().StringP("template", "t", "", "The template to use for the project")
 	projectNewCmd.Flags().Bool("force", false, "Force the project to be created even if the directory already exists")
 	projectNewCmd.Flags().String("templates-dir", "", "The directory to load the templates. Defaults to loading them from the github.com/agentuity/templates repository")
+	projectNewCmd.Flags().String("auth", "bearer", "The authentication type for the agent (bearer or none)")
+	projectNewCmd.Flags().String("action", "github-app", "The action to take for the project (github-action, github-app, none)")
 }

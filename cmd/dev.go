@@ -44,13 +44,14 @@ Examples:
 		_, appUrl, _ := util.GetURLs(log)
 		websocketUrl := viper.GetString("overrides.websocket_url")
 		websocketId, _ := cmd.Flags().GetString("websocket-id")
-		apiKey, userId := util.EnsureLoggedIn()
-		theproject := project.EnsureProject(cmd)
-		dir := theproject.Dir
-		isDeliberateRestart := false
 
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
+
+		apiKey, userId := util.EnsureLoggedIn(ctx, log, cmd)
+		theproject := project.EnsureProject(ctx, cmd)
+		dir := theproject.Dir
+		isDeliberateRestart := false
 
 		checkForUpgrade(ctx, log)
 
@@ -73,7 +74,16 @@ Examples:
 			websocketId = cstr.NewHash(orgId, userId)
 		}
 
-		websocketConn, err := dev.NewWebsocket(log, websocketId, websocketUrl, apiKey, theproject)
+		websocketConn, err := dev.NewWebsocket(dev.WebsocketArgs{
+			Ctx:          ctx,
+			Logger:       log,
+			WebsocketId:  websocketId,
+			WebsocketUrl: websocketUrl,
+			APIKey:       apiKey,
+			Project:      theproject,
+			Version:      Version,
+			OrgId:        orgId,
+		})
 		if err != nil {
 			log.Fatal("failed to create live dev connection: %s", err)
 		}
@@ -84,7 +94,7 @@ Examples:
 			log.Fatal("failed to find available port: %s", err)
 		}
 
-		projectServerCmd, err := dev.CreateRunProjectCmd(log, theproject, websocketConn, dir, orgId, port)
+		projectServerCmd, err := dev.CreateRunProjectCmd(ctx, log, theproject, websocketConn, dir, orgId, port)
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 		}
@@ -93,7 +103,7 @@ Examples:
 			started := time.Now()
 			tui.ShowSpinner("Building project ...", func() {
 				if err := bundler.Bundle(bundler.BundleContext{
-					Context:    context.Background(),
+					Context:    ctx,
 					Logger:     log,
 					ProjectDir: dir,
 					Production: false,
@@ -142,7 +152,7 @@ Examples:
 				// If it was a deliberate restart, start the new process here
 				if isDeliberateRestart {
 					isDeliberateRestart = false
-					projectServerCmd, err = dev.CreateRunProjectCmd(log, theproject, websocketConn, dir, orgId, port)
+					projectServerCmd, err = dev.CreateRunProjectCmd(ctx, log, theproject, websocketConn, dir, orgId, port)
 					if err != nil {
 						errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 					}
@@ -154,7 +164,7 @@ Examples:
 		}()
 
 		select {
-		case <-websocketConn.Done:
+		case <-websocketConn.Done():
 			log.Info("live dev connection closed, shutting down")
 			dev.KillProjectServer(projectServerCmd)
 			watcher.Close(log)

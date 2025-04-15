@@ -42,7 +42,9 @@ var agentDeleteCmd = &cobra.Command{
 	Aliases: []string{"rm", "del"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		theproject := project.EnsureProject(cmd)
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		theproject := project.EnsureProject(ctx, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 
 		if !tui.HasTTY && len(args) == 0 {
@@ -223,7 +225,7 @@ var agentCreateCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		logger := env.NewLogger(cmd)
-		theproject := project.EnsureProject(cmd)
+		theproject := project.EnsureProject(ctx, cmd)
 		apikey := theproject.Token
 		apiUrl, _, _ := util.GetURLs(logger)
 
@@ -240,6 +242,8 @@ var agentCreateCmd = &cobra.Command{
 		}
 
 		checkForUpgrade(ctx, logger)
+
+		loadTemplates(ctx, cmd)
 
 		var err error
 		remoteAgents, err = getAgentList(logger, apiUrl, apikey, theproject)
@@ -291,7 +295,7 @@ var agentCreateCmd = &cobra.Command{
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to create Agent")).ShowErrorAndExit()
 			}
 
-			tmpdir, err := getConfigTemplateDir(cmd)
+			tmpdir, _, err := getConfigTemplateDir(cmd)
 			if err != nil {
 				errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
 			}
@@ -363,7 +367,7 @@ func reconcileAgentList(logger logger.Logger, cmd *cobra.Command, apiUrl string,
 		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent list")).ShowErrorAndExit()
 	}
 
-	tmpdir, err := getConfigTemplateDir(cmd)
+	tmpdir, _, err := getConfigTemplateDir(cmd)
 	if err != nil {
 		errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
 	}
@@ -530,7 +534,9 @@ var agentListCmd = &cobra.Command{
 	Aliases: []string{"ls"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		project := project.EnsureProject(cmd)
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		project := project.EnsureProject(ctx, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 
 		// perform the reconcilation
@@ -577,7 +583,9 @@ Examples:
 	Aliases: []string{"key"},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		project := project.EnsureProject(cmd)
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		project := project.EnsureProject(ctx, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 
 		// perform the reconcilation

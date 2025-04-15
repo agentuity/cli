@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/signal"
 	"strings"
@@ -85,6 +86,7 @@ Examples:
 			viper.Set("auth.api_key", authResult.APIKey)
 			viper.Set("auth.user_id", authResult.UserId)
 			viper.Set("auth.expires", authResult.Expires.UnixMilli())
+			viper.Set("preferences.orgId", "")
 			if err := viper.WriteConfig(); err != nil {
 				errsystem.New(errsystem.ErrWriteConfigurationFile, err,
 					errsystem.WithContextMessage("Failed to write viper config")).ShowErrorAndExit()
@@ -127,15 +129,17 @@ Examples:
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
-		apiKey, userId := util.EnsureLoggedIn()
-		user, err := auth.GetUser(context.Background(), logger, apiUrl, apiKey)
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		apiKey, userId := util.EnsureLoggedIn(ctx, logger, cmd)
+		user, err := auth.GetUser(ctx, logger, apiUrl, apiKey)
 		if err != nil {
 			errsystem.New(errsystem.ErrAuthenticateUser, err,
 				errsystem.WithContextMessage("Failed to get user")).ShowErrorAndExit()
 		}
 		if user == nil {
 			auth.Logout()
-			util.ShowLogin()
+			util.ShowLogin(ctx, logger, cmd)
 			os.Exit(1)
 		}
 		var orgs []string
@@ -154,11 +158,61 @@ Examples:
 	},
 }
 
+var authSignupCmd = &cobra.Command{
+	Use:   "signup",
+	Short: "Create a new Agentuity Cloud Platform account",
+	Long: `Create a new Agentuity Cloud Platform account.
+
+Examples:
+  agentuity auth signup`,
+	Run: func(cmd *cobra.Command, args []string) {
+		logger := env.NewLogger(cmd)
+		apiUrl, appUrl, _ := util.GetURLs(logger)
+		var otp string
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+
+		otp = util.RandStringBytes(5)
+
+		body := tui.Paragraph(
+			"Please open the url in your browser:",
+			tui.Link("%s/sign-up?code=%s", appUrl, otp),
+			tui.Muted("Once you have completed the signup process, you will be given a one-time password to complete the signup process."),
+		)
+
+		tui.ShowBanner("Signup for Agentuity", body, false)
+		fmt.Println()
+
+		action := func() {
+			userId, apiKey, expires, err := auth.VerifySignupOTP(ctx, logger, apiUrl, otp)
+			if err != nil {
+				errsystem.New(errsystem.ErrAuthenticateUser, err,
+					errsystem.WithContextMessage("Failed to verify signup OTP")).ShowErrorAndExit()
+			}
+			viper.Set("auth.api_key", apiKey)
+			viper.Set("auth.user_id", userId)
+			viper.Set("auth.expires", expires)
+			viper.Set("preferences.orgId", "")
+			if err := viper.WriteConfig(); err != nil {
+				errsystem.New(errsystem.ErrWriteConfigurationFile, err,
+					errsystem.WithContextMessage("Failed to write viper config")).ShowErrorAndExit()
+			}
+		}
+
+		tui.ShowSpinner("Waiting for signup to complete...", action)
+
+		tui.ClearScreen()
+		initScreenWithLogo()
+		tui.ShowSuccess("Welcome to Agentuity! You are now logged in")
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(authCmd)
 	authCmd.AddCommand(authLoginCmd)
 	authCmd.AddCommand(authLogoutCmd)
 	authCmd.AddCommand(authWhoamiCmd)
+	authCmd.AddCommand(authSignupCmd)
 	rootCmd.AddCommand(authLoginCmd)
 	rootCmd.AddCommand(authLogoutCmd)
 }

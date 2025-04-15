@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"regexp"
 	"runtime/debug"
@@ -18,6 +19,7 @@ import (
 	"github.com/agentuity/go-common/logger"
 	"github.com/agentuity/go-common/sys"
 	"github.com/agentuity/go-common/tui"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
@@ -102,6 +104,12 @@ func (c *APIClient) Do(method, pathParam string, payload interface{}, response i
 	u, err := url.Parse(c.baseURL)
 	if err != nil {
 		return NewAPIError(c.baseURL, method, 0, "", fmt.Errorf("error parsing base url: %w", err), traceID)
+	}
+
+	i := strings.Index(pathParam, "?")
+	if i != -1 {
+		u.RawQuery = pathParam[i+1:]
+		pathParam = pathParam[:i]
 	}
 
 	basePath := u.Path
@@ -234,9 +242,75 @@ func GetURLs(logger logger.Logger) (string, string, string) {
 	return TransformUrl(apiUrl), TransformUrl(appUrl), TransformUrl(transportUrl)
 }
 
-func ShowLogin() {
-	fmt.Println(tui.Warning("You are not currently logged in or your session has expired."))
-	tui.ShowBanner("Login", tui.Text("Use ")+tui.Command("login")+tui.Text(" to login to Agentuity"), false)
+func run(ctx context.Context, c *cobra.Command, command string, args ...string) {
+	exe, err := os.Executable()
+	if err != nil {
+		tui.ShowError("Failed to get executable path: %s", err)
+		os.Exit(1)
+	}
+	cmdargs := append([]string{command}, args...)
+	if c.Flags().Changed("api-key") {
+		cmdargs = append(cmdargs, []string{"--api-key", c.Flag("api-key").Value.String()}...)
+	}
+	if c.Flags().Changed("api-url") {
+		cmdargs = append(cmdargs, []string{"--api-url", c.Flag("api-url").Value.String()}...)
+	}
+	if c.Flags().Changed("app-url") {
+		cmdargs = append(cmdargs, []string{"--app-url", c.Flag("app-url").Value.String()}...)
+	}
+	if c.Flags().Changed("transport-url") {
+		cmdargs = append(cmdargs, []string{"--transport-url", c.Flag("transport-url").Value.String()}...)
+	}
+	if c.Flags().Changed("log-level") {
+		cmdargs = append(cmdargs, []string{"--log-level", c.Flag("log-level").Value.String()}...)
+	}
+	if c.Flags().Changed("config") {
+		cmdargs = append(cmdargs, []string{"--config", c.Flag("config").Value.String()}...)
+	}
+	cmd := exec.CommandContext(ctx, exe, cmdargs...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Env = os.Environ()
+	err = cmd.Run()
+	if err != nil {
+		tui.ShowError("Failed to run command: %s", err)
+		os.Exit(1)
+	}
+}
+
+func ShowLogin(ctx context.Context, logger logger.Logger, cmd *cobra.Command) {
+	if hasLoggedInBefore() {
+		fmt.Println(tui.Warning("You are not currently logged in or your session has expired."))
+		if tui.HasTTY {
+			run(ctx, cmd, "auth", "login")
+		} else {
+			fmt.Println(tui.Warning("Use " + tui.Command("agentuity login") + " to login to Agentuity"))
+			os.Exit(1)
+		}
+	} else {
+		if tui.HasTTY {
+			// we can't assume they don't have an account so we have to ask
+			choice := tui.Select(logger, "Authentication Required", "You must login or create an account to continue:", []tui.Option{
+				{
+					ID:   "login",
+					Text: tui.PadRight("Login", 15, " ") + tui.Muted(" Login to your existing account"),
+				},
+				{
+					ID:   "signup",
+					Text: tui.PadRight("Signup", 15, " ") + tui.Muted(" Signup for a free account"),
+				},
+			})
+			if choice == "login" {
+				run(ctx, cmd, "auth", "login")
+			} else {
+				run(ctx, cmd, "auth", "signup")
+			}
+		} else {
+			fmt.Println(tui.Warning("Use " + tui.Command("agentuity auth signup") + " to create an account or " + tui.Command("agentuity login") + " to login to Agentuity"))
+			os.Exit(1)
+		}
+	}
 }
 
 func TryLoggedIn() (string, string, bool) {
@@ -255,30 +329,34 @@ func TryLoggedIn() (string, string, bool) {
 	return apikey, userId, true
 }
 
-func EnsureLoggedIn() (string, string) {
+func EnsureLoggedIn(ctx context.Context, logger logger.Logger, cmd *cobra.Command) (string, string) {
 	apikey := viper.GetString("auth.api_key")
 	if apikey == "" {
-		ShowLogin()
+		ShowLogin(ctx, logger, cmd)
 		os.Exit(1)
 	}
 	userId := viper.GetString("auth.user_id")
 	if userId == "" {
-		ShowLogin()
+		ShowLogin(ctx, logger, cmd)
 		os.Exit(1)
 	}
 	expires := viper.GetInt64("auth.expires")
 	if expires < time.Now().UnixMilli() {
-		ShowLogin()
+		ShowLogin(ctx, logger, cmd)
 		os.Exit(1)
 	}
 	return apikey, userId
 }
 
-func EnsureLoggedInWithOnlyAPIKey() string {
+func EnsureLoggedInWithOnlyAPIKey(ctx context.Context, logger logger.Logger, cmd *cobra.Command) string {
 	apikey := viper.GetString("auth.api_key")
 	if apikey == "" {
-		ShowLogin()
+		ShowLogin(ctx, logger, cmd)
 		os.Exit(1)
 	}
 	return apikey
+}
+
+func hasLoggedInBefore() bool {
+	return viper.GetInt64("auth.expires") > 0 || viper.GetString("templates.etag") != "" || viper.GetInt64("preferences.last_update_check") != 0
 }
