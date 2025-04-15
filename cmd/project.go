@@ -546,7 +546,7 @@ Examples:
 
 			var para []string
 			para = append(para, tui.Secondary("1. Switch into the project directory at ")+tui.Directory(projectDir))
-			para = append(para, tui.Secondary("2. Run ")+tui.Command("run")+tui.Secondary(" to run the project locally in development mode"))
+			para = append(para, tui.Secondary("2. Run ")+tui.Command("dev")+tui.Secondary(" to run the project locally in development mode"))
 			para = append(para, tui.Secondary("3. Run ")+tui.Command("deploy")+tui.Secondary(" to deploy the project to the Agentuity Agent Cloud"))
 			if authType != "none" {
 				para = append(para, tui.Secondary("4. Run ")+tui.Command("agent apikey")+tui.Secondary(" to fetch the Webhook API key for the agent"))

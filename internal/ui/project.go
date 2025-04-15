@@ -545,7 +545,7 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c":
 			m.quit = true
 			return m, tea.Quit
 
@@ -621,7 +621,7 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-		case "up", "k":
+		case "up":
 			if m.step <= 1 { // Only for list views
 				if m.cursor > 0 {
 					m.cursor--
@@ -655,7 +655,7 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-		case "down", "j":
+		case "down":
 			if m.step <= 1 { // Only for list views
 				maxItems := 0
 				if m.step == 0 {
@@ -1185,7 +1185,7 @@ func (m projectFormModel) View() string {
 	}
 
 	// Help bar (fixed at bottom)
-	help := []string{"↑/k up", "↓/j down"}
+	help := []string{"↑ up", "↓ down"}
 	if m.step <= 1 {
 		help = append(help, "pgup/pgdn scroll")
 	}
@@ -1202,7 +1202,7 @@ func (m projectFormModel) View() string {
 	case 4:
 		help = append(help, "←/esc back")
 	}
-	help = append(help, "q quit")
+	help = append(help, "ctrl+c quit")
 
 	helpBar := strings.Join(help, " • ")
 	if m.width > 0 {

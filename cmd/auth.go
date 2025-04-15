@@ -61,10 +61,10 @@ Examples:
 		tui.ShowSpinner("Generating login OTP...", loginaction)
 
 		body := tui.Paragraph(
-			"Please open the url in your browser:",
-			tui.Link("%s/auth/cli", appUrl),
-			"And enter the following code:",
+			"Copy the following code:",
 			tui.Bold(otp),
+			"Then open the url in your browser and paste the code:",
+			tui.Link("%s/auth/cli", appUrl),
 			tui.Muted("This code will expire in 60 seconds"),
 		)
 
