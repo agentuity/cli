@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,6 +16,7 @@ import (
 	"regexp"
 	"runtime/debug"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/agentuity/go-common/logger"
@@ -26,6 +29,7 @@ import (
 var (
 	Version = "dev"
 	Commit  = "unknown"
+	retry   = 5
 )
 
 type APIClient struct {
@@ -98,6 +102,23 @@ func UserAgent() string {
 	return "Agentuity CLI/" + Version + " (" + gitSHA + ")"
 }
 
+func shouldRetry(resp *http.Response, err error) bool {
+	if err != nil {
+		if errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ECONNREFUSED) {
+			return true
+		} else if msg := err.Error(); strings.Contains(msg, "EOF") {
+			return true
+		}
+	}
+	if resp != nil {
+		switch resp.StatusCode {
+		case http.StatusRequestTimeout, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout, http.StatusTooManyRequests:
+			return true
+		}
+	}
+	return false
+}
+
 func (c *APIClient) Do(method, pathParam string, payload interface{}, response interface{}) error {
 	var traceID string
 
@@ -140,9 +161,24 @@ func (c *APIClient) Do(method, pathParam string, payload interface{}, response i
 		req.Header.Set("Authorization", "Bearer "+c.token)
 	}
 
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error sending request: %w", err), traceID)
+	var resp *http.Response
+	for i := 0; i < retry; i++ {
+		var err error
+		resp, err = c.client.Do(req)
+		if err != nil {
+			isLast := i == retry-1
+			if shouldRetry(resp, err) && !isLast {
+				c.logger.Trace("connection reset by peer, retrying...")
+				// exponential backoff
+				v := 150 * math.Pow(2, float64(i))
+				time.Sleep(time.Duration(v) * time.Millisecond)
+				continue
+			} else {
+				return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error sending request: %w", err), traceID)
+			}
+		}
+
+		break
 	}
 	defer resp.Body.Close()
 	c.logger.Debug("response status: %s", resp.Status)
