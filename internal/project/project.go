@@ -14,6 +14,7 @@ import (
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	cstr "github.com/agentuity/go-common/string"
 	"github.com/spf13/cobra"
 	yc "github.com/zijiren233/yaml-comment"
 	"gopkg.in/yaml.v3"
@@ -44,7 +45,7 @@ type ProjectData struct {
 	Env              map[string]string `json:"env"`
 	Secrets          map[string]string `json:"secrets"`
 	WebhookAuthToken string            `json:"webhookAuthToken,omitempty"`
-	AgentID          string            `json:"agentId"`
+	Agents           []AgentConfig     `json:"agents"`
 }
 
 type InitProjectArgs struct {
@@ -56,23 +57,29 @@ type InitProjectArgs struct {
 	Name              string
 	Description       string
 	EnableWebhookAuth bool
-	AgentName         string
-	AgentDescription  string
-	AgentID           string
+	Agents            []AgentConfig
 }
 
 // InitProject will create a new project in the organization.
 // It will return the API key and project ID if the project is initialized successfully.
 func InitProject(ctx context.Context, logger logger.Logger, args InitProjectArgs) (*ProjectData, error) {
 
+	agents := make([]map[string]any, 0)
+	for _, agent := range args.Agents {
+		agents = append(agents, map[string]any{
+			"name":        agent.Name,
+			"description": agent.Description,
+		})
+	}
 	payload := map[string]any{
 		"organization_id":   args.OrgId,
 		"provider":          args.Provider,
 		"name":              args.Name,
 		"description":       args.Description,
 		"enableWebhookAuth": args.EnableWebhookAuth,
-		"agent":             map[string]string{"name": args.AgentName, "description": args.AgentDescription},
+		"agents":            agents,
 	}
+	logger.Trace("sending new project payload: %s", cstr.JSONStringify(payload))
 
 	client := util.NewAPIClient(ctx, logger, args.BaseURL, args.Token)
 

@@ -407,17 +407,15 @@ var _ Step = (*CloneRepoAction)(nil)
 func (s *CloneRepoAction) Run(ctx TemplateContext) error {
 	var url string
 	if s.Branch == "" {
-		url = fmt.Sprintf("https://api.github.com/repos/%s/zipball", s.Repo)
+		url = fmt.Sprintf("https://agentuity.sh/repo/%s", s.Repo)
 	} else {
-		url = fmt.Sprintf("https://api.github.com/repos/%s/zipball/%s", s.Repo, s.Branch)
+		url = fmt.Sprintf("https://agentuity.sh/repo/%s/%s", s.Repo, s.Branch)
 	}
 	req, err := http.NewRequestWithContext(ctx.Context, "GET", url, nil)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("User-Agent", util.UserAgent())
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err

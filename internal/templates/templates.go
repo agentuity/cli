@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver"
+	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
@@ -160,19 +161,32 @@ type Template struct {
 	Requirements []Requirement `yaml:"requirements"`
 }
 
-func (t *Template) NewProject(ctx TemplateContext) (*TemplateRules, error) {
+func (t *Template) NewProject(ctx TemplateContext) (*TemplateRules, []project.AgentConfig, error) {
 	rules, err := LoadTemplateRuleForIdentifier(ctx.TemplateDir, t.Identifier)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if !util.Exists(ctx.ProjectDir) {
 		if err := os.MkdirAll(ctx.ProjectDir, 0755); err != nil {
-			return nil, fmt.Errorf("failed to create directory %s: %w", ctx.ProjectDir, err)
+			return nil, nil, fmt.Errorf("failed to create directory %s: %w", ctx.ProjectDir, err)
 		}
 		ctx.Logger.Debug("created directory %s", ctx.ProjectDir)
 	}
 	ctx.Template = t
-	return rules, rules.NewProject(ctx)
+	if err := rules.NewProject(ctx); err != nil {
+		return nil, nil, err
+	}
+	// check to see if the project already exists from the template used and if so,
+	// we are going to use the agents from the project template
+	existingProject := project.ProjectExists(ctx.ProjectDir)
+	if existingProject {
+		var p project.Project
+		if err := p.Load(ctx.ProjectDir); err != nil {
+			return nil, nil, err
+		}
+		return rules, p.Agents, nil
+	}
+	return rules, nil, nil
 }
 
 // Matches returns true if the template matches the requirements

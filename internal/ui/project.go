@@ -81,10 +81,11 @@ type Choice struct {
 }
 
 type Template struct {
-	ID          string
-	Name        string
-	Description string
-	template    *templates.Template
+	ID            string
+	Name          string
+	Description   string
+	template      *templates.Template
+	SkipAgentStep bool
 }
 
 type DeploymentOption struct {
@@ -308,10 +309,11 @@ func initialProjectModel(initialForm ProjectForm) projectFormModel {
 		}
 		for i, t := range templates {
 			providerTemplates[template.Identifier] = append(providerTemplates[template.Identifier], Template{
-				ID:          t.Name,
-				Name:        t.Name,
-				Description: t.Description,
-				template:    &template,
+				ID:            t.Name,
+				Name:          t.Name,
+				Description:   t.Description,
+				template:      &template,
+				SkipAgentStep: t.SkipAgentStep,
 			})
 			if cursor == n && initialForm.Template == t.Name {
 				stepCursors[n] = i
@@ -562,6 +564,18 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Store current cursor position before going back
 				m.stepCursors[m.step] = m.cursor
 				m.step--
+				// If we're going back from deployment step, check if we need to skip agent step
+				if m.step == 3 {
+					if templates, ok := m.templates[m.runtime]; ok {
+						for _, t := range templates {
+							if t.Name == m.template && t.SkipAgentStep {
+								// Skip agent step and go back to project details
+								m.step--
+								break
+							}
+						}
+					}
+				}
 				// Restore cursor position for the previous step
 				if savedCursor, ok := m.stepCursors[m.step]; ok {
 					m.cursor = savedCursor
@@ -614,9 +628,22 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.step++
 						m.projectName.Blur()
 						m.description.Blur()
-						m.agentName.Focus()
+						// Check if we should skip the agent step
+						if templates, ok := m.templates[m.runtime]; ok {
+							for _, t := range templates {
+								if t.Name == m.template && t.SkipAgentStep {
+									// Skip agent step and go directly to deployment
+									m.step++
+									m.cursor = m.stepCursors[m.step]
+									break
+								}
+							}
+						}
+						if m.step == 3 {
+							m.agentName.Focus()
+						}
 					}
-				} else if m.step == 3 {
+				} else if m.step == 4 {
 					return m, tea.Quit
 				}
 			}
@@ -682,7 +709,20 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else if m.description.Focused() && m.nameValidated && !m.checkingName {
 					m.step++
 					m.description.Blur()
-					m.agentName.Focus()
+					// Check if we should skip the agent step
+					if templates, ok := m.templates[m.runtime]; ok {
+						for _, t := range templates {
+							if t.Name == m.template && t.SkipAgentStep {
+								// Skip agent step and go directly to deployment
+								m.step++
+								m.cursor = m.stepCursors[m.step]
+								break
+							}
+						}
+					}
+					if m.step == 3 {
+						m.agentName.Focus()
+					}
 				}
 			} else if m.step == 3 {
 				if m.agentName.Focused() {
@@ -734,7 +774,20 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else if m.description.Focused() && m.nameValidated && !m.checkingName {
 					m.step++
 					m.description.Blur()
-					m.agentName.Focus()
+					// Check if we should skip the agent step
+					if templates, ok := m.templates[m.runtime]; ok {
+						for _, t := range templates {
+							if t.Name == m.template && t.SkipAgentStep {
+								// Skip agent step and go directly to deployment
+								m.step++
+								m.cursor = m.stepCursors[m.step]
+								break
+							}
+						}
+					}
+					if m.step == 3 {
+						m.agentName.Focus()
+					}
 				}
 			} else if m.step == 3 {
 				if m.agentName.Focused() {
