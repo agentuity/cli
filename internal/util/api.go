@@ -167,7 +167,7 @@ func (c *APIClient) Do(method, pathParam string, payload interface{}, response i
 		var err error
 		resp, err = c.client.Do(req)
 		if shouldRetry(resp, err) && !isLast {
-			c.logger.Trace("connection reset by peer, retrying...")
+			c.logger.Trace("client returned retryable error, retrying...")
 			// exponential backoff
 			v := 150 * math.Pow(2, float64(i))
 			time.Sleep(time.Duration(v) * time.Millisecond)
