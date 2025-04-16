@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.93] - 2025-04-16
+
+### Changed
+- Improve TUI semantics ([#193](https://github.com/agentuity/cli/pull/193))
+
+### Fixed
+- Add more debug logging around CI bundling for github app ([#194](https://github.com/agentuity/cli/pull/194))
+
+### Documentation
+- Update changelog for v0.0.92 ([#192](https://github.com/agentuity/cli/pull/192))
+
 ## [v0.0.92] - 2025-04-15
 
 ### Fixed
@@ -275,6 +286,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.93]: https://github.com/agentuity/cli/compare/v0.0.92...v0.0.93
 [v0.0.92]: https://github.com/agentuity/cli/compare/v0.0.91...v0.0.92
 [v0.0.91]: https://github.com/agentuity/cli/compare/v0.0.90...v0.0.91
 [v0.0.90]: https://github.com/agentuity/cli/compare/v0.0.89...v0.0.90
