@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.96] - 2025-04-16
+
+### Fixed
+- Guard against conn being nil ([e095c09](https://github.com/agentuity/cli/commit/e095c09))
+- Only set step cursor on page 1 ([#202](https://github.com/agentuity/cli/pull/202))
+
 ## [v0.0.95] - 2025-04-16
 
 ### Added
@@ -303,6 +309,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.96]: https://github.com/agentuity/cli/compare/v0.0.95...v0.0.96
 [v0.0.95]: https://github.com/agentuity/cli/compare/v0.0.94...v0.0.95
 [v0.0.94]: https://github.com/agentuity/cli/compare/v0.0.93...v0.0.94
 [v0.0.93]: https://github.com/agentuity/cli/compare/v0.0.92...v0.0.93
