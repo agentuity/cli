@@ -41,6 +41,7 @@ Examples:
 		production, _ := cmd.Flags().GetBool("production")
 		install, _ := cmd.Flags().GetBool("install")
 		deploy, _ := cmd.Flags().GetBool("deploy")
+		ci, _ := cmd.Flags().GetBool("ci")
 
 		if err := bundler.Bundle(bundler.BundleContext{
 			Context:    ctx,
@@ -48,6 +49,7 @@ Examples:
 			ProjectDir: projectContext.Dir,
 			Production: production,
 			Install:    install,
+			CI:         ci,
 		}); err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to bundle project")).ShowErrorAndExit()
 		}

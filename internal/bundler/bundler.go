@@ -34,6 +34,7 @@ type BundleContext struct {
 	ProjectDir string
 	Production bool
 	Install    bool
+	CI         bool
 }
 
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
@@ -42,17 +43,27 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		var install *exec.Cmd
 		switch theproject.Bundler.Runtime {
 		case "nodejs":
-			install = exec.CommandContext(ctx.Context, "npm", "install", "--no-save", "--no-audit", "--no-fund", "--include=prod")
+			install = exec.CommandContext(ctx.Context, "npm", "install", "--no-save", "--no-audit", "--no-fund", "--include=prod", "--ignore-scripts")
 		case "bunjs":
-			install = exec.CommandContext(ctx.Context, "bun", "install", "--production", "--no-save", "--silent", "--no-progress", "--no-summary")
+			args := []string{"install", "--production", "--no-save", "--frozen-lockfile", "--ignore-scripts", "--cwd", dir}
+			if ctx.CI {
+				args = append(args, "--verbose", "--no-cache")
+			} else {
+				args = append(args, "--no-progress", "--no-summary", "--silent")
+			}
+			install = exec.CommandContext(ctx.Context, "bun", args...)
 		default:
 			return fmt.Errorf("unsupported runtime: %s", theproject.Bundler.Runtime)
 		}
 		util.ProcessSetup(install)
 		install.Dir = dir
 		out, err := install.CombinedOutput()
+		var ec int
+		if install.ProcessState != nil {
+			ec = install.ProcessState.ExitCode()
+		}
+		ctx.Logger.Trace("install command: %s returned: %s, err: %s, exit code: %d", strings.Join(install.Args, " "), strings.TrimSpace(string(out)), err, ec)
 		if err != nil {
-			ctx.Logger.Trace("install command: %s returned: %s, err: %s", strings.Join(install.Args, " "), string(out), err)
 			if install.ProcessState == nil || install.ProcessState.ExitCode() != 0 {
 				if install.ProcessState != nil {
 					return fmt.Errorf("failed to install dependencies (exit code %d): %w. %s", install.ProcessState.ExitCode(), err, string(out))
