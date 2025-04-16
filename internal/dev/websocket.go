@@ -109,7 +109,7 @@ func (c *Websocket) getAgentWelcome(ctx context.Context, port int) (map[string]W
 func (c *Websocket) StartReadingMessages(ctx context.Context, logger logger.Logger, port int) {
 	go func() {
 		defer close(c.done)
-		for {
+		for c.conn != nil {
 			_, m, err := c.conn.ReadMessage()
 			if err != nil {
 				if isContextCanceled(ctx, err) {
