@@ -45,7 +45,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		case "nodejs":
 			install = exec.CommandContext(ctx.Context, "npm", "install", "--no-save", "--no-audit", "--no-fund", "--include=prod", "--ignore-scripts")
 		case "bunjs":
-			args := []string{"install", "--production", "--no-save", "--frozen-lockfile", "--ignore-scripts", "--cwd", dir}
+			args := []string{"install", "--production", "--no-save", "--ignore-scripts"}
 			if ctx.CI {
 				args = append(args, "--verbose", "--no-cache")
 			} else {
