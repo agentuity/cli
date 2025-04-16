@@ -62,17 +62,14 @@ Examples:
 			}
 		}
 
-		for {
-			tui.ShowSpinner("Generating login OTP...", loginaction)
-			if upgrade {
-				tui.ShowWarning("A new version of the CLI is required, will automatically attempt to upgrade...")
-				if err := util.UpgradeCLI(ctx, logger, true); err != nil {
-					errsystem.New(errsystem.ErrUpgradeCli, err, errsystem.WithAttributes(map[string]any{"version": Version})).ShowErrorAndExit()
-				}
-				tui.ShowWarning("Please re-run the login command to continue")
-				os.Exit(1)
+		tui.ShowSpinner("Generating login OTP...", loginaction)
+		if upgrade {
+			tui.ShowWarning("A new version of the CLI is required, will automatically attempt to upgrade...")
+			if err := util.UpgradeCLI(ctx, logger, true); err != nil {
+				errsystem.New(errsystem.ErrUpgradeCli, err, errsystem.WithAttributes(map[string]any{"version": Version})).ShowErrorAndExit()
 			}
-			break
+			tui.ShowWarning("Please re-run the login command to continue")
+			os.Exit(1)
 		}
 
 		body := tui.Paragraph(
