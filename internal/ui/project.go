@@ -297,7 +297,7 @@ func initialProjectModel(initialForm ProjectForm) projectFormModel {
 			}
 		}
 	}
-	for n, template := range initialForm.Templates {
+	for _, template := range initialForm.Templates {
 		providers = append(providers, Choice{
 			ID:          template.Identifier,
 			Name:        template.Name,
@@ -315,8 +315,8 @@ func initialProjectModel(initialForm ProjectForm) projectFormModel {
 				template:      &template,
 				SkipAgentStep: t.SkipAgentStep,
 			})
-			if cursor == n && initialForm.Template == t.Name {
-				stepCursors[n] = i
+			if initialForm.Template == t.Name {
+				stepCursors[1] = i
 			}
 		}
 	}
