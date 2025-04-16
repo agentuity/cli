@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.94] - 2025-04-16
+
+### Fixed
+- Fix for mismatched lockfile when package.json version doesn't match the bun lock file by removing the --frozen-lockfile flag ([#196](https://github.com/agentuity/cli/pull/196))
+
 ## [v0.0.93] - 2025-04-16
 
 ### Changed
@@ -286,6 +291,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.94]: https://github.com/agentuity/cli/compare/v0.0.93...v0.0.94
 [v0.0.93]: https://github.com/agentuity/cli/compare/v0.0.92...v0.0.93
 [v0.0.92]: https://github.com/agentuity/cli/compare/v0.0.91...v0.0.92
 [v0.0.91]: https://github.com/agentuity/cli/compare/v0.0.90...v0.0.91
