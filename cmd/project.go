@@ -66,8 +66,7 @@ type InitProjectArgs struct {
 	Description       string
 	EnableWebhookAuth bool
 	Provider          *templates.TemplateRules
-	AgentName         string
-	AgentDescription  string
+	Agents            []project.AgentConfig
 }
 
 func initProject(ctx context.Context, logger logger.Logger, args InitProjectArgs) *project.ProjectData {
@@ -81,8 +80,7 @@ func initProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 		EnableWebhookAuth: args.EnableWebhookAuth,
 		Dir:               args.Dir,
 		Provider:          args.Provider.Identifier,
-		AgentName:         args.AgentName,
-		AgentDescription:  args.AgentDescription,
+		Agents:            args.Agents,
 	})
 	if err != nil {
 		errsystem.New(errsystem.ErrCreateProject, err, errsystem.WithContextMessage("Failed to init project")).ShowErrorAndExit()
@@ -121,14 +119,8 @@ func initProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 	proj.Deployment.Resources.CPU = args.Provider.Deployment.Resources.CPU
 	proj.Deployment.Resources.Memory = args.Provider.Deployment.Resources.Memory
 
-	// add the initial agent
-	proj.Agents = []project.AgentConfig{
-		{
-			ID:          result.AgentID,
-			Name:        args.AgentName,
-			Description: args.AgentDescription,
-		},
-	}
+	// set the agents from the result
+	proj.Agents = result.Agents
 
 	if err := proj.Save(args.Dir); err != nil {
 		errsystem.New(errsystem.ErrSaveProject, err, errsystem.WithContextMessage("Failed to save project to disk")).ShowErrorAndExit()
@@ -410,7 +402,11 @@ Examples:
 						}
 					}
 				}
-				return true, nil
+				exists, err := project.ProjectWithNameExists(ctx, logger, apiUrl, apikey, name)
+				if err != nil {
+					return false, err
+				}
+				return !exists, nil
 			}
 
 			if providerName != "" && templateName != "" && name != "" && agentName != "" {
@@ -512,9 +508,27 @@ Examples:
 		}
 
 		tui.ShowSpinner("creating project ...", func() {
-			rules, err := provider.NewProject(tmplContext)
+			rules, existingAgents, err := provider.NewProject(tmplContext)
 			if err != nil {
 				errsystem.New(errsystem.ErrCreateProject, err, errsystem.WithContextMessage("Failed to create project")).ShowErrorAndExit()
+			}
+
+			// check to see if the project already has existing agents returned and if so, we're going to use those
+			var agents []project.AgentConfig
+			if len(existingAgents) > 0 {
+				for _, agent := range existingAgents {
+					agents = append(agents, project.AgentConfig{
+						Name:        agent.Name,
+						Description: agent.Description,
+					})
+				}
+			} else {
+				agents = []project.AgentConfig{
+					{
+						Name:        agentName,
+						Description: agentDescription,
+					},
+				}
 			}
 
 			projectData = initProject(ctx, logger, InitProjectArgs{
@@ -525,8 +539,7 @@ Examples:
 				Name:              name,
 				Description:       description,
 				Provider:          rules,
-				AgentName:         agentName,
-				AgentDescription:  agentDescription,
+				Agents:            agents,
 				EnableWebhookAuth: authType != "none",
 			})
 

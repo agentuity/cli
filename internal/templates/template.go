@@ -56,10 +56,11 @@ func (t *TemplateContext) Interpolate(val any) any {
 }
 
 type ProjectTemplate struct {
-	Name         string   `yaml:"name"`
-	Description  string   `yaml:"description"`
-	Dependencies []string `yaml:"dependencies"`
-	Steps        []any    `yaml:"steps"`
+	Name          string   `yaml:"name"`
+	Description   string   `yaml:"description"`
+	Dependencies  []string `yaml:"dependencies"`
+	Steps         []any    `yaml:"steps"`
+	SkipAgentStep bool     `yaml:"skip_agent_step"`
 }
 
 type NewProjectSteps struct {
