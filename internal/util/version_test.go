@@ -94,7 +94,7 @@ func TestCheckLatestRelease(t *testing.T) {
 
 	t.Run("dev version", func(t *testing.T) {
 		Version = "dev"
-		err := CheckLatestRelease(context.Background(), logger)
+		_, err := CheckLatestRelease(context.Background(), logger, false)
 		assert.NoError(t, err)
 	})
 }

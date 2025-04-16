@@ -44,11 +44,15 @@ Examples:
 		logger := env.NewLogger(cmd)
 		apiUrl, appUrl, _ := util.GetURLs(logger)
 		var otp string
+		var upgrade bool
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		loginaction := func() {
 			var err error
-			otp, err = auth.GenerateLoginOTP(ctx, logger, apiUrl)
+			otp, upgrade, err = auth.GenerateLoginOTP(ctx, logger, apiUrl)
+			if upgrade {
+				return
+			}
 			if err != nil {
 				if isCancelled(ctx) {
 					os.Exit(1)
@@ -59,6 +63,14 @@ Examples:
 		}
 
 		tui.ShowSpinner("Generating login OTP...", loginaction)
+		if upgrade {
+			tui.ShowWarning("A new version of the CLI is required, will automatically attempt to upgrade...")
+			if err := util.UpgradeCLI(ctx, logger, true); err != nil {
+				errsystem.New(errsystem.ErrUpgradeCli, err, errsystem.WithAttributes(map[string]any{"version": Version})).ShowErrorAndExit()
+			}
+			tui.ShowWarning("Please re-run the login command to continue")
+			os.Exit(1)
+		}
 
 		body := tui.Paragraph(
 			"Copy the following code:",
@@ -96,7 +108,6 @@ Examples:
 		tui.ClearScreen()
 		initScreenWithLogo()
 		tui.ShowSuccess("Welcome to Agentuity! You are now logged in")
-		checkForUpgrade(ctx, logger)
 	},
 }
 

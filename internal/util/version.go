@@ -41,27 +41,26 @@ func GetLatestRelease(ctx context.Context) (string, error) {
 	return strings.TrimPrefix(release.TagName, "v"), nil
 }
 
-func CheckLatestRelease(ctx context.Context, logger logger.Logger) error {
+func CheckLatestRelease(ctx context.Context, logger logger.Logger, force bool) (bool, error) {
 	if Version == "dev" {
-		return nil
+		return false, nil
 	}
-
 	release, err := GetLatestRelease(ctx)
 	if err != nil {
-		return err
+		return false, err
 	}
 	latestVersion := semver.MustParse(release)
 	currentVersion := semver.MustParse(Version)
 	if latestVersion.GreaterThan(currentVersion) {
-		showUpgradeNotice(ctx, logger, release)
+		return showUpgradeNotice(ctx, logger, release, force), nil
 	}
-	return nil
+	return false, nil
 }
 
-func showUpgradeNotice(ctx context.Context, logger logger.Logger, version string) {
+func showUpgradeNotice(ctx context.Context, logger logger.Logger, version string, force bool) bool {
 	exe, err := os.Executable()
 	if err != nil {
-		return
+		return false
 	}
 	// if we are running from homebrew, we need to upgrade via homebrew
 	if tui.HasTTY {
@@ -83,7 +82,8 @@ func showUpgradeNotice(ctx context.Context, logger logger.Logger, version string
 			if !success {
 				tui.ShowWarning("Please see https://agentuity.dev/CLI/installation for instructions to upgrade manually.")
 			}
+			return success
 		}
-		return
 	}
+	return false
 }

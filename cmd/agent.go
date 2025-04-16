@@ -241,7 +241,7 @@ var agentCreateCmd = &cobra.Command{
 			initScreenWithLogo()
 		}
 
-		checkForUpgrade(ctx, logger)
+		checkForUpgrade(ctx, logger, false)
 
 		loadTemplates(ctx, cmd)
 

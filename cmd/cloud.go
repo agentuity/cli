@@ -154,7 +154,7 @@ Examples:
 		var state map[string]agentListState
 
 		if !ci {
-			checkForUpgrade(ctx, logger)
+			checkForUpgrade(ctx, logger, true)
 
 			loadTemplates(ctx, cmd)
 
