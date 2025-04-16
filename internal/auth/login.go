@@ -27,17 +27,23 @@ type OTPStartResponse struct {
 	} `json:"data"`
 }
 
-func GenerateLoginOTP(ctx context.Context, logger logger.Logger, baseUrl string) (string, error) {
+func GenerateLoginOTP(ctx context.Context, logger logger.Logger, baseUrl string) (string, bool, error) {
 	client := util.NewAPIClient(ctx, logger, baseUrl, "")
 
 	var resp OTPStartResponse
 	if err := client.Do("GET", "/cli/auth/start", nil, &resp); err != nil {
-		return "", err
+		var apiErr *util.APIError
+		if errors.As(err, &apiErr) {
+			if apiErr.Status == http.StatusUnprocessableEntity {
+				return "", true, nil
+			}
+		}
+		return "", false, err
 	}
 	if !resp.Success {
-		return "", fmt.Errorf("%s", resp.Message)
+		return "", false, fmt.Errorf("%s", resp.Message)
 	}
-	return resp.Data.OTP, nil
+	return resp.Data.OTP, false, nil
 }
 
 type OTPCompleteResponse struct {

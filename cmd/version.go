@@ -58,7 +58,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		if upgrade {
-			util.CheckLatestRelease(ctx, logger)
+			util.CheckLatestRelease(ctx, logger, true)
 		} else {
 			release, err := util.GetLatestRelease(ctx)
 			if err != nil {

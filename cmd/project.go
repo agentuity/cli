@@ -279,7 +279,7 @@ Examples:
 			errsystem.New(errsystem.ErrListFilesAndDirectories, err, errsystem.WithContextMessage("Failed to get current working directory")).ShowErrorAndExit()
 		}
 
-		checkForUpgrade(ctx, logger)
+		checkForUpgrade(ctx, logger, true)
 
 		if tui.HasTTY {
 			// handle MCP server installation

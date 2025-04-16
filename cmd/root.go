@@ -180,7 +180,7 @@ func isCancelled(ctx context.Context) bool {
 	}
 }
 
-func checkForUpgrade(ctx context.Context, logger logger.Logger) {
+func checkForUpgrade(ctx context.Context, logger logger.Logger, force bool) {
 	v := viper.GetInt64("preferences.last_update_check")
 	var check bool
 	if v == 0 {
@@ -191,10 +191,17 @@ func checkForUpgrade(ctx context.Context, logger logger.Logger) {
 			check = true
 		}
 	}
-	if check {
+	if check || force {
 		viper.Set("preferences.last_update_check", time.Now().Unix())
 		viper.WriteConfig()
-		util.CheckLatestRelease(ctx, logger)
+		ok, err := util.CheckLatestRelease(ctx, logger, force)
+		if err != nil {
+			logger.Error("Failed to check for latest release: %s", err)
+		}
+		if ok && force {
+			tui.ShowWarning("Agentuity CLI was upgraded. Please re-run the command again to continue.")
+			os.Exit(1) // force an exit after upgrade if executed
+		}
 	}
 }
 

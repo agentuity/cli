@@ -53,7 +53,7 @@ Examples:
 		dir := theproject.Dir
 		isDeliberateRestart := false
 
-		checkForUpgrade(ctx, log)
+		checkForUpgrade(ctx, log, false)
 
 		if theproject.NewProject {
 			var projectId string

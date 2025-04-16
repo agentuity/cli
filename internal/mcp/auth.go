@@ -16,7 +16,7 @@ func init() {
 			logger := c.Logger
 
 			// Generate OTP
-			otp, err := auth.GenerateLoginOTP(ctx, logger, c.APIURL)
+			otp, _, err := auth.GenerateLoginOTP(ctx, logger, c.APIURL)
 			if err != nil {
 				return nil, fmt.Errorf("failed to generate login OTP: %w", err)
 			}
