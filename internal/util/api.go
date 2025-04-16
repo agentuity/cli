@@ -163,21 +163,19 @@ func (c *APIClient) Do(method, pathParam string, payload interface{}, response i
 
 	var resp *http.Response
 	for i := 0; i < retry; i++ {
+		isLast := i == retry-1
 		var err error
 		resp, err = c.client.Do(req)
-		if err != nil {
-			isLast := i == retry-1
-			if shouldRetry(resp, err) && !isLast {
-				c.logger.Trace("connection reset by peer, retrying...")
-				// exponential backoff
-				v := 150 * math.Pow(2, float64(i))
-				time.Sleep(time.Duration(v) * time.Millisecond)
-				continue
-			} else {
-				return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error sending request: %w", err), traceID)
-			}
+		if shouldRetry(resp, err) && !isLast {
+			c.logger.Trace("connection reset by peer, retrying...")
+			// exponential backoff
+			v := 150 * math.Pow(2, float64(i))
+			time.Sleep(time.Duration(v) * time.Millisecond)
+			continue
 		}
-
+		if err != nil {
+			return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error sending request: %w", err), traceID)
+		}
 		break
 	}
 	defer resp.Body.Close()
