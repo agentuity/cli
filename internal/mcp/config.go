@@ -29,13 +29,13 @@ type MCPClientApplicationConfig struct {
 	Windows []string
 	Linux   []string
 }
+
 func toPathArray(path string) []string {
 	if path == "" {
 		return []string{}
 	}
 	return []string{path}
 }
-
 
 type MCPClientConfig struct {
 	Name           string
@@ -130,7 +130,7 @@ func Detect(all bool) ([]MCPClientConfig, error) {
 			case "linux":
 				filepaths = config.Application.Linux
 			}
-			
+
 			for _, filepath := range filepaths {
 				if filepath == "$PATH" {
 					if config.Command != "" {
@@ -236,7 +236,7 @@ func Install(ctx context.Context, logger logger.Logger) error {
 	if installed == 0 {
 		tui.ShowSuccess("All MCP clients are up-to-date")
 	}
-	
+
 	return nil
 }
 
