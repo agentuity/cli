@@ -33,7 +33,8 @@ func NewWatcher(logger logger.Logger, dir string, patterns []string, callback fu
 		if err != nil {
 			return err
 		}
-		if info.IsDir() {
+		if fw.matchesPattern(logger, path) {
+			logger.Trace("Adding path to watcher: %s", path)
 			return watcher.Add(path)
 		}
 		return nil
@@ -72,10 +73,8 @@ func (fw *FileWatcher) watch(logger logger.Logger) {
 }
 
 func (fw *FileWatcher) matchesPattern(logger logger.Logger, filename string) bool {
-	logger.Trace("matchesPattern - filename: %s, patterns: %v", filename, fw.patterns)
 	for _, pattern := range fw.patterns {
 		// Make pattern relative to watched directory
-		logger.Trace("Pattern: %s", pattern)
 		if ok, _ := doubleStarMatch(logger, pattern, filename, fw.dir); ok {
 			return true
 		}
@@ -84,7 +83,6 @@ func (fw *FileWatcher) matchesPattern(logger logger.Logger, filename string) boo
 }
 
 func doubleStarMatch(logger logger.Logger, pattern, path, baseDir string) (bool, error) {
-	logger.Trace("doubleStarMatch - pattern: %s, path: %s, baseDir: %s", pattern, path, baseDir)
 
 	// Convert absolute path to relative path from baseDir
 	relPath, err := filepath.Rel(baseDir, path)
@@ -92,16 +90,12 @@ func doubleStarMatch(logger logger.Logger, pattern, path, baseDir string) (bool,
 		logger.Error("Failed to get relative path: %v", err)
 		return false, err
 	}
-	logger.Trace("Relative path: %s", relPath)
 
 	// Clean and split paths
 	relPath = filepath.ToSlash(relPath)
 	pattern = filepath.ToSlash(pattern)
 
-	segments := strings.Split(relPath, "/")
 	patternParts := strings.Split(pattern, "/")
-
-	logger.Trace("Path segments: %v\nPattern parts: %v\n", segments, patternParts)
 
 	// Base cases
 	if pattern == "**" {
@@ -122,11 +116,9 @@ func doubleStarMatch(logger logger.Logger, pattern, path, baseDir string) (bool,
 
 	// Regular path matching
 	matched, err := filepath.Match(pattern, relPath)
-	logger.Trace("Regular match result: %v", matched)
 	return matched, err
 }
 
 func (fw *FileWatcher) Close(logger logger.Logger) error {
-	logger.Trace("Closing watcher")
 	return fw.watcher.Close()
 }
