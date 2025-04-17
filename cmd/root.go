@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/agentuity/cli/internal/deployer"
+	"github.com/agentuity/cli/internal/errsystem"
+	"github.com/agentuity/cli/internal/templates"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
 	"github.com/agentuity/go-common/tui"
@@ -53,6 +55,27 @@ func Execute() {
 	if err != nil {
 		os.Exit(1)
 	}
+}
+
+func loadTemplates(ctx context.Context, cmd *cobra.Command) (templates.Templates, string) {
+	tmplDir, custom, err := getConfigTemplateDir(cmd)
+	if err != nil {
+		errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
+	}
+
+	var tmpls templates.Templates
+
+	tui.ShowSpinner("Loading templates...", func() {
+		tmpls, err = templates.LoadTemplates(ctx, tmplDir, custom)
+		if err != nil {
+			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates")).ShowErrorAndExit()
+		}
+
+		if len(tmpls) == 0 {
+			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("No templates returned from load templates")).ShowErrorAndExit()
+		}
+	})
+	return tmpls, tmplDir
 }
 
 func init() {
@@ -157,7 +180,7 @@ func isCancelled(ctx context.Context) bool {
 	}
 }
 
-func checkForUpgrade(ctx context.Context, logger logger.Logger) {
+func checkForUpgrade(ctx context.Context, logger logger.Logger, force bool) {
 	v := viper.GetInt64("preferences.last_update_check")
 	var check bool
 	if v == 0 {
@@ -168,10 +191,17 @@ func checkForUpgrade(ctx context.Context, logger logger.Logger) {
 			check = true
 		}
 	}
-	if check {
+	if check || force {
 		viper.Set("preferences.last_update_check", time.Now().Unix())
 		viper.WriteConfig()
-		util.CheckLatestRelease(ctx, logger)
+		ok, err := util.CheckLatestRelease(ctx, logger, force)
+		if err != nil {
+			logger.Error("Failed to check for latest release: %s", err)
+		}
+		if ok && force {
+			tui.ShowWarning("Agentuity CLI was upgraded. Please re-run the command again to continue.")
+			os.Exit(1) // force an exit after upgrade if executed
+		}
 	}
 }
 

@@ -1,6 +1,7 @@
 package dev
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -15,18 +16,19 @@ import (
 )
 
 func KillProjectServer(projectServerCmd *exec.Cmd) {
-	projectServerCmd.Process.Signal(syscall.SIGTERM)
-	ch := make(chan struct{})
+	ch := make(chan struct{}, 1)
 	go func() {
 		projectServerCmd.Wait()
 		ch <- struct{}{}
 	}()
+	projectServerCmd.Process.Signal(syscall.SIGTERM)
 	select {
 	case <-ch:
-		break
-	case <-time.After(time.Second * 10):
+		return
+	case <-time.After(time.Second * 5):
 		// this will kill the process group not just the parent process
 		util.ProcessKill(projectServerCmd)
+		close(ch)
 	}
 }
 
@@ -73,15 +75,16 @@ func FindAvailablePort(p project.ProjectContext) (int, error) {
 	return findAvailablePort()
 }
 
-func CreateRunProjectCmd(log logger.Logger, theproject project.ProjectContext, liveDevConnection *Websocket, dir string, orgId string, port int) (*exec.Cmd, error) {
+func CreateRunProjectCmd(ctx context.Context, log logger.Logger, theproject project.ProjectContext, liveDevConnection *Websocket, dir string, orgId string, port int) (*exec.Cmd, error) {
 	// set the vars
-	projectServerCmd := exec.Command(theproject.Project.Development.Command, theproject.Project.Development.Args...)
+	projectServerCmd := exec.CommandContext(ctx, theproject.Project.Development.Command, theproject.Project.Development.Args...)
 	projectServerCmd.Env = os.Environ()[:]
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_OTLP_BEARER_TOKEN=%s", liveDevConnection.OtelToken))
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_OTLP_URL=%s", liveDevConnection.OtelUrl))
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_URL=%s", theproject.APIURL))
+	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_TRANSPORT_URL=%s", theproject.TransportURL))
 
-	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_DEPLOYMENT_ID=%s", liveDevConnection.WebSocketId))
+	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_DEPLOYMENT_ID=%s", liveDevConnection.webSocketId))
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_PROJECT_ID=%s", theproject.Project.ProjectId))
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_ORG_ID=%s", orgId))
 
@@ -99,6 +102,7 @@ func CreateRunProjectCmd(log logger.Logger, theproject project.ProjectContext, l
 	projectServerCmd.Stdout = os.Stdout
 	projectServerCmd.Stderr = os.Stderr
 	projectServerCmd.Stdin = os.Stdin
+	projectServerCmd.Dir = dir
 
 	util.ProcessSetup(projectServerCmd)
 

@@ -145,7 +145,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		logger := env.NewLogger(cmd)
-		tmplDir, err := getConfigTemplateDir(cmd)
+		tmplDir, _, err := getConfigTemplateDir(cmd)
 		if err != nil {
 			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
 		}
@@ -155,7 +155,7 @@ Examples:
 		} else {
 			logger.Fatal("SSE mode is not yet supported")
 		}
-		project := project.TryProject(cmd)
+		project := project.TryProject(ctx, cmd)
 		server := mcp_golang.NewServer(t)
 		mcpContext := mcp.MCPContext{
 			Context:      ctx,
