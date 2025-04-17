@@ -17,6 +17,7 @@ import (
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/go-common/logger"
 	"github.com/agentuity/go-common/telemetry"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"go.opentelemetry.io/otel"
@@ -534,10 +535,36 @@ func processInputMessage(plogger logger.Logger, c *Websocket, m []byte, port int
 
 	logger.Debug("sending request to %s with trace id: %s", url, spanContext.TraceID())
 
-	resp, lerr := http.DefaultClient.Do(req)
-	if lerr != nil {
-		logger.Error("failed to post to agent: %s", lerr)
-		err = fmt.Errorf("failed to post to agent: %w", lerr)
+	expBackoff := backoff.NewExponentialBackOff()
+	expBackoff.InitialInterval = 500 * time.Millisecond
+	expBackoff.MaxInterval = 5 * time.Second
+	expBackoff.MaxElapsedTime = 30 * time.Second // Max total time as requested
+	expBackoff.Multiplier = 2.0
+	expBackoff.RandomizationFactor = 0.3 // Add jitter
+
+	var resp *http.Response
+	operation := func() error {
+		var err error
+		resp, err = http.DefaultClient.Do(req)
+		if err != nil {
+			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				logger.Warn("connection timeout to agent, retrying...")
+				return err
+			}
+			if strings.Contains(err.Error(), "connection refused") {
+				logger.Warn("connection refused to agent, retrying...")
+				return err
+			}
+			logger.Error("failed to post to agent: %s", err)
+			return backoff.Permanent(err)
+		}
+		return nil
+	}
+
+	err = backoff.Retry(operation, expBackoff)
+	if err != nil {
+		logger.Error("all attempts to post to agent failed: %s", err)
+		err = fmt.Errorf("failed to post to agent: %w", err)
 		return
 	}
 	defer resp.Body.Close()
