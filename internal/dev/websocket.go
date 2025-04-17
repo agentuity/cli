@@ -310,7 +310,9 @@ func (c *Websocket) SendMessage(logger logger.Logger, msg Message) error {
 	if err != nil {
 		return err
 	}
-
+	if c.conn == nil {
+		return nil
+	}
 	if err := c.conn.WriteMessage(websocket.TextMessage, buf); err != nil {
 		return err
 	}
