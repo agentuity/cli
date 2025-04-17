@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.97] - 2025-04-17
+
+### Fixed
+- Fix issue with too many files error ([#205](https://github.com/agentuity/cli/pull/205))
+- Fixed small error (55996e3)
+
+### Changed
+- Bump golang.org/x/net from 0.36.0 to 0.38.0 ([#204](https://github.com/agentuity/cli/pull/204))
+
+### Documentation
+- Update changelog for v0.0.96 ([#203](https://github.com/agentuity/cli/pull/203))
+
 ## [v0.0.96] - 2025-04-16
 
 ### Fixed
@@ -309,6 +321,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.97]: https://github.com/agentuity/cli/compare/v0.0.96...v0.0.97
 [v0.0.96]: https://github.com/agentuity/cli/compare/v0.0.95...v0.0.96
 [v0.0.95]: https://github.com/agentuity/cli/compare/v0.0.94...v0.0.95
 [v0.0.94]: https://github.com/agentuity/cli/compare/v0.0.93...v0.0.94
