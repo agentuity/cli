@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.98] - 2025-04-18
+
+### Changed
+- Add exponential backoff for agent welcome connection with 30s max time ([#207](https://github.com/agentuity/cli/pull/207))
+
 ## [v0.0.97] - 2025-04-17
 
 ### Fixed
@@ -321,6 +326,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.98]: https://github.com/agentuity/cli/compare/v0.0.97...v0.0.98
 [v0.0.97]: https://github.com/agentuity/cli/compare/v0.0.96...v0.0.97
 [v0.0.96]: https://github.com/agentuity/cli/compare/v0.0.95...v0.0.96
 [v0.0.95]: https://github.com/agentuity/cli/compare/v0.0.94...v0.0.95
