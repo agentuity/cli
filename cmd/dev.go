@@ -34,7 +34,6 @@ automatically rebuilds your project when changes are detected.
 
 Flags:
   --dir            The directory to run the development server in
-  --websocket-id   The websocket room ID to use for the development agent
 
 Examples:
   agentuity dev
