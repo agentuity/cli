@@ -67,6 +67,26 @@ var (
 			Foreground(lipgloss.AdaptiveColor{Light: "#00875F", Dark: "#00FF00"}).
 			MarginTop(1)
 
+	overlayStyle = lipgloss.NewStyle().
+			Background(lipgloss.AdaptiveColor{Light: "0", Dark: "0"}).
+			Width(width).
+			Height(1)
+
+	modalStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.AdaptiveColor{Light: "#D70000", Dark: "#FF0000"}).
+			Background(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#1A1A1A"}).
+			Foreground(lipgloss.AdaptiveColor{Light: "#000000", Dark: "#FFFFFF"}).
+			Padding(1, 2).
+			Width(50).
+			Align(lipgloss.Left)
+
+	modalTitleStyle = lipgloss.NewStyle().
+			Background(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#1A1A1A"}).
+			Foreground(lipgloss.AdaptiveColor{Light: "#000000", Dark: "#FFFFFF"}).
+			Width(46).
+			Align(lipgloss.Left)
+
 	contentStyle = lipgloss.NewStyle().
 			Border(lipgloss.HiddenBorder()).
 			BorderForeground(lipgloss.AdaptiveColor{Light: "#666666", Dark: "#626262"}).
@@ -150,11 +170,11 @@ func (f *ProjectForm) CheckDependencies(template *templates.Template) error {
 
 	if len(missing) > 0 {
 		var sb strings.Builder
-		sb.WriteString("missing required dependencies:\n")
+		sb.WriteString("missing required dependencies:\n\n")
 		for _, dep := range missing {
 			sb.WriteString(fmt.Sprintf("• %s (version %s)\n", dep.Command, dep.Version))
 			if dep.URL != "" {
-				sb.WriteString(fmt.Sprintf("  Installation instructions: %s\n", dep.URL))
+				sb.WriteString(fmt.Sprintf("\nInstallation instructions:\n\n%s\n", dep.URL))
 			}
 		}
 		return fmt.Errorf("%s", sb.String())
@@ -194,6 +214,7 @@ type projectFormModel struct {
 	depsError       string
 	form            ProjectForm
 	quit            bool
+	showErrorModal  bool
 	// New fields for scrolling
 	viewport      viewport.Model
 	scrollOffset  int
@@ -339,7 +360,8 @@ func initialProjectModel(initialForm ProjectForm) projectFormModel {
 		checkingDeps:   false,
 		depsError:      "",
 		form:           initialForm,
-		itemHeight:     4, // Each item takes about 4 lines with spacing
+		showErrorModal: false,
+		itemHeight:     4,
 		ready:          false,
 	}
 
@@ -546,6 +568,14 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyMsg:
+		// Handle error modal dismissal first
+		if m.showErrorModal && (msg.Type == tea.KeyEnter || msg.Type == tea.KeyEscape) {
+			m.showErrorModal = false
+			m.depsError = ""
+			m.validationError = ""
+			return m, nil
+		}
+
 		switch msg.String() {
 		case "ctrl+c":
 			m.quit = true
@@ -905,6 +935,11 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	}
 
+	// Update error modal state
+	if m.depsError != "" || m.validationError != "" {
+		m.showErrorModal = true
+	}
+
 	return m, tea.Batch(cmds...)
 }
 
@@ -1031,7 +1066,63 @@ func (m *projectFormModel) updateCursorFromScroll() {
 func (m projectFormModel) View() string {
 	var s strings.Builder
 
-	// Fixed title bar - Always rendered first and never included in scrollable content
+	// If error modal is shown, render it over the main content
+	if m.showErrorModal {
+		// Get the error message
+		errorMsg := ""
+		if m.depsError != "" {
+			errorMsg = m.depsError
+		} else if m.validationError != "" {
+			errorMsg = m.validationError
+		}
+
+		// Format the error message with proper line breaks and indentation
+		lines := strings.Split(errorMsg, "\n")
+		var formattedMsg strings.Builder
+
+		formattedMsg.WriteString("Error\n\n")
+
+		for _, line := range lines {
+			formattedMsg.WriteString(line + "\n")
+		}
+
+		// Add a note about how to dismiss the modal
+		formattedMsg.WriteString("\nPress Enter to continue")
+
+		// Create the modal content
+		modalContent := modalStyle.Render(strings.TrimRight(formattedMsg.String(), "\n"))
+		modalHeight := strings.Count(modalContent, "\n") + 1
+		modalWidth := lipgloss.Width(modalContent)
+
+		// Calculate position to center the modal
+		leftPadding := (m.width - modalWidth) / 2
+		if leftPadding < 0 {
+			leftPadding = 0
+		}
+		topPadding := (m.height - modalHeight) / 2
+		if topPadding < 0 {
+			topPadding = 0
+		}
+
+		// Create a full-screen overlay with the modal centered
+		var overlay strings.Builder
+
+		// Add top padding
+		for i := 0; i < topPadding; i++ {
+			overlay.WriteString(strings.Repeat(" ", m.width) + "\n")
+		}
+
+		// Add the modal with horizontal centering
+		modalLines := strings.Split(modalContent, "\n")
+		for _, line := range modalLines {
+			overlay.WriteString(strings.Repeat(" ", leftPadding) + line + "\n")
+		}
+
+		// Return just the overlay when showing error
+		return overlay.String()
+	}
+
+	// Regular view rendering
 	s.WriteString(titleStyle.Render("⨺ Create New Agentuity Project"))
 	s.WriteString("\n")
 
@@ -1126,8 +1217,6 @@ func (m projectFormModel) View() string {
 		if m.step == 0 {
 			if m.checkingDeps {
 				content.WriteString("\n" + descriptionStyle.UnsetWidth().UnsetPaddingLeft().UnsetMarginLeft().MarginTop(1).Render(m.spinner.View()+" checking dependencies..."))
-			} else if m.depsError != "" {
-				content.WriteString("\n" + errorStyle.Render(m.depsError))
 			}
 		}
 
@@ -1142,8 +1231,6 @@ func (m projectFormModel) View() string {
 		content.WriteString(m.projectName.View() + "\n")
 		if m.checkingName {
 			content.WriteString(descriptionStyle.UnsetWidth().UnsetPaddingLeft().UnsetMarginLeft().MarginTop(1).Render(m.spinner.View() + " checking availability"))
-		} else if m.validationError != "" {
-			content.WriteString(errorStyle.Render(m.validationError))
 		} else if m.nameValidated {
 			content.WriteString(successStyle.Render("✓ name is available"))
 		} else {
