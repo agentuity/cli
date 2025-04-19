@@ -15,7 +15,9 @@ import (
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
 	cstr "github.com/agentuity/go-common/string"
+	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	yc "github.com/zijiren233/yaml-comment"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -572,8 +574,17 @@ func ResolveProjectDir(logger logger.Logger, cmd *cobra.Command, required bool) 
 			errsystem.WithUserMessage(fmt.Sprintf("Failed to get absolute path: %s", err))).ShowErrorAndExit()
 	}
 	if !ProjectExists(abs) && required {
-		logger.Fatal("Project file not found: %s", filepath.Join(abs, "agentuity.yaml"))
+		dir = viper.GetString("preferences.project_dir")
+		if ProjectExists(dir) {
+			tui.ShowWarning("Using your last used project directory. You should change into the correct directory or use the --dir flag.")
+			return dir
+		}
+		tui.ShowBanner("Agentuity Project Not Found", "No Agentuity project file not found in the directory "+abs+"\n\nMake sure you are in an Agentuity project directory or use the --dir flag to specify a project directory.", false)
+		os.Exit(1)
 	}
+	// if we are successful, set the project dir in the config
+	viper.Set("preferences.project_dir", abs)
+	viper.WriteConfig()
 	return abs
 }
 

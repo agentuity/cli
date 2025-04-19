@@ -546,6 +546,7 @@ Examples:
 			// remember our choices
 			viper.Set("preferences.provider", provider.Identifier)
 			viper.Set("preferences.template", templateName)
+			viper.Set("preferences.project_dir", projectDir)
 			viper.WriteConfig()
 
 		})
