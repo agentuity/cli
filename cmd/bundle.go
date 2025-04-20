@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/agentuity/cli/internal/bundler"
@@ -33,17 +35,21 @@ Examples:
 	Hidden:  true,
 	Run: func(cmd *cobra.Command, args []string) {
 		started := time.Now()
-		projectContext := project.EnsureProject(cmd)
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		projectContext := project.EnsureProject(ctx, cmd)
 		production, _ := cmd.Flags().GetBool("production")
 		install, _ := cmd.Flags().GetBool("install")
 		deploy, _ := cmd.Flags().GetBool("deploy")
+		ci, _ := cmd.Flags().GetBool("ci")
 
 		if err := bundler.Bundle(bundler.BundleContext{
-			Context:    context.Background(),
+			Context:    ctx,
 			Logger:     projectContext.Logger,
 			ProjectDir: projectContext.Dir,
 			Production: production,
 			Install:    install,
+			CI:         ci,
 		}); err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to bundle project")).ShowErrorAndExit()
 		}
@@ -76,7 +82,7 @@ Examples:
 			if err != nil {
 				projectContext.Logger.Fatal("Failed to get current working directory: %s", err)
 			}
-			c := exec.Command(bin, args...)
+			c := exec.CommandContext(ctx, bin, args...)
 			util.ProcessSetup(c)
 			c.Dir = cwd
 			c.Stdin = nil

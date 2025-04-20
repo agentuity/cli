@@ -185,7 +185,7 @@ function Get-LatestReleaseVersion {
             return $env:AGENTUITY_TEST_VERSION
         }
         
-        $releaseUrl = "https://api.github.com/repos/agentuity/cli/releases/latest"
+        $releaseUrl = "https://agentuity.sh/release/cli"
         $response = Invoke-RestMethod -Uri $releaseUrl -Headers $headers -Method Get
         
         if ($null -eq $response.tag_name) {

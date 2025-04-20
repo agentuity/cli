@@ -3,6 +3,7 @@ package deployer
 import (
 	"os"
 	"runtime"
+	"strings"
 
 	"github.com/go-git/go-git/v5"
 )
@@ -65,6 +66,14 @@ func GetGitInfo(dir string) (*GitInfo, error) {
 	remote, err := repo.Remote("origin")
 	if err == nil {
 		info.RemoteURL = remote.Config().URLs[0]
+		// re-write the github url to be https so they display correctly in the UI
+		// git@github.com:agentuity/agent-changelog.git
+		if strings.HasPrefix(info.RemoteURL, "git@github.com:") {
+			info.RemoteURL = strings.Replace(info.RemoteURL, "git@github.com:", "https://github.com/", 1)
+			if strings.HasSuffix(info.RemoteURL, ".git") {
+				info.RemoteURL = strings.TrimSuffix(info.RemoteURL, ".git")
+			}
+		}
 	}
 
 	// Get current branch and commit

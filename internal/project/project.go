@@ -14,7 +14,10 @@ import (
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	cstr "github.com/agentuity/go-common/string"
+	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	yc "github.com/zijiren233/yaml-comment"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -44,7 +47,7 @@ type ProjectData struct {
 	Env              map[string]string `json:"env"`
 	Secrets          map[string]string `json:"secrets"`
 	WebhookAuthToken string            `json:"webhookAuthToken,omitempty"`
-	AgentID          string            `json:"agentId"`
+	Agents           []AgentConfig     `json:"agents"`
 }
 
 type InitProjectArgs struct {
@@ -56,23 +59,29 @@ type InitProjectArgs struct {
 	Name              string
 	Description       string
 	EnableWebhookAuth bool
-	AgentName         string
-	AgentDescription  string
-	AgentID           string
+	Agents            []AgentConfig
 }
 
 // InitProject will create a new project in the organization.
 // It will return the API key and project ID if the project is initialized successfully.
 func InitProject(ctx context.Context, logger logger.Logger, args InitProjectArgs) (*ProjectData, error) {
 
+	agents := make([]map[string]any, 0)
+	for _, agent := range args.Agents {
+		agents = append(agents, map[string]any{
+			"name":        agent.Name,
+			"description": agent.Description,
+		})
+	}
 	payload := map[string]any{
 		"organization_id":   args.OrgId,
 		"provider":          args.Provider,
 		"name":              args.Name,
 		"description":       args.Description,
 		"enableWebhookAuth": args.EnableWebhookAuth,
-		"agent":             map[string]string{"name": args.AgentName, "description": args.AgentDescription},
+		"agents":            agents,
 	}
+	logger.Trace("sending new project payload: %s", cstr.JSONStringify(payload))
 
 	client := util.NewAPIClient(ctx, logger, args.BaseURL, args.Token)
 
@@ -478,16 +487,16 @@ func LoadProject(logger logger.Logger, dir string, apiUrl string, appUrl string,
 	}
 }
 
-func EnsureProject(cmd *cobra.Command) ProjectContext {
+func EnsureProject(ctx context.Context, cmd *cobra.Command) ProjectContext {
 	logger := env.NewLogger(cmd)
 	dir := ResolveProjectDir(logger, cmd, true)
 	apiUrl, appUrl, transportUrl := util.GetURLs(logger)
 	var token string
 	// if the --api-key flag is used, we only need to verify the api key
 	if cmd.Flags().Changed("api-key") {
-		token = util.EnsureLoggedInWithOnlyAPIKey()
+		token = util.EnsureLoggedInWithOnlyAPIKey(ctx, logger, cmd)
 	} else {
-		token, _ = util.EnsureLoggedIn()
+		token, _ = util.EnsureLoggedIn(ctx, logger, cmd)
 	}
 	p := LoadProject(logger, dir, apiUrl, appUrl, transportUrl, token)
 	if !p.NewProject && Version != "" && Version != "dev" && p.Project.Version != "" {
@@ -504,14 +513,14 @@ func EnsureProject(cmd *cobra.Command) ProjectContext {
 	return p
 }
 
-func TryProject(cmd *cobra.Command) ProjectContext {
+func TryProject(ctx context.Context, cmd *cobra.Command) ProjectContext {
 	logger := env.NewLogger(cmd)
 	dir := ResolveProjectDir(logger, cmd, false)
 	apiUrl, appUrl, transportUrl := util.GetURLs(logger)
 	var token string
 	// if the --api-key flag is used, we only need to verify the api key
 	if cmd.Flags().Changed("api-key") {
-		token = util.EnsureLoggedInWithOnlyAPIKey()
+		token = util.EnsureLoggedInWithOnlyAPIKey(ctx, logger, cmd)
 	} else {
 		apikey, _, ok := util.TryLoggedIn()
 		if ok {
@@ -565,8 +574,17 @@ func ResolveProjectDir(logger logger.Logger, cmd *cobra.Command, required bool) 
 			errsystem.WithUserMessage(fmt.Sprintf("Failed to get absolute path: %s", err))).ShowErrorAndExit()
 	}
 	if !ProjectExists(abs) && required {
-		logger.Fatal("Project file not found: %s", filepath.Join(abs, "agentuity.yaml"))
+		dir = viper.GetString("preferences.project_dir")
+		if ProjectExists(dir) {
+			tui.ShowWarning("Using your last used project directory. You should change into the correct directory or use the --dir flag.")
+			return dir
+		}
+		tui.ShowBanner("Agentuity Project Not Found", "No Agentuity project file not found in the directory "+abs+"\n\nMake sure you are in an Agentuity project directory or use the --dir flag to specify a project directory.", false)
+		os.Exit(1)
 	}
+	// if we are successful, set the project dir in the config
+	viper.Set("preferences.project_dir", abs)
+	viper.WriteConfig()
 	return abs
 }
 

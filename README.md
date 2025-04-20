@@ -18,7 +18,7 @@ The command line tools for the Agentuity Agent Cloud Platform.  These tools are 
 You can install the CLI using the install script:
 
 ```bash
-curl -fsSL https://agentuity.sh/install.sh | sh
+curl -fsSL https://agentuity.sh/install.sh | bash
 ```
 
 If you are on a Mac, you can install the CLI using Homebrew:
@@ -26,6 +26,8 @@ If you are on a Mac, you can install the CLI using Homebrew:
 ```bash
  brew install agentuity/tap/agentuity
 ```
+
+Note: The install script will automatically use Homebrew if it is available.
 
 For Windows, you can install the CLI using the install script:
 
@@ -42,6 +44,25 @@ If you have already installed the CLI, you can upgrade to the latest version usi
 ```bash
 agentuity upgrade
 ```
+
+You can check the current version with:
+
+```bash
+agentuity version
+```
+
+You can check if there is a newer version:
+
+```bash
+agentuity version check
+```
+
+Use the `--upgrade` flag to automatically upgrade if a newer version is found:
+
+```bash
+agentuity version check --upgrade
+```
+
 
 ## Usage
 

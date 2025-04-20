@@ -118,7 +118,7 @@ done
 
 if [[ ! -d "$INSTALL_PATH" ]]; then
   ohai "Creating install directory: $INSTALL_PATH"
-  mkdir -p "$INSTALL_PATH" || abort "Failed to create directory: $INSTALL_PATH"
+  mkdir -p "$INSTALL_PATH" 2>/dev/null || true  # Don't abort if mkdir fails
 fi
 
 if [[ "$OS" == "Darwin" ]] && command -v brew >/dev/null 2>&1 && [[ "$NO_BREW" != "true" ]]; then
@@ -147,12 +147,8 @@ if [[ "$OS" == "Darwin" ]] && command -v brew >/dev/null 2>&1 && [[ "$NO_BREW" !
   fi
 fi
 
-if [[ ! -d "$INSTALL_PATH" ]]; then
-  ohai "Creating install directory: $INSTALL_PATH"
-  mkdir -p "$INSTALL_PATH" || abort "Failed to create directory: $INSTALL_PATH. Try running with sudo or specify a different directory with --dir."
-fi
 
-if [[ ! -w "$INSTALL_PATH" ]]; then
+if [[ ! -d "$INSTALL_PATH" ]] || [[ ! -w "$INSTALL_PATH" ]]; then
   if [[ "$INSTALL_PATH" == "/usr/local/bin" ]]; then
     ohai "No write permission to $INSTALL_PATH. Trying alternative locations..."
     
@@ -167,7 +163,7 @@ if [[ ! -w "$INSTALL_PATH" ]]; then
         INSTALL_PATH="$HOME/bin"
       fi
     else
-      abort "No write permission to $INSTALL_PATH. Try running with sudo or specify a different directory with --dir."
+      abort "Could not find or create a writable installation directory. Try running with sudo or specify a different directory with --dir."
     fi
   else
     abort "No write permission to $INSTALL_PATH. Try running with sudo or specify a different directory with --dir."
@@ -182,7 +178,7 @@ trap cleanup EXIT
 
 if [[ "$VERSION" == "latest" ]]; then
   ohai "Fetching latest release information..."
-  RELEASE_URL="https://api.github.com/repos/agentuity/cli/releases/latest"
+  RELEASE_URL="https://agentuity.sh/release/cli"
   VERSION=$(curl -s $RELEASE_URL | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
   if [[ -z "$VERSION" ]]; then
     abort "Failed to fetch latest version information"
@@ -286,6 +282,10 @@ fi
 
 ohai "Installing to $INSTALL_PATH..."
 if [[ -f "$TMP_DIR/agentuity" ]]; then
+  if [[ "$OS" == "Darwin" ]] && [[ -f "$INSTALL_PATH/agentuity" ]]; then
+    ohai "Removing existing binary to avoid macOS quarantine issues..."
+    rm -f "$INSTALL_PATH/agentuity" || abort "Failed to remove existing binary from $INSTALL_PATH"
+  fi
   cp "$TMP_DIR/agentuity" "$INSTALL_PATH/" || abort "Failed to copy binary to $INSTALL_PATH"
   chmod +x "$INSTALL_PATH/agentuity" || abort "Failed to make binary executable"
 else

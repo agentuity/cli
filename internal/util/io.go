@@ -189,10 +189,25 @@ func ReadFileLines(filename string, startLine, endLine int) ([]string, error) {
 }
 
 func GetRelativePath(basePath, absolutePath string) string {
+	if isDifferentWindowsDrives(basePath, absolutePath) {
+		return filepath.ToSlash(absolutePath)
+	}
+
 	rel, err := filepath.Rel(basePath, absolutePath)
 	if err != nil {
 		return absolutePath
 	}
 	rel = filepath.ToSlash(rel)
 	return rel
+}
+
+func isDifferentWindowsDrives(path1, path2 string) bool {
+	isDrive1 := len(path1) >= 2 && path1[1] == ':' && ((path1[0] >= 'A' && path1[0] <= 'Z') || (path1[0] >= 'a' && path1[0] <= 'z'))
+	isDrive2 := len(path2) >= 2 && path2[1] == ':' && ((path2[0] >= 'A' && path2[0] <= 'Z') || (path2[0] >= 'a' && path2[0] <= 'z'))
+
+	if isDrive1 && isDrive2 && (path1[0] != path2[0]) {
+		return true
+	}
+
+	return false
 }
