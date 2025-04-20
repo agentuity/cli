@@ -242,7 +242,7 @@ func loadTemplates(reader io.Reader) (Templates, error) {
 }
 
 const githubTemplatesLatest = "https://agentuity.sh/templates.zip"
-const markerFileName = ".marker"
+const markerFileName = ".marker-v1"
 
 func unzip(src, dest string) error {
 	r, err := zip.OpenReader(src)
