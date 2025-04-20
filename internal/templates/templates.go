@@ -288,17 +288,19 @@ func unzip(src, dest string) error {
 			continue
 		}
 
-		rc, err := f.Open()
-		if err != nil {
-			return err
-		}
-		defer rc.Close()
+		err := func() error {
+			rc, err := f.Open()
+			if err != nil {
+				return err
+			}
+			defer rc.Close()
 
-		fpath := filepath.Join(dest, strings.Replace(f.Name, rootDir, "", 1))
+			fpath := filepath.Join(dest, strings.Replace(f.Name, rootDir, "", 1))
 
-		if f.FileInfo().IsDir() {
-			os.MkdirAll(fpath, os.ModePerm)
-		} else {
+			if f.FileInfo().IsDir() {
+				return os.MkdirAll(fpath, os.ModePerm)
+			}
+
 			var fdir string
 			if lastIndex := strings.LastIndex(fpath, string(os.PathSeparator)); lastIndex > -1 {
 				fdir = fpath[:lastIndex]
@@ -308,17 +310,20 @@ func unzip(src, dest string) error {
 			if err != nil {
 				return err
 			}
-			f, err := os.OpenFile(
+
+			outFile, err := os.OpenFile(
 				fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
 			if err != nil {
 				return err
 			}
-			defer f.Close()
+			defer outFile.Close()
 
-			_, err = io.Copy(f, rc)
-			if err != nil {
-				return err
-			}
+			_, err = io.Copy(outFile, rc)
+			return err
+		}()
+
+		if err != nil {
+			return err
 		}
 	}
 	return nil
