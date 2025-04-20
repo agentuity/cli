@@ -298,7 +298,10 @@ func unzip(src, dest string) error {
 			fpath := filepath.Join(dest, strings.Replace(f.Name, rootDir, "", 1))
 
 			if f.FileInfo().IsDir() {
-				return os.MkdirAll(fpath, os.ModePerm)
+				if err := os.MkdirAll(fpath, os.ModePerm); err != nil {
+					return err
+				}
+				return nil
 			}
 
 			var fdir string
@@ -306,8 +309,7 @@ func unzip(src, dest string) error {
 				fdir = fpath[:lastIndex]
 			}
 
-			err = os.MkdirAll(fdir, os.ModePerm)
-			if err != nil {
+			if err := os.MkdirAll(fdir, os.ModePerm); err != nil {
 				return err
 			}
 
@@ -319,7 +321,10 @@ func unzip(src, dest string) error {
 			defer outFile.Close()
 
 			_, err = io.Copy(outFile, rc)
-			return err
+			if err != nil {
+				return err
+			}
+			return nil
 		}()
 
 		if err != nil {
