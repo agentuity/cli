@@ -242,7 +242,7 @@ func loadTemplates(reader io.Reader) (Templates, error) {
 }
 
 const githubTemplatesLatest = "https://agentuity.sh/templates.zip"
-const markerFileName = ".marker"
+const markerFileName = ".marker-v1"
 
 func unzip(src, dest string) error {
 	r, err := zip.OpenReader(src)
@@ -269,37 +269,49 @@ func unzip(src, dest string) error {
 			continue
 		}
 
-		rc, err := f.Open()
-		if err != nil {
-			return err
-		}
-		defer rc.Close()
-
 		fpath := filepath.Join(dest, strings.Replace(f.Name, rootDir, "", 1))
 
 		if f.FileInfo().IsDir() {
-			os.MkdirAll(fpath, os.ModePerm)
-		} else {
-			var fdir string
-			if lastIndex := strings.LastIndex(fpath, string(os.PathSeparator)); lastIndex > -1 {
-				fdir = fpath[:lastIndex]
+			if err := os.MkdirAll(fpath, os.ModePerm); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", fpath, err)
 			}
+			continue
+		}
 
-			err = os.MkdirAll(fdir, os.ModePerm)
-			if err != nil {
-				return err
-			}
-			f, err := os.OpenFile(
-				fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-			if err != nil {
-				return err
-			}
-			defer f.Close()
+		var fdir string
+		if lastIndex := strings.LastIndex(fpath, string(os.PathSeparator)); lastIndex > -1 {
+			fdir = fpath[:lastIndex]
+		}
 
-			_, err = io.Copy(f, rc)
-			if err != nil {
-				return err
-			}
+		if err := os.MkdirAll(fdir, os.ModePerm); err != nil {
+			return fmt.Errorf("failed to create directory %s: %w", fdir, err)
+		}
+
+		rc, err := f.Open()
+		if err != nil {
+			return fmt.Errorf("failed to open file from zip %s: %w", f.Name, err)
+		}
+
+		outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		if err != nil {
+			rc.Close() // Close the zip file before returning
+			return fmt.Errorf("failed to create output file %s: %w", fpath, err)
+		}
+
+		_, err = io.Copy(outFile, rc)
+
+		closeErr1 := outFile.Close()
+		closeErr2 := rc.Close()
+
+		if err != nil {
+			return fmt.Errorf("failed to copy content to %s: %w", fpath, err)
+		}
+
+		if closeErr1 != nil {
+			return fmt.Errorf("failed to close output file %s: %w", fpath, closeErr1)
+		}
+		if closeErr2 != nil {
+			return fmt.Errorf("failed to close zip file %s: %w", f.Name, closeErr2)
 		}
 	}
 	return nil
