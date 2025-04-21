@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.102] - 2025-04-21
+
+### Fixed
+- Don't fail if MCP detection fails for any reason on create project ([#216](https://github.com/agentuity/cli/pull/216))
+
 ## [v0.0.100] - 2025-04-19
 
 ### Changed
@@ -340,6 +345,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.102]: https://github.com/agentuity/cli/compare/v0.0.101...v0.0.102
 [v0.0.100]: https://github.com/agentuity/cli/compare/v0.0.99...v0.0.100
 [v0.0.99]: https://github.com/agentuity/cli/compare/v0.0.98...v0.0.99
 [v0.0.98]: https://github.com/agentuity/cli/compare/v0.0.97...v0.0.98
