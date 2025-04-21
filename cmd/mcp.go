@@ -94,7 +94,7 @@ Examples:
   agentuity mcp list`,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		detected, err := mcp.Detect(true)
+		detected, err := mcp.Detect(logger, true)
 		if err != nil {
 			logger.Fatal("%s", err)
 		}

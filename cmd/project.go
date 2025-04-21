@@ -283,9 +283,9 @@ Examples:
 
 		if tui.HasTTY {
 			// handle MCP server installation
-			detected, err := mcp.Detect(true)
+			detected, err := mcp.Detect(logger, true)
 			if err != nil {
-				logger.Fatal("%s", err)
+				logger.Error("failed to detect MCP clients: %s", err)
 			}
 			if len(detected) > 0 {
 				var clients []string
