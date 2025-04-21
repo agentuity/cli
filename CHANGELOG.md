@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Don't fail if MCP detection fails for any reason on create project ([#216](https://github.com/agentuity/cli/pull/216))
 
+## [v0.0.101] - 2025-04-19
+
+### Fixed
+- Fix unzip function to properly close file handles ([#215](https://github.com/agentuity/cli/pull/215))
+
 ## [v0.0.100] - 2025-04-19
 
 ### Changed
@@ -346,6 +351,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks for new agent creation
 
 [v0.0.102]: https://github.com/agentuity/cli/compare/v0.0.101...v0.0.102
+[v0.0.101]: https://github.com/agentuity/cli/compare/v0.0.100...v0.0.101
 [v0.0.100]: https://github.com/agentuity/cli/compare/v0.0.99...v0.0.100
 [v0.0.99]: https://github.com/agentuity/cli/compare/v0.0.98...v0.0.99
 [v0.0.98]: https://github.com/agentuity/cli/compare/v0.0.97...v0.0.98
