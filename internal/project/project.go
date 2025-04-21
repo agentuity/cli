@@ -99,8 +99,7 @@ func getFilename(dir string) string {
 
 func ProjectExists(dir string) bool {
 	fn := getFilename(dir)
-	_, err := os.Stat(fn)
-	return err == nil
+	return util.Exists(fn)
 }
 
 type Resources struct {
@@ -151,16 +150,16 @@ type Project struct {
 // Load will load the project from a file in the given directory.
 func (p *Project) Load(dir string) error {
 	fn := getFilename(dir)
-	if _, err := os.Stat(fn); os.IsNotExist(err) {
+	if !util.Exists(fn) {
 		return nil
 	}
 	of, err := os.Open(fn)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open project file: %s. %w", fn, err)
 	}
 	defer of.Close()
 	if err := yaml.NewDecoder(of).Decode(p); err != nil {
-		return err
+		return fmt.Errorf("failed to decode YAML project file: %s. %w", fn, err)
 	}
 	if p.ProjectId == "" {
 		return ErrProjectMissingProjectId
@@ -582,9 +581,11 @@ func ResolveProjectDir(logger logger.Logger, cmd *cobra.Command, required bool) 
 		tui.ShowBanner("Agentuity Project Not Found", "No Agentuity project file not found in the directory "+abs+"\n\nMake sure you are in an Agentuity project directory or use the --dir flag to specify a project directory.", false)
 		os.Exit(1)
 	}
-	// if we are successful, set the project dir in the config
-	viper.Set("preferences.project_dir", abs)
-	viper.WriteConfig()
+	if ProjectExists(abs) {
+		// if we are successful, set the project dir in the config
+		viper.Set("preferences.project_dir", abs)
+		viper.WriteConfig()
+	}
 	return abs
 }
 

@@ -235,7 +235,10 @@ func getAgents(theproject *project.Project, filename string) []AgentConfig {
 func Bundle(ctx BundleContext) error {
 	theproject := project.NewProject()
 	if err := theproject.Load(ctx.ProjectDir); err != nil {
-		return err
+		return fmt.Errorf("failed to load project from %s: %w", ctx.ProjectDir, err)
+	}
+	if theproject.ProjectId == "" {
+		return fmt.Errorf("project in the directory %s is not a valid agentuity project", ctx.ProjectDir)
 	}
 	dir := ctx.ProjectDir
 	outdir := filepath.Join(dir, ".agentuity")
