@@ -99,8 +99,7 @@ func getFilename(dir string) string {
 
 func ProjectExists(dir string) bool {
 	fn := getFilename(dir)
-	_, err := os.Stat(fn)
-	return err == nil
+	return util.Exists(fn)
 }
 
 type Resources struct {
@@ -582,9 +581,11 @@ func ResolveProjectDir(logger logger.Logger, cmd *cobra.Command, required bool) 
 		tui.ShowBanner("Agentuity Project Not Found", "No Agentuity project file not found in the directory "+abs+"\n\nMake sure you are in an Agentuity project directory or use the --dir flag to specify a project directory.", false)
 		os.Exit(1)
 	}
-	// if we are successful, set the project dir in the config
-	viper.Set("preferences.project_dir", abs)
-	viper.WriteConfig()
+	if ProjectExists(abs) {
+		// if we are successful, set the project dir in the config
+		viper.Set("preferences.project_dir", abs)
+		viper.WriteConfig()
+	}
 	return abs
 }
 
