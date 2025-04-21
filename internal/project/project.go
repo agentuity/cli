@@ -151,16 +151,16 @@ type Project struct {
 // Load will load the project from a file in the given directory.
 func (p *Project) Load(dir string) error {
 	fn := getFilename(dir)
-	if _, err := os.Stat(fn); os.IsNotExist(err) {
+	if !util.Exists(fn) {
 		return nil
 	}
 	of, err := os.Open(fn)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open project file: %s. %w", fn, err)
 	}
 	defer of.Close()
 	if err := yaml.NewDecoder(of).Decode(p); err != nil {
-		return err
+		return fmt.Errorf("failed to decode YAML project file: %s. %w", fn, err)
 	}
 	if p.ProjectId == "" {
 		return ErrProjectMissingProjectId
