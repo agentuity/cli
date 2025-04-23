@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.103] - 2025-04-23
+
+### Fixed
+- Fix dev mode for new sdk ([#219](https://github.com/agentuity/cli/pull/219))
+- A better error messages when trying to load a project ([#218](https://github.com/agentuity/cli/pull/218))
+
 ## [v0.0.102] - 2025-04-21
 
 ### Fixed
