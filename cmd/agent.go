@@ -345,6 +345,8 @@ type agentListState struct {
 	Filename    string       `json:"filename"`
 	FoundLocal  bool         `json:"foundLocal"`
 	FoundRemote bool         `json:"foundRemote"`
+	Rename      bool         `json:"rename"`
+	RenameFrom  string       `json:"renameFrom"`
 }
 
 func getAgentList(logger logger.Logger, apiUrl string, apikey string, project project.ProjectContext) ([]agent.Agent, error) {
@@ -381,8 +383,10 @@ func reconcileAgentList(logger logger.Logger, cmd *cobra.Command, apiUrl string,
 
 	// make a map of the agents in the agentuity config file
 	fileAgents := make(map[string]project.AgentConfig)
+	fileAgentsByID := make(map[string]project.AgentConfig)
 	for _, agent := range theproject.Project.Agents {
 		fileAgents[normalAgentName(agent.Name)] = agent
+		fileAgentsByID[agent.ID] = agent
 	}
 
 	agentFilename := rules.Filename
@@ -405,6 +409,29 @@ func reconcileAgentList(logger logger.Logger, cmd *cobra.Command, apiUrl string,
 	for _, filename := range localAgents {
 		agentName := filepath.Base(filepath.Dir(filename))
 		key := normalAgentName(agentName)
+		var found bool
+		for _, agent := range remoteAgents {
+			if localAgent, ok := fileAgentsByID[agent.ID]; ok {
+				if localAgent.Name == agentName {
+					oldkey := normalAgentName(agent.Name)
+					agent.Name = localAgent.Name
+					state[key] = agentListState{
+						Agent:       &agent,
+						Filename:    filename,
+						FoundLocal:  true,
+						FoundRemote: true,
+						Rename:      true,
+						RenameFrom:  oldkey,
+					}
+					delete(state, oldkey)
+					found = true
+					break
+				}
+			}
+		}
+		if found {
+			continue
+		}
 		if filepath.Base(filename) == agentFilename {
 			if found, ok := state[key]; ok {
 				state[key] = agentListState{
@@ -474,6 +501,9 @@ func buildAgentTree(keys []string, state map[string]agentListState, project proj
 				desc = emptyProjectDescription
 			}
 			sublabels = append(sublabels, tui.Muted("Description: ")+tui.Secondary(desc))
+			if st.Rename {
+				label += " " + tui.Warning("⚠ Renaming from "+st.RenameFrom)
+			}
 		} else if st.FoundLocal {
 			sublabels = append(sublabels, tui.Warning("⚠ Agent found local but not remotely"))
 			localIssues++
