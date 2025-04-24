@@ -556,7 +556,7 @@ func ResolveProjectDir(logger logger.Logger, cmd *cobra.Command, required bool) 
 	cwd, err := os.Getwd()
 	if err != nil {
 		errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
-			errsystem.WithUserMessage(fmt.Sprintf("Failed to get current directory: %s", err))).ShowErrorAndExit()
+			errsystem.WithUserMessage("Failed to get current working directory: %s", err)).ShowErrorAndExit()
 	}
 	dir := cwd
 	dirFlag, _ := cmd.Flags().GetString("dir")
@@ -570,7 +570,7 @@ func ResolveProjectDir(logger logger.Logger, cmd *cobra.Command, required bool) 
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
-			errsystem.WithUserMessage(fmt.Sprintf("Failed to get absolute path: %s", err))).ShowErrorAndExit()
+			errsystem.WithUserMessage("Failed to get absolute path to %s: %s", dir, err)).ShowErrorAndExit()
 	}
 	if !ProjectExists(abs) && required {
 		dir = viper.GetString("preferences.project_dir")

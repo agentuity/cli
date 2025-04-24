@@ -67,9 +67,9 @@ func (e *errSystem) Error() string {
 }
 
 // WithUserMessage adds a user-friendly message to the error.
-func WithUserMessage(message string) option {
+func WithUserMessage(message string, args ...any) option {
 	return func(e *errSystem) {
-		e.message = message
+		e.message = fmt.Sprintf(message, args...)
 	}
 }
 
