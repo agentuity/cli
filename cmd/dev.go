@@ -64,7 +64,7 @@ Examples:
 
 		project, err := theproject.Project.GetProject(ctx, log, theproject.APIURL, apiKey)
 		if err != nil {
-			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithUserMessage("We failed to validate your project (%s) using the provided API key from the .env file in %s. This is most likely due to an invalid API key or this project has been deleted.", theproject.Project.ProjectId, dir), errsystem.WithContextMessage(fmt.Sprintf("Failed to get project: %s", err))).ShowErrorAndExit()
+			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithUserMessage("Failed to validate project (%s) using the provided API key from the .env file in %s. This is most likely due to the API key being invalid or the project has been deleted.", theproject.Project.ProjectId, dir), errsystem.WithContextMessage(fmt.Sprintf("Failed to get project: %s", err))).ShowErrorAndExit()
 		}
 
 		orgId := project.OrgId
