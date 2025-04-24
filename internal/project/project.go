@@ -257,11 +257,11 @@ type Response[T any] struct {
 
 type ProjectResponse = Response[ProjectData]
 
-func ProjectWithNameExists(ctx context.Context, logger logger.Logger, baseUrl string, token string, name string) (bool, error) {
+func ProjectWithNameExists(ctx context.Context, logger logger.Logger, baseUrl string, token string, orgId string, name string) (bool, error) {
 	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var resp Response[bool]
-	if err := client.Do("GET", fmt.Sprintf("/cli/project/exists/%s", url.PathEscape(name)), nil, &resp); err != nil {
+	if err := client.Do("GET", fmt.Sprintf("/cli/project/exists/%s?orgId=%s", url.PathEscape(name), url.PathEscape(orgId)), nil, &resp); err != nil {
 		var apiErr *util.APIError
 		if errors.As(err, &apiErr) {
 			if apiErr.Status == http.StatusConflict {

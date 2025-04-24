@@ -90,7 +90,7 @@ func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.
 	tui.WaitForAnyKey()
 	tui.ClearScreen()
 	orgId := promptForOrganization(ctx, logger, cmd, apiUrl, apikey)
-	name, description := promptForProjectDetail(ctx, logger, apiUrl, apikey, project.Name, project.Description)
+	name, description := promptForProjectDetail(ctx, logger, apiUrl, apikey, project.Name, project.Description, orgId)
 	project.Name = name
 	project.Description = description
 	var createWebhookAuth bool
