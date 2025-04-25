@@ -3,8 +3,8 @@ package bundler
 var jsheader = "/* DO NOT EDIT - GENERATED CODE */\n"
 
 var jsshim = `// Shim for dynamic requires of Node.js built-in modules
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
+import { createRequire as __agentuity_createRequire } from 'module';
+const require = __agentuity_createRequire(import.meta.url);
 
 // List of Node.js built-in modules that might be dynamically required
 const nodeBuiltins = [
