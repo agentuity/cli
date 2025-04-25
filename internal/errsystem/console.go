@@ -23,7 +23,7 @@ import (
 
 var Version string = "dev"
 
-const baseDocURL = "https://agentuity.dev/errors/%s"
+const baseDocURL = "https://agentuity.dev/Troubleshooting/error-codes/cli#%s"
 const discordURL = "https://discord.gg/vtn3hgUfuc"
 
 type crashReport struct {
@@ -94,6 +94,10 @@ func (e *errSystem) sendReport(filename string) {
 	}
 }
 
+func formatErrorAnchor(code errorType) string {
+	return strings.ToLower(code.Code) + "-" + strings.ReplaceAll(strings.ToLower(code.Message), " ", "-")
+}
+
 // ShowErrorAndExit shows an error message and exits the program.
 // If the program is running in a terminal, it will wait for a key press
 // and then upload the error report to the Agentuity team.
@@ -131,7 +135,7 @@ func (e *errSystem) ShowErrorAndExit() {
 	}
 	detail = append(detail, tui.Bold(tui.PadRight("Code:", 10, " "))+tui.Muted(e.code.Code))
 	detail = append(detail, tui.Bold(tui.PadRight("ID:", 10, " "))+tui.Muted(e.id))
-	detail = append(detail, tui.Bold(tui.PadRight("Doc:", 10, " "))+tui.Link(baseDocURL, e.code.Code))
+	detail = append(detail, tui.Bold(tui.PadRight("Doc:", 10, " "))+tui.Link(fmt.Sprintf(baseDocURL, formatErrorAnchor(e.code)), e.code.Code))
 	detail = append(detail, tui.Bold(tui.PadRight("Help:", 10, " "))+tui.Link(discordURL))
 	detail = append(detail, tui.Bold(tui.PadRight("", 10, " "))+tui.Link("support@agentuity.com"))
 	crashReportFile := e.writeCrashReportFile(stackTrace)
