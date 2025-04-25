@@ -5,6 +5,11 @@ var jsheader = "/* DO NOT EDIT - GENERATED CODE */\n"
 var jsshim = `// Shim for dynamic requires of Node.js built-in modules
 import { createRequire as __agentuity_createRequire } from 'module';
 const require = __agentuity_createRequire(import.meta.url);
+import { fileURLToPath as __agentuity_fileURLToPath } from 'url';
+import { dirname as __agentuity_dirname } from 'path';
+
+const __filename = __agentuity_fileURLToPath(import.meta.url);
+const __dirname = __agentuity_dirname(__filename);
 
 // List of Node.js built-in modules that might be dynamically required
 const nodeBuiltins = [
