@@ -537,30 +537,39 @@ func processInputMessage(plogger logger.Logger, c *Websocket, m []byte, port int
 		return
 	}
 
+	var inputPayload []byte
 	url := fmt.Sprintf("http://localhost:%d/%s", port, inputMsg.Payload.AgentID)
+	contentType := "application/json"
 
-	// make a json object with the payload
-	payload := map[string]any{
-		"contentType": inputMsg.Payload.ContentType,
-		"payload":     inputMsg.Payload.Payload,
-		"trigger":     "manual",
+	if !c.binaryProtocol {
+		// TODO: remove this once were all off the old protocol
+		// make a json object with the payload
+		payload := map[string]any{
+			"contentType": inputMsg.Payload.ContentType,
+			"payload":     inputMsg.Payload.Payload,
+			"trigger":     "manual",
+		}
+
+		var lerr error
+		inputPayload, lerr = json.Marshal(payload)
+		if lerr != nil {
+			logger.Error("failed to marshal payload: %s", lerr)
+			err = fmt.Errorf("failed to marshal payload: %w", lerr)
+			return
+		}
+	} else {
+		contentType = inputMsg.Payload.ContentType
+		inputPayload = inputMsg.Payload.Payload
 	}
+	logger.Debug("sending payload: %s to %s", string(inputPayload), url)
 
-	jsonPayload, lerr := json.Marshal(payload)
-	if lerr != nil {
-		logger.Error("failed to marshal payload: %s", lerr)
-		err = fmt.Errorf("failed to marshal payload: %w", lerr)
-		return
-	}
-	logger.Debug("sending payload: %s to %s", string(jsonPayload), url)
-
-	req, lerr := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonPayload))
+	req, lerr := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(inputPayload))
 	if lerr != nil {
 		logger.Error("failed to create request: %s", lerr)
 		err = fmt.Errorf("failed to create HTTP request: %w", lerr)
 		return
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("User-Agent", "Agentuity CLI/"+c.version)
 	propagator.Inject(ctx, propagation.HeaderCarrier(req.Header))
 
@@ -615,7 +624,6 @@ func processInputMessage(plogger logger.Logger, c *Websocket, m []byte, port int
 	logger.Debug("response: %s (status code: %d)", string(body), resp.StatusCode)
 
 	var trigger string
-	var contentType string
 	if c.binaryProtocol {
 		trigger = resp.Header.Get("x-agentuity-trigger")
 		contentType = resp.Header.Get("content-type")
