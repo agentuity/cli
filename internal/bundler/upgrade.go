@@ -11,8 +11,6 @@ import (
 	"github.com/agentuity/go-common/tui"
 )
 
-var jsSDKVersion = ">=0.0.106"
-
 type breakingChange struct {
 	Title   string
 	Message string
