@@ -19,18 +19,18 @@ type breakingChange struct {
 }
 
 var jsBreakingChanges = []breakingChange{
-	// {
-	// 	Runtime: "bunjs",
-	// 	Version: "<0.0.106",
-	// 	Title:   "🚫 JS SDK Breaking Change 🚫",
-	// 	Message: "The JS SDK type signatures for AgentRequest have changed to be async functions. Please see the v0.0.106 Changelog for how to update your code.\n\n" + tui.Link("https://agentuity.dev/Changelog/sdk-js#v00106") + "\n\nPlease bun upgrade @agentuity/sdk, fix your types and ensure your code passes type checking and then re-run this command again.",
-	// },
-	// {
-	// 	Runtime: "nodejs",
-	// 	Version: "<0.0.106",
-	// 	Title:   "🚫 JS SDK Breaking Change 🚫",
-	// 	Message: "The JS SDK type signatures for AgentRequest have changed to be async functions. Please see the v0.0.106 Changelog for how to update your code.\n\n" + tui.Link("https://agentuity.dev/Changelog/sdk-js#v00106") + "\n\nPlease npm upgrade @agentuity/sdk, fix your types and ensure your code passes type checking and then re-run this command again.",
-	// },
+	{
+		Runtime: "bunjs",
+		Version: "<0.0.106",
+		Title:   "🚫 JS SDK Breaking Change 🚫",
+		Message: "The JS SDK type signatures for AgentRequest have changed to be async functions. Please see the v0.0.106 Changelog for how to update your code.\n\n" + tui.Link("https://agentuity.dev/Changelog/sdk-js#v00106") + "\n\nPlease bun upgrade @agentuity/sdk, fix your types and ensure your code passes type checking and then re-run this command again.",
+	},
+	{
+		Runtime: "nodejs",
+		Version: "<0.0.106",
+		Title:   "🚫 JS SDK Breaking Change 🚫",
+		Message: "The JS SDK type signatures for AgentRequest have changed to be async functions. Please see the v0.0.106 Changelog for how to update your code.\n\n" + tui.Link("https://agentuity.dev/Changelog/sdk-js#v00106") + "\n\nPlease npm upgrade @agentuity/sdk, fix your types and ensure your code passes type checking and then re-run this command again.",
+	},
 }
 
 type packageJSON struct {
