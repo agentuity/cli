@@ -56,7 +56,7 @@ Dashboard:      %s`,
 			tui.Bold("⨺ Agentuity"),
 			tui.Muted("Build, manage and deploy AI agents"),
 			Version,
-			tui.Link("https://agentuity.dev/docs"),
+			tui.Link("https://agentuity.dev"),
 			tui.Link("https://discord.gg/vtn3hgUfuc"),
 			tui.Link("https://app.agentuity.com"),
 		))
