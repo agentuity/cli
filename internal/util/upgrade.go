@@ -521,7 +521,7 @@ func upgradeWithHomebrew(ctx context.Context, logger logger.Logger) error {
 		newVersion = strings.TrimSpace(string(v))
 	}
 
-	tui.ShowSpinner("Upgrading agentuity via Homebrew", action)
+	action()
 
 	if err != nil {
 		return err
