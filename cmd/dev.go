@@ -203,7 +203,7 @@ func displayLocalInstructions(port int, agents []project.AgentConfig, devModeUrl
 		sampleAgentID = agents[0].ID
 	}
 
-	curlCommand := fmt.Sprintf("curl -v http://localhost:%d/run/%s --json '{\"input\": \"Hello, world!\"}'", port, sampleAgentID)
+	curlCommand := fmt.Sprintf("curl -v http://localhost:%d/%s --json '{\"input\": \"Hello, world!\"}'", port, sampleAgentID)
 
 	fmt.Println()
 	fmt.Println(tui.Text("To interact with your agents locally, you can use:"))
