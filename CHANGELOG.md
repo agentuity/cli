@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.104] - 2025-04-24
+
+### Changed
+- Small tweaks around help and error dialog ([#227](https://github.com/agentuity/cli/pull/227))
+
+### Fixed
+- Fix regression in devmode input json using new binary protocol ([#228](https://github.com/agentuity/cli/pull/228))
+- Add error message for JS SDK breaking change ([#225](https://github.com/agentuity/cli/pull/225))
+- Project Name uniqueness check should be within project not any project in the users org ([#223](https://github.com/agentuity/cli/pull/223))
+- Add a more helpful error message when dev command cannot validate the project ([#222](https://github.com/agentuity/cli/pull/222))
+- Better handling when you rename an agent and attempt to deploy ([#221](https://github.com/agentuity/cli/pull/221))
+
+### Documentation
+- Update changelog for v0.0.103 ([#220](https://github.com/agentuity/cli/pull/220))
+
 ## [v0.0.103] - 2025-04-23
 
 ### Fixed
@@ -356,6 +371,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.104]: https://github.com/agentuity/cli/compare/v0.0.103...v0.0.104
+[v0.0.103]: https://github.com/agentuity/cli/compare/v0.0.102...v0.0.103
 [v0.0.102]: https://github.com/agentuity/cli/compare/v0.0.101...v0.0.102
 [v0.0.101]: https://github.com/agentuity/cli/compare/v0.0.100...v0.0.101
 [v0.0.100]: https://github.com/agentuity/cli/compare/v0.0.99...v0.0.100
