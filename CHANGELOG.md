@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.105] - 2025-04-25
+
+### Changed
+- Temporarily revert the agent rename detection ([#231](https://github.com/agentuity/cli/pull/231))
+- Revert "temporarily comment out the new sdk upgrade requirement until ready" ([#229](https://github.com/agentuity/cli/pull/229))
+- Update the dev help output to use the direct agent route instead of legacy route ([#224](https://github.com/agentuity/cli/pull/224))
+
 ## [v0.0.104] - 2025-04-24
 
 ### Changed
@@ -371,6 +378,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.105]: https://github.com/agentuity/cli/compare/v0.0.104...v0.0.105
 [v0.0.104]: https://github.com/agentuity/cli/compare/v0.0.103...v0.0.104
 [v0.0.103]: https://github.com/agentuity/cli/compare/v0.0.102...v0.0.103
 [v0.0.102]: https://github.com/agentuity/cli/compare/v0.0.101...v0.0.102
