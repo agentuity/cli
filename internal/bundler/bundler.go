@@ -74,6 +74,10 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		ctx.Logger.Debug("installed dependencies: %s", strings.TrimSpace(string(out)))
 	}
 
+	if err := checkForBreakingChanges(ctx, "javascript", theproject.Bundler.Runtime); err != nil {
+		return err
+	}
+
 	var entryPoints []string
 	entryPoints = append(entryPoints, filepath.Join(dir, "index.js"))
 	files, err := util.ListDir(filepath.Join(dir, theproject.Bundler.AgentConfig.Dir))
@@ -190,6 +194,10 @@ func bundlePython(ctx BundleContext, dir string, outdir string, theproject *proj
 			}
 		}
 		ctx.Logger.Debug("installed dependencies: %s", strings.TrimSpace(string(out)))
+	}
+
+	if err := checkForBreakingChanges(ctx, "python", theproject.Bundler.Runtime); err != nil {
+		return err
 	}
 
 	config := map[string]any{
