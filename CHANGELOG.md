@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.106] - 2025-04-26
+
+### Changed
+- Use update not upgrade ([#235](https://github.com/agentuity/cli/pull/235))
+- Some Node libraries which have already been bundled conflict with our bundle require shim ([#233](https://github.com/agentuity/cli/pull/233))
+
+### Documentation
+- Update changelog for v0.0.105 ([#232](https://github.com/agentuity/cli/pull/232))
+- Fix doc link
+
 ## [v0.0.105] - 2025-04-25
 
 ### Changed
