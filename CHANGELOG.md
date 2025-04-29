@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.107] - 2025-04-29
+
+### Fixed
+- DevMode: connect to ipv4 loopback explicitly ([#237](https://github.com/agentuity/cli/pull/237))
+
 ## [v0.0.106] - 2025-04-26
 
 ### Changed
@@ -388,6 +393,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.107]: https://github.com/agentuity/cli/compare/v0.0.106...v0.0.107
+[v0.0.106]: https://github.com/agentuity/cli/compare/v0.0.105...v0.0.106
 [v0.0.105]: https://github.com/agentuity/cli/compare/v0.0.104...v0.0.105
 [v0.0.104]: https://github.com/agentuity/cli/compare/v0.0.103...v0.0.104
 [v0.0.103]: https://github.com/agentuity/cli/compare/v0.0.102...v0.0.103
