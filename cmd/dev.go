@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -44,7 +45,12 @@ Examples:
 		websocketUrl := viper.GetString("overrides.websocket_url")
 		websocketId, _ := cmd.Flags().GetString("websocket-id")
 
-		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		signals := []os.Signal{os.Interrupt, syscall.SIGINT}
+		if runtime.GOOS != "windows" {
+			signals = append(signals, syscall.SIGTERM)
+		}
+
+		ctx, cancel := signal.NotifyContext(context.Background(), signals...)
 		defer cancel()
 
 		apiKey, userId := util.EnsureLoggedIn(ctx, log, cmd)
@@ -143,9 +149,15 @@ Examples:
 
 		go func() {
 			for {
-				defer cancel()
-				projectServerCmd.Wait()
-				log.Debug("project server exited")
+				log.Trace("waiting for project server to exit")
+				if err := projectServerCmd.Wait(); err != nil {
+					log.Error("project server exited with error: %s", err)
+				}
+				if projectServerCmd.ProcessState != nil {
+					log.Debug("project server exited with code %d", projectServerCmd.ProcessState.ExitCode())
+				} else {
+					log.Debug("project server exited")
+				}
 				log.Debug("isDeliberateRestart: %t", isDeliberateRestart)
 				if !isDeliberateRestart {
 					return
@@ -154,6 +166,7 @@ Examples:
 				// If it was a deliberate restart, start the new process here
 				if isDeliberateRestart {
 					isDeliberateRestart = false
+					log.Trace("restarting project server")
 					projectServerCmd, err = dev.CreateRunProjectCmd(ctx, log, theproject, websocketConn, dir, orgId, port)
 					if err != nil {
 						errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()

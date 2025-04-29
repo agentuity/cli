@@ -283,7 +283,7 @@ func (s *CreateFileAction) Run(ctx TemplateContext) error {
 			return fmt.Errorf("failed to read embedded file: %w", err)
 		}
 		tmpl := template.New(s.Template)
-		tmpl, err = funcTemplates(tmpl).Parse(string(tbuf))
+		tmpl, err = funcTemplates(tmpl, ctx.Template.Language == "python").Parse(string(tbuf))
 		if err != nil {
 			return fmt.Errorf("failed to parse template: %w", err)
 		}
