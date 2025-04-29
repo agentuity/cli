@@ -305,6 +305,11 @@ var agentCreateCmd = &cobra.Command{
 				errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithAttributes(map[string]any{"identifier": theproject.Project.Bundler.Identifier})).ShowErrorAndExit()
 			}
 
+			template, err := templates.LoadTemplateForRuntime(context.Background(), tmpdir, theproject.Project.Bundler.Identifier)
+			if err != nil {
+				errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithAttributes(map[string]any{"identifier": theproject.Project.Bundler.Identifier})).ShowErrorAndExit()
+			}
+
 			if err := rules.NewAgent(templates.TemplateContext{
 				Logger:           logger,
 				AgentName:        name,
@@ -313,6 +318,7 @@ var agentCreateCmd = &cobra.Command{
 				AgentDescription: description,
 				ProjectDir:       theproject.Dir,
 				TemplateDir:      tmpdir,
+				Template:         template,
 				AgentuityCommand: getAgentuityCommand(),
 			}); err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithAttributes(map[string]any{"name": name})).ShowErrorAndExit()
