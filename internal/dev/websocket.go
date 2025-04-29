@@ -81,7 +81,7 @@ func (c *Websocket) Done() <-chan struct{} {
 }
 
 func (c *Websocket) getAgentProtocol(ctx context.Context, port int) (bool, error) {
-	url := fmt.Sprintf("http://localhost:%d/_health", port)
+	url := fmt.Sprintf("http://127.0.0.1:%d/_health", port)
 	for i := 0; i < 5; i++ {
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
@@ -104,7 +104,7 @@ func (c *Websocket) getAgentProtocol(ctx context.Context, port int) (bool, error
 }
 
 func (c *Websocket) getAgentWelcome(ctx context.Context, port int) (map[string]Welcome, error) {
-	url := fmt.Sprintf("http://localhost:%d/welcome", port)
+	url := fmt.Sprintf("http://127.0.0.1:%d/welcome", port)
 	for i := 0; i < 5; i++ {
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
@@ -538,7 +538,7 @@ func processInputMessage(plogger logger.Logger, c *Websocket, m []byte, port int
 	}
 
 	var inputPayload []byte
-	url := fmt.Sprintf("http://localhost:%d/%s", port, inputMsg.Payload.AgentID)
+	url := fmt.Sprintf("http://127.0.0.1:%d/%s", port, inputMsg.Payload.AgentID)
 	contentType := "application/json"
 
 	if !c.binaryProtocol {

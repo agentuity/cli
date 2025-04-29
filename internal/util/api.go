@@ -233,7 +233,7 @@ var testInside bool
 
 func TransformUrl(urlString string) string {
 	// NOTE: these urls are special cases for local development inside a container
-	if strings.Contains(urlString, "api.agentuity.dev") || strings.Contains(urlString, "localhost:") {
+	if strings.Contains(urlString, "api.agentuity.dev") || strings.Contains(urlString, "localhost:") || strings.Contains(urlString, "127.0.0.1:") {
 		if sys.Exists("/.dockerenv") || sys.Exists("/proc/1/cgroup") || testInside {
 			if strings.HasPrefix(urlString, "https://api.agentuity.dev") {
 				u, _ := url.Parse(urlString)
@@ -264,14 +264,14 @@ func GetURLs(logger logger.Logger) (string, string, string) {
 		appUrl = "https://app.agentuity.com"
 	} else if apiUrl == "https://api.agentuity.dev" && appUrl == "https://app.agentuity.com" {
 		logger.Debug("switching app url to dev since the api url is dev")
-		appUrl = "http://localhost:3000"
+		appUrl = "http://127.0.0.1:3000"
 	}
 	if apiUrl == "https://api.agentuity.com" && transportUrl != "https://agentuity.api" {
 		logger.Debug("switching transport url to production since the api url is production")
 		transportUrl = "https://agentuity.ai"
 	} else if apiUrl == "https://api.agentuity.dev" && transportUrl == "https://agentuity.ai" {
 		logger.Debug("switching transport url to dev since the api url is dev")
-		transportUrl = "http://localhost:3939"
+		transportUrl = "http://127.0.0.1:3939"
 	}
 	return TransformUrl(apiUrl), TransformUrl(appUrl), TransformUrl(transportUrl)
 }
