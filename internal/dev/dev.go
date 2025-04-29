@@ -21,12 +21,18 @@ func KillProjectServer(projectServerCmd *exec.Cmd) {
 		projectServerCmd.Wait()
 		ch <- struct{}{}
 	}()
-	projectServerCmd.Process.Signal(syscall.SIGTERM)
+
+	if projectServerCmd.Process != nil {
+		// Try SIGINT first (Ctrl+C equivalent)
+		projectServerCmd.Process.Signal(syscall.SIGINT)
+	}
+
+	// Wait a bit longer for SIGTERM to take effect
 	select {
 	case <-ch:
 		return
-	case <-time.After(time.Second * 5):
-		// this will kill the process group not just the parent process
+	case <-time.After(time.Second * 3):
+		// If neither signal worked, use the platform-specific kill
 		util.ProcessKill(projectServerCmd)
 		close(ch)
 	}
