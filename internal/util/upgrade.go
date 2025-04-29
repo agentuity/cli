@@ -186,7 +186,7 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 			return nil
 		}
 
-		return upgradeWithWindowsMsi(ctx, release)
+		return upgradeWithWindowsMsi(ctx, logger, release)
 	}
 
 	release, err := GetLatestRelease(ctx) // Using public function from version.go
@@ -531,7 +531,7 @@ func upgradeWithHomebrew(ctx context.Context, logger logger.Logger) error {
 	return nil
 }
 
-func upgradeWithWindowsMsi(ctx context.Context, version string) error {
+func upgradeWithWindowsMsi(ctx context.Context, logger logger.Logger, version string) error {
 	if os.Getenv("CI") != "" || os.Getenv("GITHUB_ACTIONS") != "" || os.Getenv("NONINTERACTIVE") != "" {
 		tui.ShowWarning("Non-interactive environment detected, skipping automatic MSI installation")
 
@@ -596,19 +596,11 @@ func upgradeWithWindowsMsi(ctx context.Context, version string) error {
 $products = Get-CimInstance -Class Win32_Product | Where-Object { $_.Name -like "*Agentuity*" }
 if ($products) {
     foreach ($product in $products) {
-        Write-Output "Uninstalling: $($product.Name) ($($product.IdentifyingNumber))"
         $result = $product | Invoke-CimMethod -MethodName Uninstall
-        if ($result.ReturnValue -eq 0) {
-            Write-Output "Successfully uninstalled $($product.Name)"
-        } else {
-            Write-Output "Failed to uninstall $($product.Name) with return code $($result.ReturnValue)"
-            exit 1
+        if ($result.ReturnValue -ne 0) {
+            throw "Failed to uninstall $($product.Name) with return code $($result.ReturnValue)"
         }
     }
-    exit 0
-} else {
-    Write-Output "No existing Agentuity installation found"
-    exit 0
 }
 `
 		if err := os.WriteFile(uninstallScriptPath, []byte(uninstallScript), 0644); err != nil {
@@ -622,7 +614,8 @@ if ($products) {
 			uninstallErr = fmt.Errorf("failed to run uninstall script: %w, output: %s", err, string(output))
 			return
 		}
-		tui.ShowSuccess("Uninstall step completed: %s", strings.TrimSpace(string(output)))
+		logger.Trace(strings.TrimSpace(string(output)))
+		tui.ShowSuccess("Uninstalled existing installation")
 	}
 	tui.ShowSpinner("Checking for existing installations...", uninstallAction)
 	if uninstallErr != nil {
