@@ -18,6 +18,7 @@ import (
 	cstr "github.com/agentuity/go-common/string"
 	csys "github.com/agentuity/go-common/sys"
 	"github.com/agentuity/go-common/tui"
+	"github.com/bep/debounce"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -134,13 +135,21 @@ Examples:
 		// Initial build
 		build(true)
 
-		// Watch for changes
-		watcher, err := dev.NewWatcher(log, dir, theproject.Project.Development.Watch.Files, func(path string) {
+		restart := func() {
 			build(false)
 			isDeliberateRestart = true
 			log.Debug("killing project server")
 			dev.KillProjectServer(projectServerCmd)
 			log.Debug("killing project server done")
+		}
+
+		// debounce a lot of changes at once to avoid multiple restarts in succession
+		debounced := debounce.New(250 * time.Millisecond)
+
+		// Watch for changes
+		watcher, err := dev.NewWatcher(log, dir, theproject.Project.Development.Watch.Files, func(path string) {
+			log.Trace("%s has changed", path)
+			debounced(restart)
 		})
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start watcher: %s", err))).ShowErrorAndExit()
