@@ -22,6 +22,8 @@ import (
 
 var Version = "dev"
 
+var ErrBuildFailed = fmt.Errorf("build failed")
+
 type AgentConfig struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
@@ -35,6 +37,7 @@ type BundleContext struct {
 	Production bool
 	Install    bool
 	CI         bool
+	DevMode    bool
 }
 
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
@@ -155,6 +158,10 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		for _, err := range result.Errors {
 			formattedError := formatESBuildError(dir, err)
 			fmt.Println(formattedError)
+		}
+
+		if ctx.DevMode {
+			return ErrBuildFailed
 		}
 
 		os.Exit(2)

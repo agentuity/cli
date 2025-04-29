@@ -107,27 +107,36 @@ Examples:
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 		}
 
-		build := func() {
+		build := func(initial bool) {
 			started := time.Now()
+			var ok bool
 			tui.ShowSpinner("Building project ...", func() {
 				if err := bundler.Bundle(bundler.BundleContext{
 					Context:    ctx,
 					Logger:     log,
 					ProjectDir: dir,
 					Production: false,
+					DevMode:    !initial,
 				}); err != nil {
+					if err == bundler.ErrBuildFailed {
+						log.Error("build failed ...")
+						return
+					}
 					errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to bundle project: %s", err))).ShowErrorAndExit()
 				}
+				ok = true
 			})
-			fmt.Println(tui.Text(fmt.Sprintf("✨ Built in %s", time.Since(started).Round(time.Millisecond))))
+			if ok {
+				fmt.Println(tui.Text(fmt.Sprintf("✨ Built in %s", time.Since(started).Round(time.Millisecond))))
+			}
 		}
 
 		// Initial build
-		build()
+		build(true)
 
 		// Watch for changes
 		watcher, err := dev.NewWatcher(log, dir, theproject.Project.Development.Watch.Files, func(path string) {
-			build()
+			build(false)
 			isDeliberateRestart = true
 			log.Debug("killing project server")
 			dev.KillProjectServer(projectServerCmd)
