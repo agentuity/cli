@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Masterminds/semver"
 	"github.com/agentuity/cli/internal/errsystem"
@@ -486,6 +487,13 @@ func LoadProject(logger logger.Logger, dir string, apiUrl string, appUrl string,
 	}
 }
 
+func isVersionCheckRequired(ver string) bool {
+	if ver != "" && ver != "dev" && !strings.Contains(ver, "-next") {
+		return true
+	}
+	return false
+}
+
 func EnsureProject(ctx context.Context, cmd *cobra.Command) ProjectContext {
 	logger := env.NewLogger(cmd)
 	dir := ResolveProjectDir(logger, cmd, true)
@@ -498,7 +506,7 @@ func EnsureProject(ctx context.Context, cmd *cobra.Command) ProjectContext {
 		token, _ = util.EnsureLoggedIn(ctx, logger, cmd)
 	}
 	p := LoadProject(logger, dir, apiUrl, appUrl, transportUrl, token)
-	if !p.NewProject && Version != "" && Version != "dev" && p.Project.Version != "" {
+	if !p.NewProject && isVersionCheckRequired(Version) && p.Project.Version != "" {
 		v := semver.MustParse(Version)
 		c, err := semver.NewConstraint(p.Project.Version)
 		if err != nil {
@@ -538,7 +546,7 @@ func TryProject(ctx context.Context, cmd *cobra.Command) ProjectContext {
 		}
 	}
 	p := LoadProject(logger, dir, apiUrl, appUrl, transportUrl, token)
-	if !p.NewProject && Version != "" && Version != "dev" && p.Project.Version != "" {
+	if !p.NewProject && isVersionCheckRequired(Version) && p.Project.Version != "" {
 		v := semver.MustParse(Version)
 		c, err := semver.NewConstraint(p.Project.Version)
 		if err != nil {

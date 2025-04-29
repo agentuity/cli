@@ -80,27 +80,47 @@ func (c *Websocket) Done() <-chan struct{} {
 	return c.done
 }
 
+const maxHealthCheckDuration = time.Second * 30
+
+func isConnectionErrorRetryable(err error) bool {
+	if strings.Contains(err.Error(), "connection refused") {
+		return true
+	}
+	if strings.Contains(err.Error(), "connection reset by peer") {
+		return true
+	}
+	if strings.Contains(err.Error(), "No connection could be made because the target machine actively refused it") { // windows
+		return true
+	}
+	return false
+}
+
 func (c *Websocket) getAgentProtocol(ctx context.Context, port int) (bool, error) {
 	url := fmt.Sprintf("http://127.0.0.1:%d/_health", port)
-	for i := 0; i < 5; i++ {
+	started := time.Now()
+	var i int
+	for time.Since(started) < maxHealthCheckDuration {
+		i++
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
 			return false, err
 		}
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			if strings.Contains(err.Error(), "connection refused") {
+			c.logger.Debug("healthcheck attempt #%d failed: %s", i, err)
+			if isConnectionErrorRetryable(err) {
 				time.Sleep(time.Millisecond * time.Duration(100*i+1))
 				continue
 			}
 			return false, err
 		}
+		c.logger.Debug("healthcheck attempt #%d succeeded with status code %d", i, resp.StatusCode)
 		defer resp.Body.Close()
 		if resp.StatusCode == 200 {
 			return resp.Header.Get("x-agentuity-binary") == "true", nil
 		}
 	}
-	return false, fmt.Errorf("failed to inspect agents after 5 attempts")
+	return false, fmt.Errorf("failed to inspect agents after %s", maxHealthCheckDuration)
 }
 
 func (c *Websocket) getAgentWelcome(ctx context.Context, port int) (map[string]Welcome, error) {
@@ -112,7 +132,7 @@ func (c *Websocket) getAgentWelcome(ctx context.Context, port int) (map[string]W
 		}
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			if strings.Contains(err.Error(), "connection refused") {
+			if isConnectionErrorRetryable(err) {
 				time.Sleep(time.Millisecond * time.Duration(100*i+1))
 				continue
 			}
@@ -135,7 +155,7 @@ func (c *Websocket) StartReadingMessages(ctx context.Context, logger logger.Logg
 	var err error
 	c.binaryProtocol, err = c.getAgentProtocol(ctx, port)
 	if err != nil {
-		logger.Error("failed to healthcheck agents: %s", err)
+		logger.Fatal("Your project failed to start. This typically happens when the project cannot compile or this is an underlying issue with starting the project.")
 		return
 	}
 
