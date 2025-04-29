@@ -532,8 +532,55 @@ func upgradeWithHomebrew(ctx context.Context, logger logger.Logger) error {
 }
 
 func upgradeWithWindowsMsi(ctx context.Context, version string) error {
+	if os.Getenv("CI") != "" || os.Getenv("GITHUB_ACTIONS") != "" || os.Getenv("NONINTERACTIVE") != "" {
+		tui.ShowWarning("Non-interactive environment detected, skipping automatic MSI installation")
+
+		tempDir, err := os.MkdirTemp("", "agentuity-upgrade-msi")
+		if err != nil {
+			return fmt.Errorf("failed to create temp directory: %w", err)
+		}
+		defer os.RemoveAll(tempDir)
+
+		installerName := getMsiInstallerName()
+		if strings.HasPrefix(version, "v") {
+			version = strings.TrimPrefix(version, "v")
+		}
+		installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/v%s/%s", version, installerName)
+		installerPath := filepath.Join(tempDir, installerName)
+
+		var downloadErr error
+		downloadAction := func() {
+			if err := downloadFile(installerURL, installerPath); err != nil {
+				downloadErr = fmt.Errorf("failed to download MSI installer: %w", err)
+			}
+		}
+		tui.ShowSpinner("Downloading MSI installer...", downloadAction)
+		if downloadErr != nil {
+			return downloadErr
+		}
+
+		homePath := os.Getenv("HOME")
+		if homePath == "" {
+			homePath = os.Getenv("USERPROFILE")
+		}
+		if homePath == "" {
+			return fmt.Errorf("unable to determine home directory")
+		}
+
+		destPath := filepath.Join(homePath, installerName)
+		if err := copyFile(installerPath, destPath); err != nil {
+			return fmt.Errorf("failed to copy MSI to %s: %w", destPath, err)
+		}
+
+		tui.ShowSuccess("MSI installer copied to %s", destPath)
+		tui.ShowWarning("To install manually, run the MSI installer at: %s", destPath)
+		return nil
+	}
+
 	if !isAdmin(ctx) {
-		return fmt.Errorf("administrator privileges required to upgrade MSI installation. Please run the command as administrator")
+		tui.ShowWarning("Administrator privileges required to upgrade the CLI on Windows")
+		tui.ShowWarning("Please restart the CLI with administrator privileges and try again")
+		return fmt.Errorf("administrator privileges required")
 	}
 
 	tempDir, err := os.MkdirTemp("", "agentuity-upgrade-msi")
@@ -619,7 +666,24 @@ if ($products) {
 	}
 	tui.ShowSpinner("Installing upgrade...", installAction)
 	if installErr != nil {
-		return installErr
+		tui.ShowWarning("Automatic installation failed: %v", installErr)
+
+		homePath := os.Getenv("HOME")
+		if homePath == "" {
+			homePath = os.Getenv("USERPROFILE")
+		}
+		if homePath == "" {
+			return fmt.Errorf("unable to determine home directory: %w", installErr)
+		}
+
+		destPath := filepath.Join(homePath, installerName)
+		if err := copyFile(installerPath, destPath); err != nil {
+			return fmt.Errorf("failed to copy MSI to %s: %w", destPath, err)
+		}
+
+		tui.ShowSuccess("MSI installer copied to %s", destPath)
+		tui.ShowWarning("To install manually, run the MSI installer at: %s", destPath)
+		return nil
 	}
 
 	tui.ShowSuccess("Successfully upgraded to version %s", version)
