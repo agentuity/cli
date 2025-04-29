@@ -283,6 +283,31 @@ function Add-ToPath {
             # Also update current session
             $env:PATH = "$env:PATH;$PathToAdd"
         }
+        
+        # Refresh PowerShell's command discovery to make the command immediately available
+        # This creates a temporary function with the same name as the executable to force PowerShell to refresh
+        $exeName = "agentuity"
+        $tempFunctionName = "global:$exeName"
+        
+        # Remove any existing function with this name first
+        if (Get-Command $exeName -ErrorAction SilentlyContinue) {
+            if ((Get-Command $exeName).CommandType -eq "Function") {
+                Remove-Item -Path "Function:\$exeName" -ErrorAction SilentlyContinue
+            }
+        }
+        
+        # Create a temporary function that will redirect to the actual executable
+        $scriptBlock = {
+            param($argumentList)
+            & "$PathToAdd\$exeName.exe" @argumentList
+            # Remove this function after first use to ensure future calls use the actual executable
+            Remove-Item -Path "Function:\$exeName" -ErrorAction SilentlyContinue
+        }
+        
+        # Register the function
+        Set-Item -Path $tempFunctionName -Value $scriptBlock -Force
+        
+        Write-Success "Command '$exeName' is now available in the current PowerShell session"
     }
     catch {
         Write-Error "Failed to update PATH: $_"
