@@ -392,6 +392,19 @@ func LoadTemplates(ctx context.Context, dir string, custom bool) (Templates, err
 	return LoadTemplatesFromGithub(ctx, dir)
 }
 
+func LoadTemplateForRuntime(ctx context.Context, dir string, runtime string) (*Template, error) {
+	templates, err := LoadTemplates(ctx, dir, false)
+	if err != nil {
+		return nil, err
+	}
+	for _, template := range templates {
+		if template.Identifier == runtime {
+			return &template, nil
+		}
+	}
+	return nil, fmt.Errorf("template for runtime %s not found", runtime)
+}
+
 func LoadLanguageTemplates(ctx context.Context, dir string, runtime string) (LanguageTemplates, error) {
 	filename := filepath.Join(dir, runtime, "templates.yaml")
 	reader, err := getEmbeddedFile(filename)

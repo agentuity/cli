@@ -159,6 +159,9 @@ func (t *TemplateRules) NewProject(ctx TemplateContext) error {
 }
 
 func (t *TemplateRules) NewAgent(ctx TemplateContext) error {
+	if ctx.Template == nil {
+		return fmt.Errorf("template is nil and is required")
+	}
 	for _, step := range t.NewAgentSteps.Steps {
 		if command, ok := resolveStep(ctx, step); ok {
 			if err := command.Run(ctx); err != nil {
