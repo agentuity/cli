@@ -80,7 +80,7 @@ func (c *Websocket) Done() <-chan struct{} {
 	return c.done
 }
 
-const maxHealthCheckDuration = time.Minute
+const maxHealthCheckDuration = time.Second * 30
 
 func isConnectionErrorRetryable(err error) bool {
 	if strings.Contains(err.Error(), "connection refused") {
