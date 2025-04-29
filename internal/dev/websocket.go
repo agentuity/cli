@@ -80,27 +80,34 @@ func (c *Websocket) Done() <-chan struct{} {
 	return c.done
 }
 
+const maxHealthCheckDuration = time.Minute
+
 func (c *Websocket) getAgentProtocol(ctx context.Context, port int) (bool, error) {
 	url := fmt.Sprintf("http://127.0.0.1:%d/_health", port)
-	for i := 0; i < 5; i++ {
+	started := time.Now()
+	var i int
+	for time.Since(started) < maxHealthCheckDuration {
+		i++
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
 			return false, err
 		}
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
+			c.logger.Debug("healthcheck attempt #%d failed: %s", i, err)
 			if strings.Contains(err.Error(), "connection refused") {
 				time.Sleep(time.Millisecond * time.Duration(100*i+1))
 				continue
 			}
 			return false, err
 		}
+		c.logger.Debug("healthcheck attempt #%d succeeded with status code %d", i, resp.StatusCode)
 		defer resp.Body.Close()
 		if resp.StatusCode == 200 {
 			return resp.Header.Get("x-agentuity-binary") == "true", nil
 		}
 	}
-	return false, fmt.Errorf("failed to inspect agents after 5 attempts")
+	return false, fmt.Errorf("failed to inspect agents after %s", maxHealthCheckDuration)
 }
 
 func (c *Websocket) getAgentWelcome(ctx context.Context, port int) (map[string]Welcome, error) {
