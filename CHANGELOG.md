@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.113] - 2025-04-29
+
+### Added
+- Make sure agent create has a reference to the template so we can reference it in interpolation ([#251](https://github.com/agentuity/cli/pull/251))
+
+### Changed
+- DevMode: debounce hot reloads ([#250](https://github.com/agentuity/cli/pull/250))
+
 ## [v0.0.111] - 2025-04-29
 
 ### Fixed
@@ -414,6 +422,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.113]: https://github.com/agentuity/cli/compare/v0.0.112...v0.0.113
 [v0.0.110]: https://github.com/agentuity/cli/compare/v0.0.109...v0.0.110
 [v0.0.109]: https://github.com/agentuity/cli/compare/v0.0.108...v0.0.109
 [v0.0.108]: https://github.com/agentuity/cli/compare/v0.0.107...v0.0.108
