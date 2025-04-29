@@ -82,6 +82,19 @@ func (c *Websocket) Done() <-chan struct{} {
 
 const maxHealthCheckDuration = time.Minute
 
+func isConnectionErrorRetryable(err error) bool {
+	if strings.Contains(err.Error(), "connection refused") {
+		return true
+	}
+	if strings.Contains(err.Error(), "connection reset by peer") {
+		return true
+	}
+	if strings.Contains(err.Error(), "No connection could be made because the target machine actively refused it") { // windows
+		return true
+	}
+	return false
+}
+
 func (c *Websocket) getAgentProtocol(ctx context.Context, port int) (bool, error) {
 	url := fmt.Sprintf("http://127.0.0.1:%d/_health", port)
 	started := time.Now()
@@ -95,7 +108,7 @@ func (c *Websocket) getAgentProtocol(ctx context.Context, port int) (bool, error
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			c.logger.Debug("healthcheck attempt #%d failed: %s", i, err)
-			if strings.Contains(err.Error(), "connection refused") {
+			if isConnectionErrorRetryable(err) {
 				time.Sleep(time.Millisecond * time.Duration(100*i+1))
 				continue
 			}
@@ -119,7 +132,7 @@ func (c *Websocket) getAgentWelcome(ctx context.Context, port int) (map[string]W
 		}
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			if strings.Contains(err.Error(), "connection refused") {
+			if isConnectionErrorRetryable(err) {
 				time.Sleep(time.Millisecond * time.Duration(100*i+1))
 				continue
 			}
@@ -142,7 +155,7 @@ func (c *Websocket) StartReadingMessages(ctx context.Context, logger logger.Logg
 	var err error
 	c.binaryProtocol, err = c.getAgentProtocol(ctx, port)
 	if err != nil {
-		logger.Error("failed to healthcheck agents: %s", err)
+		logger.Fatal("Your project failed to start. This typically happens when the project cannot compile or this is an underlying issue with starting the project.")
 		return
 	}
 

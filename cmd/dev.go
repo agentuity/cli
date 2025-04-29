@@ -73,6 +73,14 @@ Examples:
 			websocketId = cstr.NewHash(orgId, userId)
 		}
 
+		port, _ := cmd.Flags().GetInt("port")
+		if port == 0 {
+			port, err = dev.FindAvailablePort(theproject)
+			if err != nil {
+				log.Fatal("failed to find available port: %s", err)
+			}
+		}
+
 		websocketConn, err := dev.NewWebsocket(dev.WebsocketArgs{
 			Ctx:          ctx,
 			Logger:       log,
@@ -87,11 +95,6 @@ Examples:
 			log.Fatal("failed to create live dev connection: %s", err)
 		}
 		defer websocketConn.Close()
-
-		port, err := dev.FindAvailablePort(theproject)
-		if err != nil {
-			log.Fatal("failed to find available port: %s", err)
-		}
 
 		projectServerCmd, err := dev.CreateRunProjectCmd(ctx, log, theproject, websocketConn, dir, orgId, port)
 		if err != nil {
@@ -222,6 +225,7 @@ func init() {
 	devCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
 	devCmd.Flags().String("websocket-id", "", "The websocket room id to use for the development agent")
 	devCmd.Flags().String("org-id", "", "The organization to run the project")
+	devCmd.Flags().Int("port", 0, "The port to run the development server on (uses project default if not provided)")
 	devCmd.Flags().MarkHidden("websocket-id")
 	devCmd.Flags().MarkHidden("org-id")
 }

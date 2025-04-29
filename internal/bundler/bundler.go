@@ -120,7 +120,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 			defines["process.env.AGENTUITY_ENVIRONMENT"] = fmt.Sprintf("'%s'", "development")
 		}
 	}
-	defines["process.env.AGENTUITY_CLOUD_AGENTS_JSON"] = fmt.Sprintf("'%s'", cstr.JSONStringify(agents))
+	defines["process.env.AGENTUITY_CLOUD_AGENTS_JSON"] = cstr.JSONStringify(cstr.JSONStringify(agents))
 
 	ctx.Logger.Debug("starting build")
 	started := time.Now()
