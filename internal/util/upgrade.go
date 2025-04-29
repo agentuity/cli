@@ -542,6 +542,46 @@ func upgradeWithWindowsMsi(ctx context.Context, version string) error {
 	}
 	defer os.RemoveAll(tempDir)
 
+	var uninstallErr error
+	uninstallAction := func() {
+		uninstallScriptPath := filepath.Join(tempDir, "uninstall.ps1")
+		uninstallScript := `
+$products = Get-CimInstance -Class Win32_Product | Where-Object { $_.Name -like "*Agentuity*" }
+if ($products) {
+    foreach ($product in $products) {
+        Write-Output "Uninstalling: $($product.Name) ($($product.IdentifyingNumber))"
+        $result = $product | Invoke-CimMethod -MethodName Uninstall
+        if ($result.ReturnValue -eq 0) {
+            Write-Output "Successfully uninstalled $($product.Name)"
+        } else {
+            Write-Output "Failed to uninstall $($product.Name) with return code $($result.ReturnValue)"
+            exit 1
+        }
+    }
+    exit 0
+} else {
+    Write-Output "No existing Agentuity installation found"
+    exit 0
+}
+`
+		if err := os.WriteFile(uninstallScriptPath, []byte(uninstallScript), 0644); err != nil {
+			uninstallErr = fmt.Errorf("failed to create uninstall script: %w", err)
+			return
+		}
+
+		uninstallCmd := exec.CommandContext(ctx, "powershell", "-ExecutionPolicy", "Bypass", "-File", uninstallScriptPath)
+		output, err := uninstallCmd.CombinedOutput()
+		if err != nil {
+			uninstallErr = fmt.Errorf("failed to run uninstall script: %w, output: %s", err, string(output))
+			return
+		}
+		tui.ShowSuccess("Uninstall step completed: %s", strings.TrimSpace(string(output)))
+	}
+	tui.ShowSpinner("Checking for existing installations...", uninstallAction)
+	if uninstallErr != nil {
+		tui.ShowWarning("Uninstall failed, continuing with installation: %v", uninstallErr)
+	}
+
 	installerName := getMsiInstallerName()
 	if strings.HasPrefix(version, "v") {
 		version = strings.TrimPrefix(version, "v")
@@ -562,12 +602,18 @@ func upgradeWithWindowsMsi(ctx context.Context, version string) error {
 
 	var installErr error
 	installAction := func() {
-		updateCmd := exec.CommandContext(ctx, "msiexec", "/update", installerPath, "/qn")
-		if err := updateCmd.Run(); err != nil {
-			tui.ShowWarning("Update approach failed, trying install with reinstall: %v", err)
-			installCmd := exec.CommandContext(ctx, "msiexec", "/i", installerPath, "/qn", "REINSTALLMODE=amus", "REINSTALL=ALL")
-			if err := installCmd.Run(); err != nil {
-				installErr = fmt.Errorf("failed to run MSI installer: %w", err)
+		installCmd := exec.CommandContext(ctx, "msiexec", "/i", installerPath, "/qn", "/norestart")
+		if err := installCmd.Run(); err != nil {
+			tui.ShowWarning("Direct install failed, trying with update approach: %v", err)
+
+			updateCmd := exec.CommandContext(ctx, "msiexec", "/update", installerPath, "/qn")
+			if err := updateCmd.Run(); err != nil {
+				tui.ShowWarning("Update approach failed, trying install with reinstall: %v", err)
+
+				reinstallCmd := exec.CommandContext(ctx, "msiexec", "/i", installerPath, "/qn", "REINSTALLMODE=amus", "REINSTALL=ALL")
+				if err := reinstallCmd.Run(); err != nil {
+					installErr = fmt.Errorf("failed to run MSI installer: %w", err)
+				}
 			}
 		}
 	}
