@@ -287,7 +287,6 @@ function Add-ToPath {
         # Refresh PowerShell's command discovery to make the command immediately available
         # This creates a temporary function with the same name as the executable to force PowerShell to refresh
         $exeName = "agentuity"
-        $tempFunctionName = "global:$exeName"
         
         # Remove any existing function with this name first
         if (Get-Command $exeName -ErrorAction SilentlyContinue) {
@@ -304,8 +303,8 @@ function Add-ToPath {
             Remove-Item -Path "Function:\$exeName" -ErrorAction SilentlyContinue
         }
         
-        # Register the function
-        Set-Item -Path $tempFunctionName -Value $scriptBlock -Force
+        # Register the function using the Function: drive instead of global: scope
+        Set-Item -Path "Function:\$exeName" -Value $scriptBlock -Force
         
         Write-Success "Command '$exeName' is now available in the current PowerShell session"
     }
