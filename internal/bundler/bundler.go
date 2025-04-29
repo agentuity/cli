@@ -231,10 +231,16 @@ func bundlePython(ctx BundleContext, dir string, outdir string, theproject *proj
 func getAgents(theproject *project.Project, filename string) []AgentConfig {
 	var agents []AgentConfig
 	for _, agent := range theproject.Agents {
+		var agentfilename string
+		if theproject.Bundler.Language == "python" {
+			agentfilename = util.SafePythonFilename(agent.Name)
+		} else {
+			agentfilename = util.SafeFilename(agent.Name)
+		}
 		agents = append(agents, AgentConfig{
 			ID:       agent.ID,
 			Name:     agent.Name,
-			Filename: filepath.Join(theproject.Bundler.AgentConfig.Dir, util.SafeFilename(agent.Name), filename),
+			Filename: filepath.Join(theproject.Bundler.AgentConfig.Dir, agentfilename, filename),
 		})
 	}
 	return agents
