@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - DevMode: debounce hot reloads ([#250](https://github.com/agentuity/cli/pull/250))
 
+## [v0.0.112] - 2025-04-29
+
+### Fixed
+- Enhance Windows MSI upgrade with better fallbacks and error handling ([#249](https://github.com/agentuity/cli/pull/249))
+
 ## [v0.0.111] - 2025-04-29
 
 ### Fixed
