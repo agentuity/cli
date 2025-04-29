@@ -16,6 +16,9 @@ import (
 )
 
 func KillProjectServer(projectServerCmd *exec.Cmd) {
+	if projectServerCmd == nil || projectServerCmd.ProcessState == nil || projectServerCmd.ProcessState.Exited() {
+		return
+	}
 	ch := make(chan struct{}, 1)
 	go func() {
 		projectServerCmd.Wait()

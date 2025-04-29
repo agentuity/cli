@@ -131,6 +131,7 @@ Examples:
 			isDeliberateRestart = true
 			log.Debug("killing project server")
 			dev.KillProjectServer(projectServerCmd)
+			log.Debug("killing project server done")
 		})
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start watcher: %s", err))).ShowErrorAndExit()
