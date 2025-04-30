@@ -308,6 +308,18 @@ func replaceBinary(ctx context.Context, logger logger.Logger, assetPath, version
 	}
 
 	if err := checkWritePermission(currentExe); err != nil {
+		if strings.Contains(err.Error(), "binary is currently running") {
+			var updateErr error
+			updateAction := func() {
+				updateErr = updateRunningBinary(currentExe, binaryPath, fileMode)
+			}
+			tui.ShowSpinner("Setting up background update...", updateAction)
+			if updateErr != nil {
+				return fmt.Errorf("failed to set up background update: %w", updateErr)
+			}
+			tui.ShowSuccess("Successfully scheduled update to %s. The update will complete when this process exits.", version)
+			return nil
+		}
 		return fmt.Errorf("insufficient permissions to update binary: %w", err)
 	}
 
@@ -369,11 +381,45 @@ func checkWritePermission(filePath string) error {
 
 	file, err := os.OpenFile(filePath, os.O_WRONLY, info.Mode())
 	if err != nil {
+		if strings.Contains(err.Error(), "text file busy") {
+			return fmt.Errorf("binary is currently running: %w", err)
+		}
 		return err
 	}
 	file.Close()
 
 	return nil
+}
+
+func updateRunningBinary(currentExe, newBinary string, fileMode os.FileMode) error {
+	dir := filepath.Dir(currentExe)
+	tmpBinary := filepath.Join(dir, ".agentuity.new")
+	oldBinary := filepath.Join(dir, ".agentuity.old")
+
+	if err := copyFile(newBinary, tmpBinary); err != nil {
+		return fmt.Errorf("failed to copy new binary to temp location: %w", err)
+	}
+
+	if err := os.Chmod(tmpBinary, fileMode); err != nil {
+		return fmt.Errorf("failed to set permissions on new binary: %w", err)
+	}
+
+	script := fmt.Sprintf(`#!/bin/sh
+# Wait for the process to exit
+sleep 1
+# Perform the update
+mv "%s" "%s"
+mv "%s" "%s"
+rm "%s"
+`, currentExe, oldBinary, tmpBinary, currentExe, oldBinary)
+
+	updateScript := filepath.Join(dir, ".agentuity_updater.sh")
+	if err := os.WriteFile(updateScript, []byte(script), 0755); err != nil {
+		return fmt.Errorf("failed to create update script: %w", err)
+	}
+
+	cmd := exec.Command("sh", "-c", fmt.Sprintf("nohup %s > /dev/null 2>&1 &", updateScript))
+	return cmd.Start()
 }
 
 func extractBinary(ctx context.Context, logger logger.Logger, assetPath, extractDir string) string {
