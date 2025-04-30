@@ -515,6 +515,20 @@ function Set-PowerShellCompletion {
             }
         }
         
+        # Test that the executable is actually accessible
+        try {
+            $testOutput = & $ExePath version 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "Executable verification failed with exit code $LASTEXITCODE"
+                throw "Executable verification failed"
+            }
+            Write-Success "Verified executable is accessible: $testOutput"
+        }
+        catch {
+            Write-Warning "Failed to execute $ExePath: $_"
+            throw "Executable verification failed"
+        }
+        
         # Create PowerShell profile directory if it doesn't exist
         $profileDir = Split-Path -Parent $PROFILE
         if (-not (Test-Path -Path $profileDir)) {
@@ -529,7 +543,20 @@ function Set-PowerShellCompletion {
         
         # Generate completion script
         $completionPath = Join-Path -Path $completionDir -ChildPath "agentuity.ps1"
-        & $ExePath completion powershell | Out-File -FilePath $completionPath -Encoding utf8 -Force
+        Write-Step "Generating PowerShell completion script at $completionPath"
+        
+        try {
+            $completionOutput = & $ExePath completion powershell 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "Failed to generate completion script: $completionOutput"
+                throw "Completion generation failed"
+            }
+            $completionOutput | Out-File -FilePath $completionPath -Encoding utf8 -Force
+        }
+        catch {
+            Write-Warning "Failed to generate completion script: $_"
+            throw "Completion generation failed"
+        }
         
         # Check if the profile exists, create if not
         if (-not (Test-Path -Path $PROFILE)) {
@@ -543,16 +570,29 @@ function Set-PowerShellCompletion {
         if (-not $profileContent -or -not $profileContent.Contains($completionLine)) {
             Add-Content -Path $PROFILE -Value "`n# Agentuity CLI completion`n$completionLine" -Force
             Write-Success "PowerShell completion installed to $completionPath and added to your profile"
+            Write-Step "NOTE: You'll need to restart PowerShell or run '. $PROFILE' for completion to take effect in future sessions"
         }
         else {
             Write-Success "PowerShell completion already configured in your profile"
         }
+        
+        # Source the completion script in the current session
+        try {
+            . $completionPath
+            Write-Success "PowerShell completion loaded in current session"
+        }
+        catch {
+            Write-Warning "Failed to load completion in current session: $_"
+            Write-Warning "Completion will be available in new PowerShell sessions"
+        }
     }
     catch {
         Write-Warning "Failed to set up PowerShell completion: $_"
-        Write-Warning "You can manually set up completion by running:"
+        Write-Warning "You can manually set up completion by running these commands:"
+        Write-Warning "  mkdir -Force $HOME\Documents\WindowsPowerShell\Completion"
         Write-Warning "  $ExePath completion powershell > $HOME\Documents\WindowsPowerShell\Completion\agentuity.ps1"
         Write-Warning "  Add '. `"$HOME\Documents\WindowsPowerShell\Completion\agentuity.ps1`"' to your PowerShell profile"
+        Write-Warning "  To edit your profile, run: notepad $PROFILE"
     }
 }
 
@@ -774,8 +814,26 @@ try {
         exit 1
     }
     
-    # Success message
-    Write-Success "Installation complete! Run 'agentuity --help' to get started."
+    # Final verification that the command is accessible
+    Write-Step "Verifying command is accessible in current session..."
+    try {
+        $verifyOutput = & agentuity version 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "Agentuity CLI is ready to use in the current session!"
+            Write-Success "Installation complete! Run 'agentuity --help' to get started."
+        } else {
+            Write-Warning "Command verification failed with exit code $LASTEXITCODE"
+            Write-Warning "You may need to restart your PowerShell session or manually add the installation directory to your PATH"
+            Write-Warning "Installation directory: $installDir"
+            Write-Warning "To manually add to PATH, run: `$env:PATH += ';$installDir'"
+        }
+    } catch {
+        Write-Warning "Command 'agentuity' is not accessible in the current session: $_"
+        Write-Warning "You may need to restart your PowerShell session or manually add the installation directory to your PATH"
+        Write-Warning "Installation directory: $installDir"
+        Write-Warning "To manually add to PATH, run: `$env:PATH += ';$installDir'"
+    }
+    
     Write-Step "For more information, visit: $(Write-Url "https://agentuity.dev")"
 }
 finally {
