@@ -694,7 +694,7 @@ try {
     }
     catch {
         $errorMessage = $_.Exception.Message
-        Write-Error "Failed to download from $downloadUrl: $errorMessage" -Exit
+        Write-Error "Failed to download from ${downloadUrl}: ${errorMessage}" -Exit
     }
     
     # Download and verify checksums
@@ -713,7 +713,7 @@ try {
             Write-Warning "Checksum for $downloadFilename not found in checksums.txt. Skipping verification."
         }
         elseif ($computedChecksum -ne $expectedChecksum) {
-            Write-Error "Checksum verification failed. Expected: $expectedChecksum, Got: $computedChecksum" -Exit
+            Write-Error "Checksum verification failed. Expected: ${expectedChecksum}, Got: ${computedChecksum}" -Exit
         }
         else {
             Write-Success "Checksum verification passed!"
@@ -822,7 +822,7 @@ try {
     
     if (-not $installVerified) {
         Write-Error "Failed to verify installation. The MSI may have installed to a different location or failed silently."
-        Write-Warning "Please check the installation log at $env:TEMP\agentuity_install.log for details."
+        Write-Warning "Please check the installation log at ${env:TEMP}\agentuity_install.log for details."
         exit 1
     }
     
@@ -837,7 +837,7 @@ try {
             Write-Warning "Command verification failed with exit code $LASTEXITCODE"
             Write-Warning "You may need to restart your PowerShell session or manually add the installation directory to your PATH"
             Write-Warning "Installation directory: $installDir"
-            Write-Warning "To manually add to PATH, run: `$env:PATH += ';$installDir'"
+            Write-Warning "To manually add to PATH, run: `${env:PATH} += ';${installDir}'"
         }
     } catch {
         $errorMessage = $_.Exception.Message
@@ -845,7 +845,7 @@ try {
         Write-Warning "Error: $errorMessage"
         Write-Warning "You may need to restart your PowerShell session or manually add the installation directory to your PATH"
         Write-Warning "Installation directory: $installDir"
-        Write-Warning "To manually add to PATH, run: `$env:PATH += ';$installDir'"
+        Write-Warning "To manually add to PATH, run: `${env:PATH} += ';${installDir}'"
     }
     
     Write-Step "For more information, visit: $(Write-Url "https://agentuity.dev")"
