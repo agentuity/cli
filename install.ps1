@@ -269,9 +269,6 @@ function Add-ToPath {
             $newSystemPath = "$systemPath;$PathToAdd"
             [Environment]::SetEnvironmentVariable("PATH", $newSystemPath, [EnvironmentVariableTarget]::Machine)
             Write-Success "Added to system PATH"
-            
-            # Also update current session
-            $env:PATH = "$env:PATH;$PathToAdd"
         }
         else {
             # User PATH update (doesn't require admin)
@@ -279,38 +276,68 @@ function Add-ToPath {
             $newUserPath = "$userPath;$PathToAdd"
             [Environment]::SetEnvironmentVariable("PATH", $newUserPath, [EnvironmentVariableTarget]::User)
             Write-Success "Added to user PATH"
-            
-            # Also update current session
-            $env:PATH = "$env:PATH;$PathToAdd"
+        }
+
+        # Update current session PATH
+        $env:PATH = "$env:PATH;$PathToAdd"
+        
+        # Force PowerShell to refresh its command discovery
+        $ExecutionContext.SessionState.InvokeCommand.ClearCommandCache()
+
+        Write-Success "Command 'agentuity' is now available in the current session"
+    }
+    catch {
+        Write-Error "Failed to update PATH: $_"
+        Write-Warning "You may need to manually add $PathToAdd to your PATH environment variable."
+    }
+}
+
+function Load-InCurrentSession {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$ExePath
+    )
+
+    Write-Step "Loading Agentuity CLI in current session..."
+
+    try {
+        # Verify the executable exists
+        if (-not (Test-Path -Path $ExePath)) {
+            Write-Warning "Executable not found at $ExePath"
+            return $false
         }
         
-        # Refresh PowerShell's command discovery to make the command immediately available
-        # This creates a temporary function with the same name as the executable to force PowerShell to refresh
-        $exeName = "agentuity"
-        
-        # Remove any existing function with this name first
-        if (Get-Command $exeName -ErrorAction SilentlyContinue) {
-            if ((Get-Command $exeName).CommandType -eq "Function") {
-                Remove-Item -Path "Function:\$exeName" -ErrorAction SilentlyContinue
+        # Test that the executable is actually accessible
+        try {
+            $testOutput = & $ExePath version 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "Executable verification failed with exit code $LASTEXITCODE"
+                return $false
             }
+            Write-Success "Verified executable is accessible: $testOutput"
+        }
+        catch {
+            Write-Warning "Failed to execute $ExePath"
+            Write-Warning "Error: $($_.Exception.Message)"
+            return $false
         }
         
         # Create a temporary function that will redirect to the actual executable
         $scriptBlock = {
             param($argumentList)
-            & "$PathToAdd\$exeName.exe" @argumentList
-            # Remove this function after first use to ensure future calls use the actual executable
-            Remove-Item -Path "Function:\$exeName" -ErrorAction SilentlyContinue
+            & $ExePath @argumentList
         }
         
-        # Register the function using the Function: drive instead of global: scope
-        Set-Item -Path "Function:\$exeName" -Value $scriptBlock -Force
+        # Register the function in the current session
+        Set-Item -Path "Function:\agentuity" -Value $scriptBlock -Force
         
-        Write-Success "Command '$exeName' is now available in the current PowerShell session"
+        Write-Success "Agentuity CLI loaded in current session"
+        return $true
     }
     catch {
-        Write-Error "Failed to update PATH: $_"
-        Write-Warning "You may need to manually add $PathToAdd to your PATH environment variable."
+        Write-Warning "Failed to load Agentuity CLI in current session"
+        Write-Warning "Error: $($_.Exception.Message)"
+        return $false
     }
 }
 
@@ -685,7 +712,7 @@ New-Item -Path $tempDir -ItemType Directory -Force | Out-Null
 try {
     # Download MSI installer
     $msiPath = Join-Path -Path $tempDir -ChildPath $downloadFilename
-    Write-Step "Downloading Agentuity CLI v${Version} for Windows/$arch..."
+    Write-Step "Downloading Agentuity CLI v${VersionToUse} for Windows/$arch..."
     
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -751,7 +778,7 @@ try {
     $programFilesX86Path = [System.IO.Path]::Combine(${env:ProgramFiles(x86)}, "Agentuity")
     $localAppDataPath = [System.IO.Path]::Combine($env:LOCALAPPDATA, "Agentuity")
     
-    $installPaths = @($programFilesPath, $programFilesX86Path, $localAppDataPath, $installDir)
+    $installPaths = @($programFilesX86Path, $programFilesPath, $localAppDataPath, $installDir)
     $installVerified = $false
     
     # In CI environment, list all paths being checked
@@ -783,7 +810,10 @@ try {
             
             # Add to PATH if not already there
             Add-ToPath -PathToAdd $path
-            
+
+            # Load in current session
+            Load-InCurrentSession -ExePath $exePath
+
             # Set up PowerShell completion
             Set-PowerShellCompletion -ExePath $exePath
             
@@ -809,6 +839,9 @@ try {
                     # Add to PATH if not already there
                     Add-ToPath -PathToAdd $installDir
                     
+                    # Load in current session
+                    Load-InCurrentSession -ExePath $exePath
+
                     # Set up PowerShell completion
                     Set-PowerShellCompletion -ExePath $exePath
                     
