@@ -409,7 +409,7 @@ func updateRunningBinary(currentExe, newBinary string, fileMode os.FileMode) err
 	dir := filepath.Dir(currentExe)
 	tmpBinary := filepath.Join(dir, ".agentuity.new")
 	oldBinary := filepath.Join(dir, ".agentuity.old")
-	
+
 	cleanupUpdateFiles(dir)
 
 	if err := copyFile(newBinary, tmpBinary); err != nil {
@@ -460,7 +460,7 @@ try {
 			return fmt.Errorf("failed to create update script: %w", err)
 		}
 
-		cmd := exec.Command("powershell", "-WindowStyle", "Hidden", "-Command", 
+		cmd := exec.Command("powershell", "-WindowStyle", "Hidden", "-Command",
 			fmt.Sprintf("Start-Process powershell -ArgumentList '-WindowStyle Hidden -ExecutionPolicy Bypass -File \"%s\"' -WindowStyle Hidden", updateScript))
 		return cmd.Start()
 	} else {
