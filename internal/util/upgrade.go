@@ -307,6 +307,12 @@ func replaceBinary(ctx context.Context, logger logger.Logger, assetPath, version
 		return fmt.Errorf("failed to extract binary")
 	}
 
+	info, err := os.Stat(currentExe)
+	if err != nil {
+		return fmt.Errorf("failed to get file info: %w", err)
+	}
+	fileMode := info.Mode()
+
 	if err := checkWritePermission(currentExe); err != nil {
 		if strings.Contains(err.Error(), "binary is currently running") {
 			var updateErr error
@@ -322,12 +328,6 @@ func replaceBinary(ctx context.Context, logger logger.Logger, assetPath, version
 		}
 		return fmt.Errorf("insufficient permissions to update binary: %w", err)
 	}
-
-	info, err := os.Stat(currentExe)
-	if err != nil {
-		return fmt.Errorf("failed to get file info: %w", err)
-	}
-	fileMode := info.Mode()
 
 	var replaceErr error
 	replaceAction := func() {
