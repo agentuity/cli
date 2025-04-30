@@ -525,7 +525,7 @@ function Set-PowerShellCompletion {
             Write-Success "Verified executable is accessible: $testOutput"
         }
         catch {
-            Write-Warning "Failed to execute $ExePath: $_"
+            Write-Warning "Failed to execute $ExePath: $($_)"
             throw "Executable verification failed"
         }
         
@@ -554,7 +554,7 @@ function Set-PowerShellCompletion {
             $completionOutput | Out-File -FilePath $completionPath -Encoding utf8 -Force
         }
         catch {
-            Write-Warning "Failed to generate completion script: $_"
+            Write-Warning "Failed to generate completion script: $($_)"
             throw "Completion generation failed"
         }
         
@@ -582,12 +582,12 @@ function Set-PowerShellCompletion {
             Write-Success "PowerShell completion loaded in current session"
         }
         catch {
-            Write-Warning "Failed to load completion in current session: $_"
+            Write-Warning "Failed to load completion in current session: $($_)"
             Write-Warning "Completion will be available in new PowerShell sessions"
         }
     }
     catch {
-        Write-Warning "Failed to set up PowerShell completion: $_"
+        Write-Warning "Failed to set up PowerShell completion: $($_)"
         Write-Warning "You can manually set up completion by running these commands:"
         Write-Warning "  mkdir -Force $HOME\Documents\WindowsPowerShell\Completion"
         Write-Warning "  $ExePath completion powershell > $HOME\Documents\WindowsPowerShell\Completion\agentuity.ps1"
@@ -650,7 +650,7 @@ if (-not (Test-Path -Path $installDir)) {
         New-Item -Path $installDir -ItemType Directory -Force | Out-Null
     }
     catch {
-        Write-Error "Failed to create installation directory: $_" -Exit
+        Write-Error "Failed to create installation directory: $($_)" -Exit
     }
 }
 
@@ -684,7 +684,7 @@ try {
         $webClient.DownloadFile($downloadUrl, $msiPath)
     }
     catch {
-        Write-Error "Failed to download from $downloadUrl`: $_" -Exit
+        Write-Error "Failed to download from $downloadUrl`: $($_)" -Exit
     }
     
     # Download and verify checksums
@@ -710,7 +710,7 @@ try {
         }
     }
     catch {
-        Write-Warning "Failed to verify checksum: $_"
+        Write-Warning "Failed to verify checksum: $($_)"
         
         if (-not (Get-UserConfirmation -Message "Continue without checksum verification?" -DefaultToYes $false)) {
             Write-Step "Installation cancelled."
@@ -828,7 +828,7 @@ try {
             Write-Warning "To manually add to PATH, run: `$env:PATH += ';$installDir'"
         }
     } catch {
-        Write-Warning "Command 'agentuity' is not accessible in the current session: $_"
+        Write-Warning "Command 'agentuity' is not accessible in the current session: $($_)"
         Write-Warning "You may need to restart your PowerShell session or manually add the installation directory to your PATH"
         Write-Warning "Installation directory: $installDir"
         Write-Warning "To manually add to PATH, run: `$env:PATH += ';$installDir'"
