@@ -391,10 +391,26 @@ func checkWritePermission(filePath string) error {
 	return nil
 }
 
+// cleanupUpdateFiles removes any leftover temporary files from previous update attempts
+func cleanupUpdateFiles(dir string) {
+	tmpFiles := []string{
+		filepath.Join(dir, ".agentuity.new"),
+		filepath.Join(dir, ".agentuity.old"),
+		filepath.Join(dir, ".agentuity_updater.sh"),
+		filepath.Join(dir, ".agentuity_updater.ps1"),
+	}
+
+	for _, file := range tmpFiles {
+		_ = os.Remove(file)
+	}
+}
+
 func updateRunningBinary(currentExe, newBinary string, fileMode os.FileMode) error {
 	dir := filepath.Dir(currentExe)
 	tmpBinary := filepath.Join(dir, ".agentuity.new")
 	oldBinary := filepath.Join(dir, ".agentuity.old")
+	
+	cleanupUpdateFiles(dir)
 
 	if err := copyFile(newBinary, tmpBinary); err != nil {
 		return fmt.Errorf("failed to copy new binary to temp location: %w", err)
@@ -404,22 +420,69 @@ func updateRunningBinary(currentExe, newBinary string, fileMode os.FileMode) err
 		return fmt.Errorf("failed to set permissions on new binary: %w", err)
 	}
 
-	script := fmt.Sprintf(`#!/bin/sh
+	if runtime.GOOS == "windows" {
+		script := fmt.Sprintf(`
+$currentExe = "%s"
+$oldBinary = "%s" 
+$tmpBinary = "%s"
+$updateScript = $MyInvocation.MyCommand.Path
+
+# Wait for the process to exit (give it a moment)
+Start-Sleep -Seconds 1
+
+# Perform the update
+try {
+    # Move current binary to old
+    if (Test-Path $currentExe) {
+        Move-Item -Path $currentExe -Destination $oldBinary -Force
+    }
+    
+    # Move new binary to current location
+    Move-Item -Path $tmpBinary -Destination $currentExe -Force
+    
+    # Clean up old binary
+    if (Test-Path $oldBinary) {
+        Remove-Item -Path $oldBinary -Force
+    }
+    
+    # Clean up this script
+    Remove-Item -Path $updateScript -Force
+} catch {
+    # If something goes wrong, try to restore the old binary
+    if (Test-Path $oldBinary) {
+        Move-Item -Path $oldBinary -Destination $currentExe -Force
+    }
+}
+`, currentExe, oldBinary, tmpBinary)
+
+		updateScript := filepath.Join(dir, ".agentuity_updater.ps1")
+		if err := os.WriteFile(updateScript, []byte(script), 0644); err != nil {
+			return fmt.Errorf("failed to create update script: %w", err)
+		}
+
+		cmd := exec.Command("powershell", "-WindowStyle", "Hidden", "-Command", 
+			fmt.Sprintf("Start-Process powershell -ArgumentList '-WindowStyle Hidden -ExecutionPolicy Bypass -File \"%s\"' -WindowStyle Hidden", updateScript))
+		return cmd.Start()
+	} else {
+		script := fmt.Sprintf(`#!/bin/sh
 # Wait for the process to exit
 sleep 1
 # Perform the update
 mv "%s" "%s"
 mv "%s" "%s"
 rm "%s"
+# Clean up this script
+rm -- "$0"
 `, currentExe, oldBinary, tmpBinary, currentExe, oldBinary)
 
-	updateScript := filepath.Join(dir, ".agentuity_updater.sh")
-	if err := os.WriteFile(updateScript, []byte(script), 0755); err != nil {
-		return fmt.Errorf("failed to create update script: %w", err)
-	}
+		updateScript := filepath.Join(dir, ".agentuity_updater.sh")
+		if err := os.WriteFile(updateScript, []byte(script), 0755); err != nil {
+			return fmt.Errorf("failed to create update script: %w", err)
+		}
 
-	cmd := exec.Command("sh", "-c", fmt.Sprintf("nohup %s > /dev/null 2>&1 &", updateScript))
-	return cmd.Start()
+		cmd := exec.Command("sh", "-c", fmt.Sprintf("nohup %s > /dev/null 2>&1 &", updateScript))
+		return cmd.Start()
+	}
 }
 
 func extractBinary(ctx context.Context, logger logger.Logger, assetPath, extractDir string) string {
