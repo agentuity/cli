@@ -373,10 +373,12 @@ func (c *Websocket) SendMessage(logger logger.Logger, msg Message) error {
 
 func (c *Websocket) Close() error {
 	c.SendMessage(c.logger, NewCloseMessage(uuid.New().String(), c.Project.Project.ProjectId))
-	closeHandler := c.conn.CloseHandler()
-	if err := closeHandler(1000, "User requested shutdown"); err != nil {
-		c.logger.Error("failed to close connection: %s", err)
-		return err
+	if c.conn != nil {
+		closeHandler := c.conn.CloseHandler()
+		if err := closeHandler(1000, "User requested shutdown"); err != nil {
+			c.logger.Error("failed to close connection: %s", err)
+			return err
+		}
 	}
 	if c.cleanup != nil {
 		c.cleanup()
