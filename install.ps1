@@ -486,26 +486,64 @@ function Install-MSI {
                     return $false
                 }
                 
-                # Check if extraction created a nested Agentuity directory structure
-                $nestedDir = Join-Path -Path $localAppDataPath -ChildPath "Agentuity"
-                if (Test-Path -Path $nestedDir) {
-                    Write-Step "Found nested Agentuity directory, moving files to correct location"
-                    # Move all files from nested directory to parent
-                    Get-ChildItem -Path $nestedDir -Recurse | ForEach-Object {
-                        $targetPath = $_.FullName.Replace($nestedDir, $localAppDataPath)
-                        $targetDir = Split-Path -Parent $targetPath
+                # Check for common nested directory structures
+                $nestedDirs = @(
+                    (Join-Path -Path $localAppDataPath -ChildPath "Agentuity"),
+                    (Join-Path -Path $localAppDataPath -ChildPath "PFiles\Agentuity")
+                )
+                
+                foreach ($nestedDir in $nestedDirs) {
+                    if (Test-Path -Path $nestedDir) {
+                        Write-Step "Found nested directory at $nestedDir, moving files to correct location"
                         
-                        # Create target directory if it doesn't exist
-                        if (-not (Test-Path -Path $targetDir)) {
-                            New-Item -Path $targetDir -ItemType Directory -Force | Out-Null
+                        # Check if the executable exists in this nested directory
+                        $nestedExePath = Join-Path -Path $nestedDir -ChildPath "agentuity.exe"
+                        if (Test-Path -Path $nestedExePath) {
+                            Write-Step "Found executable in nested directory, copying to root installation directory"
+                            try {
+                                Copy-Item -Path $nestedExePath -Destination (Join-Path -Path $localAppDataPath -ChildPath "agentuity.exe") -Force -ErrorAction SilentlyContinue
+                                Write-Success "Successfully copied executable from nested directory"
+                            } catch {
+                                Write-Warning "Failed to copy executable from nested directory: $_"
+                            }
                         }
                         
-                        # Move the item
-                        Move-Item -Path $_.FullName -Destination $targetPath -Force
+                        # Move all files from nested directory to parent
+                        Get-ChildItem -Path $nestedDir -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+                            try {
+                                $relativePath = $_.FullName.Substring($nestedDir.Length)
+                                $targetPath = Join-Path -Path $localAppDataPath -ChildPath $relativePath
+                                $targetDir = Split-Path -Parent $targetPath
+                                
+                                # Create target directory if it doesn't exist
+                                if (-not (Test-Path -Path $targetDir)) {
+                                    New-Item -Path $targetDir -ItemType Directory -Force -ErrorAction SilentlyContinue | Out-Null
+                                }
+                                
+                                # Copy the item instead of moving to avoid permission issues
+                                Copy-Item -Path $_.FullName -Destination $targetPath -Force -ErrorAction SilentlyContinue
+                            } catch {
+                                Write-Warning "Failed to copy item from nested directory: $_"
+                            }
+                        }
                     }
+                }
+                
+                # Also check for PFiles directory without Agentuity subdirectory
+                $pfilesDir = Join-Path -Path $localAppDataPath -ChildPath "PFiles"
+                if (Test-Path -Path $pfilesDir) {
+                    Write-Step "Found PFiles directory, checking for executable"
+                    $exeFiles = Get-ChildItem -Path $pfilesDir -Recurse -Filter "agentuity.exe" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
                     
-                    # Remove the now-empty nested directory
-                    Remove-Item -Path $nestedDir -Recurse -Force
+                    if ($exeFiles.Count -gt 0) {
+                        Write-Step "Found executable in PFiles directory, copying to root installation directory"
+                        try {
+                            Copy-Item -Path $exeFiles[0] -Destination (Join-Path -Path $localAppDataPath -ChildPath "agentuity.exe") -Force -ErrorAction SilentlyContinue
+                            Write-Success "Successfully copied executable from PFiles directory"
+                        } catch {
+                            Write-Warning "Failed to copy executable from PFiles directory: $_"
+                        }
+                    }
                 }
                 
                 # If no executable found, try to extract files directly
@@ -630,7 +668,7 @@ function Install-MSI {
                     }
                 }
                 
-                # Add MSIINSTALLPERUSER=1 to registry to allow uninstallation without admin privileges
+                # Add registry entries to allow uninstallation without admin privileges
                 Write-Step "Setting registry keys for non-admin uninstallation"
                 try {
                     # Create registry key for the application
@@ -639,13 +677,72 @@ function Install-MSI {
                         New-Item -Path $regPath -Force | Out-Null
                     }
                     
-                    # Set required properties
+                    # Try to extract product code from MSI
+                    $productCode = ""
+                    try {
+                        # Create a temporary directory to extract MSI property
+                        $tempDir = Join-Path -Path $env:TEMP -ChildPath "AgentuityMsiInfo"
+                        if (-not (Test-Path -Path $tempDir)) {
+                            New-Item -Path $tempDir -ItemType Directory -Force | Out-Null
+                        }
+                        
+                        # Use Windows Installer automation to get product code
+                        $windowsInstaller = New-Object -ComObject WindowsInstaller.Installer
+                        $database = $windowsInstaller.GetType().InvokeMember("OpenDatabase", "InvokeMethod", $null, $windowsInstaller, @($MsiPath, 0))
+                        
+                        $query = "SELECT `Value` FROM `Property` WHERE `Property` = 'ProductCode'"
+                        $view = $database.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $database, @($query))
+                        $view.GetType().InvokeMember("Execute", "InvokeMethod", $null, $view, $null)
+                        
+                        $record = $view.GetType().InvokeMember("Fetch", "InvokeMethod", $null, $view, $null)
+                        if ($record -ne $null) {
+                            $productCode = $record.GetType().InvokeMember("StringData", "GetProperty", $null, $record, 1)
+                        }
+                        
+                        # Clean up
+                        $view.GetType().InvokeMember("Close", "InvokeMethod", $null, $view, $null)
+                        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($database) | Out-Null
+                        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($windowsInstaller) | Out-Null
+                        
+                        Write-Step "Extracted product code: $productCode"
+                    } catch {
+                        Write-Warning "Failed to extract product code from MSI: $_"
+                    }
+                    
+                    # Create a direct uninstall command that doesn't rely on MSI
+                    $uninstallCmd = if ($productCode -ne "") {
+                        "msiexec.exe /x $productCode MSIINSTALLPERUSER=1 /qn"
+                    } else {
+                        # Fallback to direct executable removal
+                        "cmd.exe /c rd /s /q `"$localAppDataPath`""
+                    }
+                    
+                    # Set required properties for Add/Remove Programs
                     New-ItemProperty -Path $regPath -Name "DisplayName" -Value "Agentuity CLI" -PropertyType String -Force | Out-Null
-                    New-ItemProperty -Path $regPath -Name "UninstallString" -Value "msiexec.exe /x {PRODUCT_CODE} /qn" -PropertyType String -Force | Out-Null
+                    New-ItemProperty -Path $regPath -Name "DisplayVersion" -Value (Get-LatestReleaseVersion) -PropertyType String -Force | Out-Null
+                    New-ItemProperty -Path $regPath -Name "UninstallString" -Value $uninstallCmd -PropertyType String -Force | Out-Null
+                    New-ItemProperty -Path $regPath -Name "QuietUninstallString" -Value $uninstallCmd -PropertyType String -Force | Out-Null
                     New-ItemProperty -Path $regPath -Name "InstallLocation" -Value $localAppDataPath -PropertyType String -Force | Out-Null
                     New-ItemProperty -Path $regPath -Name "InstallSource" -Value $localAppDataPath -PropertyType String -Force | Out-Null
+                    New-ItemProperty -Path $regPath -Name "Publisher" -Value "Agentuity" -PropertyType String -Force | Out-Null
                     New-ItemProperty -Path $regPath -Name "NoModify" -Value 1 -PropertyType DWord -Force | Out-Null
                     New-ItemProperty -Path $regPath -Name "NoRepair" -Value 1 -PropertyType DWord -Force | Out-Null
+                    New-ItemProperty -Path $regPath -Name "SystemComponent" -Value 0 -PropertyType DWord -Force | Out-Null
+                    
+                    # Add estimated size (in KB)
+                    $sizeInKB = 5000  # Default size if we can't calculate
+                    try {
+                        $exePath = Join-Path -Path $localAppDataPath -ChildPath "agentuity.exe"
+                        if (Test-Path -Path $exePath) {
+                            $fileInfo = Get-Item -Path $exePath
+                            $sizeInKB = [math]::Ceiling($fileInfo.Length / 1024)
+                        }
+                    } catch {
+                        Write-Warning "Failed to get executable size: $_"
+                    }
+                    New-ItemProperty -Path $regPath -Name "EstimatedSize" -Value $sizeInKB -PropertyType DWord -Force | Out-Null
+                    
+                    Write-Success "Successfully set registry keys for uninstallation"
                 } catch {
                     Write-Warning "Failed to set registry keys: $_"
                     # Continue anyway as this is not critical
