@@ -533,7 +533,31 @@ function Install-MSI {
                         $foundExeDir = Split-Path -Parent $foundExePath
                         
                         # Copy all files from the directory containing the executable
-                        Copy-Item -Path "$foundExeDir\*" -Destination $localAppDataPath -Recurse -Force
+                        # Use error handling to skip files that can't be accessed due to permission issues
+                        Get-ChildItem -Path $foundExeDir -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+                            try {
+                                $targetPath = $_.FullName.Replace($foundExeDir, $localAppDataPath)
+                                $targetDir = Split-Path -Parent $targetPath
+                                
+                                # Create target directory if it doesn't exist
+                                if (-not (Test-Path -Path $targetDir)) {
+                                    New-Item -Path $targetDir -ItemType Directory -Force -ErrorAction SilentlyContinue | Out-Null
+                                }
+                                
+                                # Copy the item, skip if access denied
+                                Copy-Item -Path $_.FullName -Destination $targetPath -Force -ErrorAction SilentlyContinue
+                            } catch {
+                                Write-Warning "Skipping file due to access error: $($_.FullName)"
+                            }
+                        }
+                        
+                        # As a fallback, try to copy just the executable directly
+                        try {
+                            Copy-Item -Path $foundExePath -Destination (Join-Path -Path $localAppDataPath -ChildPath "agentuity.exe") -Force -ErrorAction SilentlyContinue
+                            Write-Step "Copied executable directly to installation directory"
+                        } catch {
+                            Write-Warning "Failed to copy executable directly: $_"
+                        }
                     }
                     
                     # Clean up temp directory
