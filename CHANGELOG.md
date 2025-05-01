@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.114] - 2025-05-01
+
+### Fixed
+- Don't call close handler if conn is nil ([#255](https://github.com/agentuity/cli/pull/255))
+- Fix 'text file busy' error during CLI updates ([#254](https://github.com/agentuity/cli/pull/254))
+- Windows: improve the output for windows upgrade ([#253](https://github.com/agentuity/cli/pull/253))
+- Fix PowerShell installation issues in install.ps1 ([#257](https://github.com/agentuity/cli/pull/257))
+- DevMode: Make sure to terminate child processes ([#259](https://github.com/agentuity/cli/pull/259))
+- Don't error if deliberate restart ([#260](https://github.com/agentuity/cli/pull/260))
+- Set ALLUSERS=0 for non-admin installations to ensure proper installation to AppData/Local/Agentuity ([#261](https://github.com/agentuity/cli/pull/261))
+
+### Added
+- Update install.sh to support /home/ubuntu/.bin and prompt for shell reload ([#258](https://github.com/agentuity/cli/pull/258))
+- Add breaking change for new Python SDK ([#256](https://github.com/agentuity/cli/pull/256))
+
 ## [v0.0.113] - 2025-04-29
 
 ### Added
@@ -427,6 +442,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.114]: https://github.com/agentuity/cli/compare/v0.0.113...v0.0.114
 [v0.0.113]: https://github.com/agentuity/cli/compare/v0.0.112...v0.0.113
 [v0.0.112]: https://github.com/agentuity/cli/compare/v0.0.111...v0.0.112
 [v0.0.111]: https://github.com/agentuity/cli/compare/v0.0.110...v0.0.111
