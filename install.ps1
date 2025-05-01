@@ -845,7 +845,14 @@ try {
     $programFilesX86Path = [System.IO.Path]::Combine(${env:ProgramFiles(x86)}, "Agentuity")
     $localAppDataPath = [System.IO.Path]::Combine($env:LOCALAPPDATA, "Agentuity")
     
-    $installPaths = @($programFilesX86Path, $programFilesPath, $localAppDataPath, $installDir)
+    # Prioritize paths based on admin status and installation directory
+    if (Test-Administrator) {
+        # For admin users, check Program Files locations first
+        $installPaths = @($programFilesX86Path, $programFilesPath, $localAppDataPath, $installDir)
+    } else {
+        # For non-admin users, check LOCALAPPDATA first
+        $installPaths = @($localAppDataPath, $installDir, $programFilesX86Path, $programFilesPath)
+    }
     $installVerified = $false
     
     # In CI environment, list all paths being checked
