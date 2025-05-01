@@ -13,6 +13,7 @@ tty_red="$(tty_mkbold 31)"
 tty_bold="$(tty_mkbold 39)"
 tty_reset="$(tty_escape 0)"
 tty_cyan="$(tty_mkbold 36)"
+tty_magenta="$(tty_mkbold 35)"
 tty_underline="$(tty_escape 4)"
 
 ohai() {
@@ -37,7 +38,7 @@ success() {
   ohai "For more information, visit: $(url "https://agentuity.dev")"
   
   if ! command -v agentuity >/dev/null 2>&1; then
-    ohai "To apply PATH changes, restart your terminal or run: source ~/.$(basename $SHELL)rc"
+    printf "${tty_blue}==>${tty_bold} ${tty_magenta}To apply PATH changes, restart your terminal or run:${tty_reset} source ~/.$(basename $SHELL)rc\n"
   fi
   
   exit 0
@@ -336,7 +337,7 @@ if [[ ":$PATH:" != *":$INSTALL_PATH:"* ]]; then
     ohai "Added $INSTALL_PATH to PATH in $SHELL_CONFIG"
     
     if ! command -v agentuity >/dev/null 2>&1; then
-      ohai "To apply changes, restart your terminal or run: source $SHELL_CONFIG"
+      printf "${tty_blue}==>${tty_bold} ${tty_magenta}To apply changes, restart your terminal or run:${tty_reset} source $SHELL_CONFIG\n"
     fi
     
     export PATH="$PATH:$INSTALL_PATH"
