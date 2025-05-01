@@ -13,6 +13,7 @@ tty_red="$(tty_mkbold 31)"
 tty_bold="$(tty_mkbold 39)"
 tty_reset="$(tty_escape 0)"
 tty_cyan="$(tty_mkbold 36)"
+tty_magenta="$(tty_mkbold 35)"
 tty_underline="$(tty_escape 4)"
 
 ohai() {
@@ -35,6 +36,11 @@ abort() {
 success() {
   ohai "Installation complete! Run 'agentuity --help' to get started."
   ohai "For more information, visit: $(url "https://agentuity.dev")"
+  
+  if ! command -v agentuity >/dev/null 2>&1; then
+    printf "${tty_blue}==>${tty_bold} ${tty_magenta}To apply PATH changes, restart your terminal or run:${tty_reset} source ~/.$(basename $SHELL)rc\n"
+  fi
+  
   exit 0
 }
 
@@ -58,6 +64,8 @@ if [[ "$OS" == "Darwin" ]]; then
   EXTENSION="tar.gz"
   if [[ -d "$HOME/.local/bin" ]] && [[ -w "$HOME/.local/bin" ]]; then
     INSTALL_DIR="$HOME/.local/bin"
+  elif [[ -d "$HOME/.bin" ]] && [[ -w "$HOME/.bin" ]]; then
+    INSTALL_DIR="$HOME/.bin"
   elif [[ -d "$HOME/bin" ]] && [[ -w "$HOME/bin" ]]; then
     INSTALL_DIR="$HOME/bin"
   else
@@ -68,6 +76,8 @@ elif [[ "$OS" == "Linux" ]]; then
   EXTENSION="tar.gz"
   if [[ -d "$HOME/.local/bin" ]] && [[ -w "$HOME/.local/bin" ]]; then
     INSTALL_DIR="$HOME/.local/bin"
+  elif [[ -d "$HOME/.bin" ]] && [[ -w "$HOME/.bin" ]]; then
+    INSTALL_DIR="$HOME/.bin"
   elif [[ -d "$HOME/bin" ]] && [[ -w "$HOME/bin" ]]; then
     INSTALL_DIR="$HOME/bin"
   else
@@ -156,6 +166,11 @@ if [[ ! -d "$INSTALL_PATH" ]] || [[ ! -w "$INSTALL_PATH" ]]; then
       if [[ -w "$HOME/.local/bin" ]]; then
         ohai "Using $HOME/.local/bin instead"
         INSTALL_PATH="$HOME/.local/bin"
+      fi
+    elif [[ -d "$HOME/.bin" ]] || mkdir -p "$HOME/.bin" 2>/dev/null; then
+      if [[ -w "$HOME/.bin" ]]; then
+        ohai "Using $HOME/.bin instead"
+        INSTALL_PATH="$HOME/.bin"
       fi
     elif [[ -d "$HOME/bin" ]] || mkdir -p "$HOME/bin" 2>/dev/null; then
       if [[ -w "$HOME/bin" ]]; then
@@ -320,21 +335,30 @@ if [[ ":$PATH:" != *":$INSTALL_PATH:"* ]]; then
   if [[ -n "$SHELL_CONFIG" ]] && [[ -w "$SHELL_CONFIG" ]]; then
     echo "export PATH=\"\$PATH:$INSTALL_PATH\"" >> "$SHELL_CONFIG"
     ohai "Added $INSTALL_PATH to PATH in $SHELL_CONFIG"
+    
+    if ! command -v agentuity >/dev/null 2>&1; then
+      printf "${tty_blue}==>${tty_bold} ${tty_magenta}To apply changes, restart your terminal or run:${tty_reset} source $SHELL_CONFIG\n"
+    fi
+    
     export PATH="$PATH:$INSTALL_PATH"
   else
     warn "$INSTALL_PATH is not in your PATH. You may need to add it manually to use the agentuity command."
     case "$SHELL" in
       */bash*)
         echo "  echo 'export PATH=\"\$PATH:$INSTALL_PATH\"' >> ~/.bashrc"
+        echo "  source ~/.bashrc  # To apply changes immediately"
         ;;
       */zsh*)
         echo "  echo 'export PATH=\"\$PATH:$INSTALL_PATH\"' >> ~/.zshrc"
+        echo "  source ~/.zshrc  # To apply changes immediately"
         ;;
       */fish*)
         echo "  echo 'set -gx PATH \$PATH $INSTALL_PATH' >> ~/.config/fish/config.fish"
+        echo "  source ~/.config/fish/config.fish  # To apply changes immediately"
         ;;
       *)
         echo "  Add $INSTALL_PATH to your PATH"
+        echo "  Then restart your terminal or reload your shell configuration"
         ;;
     esac
   fi
