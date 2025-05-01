@@ -22,7 +22,7 @@
     Installs the latest version of Agentuity CLI to C:\Tools.
 .NOTES
     Author: Agentuity, Inc.
-    Website: https://agentuity.dev
+    Website: https://agentuity.com
 #>
 
 [CmdletBinding()]
@@ -227,8 +227,14 @@ function Get-Architecture {
 function Get-DefaultInstallDir {
     if ([string]::IsNullOrEmpty($InstallDir)) {
         if (Test-Administrator) {
+            $programFilesX86Path = [System.IO.Path]::Combine(${env:ProgramFiles(x86)})
+            if (Test-Path -Path $programFilesX86Path) {
+                return [System.IO.Path]::Combine(${env:ProgramFiles(x86)}, "Agentuity")
+            }
+            else {
             # Return the standard Program Files path by default
-            return [System.IO.Path]::Combine($env:ProgramFiles, "Agentuity")
+                return [System.IO.Path]::Combine($env:ProgramFiles, "Agentuity")
+            }
         }
         else {
             return [System.IO.Path]::Combine($env:LOCALAPPDATA, "Agentuity")
@@ -269,9 +275,6 @@ function Add-ToPath {
             $newSystemPath = "$systemPath;$PathToAdd"
             [Environment]::SetEnvironmentVariable("PATH", $newSystemPath, [EnvironmentVariableTarget]::Machine)
             Write-Success "Added to system PATH"
-            
-            # Also update current session
-            $env:PATH = "$env:PATH;$PathToAdd"
         }
         else {
             # User PATH update (doesn't require admin)
@@ -279,38 +282,80 @@ function Add-ToPath {
             $newUserPath = "$userPath;$PathToAdd"
             [Environment]::SetEnvironmentVariable("PATH", $newUserPath, [EnvironmentVariableTarget]::User)
             Write-Success "Added to user PATH"
-            
-            # Also update current session
-            $env:PATH = "$env:PATH;$PathToAdd"
+        }
+
+        # Update current session PATH
+        $env:PATH = "$env:PATH;$PathToAdd"
+
+        # Force PowerShell to refresh its command discovery
+        # Remove any existing function with this name first
+        if (Get-Command "agentuity" -ErrorAction SilentlyContinue) {
+            if ((Get-Command "agentuity").CommandType -eq "Function") {
+                Remove-Item -Path "Function:\agentuity" -ErrorAction SilentlyContinue
+            }
+        }
+
+        # Create a temporary function that will redirect to the actual executable
+        $scriptBlock = {
+            param($argumentList)
+            & (Join-Path -Path $PathToAdd -ChildPath "agentuity.exe") @argumentList
+        }
+
+        # Register the function in the current session
+        Set-Item -Path "Function:\agentuity" -Value $scriptBlock -Force
+
+        Write-Success "Command 'agentuity' is now available in the current session"
+    }
+    catch {
+        Write-Error "Failed to update PATH: $_"
+        Write-Warning "You may need to manually add $PathToAdd to your PATH environment variable."
+    }
+}
+
+function Load-InCurrentSession {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$ExePath
+    )
+
+    Write-Step "Loading Agentuity CLI in current session..."
+
+    try {
+        # Verify the executable exists
+        if (-not (Test-Path -Path $ExePath)) {
+            Write-Warning "Executable not found at $ExePath"
+            return
         }
         
-        # Refresh PowerShell's command discovery to make the command immediately available
-        # This creates a temporary function with the same name as the executable to force PowerShell to refresh
-        $exeName = "agentuity"
-        
-        # Remove any existing function with this name first
-        if (Get-Command $exeName -ErrorAction SilentlyContinue) {
-            if ((Get-Command $exeName).CommandType -eq "Function") {
-                Remove-Item -Path "Function:\$exeName" -ErrorAction SilentlyContinue
+        # Test that the executable is actually accessible
+        try {
+            $testOutput = & $ExePath version 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "Executable verification failed with exit code $LASTEXITCODE"
+                return
             }
+            Write-Success "Verified executable is accessible: $testOutput"
+        }
+        catch {
+            Write-Warning "Failed to execute $ExePath"
+            Write-Warning "Error: $($_.Exception.Message)"
+            return
         }
         
         # Create a temporary function that will redirect to the actual executable
         $scriptBlock = {
             param($argumentList)
-            & "$PathToAdd\$exeName.exe" @argumentList
-            # Remove this function after first use to ensure future calls use the actual executable
-            Remove-Item -Path "Function:\$exeName" -ErrorAction SilentlyContinue
+            & $ExePath @argumentList
         }
         
-        # Register the function using the Function: drive instead of global: scope
-        Set-Item -Path "Function:\$exeName" -Value $scriptBlock -Force
+        # Register the function in the current session
+        Set-Item -Path "Function:\agentuity" -Value $scriptBlock -Force
         
-        Write-Success "Command '$exeName' is now available in the current PowerShell session"
+        Write-Success "Agentuity CLI loaded in current session"
     }
     catch {
-        Write-Error "Failed to update PATH: $_"
-        Write-Warning "You may need to manually add $PathToAdd to your PATH environment variable."
+        Write-Warning "Failed to load Agentuity CLI in current session"
+        Write-Warning "Error: $($_.Exception.Message)"
     }
 }
 
@@ -492,6 +537,38 @@ function Test-Installation {
     }
 }
 
+function Test-ExecutionPolicy {
+    $currentPolicy = Get-ExecutionPolicy
+    $allowedPolicies = @("Unrestricted", "RemoteSigned", "Bypass")
+
+    if ($allowedPolicies -contains $currentPolicy) {
+        return $true
+    }
+
+    Write-Warning "PowerShell execution policy is set to '$currentPolicy' which may prevent script execution."
+    Write-Warning "Allowed policies are: $($allowedPolicies -join ', ')"
+
+    if ($NoPrompt) {
+        Write-Warning "Skipping PowerShell completion setup due to execution policy restrictions"
+        return $false
+    }
+
+    $message = "Would you like to temporarily set the execution policy to 'RemoteSigned' for this session?"
+    if (Get-UserConfirmation -Message $message -DefaultToYes $true) {
+        try {
+            Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
+            Write-Success "Temporarily set execution policy to RemoteSigned for this session"
+            return $true
+        }
+        catch {
+            Write-Warning "Failed to set execution policy: $_"
+            return $false
+        }
+    }
+
+    return $false
+}
+
 function Set-PowerShellCompletion {
     param (
         [Parameter(Mandatory = $true)]
@@ -500,6 +577,17 @@ function Set-PowerShellCompletion {
     
     Write-Step "Setting up PowerShell completion..."
     
+    # Check execution policy first
+    if (-not (Test-ExecutionPolicy)) {
+        Write-Warning "Skipping PowerShell completion setup due to execution policy restrictions"
+        Write-Warning "You can manually set up completion by running these commands:"
+        Write-Warning "  mkdir -Force $HOME\Documents\WindowsPowerShell\Completion"
+        Write-Warning "  $ExePath completion powershell > $HOME\Documents\WindowsPowerShell\Completion\agentuity.ps1"
+        Write-Warning "  Add '. `"$HOME\Documents\WindowsPowerShell\Completion\agentuity.ps1`"' to your PowerShell profile"
+        Write-Warning "  To edit your profile, run: notepad $PROFILE"
+        return
+    }
+
     try {
         # Verify the executable exists
         if (-not (Test-Path -Path $ExePath)) {
@@ -513,6 +601,22 @@ function Set-PowerShellCompletion {
                 Write-Warning "Executable not found at $ExePath or $programFilesX86Path"
                 throw "Executable not found"
             }
+        }
+        
+        # Test that the executable is actually accessible
+        try {
+            $testOutput = & $ExePath version 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "Executable verification failed with exit code $LASTEXITCODE"
+                throw "Executable verification failed"
+            }
+            Write-Success "Verified executable is accessible: $testOutput"
+        }
+        catch {
+            $errorMessage = $_.Exception.Message
+            Write-Warning "Failed to execute $ExePath"
+            Write-Warning "Error: $errorMessage"
+            throw "Executable verification failed"
         }
         
         # Create PowerShell profile directory if it doesn't exist
@@ -529,7 +633,22 @@ function Set-PowerShellCompletion {
         
         # Generate completion script
         $completionPath = Join-Path -Path $completionDir -ChildPath "agentuity.ps1"
-        & $ExePath completion powershell | Out-File -FilePath $completionPath -Encoding utf8 -Force
+        Write-Step "Generating PowerShell completion script at $completionPath"
+        
+        try {
+            $completionOutput = & $ExePath completion powershell 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "Failed to generate completion script: $completionOutput"
+                throw "Completion generation failed"
+            }
+            $completionOutput | Out-File -FilePath $completionPath -Encoding utf8 -Force
+        }
+        catch {
+            $errorMessage = $_.Exception.Message
+            Write-Warning "Failed to generate completion script"
+            Write-Warning "Error: $errorMessage"
+            throw "Completion generation failed"
+        }
         
         # Check if the profile exists, create if not
         if (-not (Test-Path -Path $PROFILE)) {
@@ -543,16 +662,33 @@ function Set-PowerShellCompletion {
         if (-not $profileContent -or -not $profileContent.Contains($completionLine)) {
             Add-Content -Path $PROFILE -Value "`n# Agentuity CLI completion`n$completionLine" -Force
             Write-Success "PowerShell completion installed to $completionPath and added to your profile"
+            Write-Step "NOTE: You'll need to restart PowerShell or run '. $PROFILE' for completion to take effect in future sessions"
         }
         else {
             Write-Success "PowerShell completion already configured in your profile"
         }
+        
+        # Source the completion script in the current session
+        try {
+            . $completionPath
+            Write-Success "PowerShell completion loaded in current session"
+        }
+        catch {
+            $errorMessage = $_.Exception.Message
+            Write-Warning "Failed to load completion in current session"
+            Write-Warning "Error: $errorMessage"
+            Write-Warning "Completion will be available in new PowerShell sessions"
+        }
     }
     catch {
-        Write-Warning "Failed to set up PowerShell completion: $_"
-        Write-Warning "You can manually set up completion by running:"
+        $errorMessage = $_.Exception.Message
+        Write-Warning "Failed to set up PowerShell completion"
+        Write-Warning "Error: $errorMessage"
+        Write-Warning "You can manually set up completion by running these commands:"
+        Write-Warning "  mkdir -Force $HOME\Documents\WindowsPowerShell\Completion"
         Write-Warning "  $ExePath completion powershell > $HOME\Documents\WindowsPowerShell\Completion\agentuity.ps1"
         Write-Warning "  Add '. `"$HOME\Documents\WindowsPowerShell\Completion\agentuity.ps1`"' to your PowerShell profile"
+        Write-Warning "  To edit your profile, run: notepad $PROFILE"
     }
 }
 
@@ -610,7 +746,8 @@ if (-not (Test-Path -Path $installDir)) {
         New-Item -Path $installDir -ItemType Directory -Force | Out-Null
     }
     catch {
-        Write-Error "Failed to create installation directory: $_" -Exit
+        $errorMessage = $_.Exception.Message
+        Write-Error "Failed to create installation directory: $errorMessage" -Exit
     }
 }
 
@@ -636,7 +773,7 @@ New-Item -Path $tempDir -ItemType Directory -Force | Out-Null
 try {
     # Download MSI installer
     $msiPath = Join-Path -Path $tempDir -ChildPath $downloadFilename
-    Write-Step "Downloading Agentuity CLI v${Version} for Windows/$arch..."
+    Write-Step "Downloading Agentuity CLI v${VersionToUse} for Windows/$arch..."
     
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -644,7 +781,8 @@ try {
         $webClient.DownloadFile($downloadUrl, $msiPath)
     }
     catch {
-        Write-Error "Failed to download from $downloadUrl`: $_" -Exit
+        $errorMessage = $_.Exception.Message
+        Write-Error "Failed to download from ${downloadUrl}: ${errorMessage}" -Exit
     }
     
     # Download and verify checksums
@@ -663,14 +801,16 @@ try {
             Write-Warning "Checksum for $downloadFilename not found in checksums.txt. Skipping verification."
         }
         elseif ($computedChecksum -ne $expectedChecksum) {
-            Write-Error "Checksum verification failed. Expected: $expectedChecksum, Got: $computedChecksum" -Exit
+            Write-Error "Checksum verification failed. Expected: ${expectedChecksum}, Got: ${computedChecksum}" -Exit
         }
         else {
             Write-Success "Checksum verification passed!"
         }
     }
     catch {
-        Write-Warning "Failed to verify checksum: $_"
+        $errorMessage = $_.Exception.Message
+        Write-Warning "Failed to verify checksum"
+        Write-Warning "Error: $errorMessage"
         
         if (-not (Get-UserConfirmation -Message "Continue without checksum verification?" -DefaultToYes $false)) {
             Write-Step "Installation cancelled."
@@ -680,7 +820,7 @@ try {
     
     # Confirm installation
     if (-not $NoPrompt) {
-        $confirmMessage = "Ready to install Agentuity CLI v${Version} to $installDir. Continue?"
+        $confirmMessage = "Ready to install Agentuity CLI v${VersionToUse} to $installDir. Continue?"
         if (-not (Get-UserConfirmation -Message $confirmMessage -DefaultToYes $true)) {
             Write-Step "Installation cancelled."
             exit 0
@@ -699,7 +839,7 @@ try {
     $programFilesX86Path = [System.IO.Path]::Combine(${env:ProgramFiles(x86)}, "Agentuity")
     $localAppDataPath = [System.IO.Path]::Combine($env:LOCALAPPDATA, "Agentuity")
     
-    $installPaths = @($programFilesPath, $programFilesX86Path, $localAppDataPath, $installDir)
+    $installPaths = @($programFilesX86Path, $programFilesPath, $localAppDataPath, $installDir)
     $installVerified = $false
     
     # In CI environment, list all paths being checked
@@ -731,7 +871,10 @@ try {
             
             # Add to PATH if not already there
             Add-ToPath -PathToAdd $path
-            
+
+            # Load in current session
+            Load-InCurrentSession -ExePath $exePath
+
             # Set up PowerShell completion
             Set-PowerShellCompletion -ExePath $exePath
             
@@ -757,6 +900,9 @@ try {
                     # Add to PATH if not already there
                     Add-ToPath -PathToAdd $installDir
                     
+                    # Load in current session
+                    Load-InCurrentSession -ExePath $exePath
+
                     # Set up PowerShell completion
                     Set-PowerShellCompletion -ExePath $exePath
                     
@@ -770,12 +916,32 @@ try {
     
     if (-not $installVerified) {
         Write-Error "Failed to verify installation. The MSI may have installed to a different location or failed silently."
-        Write-Warning "Please check the installation log at $env:TEMP\agentuity_install.log for details."
+        Write-Warning "Please check the installation log at ${env:TEMP}\agentuity_install.log for details."
         exit 1
     }
     
-    # Success message
-    Write-Success "Installation complete! Run 'agentuity --help' to get started."
+    # Final verification that the command is accessible
+    Write-Step "Verifying command is accessible in current session..."
+    try {
+        $verifyOutput = & agentuity version 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "Agentuity CLI is ready to use in the current session!"
+            Write-Success "Installation complete! Run 'agentuity --help' to get started."
+        } else {
+            Write-Warning "Command verification failed with exit code $LASTEXITCODE"
+            Write-Warning "You may need to restart your PowerShell session or manually add the installation directory to your PATH"
+            Write-Warning "Installation directory: $installDir"
+            Write-Warning "To manually add to PATH, run: `${env:PATH} += ';${installDir}'"
+        }
+    } catch {
+        $errorMessage = $_.Exception.Message
+        Write-Warning "Command 'agentuity' is not accessible in the current session"
+        Write-Warning "Error: $errorMessage"
+        Write-Warning "You may need to restart your PowerShell session or manually add the installation directory to your PATH"
+        Write-Warning "Installation directory: $installDir"
+        Write-Warning "To manually add to PATH, run: `${env:PATH} += ';${installDir}'"
+    }
+    
     Write-Step "For more information, visit: $(Write-Url "https://agentuity.dev")"
 }
 finally {
