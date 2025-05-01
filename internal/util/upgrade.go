@@ -680,7 +680,6 @@ func upgradeWithWindowsUser(ctx context.Context, logger logger.Logger, version s
 	if err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	defer os.RemoveAll(tempDir)
 
 	installerName := getMsiInstallerName()
 
@@ -699,6 +698,7 @@ func upgradeWithWindowsUser(ctx context.Context, logger logger.Logger, version s
 	}
 	tui.ShowSpinner(fmt.Sprintf("Downloading %s...", version), downloadAction)
 	if downloadErr != nil {
+		os.RemoveAll(tempDir) // Clean up on error
 		return downloadErr
 	}
 
@@ -714,6 +714,7 @@ func upgradeWithWindowsUser(ctx context.Context, logger logger.Logger, version s
 	}
 	tui.ShowSpinner("Downloading checksum...", checksumAction)
 	if checksumDownloadErr != nil {
+		os.RemoveAll(tempDir) // Clean up on error
 		return checksumDownloadErr
 	}
 
@@ -735,29 +736,29 @@ func upgradeWithWindowsUser(ctx context.Context, logger logger.Logger, version s
 	}
 	tui.ShowSpinner("Verifying checksum...", verifyAction)
 	if checksumErr != nil {
+		os.RemoveAll(tempDir) // Clean up on error
 		return checksumErr
 	}
 
 	if !valid {
+		os.RemoveAll(tempDir) // Clean up on error
 		return fmt.Errorf("checksum verification failed")
 	}
 
 	logger.Debug("Installing MSI for current user only")
 
-	batchFile := filepath.Join(tempDir, "install.bat")
-	batchContent := fmt.Sprintf("msiexec.exe /i \"%s\" /qn ALLUSERS=0", installerPath)
-	if err := os.WriteFile(batchFile, []byte(batchContent), 0755); err != nil {
-		return fmt.Errorf("failed to create batch file: %w", err)
-	}
-
 	var installErr error
 	installAction := func() {
-		cmd := exec.CommandContext(ctx, "cmd.exe", "/C", batchFile)
+		cmd := exec.CommandContext(ctx, "msiexec.exe", "/i", installerPath, "/qn", "ALLUSERS=0")
+		cmd.Dir = tempDir
 		if out, err := cmd.CombinedOutput(); err != nil {
 			installErr = fmt.Errorf("failed to install MSI: %w\nOutput: %s", err, string(out))
 		}
 	}
 	tui.ShowSpinner("Installing...", installAction)
+
+	defer os.RemoveAll(tempDir)
+
 	if installErr != nil {
 		return installErr
 	}
