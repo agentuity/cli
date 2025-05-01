@@ -227,6 +227,15 @@ function Get-Architecture {
 function Get-DefaultInstallDir {
     if ([string]::IsNullOrEmpty($InstallDir)) {
         if (Test-Administrator) {
+            $programFilesX86Path = [System.IO.Path]::Combine(${env:ProgramFiles(x86)}, "Agentuity")
+            if (Test-Path -Path $programFilesX86Path) {
+                return $programFilesX86Path
+            }
+            else {
+                return [System.IO.Path]::Combine($env:ProgramFiles, "Agentuity")
+            }
+        }
+        else {
             # Return the standard Program Files path by default
             return [System.IO.Path]::Combine($env:ProgramFiles, "Agentuity")
         }
@@ -280,9 +289,23 @@ function Add-ToPath {
 
         # Update current session PATH
         $env:PATH = "$env:PATH;$PathToAdd"
-        
+
         # Force PowerShell to refresh its command discovery
-        $ExecutionContext.SessionState.InvokeCommand.ClearCommandCache()
+        # Remove any existing function with this name first
+        if (Get-Command "agentuity" -ErrorAction SilentlyContinue) {
+            if ((Get-Command "agentuity").CommandType -eq "Function") {
+                Remove-Item -Path "Function:\agentuity" -ErrorAction SilentlyContinue
+            }
+        }
+
+        # Create a temporary function that will redirect to the actual executable
+        $scriptBlock = {
+            param($argumentList)
+            & (Join-Path -Path $PathToAdd -ChildPath "agentuity.exe") @argumentList
+        }
+
+        # Register the function in the current session
+        Set-Item -Path "Function:\agentuity" -Value $scriptBlock -Force
 
         Write-Success "Command 'agentuity' is now available in the current session"
     }
@@ -759,7 +782,7 @@ try {
     
     # Confirm installation
     if (-not $NoPrompt) {
-        $confirmMessage = "Ready to install Agentuity CLI v${Version} to $installDir. Continue?"
+        $confirmMessage = "Ready to install Agentuity CLI v${VersionToUse} to $installDir. Continue?"
         if (-not (Get-UserConfirmation -Message $confirmMessage -DefaultToYes $true)) {
             Write-Step "Installation cancelled."
             exit 0
