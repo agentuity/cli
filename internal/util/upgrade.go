@@ -676,23 +676,35 @@ func upgradeWithHomebrew(ctx context.Context, logger logger.Logger) error {
 }
 
 func upgradeWithWindowsUser(ctx context.Context, logger logger.Logger, version string) error {
-	tempDir, err := os.MkdirTemp("", "agentuity-upgrade-zip")
+	tempDir, err := os.MkdirTemp("", "agentuity-upgrade-msi")
 	if err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
 	defer os.RemoveAll(tempDir)
 
-	assetName := getReleaseAssetName() // This returns the zip file
+	var arch string
+	if runtime.GOARCH == "amd64" {
+		arch = "x64"
+	} else if runtime.GOARCH == "386" {
+		arch = "x86"
+	} else if runtime.GOARCH == "arm64" {
+		arch = "arm64"
+	} else {
+		return fmt.Errorf("unsupported architecture: %s", runtime.GOARCH)
+	}
+
+	installerName := fmt.Sprintf("agentuity-%s.msi", arch)
+
 	versionPrefix := "v"
 	if strings.HasPrefix(version, "v") {
 		versionPrefix = ""
 	}
-	assetURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s%s/%s", versionPrefix, version, assetName)
-	assetPath := filepath.Join(tempDir, assetName)
+	installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s%s/%s", versionPrefix, version, installerName)
+	installerPath := filepath.Join(tempDir, installerName)
 
 	var downloadErr error
 	downloadAction := func() {
-		if err := downloadFile(assetURL, assetPath); err != nil {
+		if err := downloadFile(installerURL, installerPath); err != nil {
 			downloadErr = fmt.Errorf("failed to download release asset: %w", err)
 		}
 	}
@@ -721,13 +733,13 @@ func upgradeWithWindowsUser(ctx context.Context, logger logger.Logger, version s
 	var valid bool
 	verifyAction := func() {
 		var err1, err2 error
-		checksum, err1 = getChecksumFromFile(checksumPath, assetName)
+		checksum, err1 = getChecksumFromFile(checksumPath, installerName)
 		if err1 != nil {
 			checksumErr = fmt.Errorf("failed to get checksum: %w", err1)
 			return
 		}
 
-		valid, err2 = verifyChecksum(assetPath, checksum)
+		valid, err2 = verifyChecksum(installerPath, checksum)
 		if err2 != nil {
 			checksumErr = fmt.Errorf("failed to verify checksum: %w", err2)
 		}
@@ -741,7 +753,28 @@ func upgradeWithWindowsUser(ctx context.Context, logger logger.Logger, version s
 		return fmt.Errorf("checksum verification failed")
 	}
 
-	return replaceBinary(ctx, logger, assetPath, version)
+	logger.Debug("Installing MSI for current user only")
+
+	batchFile := filepath.Join(tempDir, "install.bat")
+	batchContent := fmt.Sprintf("msiexec.exe /i \"%s\" /qn ALLUSERS=0", installerPath)
+	if err := os.WriteFile(batchFile, []byte(batchContent), 0755); err != nil {
+		return fmt.Errorf("failed to create batch file: %w", err)
+	}
+
+	var installErr error
+	installAction := func() {
+		cmd := exec.CommandContext(ctx, "cmd.exe", "/C", batchFile)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			installErr = fmt.Errorf("failed to install MSI: %w\nOutput: %s", err, string(out))
+		}
+	}
+	tui.ShowSpinner("Installing...", installAction)
+	if installErr != nil {
+		return installErr
+	}
+
+	tui.ShowSuccess("Successfully upgraded to version %s", version)
+	return nil
 }
 
 func upgradeWithWindowsMsi(ctx context.Context, logger logger.Logger, version string) error {
