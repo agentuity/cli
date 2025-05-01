@@ -227,17 +227,14 @@ function Get-Architecture {
 function Get-DefaultInstallDir {
     if ([string]::IsNullOrEmpty($InstallDir)) {
         if (Test-Administrator) {
-            $programFilesX86Path = [System.IO.Path]::Combine(${env:ProgramFiles(x86)}, "Agentuity")
+            $programFilesX86Path = [System.IO.Path]::Combine(${env:ProgramFiles(x86)})
             if (Test-Path -Path $programFilesX86Path) {
-                return $programFilesX86Path
+                return [System.IO.Path]::Combine(${env:ProgramFiles(x86)}, "Agentuity")
             }
             else {
+            # Return the standard Program Files path by default
                 return [System.IO.Path]::Combine($env:ProgramFiles, "Agentuity")
             }
-        }
-        else {
-            # Return the standard Program Files path by default
-            return [System.IO.Path]::Combine($env:ProgramFiles, "Agentuity")
         }
         else {
             return [System.IO.Path]::Combine($env:LOCALAPPDATA, "Agentuity")
