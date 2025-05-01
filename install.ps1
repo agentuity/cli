@@ -22,7 +22,7 @@
     Installs the latest version of Agentuity CLI to C:\Tools.
 .NOTES
     Author: Agentuity, Inc.
-    Website: https://agentuity.dev
+    Website: https://agentuity.com
 #>
 
 [CmdletBinding()]
