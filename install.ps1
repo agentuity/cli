@@ -324,7 +324,7 @@ function Load-InCurrentSession {
         # Verify the executable exists
         if (-not (Test-Path -Path $ExePath)) {
             Write-Warning "Executable not found at $ExePath"
-            return $false
+            return
         }
         
         # Test that the executable is actually accessible
@@ -332,14 +332,14 @@ function Load-InCurrentSession {
             $testOutput = & $ExePath version 2>&1
             if ($LASTEXITCODE -ne 0) {
                 Write-Warning "Executable verification failed with exit code $LASTEXITCODE"
-                return $false
+                return
             }
             Write-Success "Verified executable is accessible: $testOutput"
         }
         catch {
             Write-Warning "Failed to execute $ExePath"
             Write-Warning "Error: $($_.Exception.Message)"
-            return $false
+            return
         }
         
         # Create a temporary function that will redirect to the actual executable
@@ -352,12 +352,10 @@ function Load-InCurrentSession {
         Set-Item -Path "Function:\agentuity" -Value $scriptBlock -Force
         
         Write-Success "Agentuity CLI loaded in current session"
-        return $true
     }
     catch {
         Write-Warning "Failed to load Agentuity CLI in current session"
         Write-Warning "Error: $($_.Exception.Message)"
-        return $false
     }
 }
 
