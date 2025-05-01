@@ -709,19 +709,53 @@ function Install-MSI {
                         Write-Warning "Failed to extract product code from MSI: $_"
                     }
                     
-                    # Create a direct uninstall command that doesn't rely on MSI
-                    $uninstallCmd = if ($productCode -ne "") {
-                        "msiexec.exe /x $productCode MSIINSTALLPERUSER=1 /qn"
-                    } else {
-                        # Fallback to direct executable removal
-                        "cmd.exe /c rd /s /q `"$localAppDataPath`""
+                    # Create an uninstaller script in the installation directory
+                    $uninstallerPath = Join-Path -Path $localAppDataPath -ChildPath "uninstall.cmd"
+                    $uninstallerContent = @"
+@echo off
+echo Uninstalling Agentuity CLI...
+
+REM Remove the executable and other files
+if exist "$($localAppDataPath -replace '\\', '\\')\agentuity.exe" (
+    echo Removing executable files...
+    del /f /q "$($localAppDataPath -replace '\\', '\\')\agentuity.exe" >nul 2>&1
+)
+
+REM Remove the installation directory
+echo Removing installation directory...
+rd /s /q "$($localAppDataPath -replace '\\', '\\')" >nul 2>&1
+
+REM Remove from PATH
+echo Updating PATH environment variable...
+for /f "tokens=2*" %%a in ('reg query HKCU\Environment /v PATH 2^>nul ^| find "PATH"') do (
+    setx PATH "%%b" | findstr /v "$($localAppDataPath -replace '\\', '\\')" >nul 2>&1
+)
+
+REM Remove registry entries
+echo Removing registry entries...
+reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\Agentuity" /f >nul 2>&1
+
+echo Agentuity CLI has been uninstalled successfully.
+pause
+"@
+                    
+                    # Write the uninstaller script
+                    try {
+                        Set-Content -Path $uninstallerPath -Value $uninstallerContent -Force
+                        Write-Step "Created uninstaller script at $uninstallerPath"
+                    } catch {
+                        Write-Warning "Failed to create uninstaller script: $_"
                     }
+                    
+                    # Create a direct uninstall command that uses our script
+                    $uninstallCmd = "cmd.exe /c start `"Agentuity CLI Uninstaller`" /wait `"$uninstallerPath`""
                     
                     # Set required properties for Add/Remove Programs
                     New-ItemProperty -Path $regPath -Name "DisplayName" -Value "Agentuity CLI" -PropertyType String -Force | Out-Null
                     New-ItemProperty -Path $regPath -Name "DisplayVersion" -Value (Get-LatestReleaseVersion) -PropertyType String -Force | Out-Null
                     New-ItemProperty -Path $regPath -Name "UninstallString" -Value $uninstallCmd -PropertyType String -Force | Out-Null
-                    New-ItemProperty -Path $regPath -Name "QuietUninstallString" -Value $uninstallCmd -PropertyType String -Force | Out-Null
+                    # Don't set QuietUninstallString to ensure the user sees the uninstall process
+                    New-ItemProperty -Path $regPath -Name "DisplayIcon" -Value "$exePath,0" -PropertyType String -Force | Out-Null
                     New-ItemProperty -Path $regPath -Name "InstallLocation" -Value $localAppDataPath -PropertyType String -Force | Out-Null
                     New-ItemProperty -Path $regPath -Name "InstallSource" -Value $localAppDataPath -PropertyType String -Force | Out-Null
                     New-ItemProperty -Path $regPath -Name "Publisher" -Value "Agentuity" -PropertyType String -Force | Out-Null
