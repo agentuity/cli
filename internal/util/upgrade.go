@@ -107,6 +107,26 @@ func isWindowsMsiInstallation() bool {
 		strings.Contains(strings.ToLower(exe), "\\program files (x86)\\")
 }
 
+func isWindowsUserInstallation() bool {
+	if runtime.GOOS != "windows" {
+		return false
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return false
+	}
+
+	localAppData := os.Getenv("LOCALAPPDATA")
+	if localAppData == "" {
+		return false
+	}
+
+	exePath := strings.ToLower(strings.ReplaceAll(exe, "\\", "/"))
+	localAppDataPath := strings.ToLower(strings.ReplaceAll(filepath.Join(localAppData, "Agentuity"), "\\", "/"))
+
+	return strings.HasPrefix(exePath, localAppDataPath)
+}
+
 func getReleaseAssetName() string {
 	goos := runtime.GOOS
 	arch := runtime.GOARCH
@@ -187,6 +207,21 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 		}
 
 		return upgradeWithWindowsMsi(ctx, logger, release)
+	}
+
+	if runtime.GOOS == "windows" && isWindowsUserInstallation() {
+		logger.Debug("Detected Windows user installation, upgrading without admin privileges")
+		release, err := GetLatestRelease(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get latest release: %w", err)
+		}
+
+		if Version == release && !force {
+			tui.ShowSuccess("You are already on the latest version (%s)", release)
+			return nil
+		}
+
+		return upgradeWithWindowsUser(ctx, logger, release)
 	}
 
 	release, err := GetLatestRelease(ctx) // Using public function from version.go
@@ -638,6 +673,71 @@ func upgradeWithHomebrew(ctx context.Context, logger logger.Logger) error {
 
 	tui.ShowSuccess("Successfully upgraded to version %s via Homebrew", newVersion)
 	return nil
+}
+
+func upgradeWithWindowsUser(ctx context.Context, logger logger.Logger, version string) error {
+	tempDir, err := os.MkdirTemp("", "agentuity-upgrade-zip")
+	if err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	assetName := getReleaseAssetName() // This returns the zip file
+	assetURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/v%s/%s", version, assetName)
+	assetPath := filepath.Join(tempDir, assetName)
+
+	var downloadErr error
+	downloadAction := func() {
+		if err := downloadFile(assetURL, assetPath); err != nil {
+			downloadErr = fmt.Errorf("failed to download release asset: %w", err)
+		}
+	}
+	tui.ShowSpinner(fmt.Sprintf("Downloading %s...", version), downloadAction)
+	if downloadErr != nil {
+		return downloadErr
+	}
+
+	checksumFileName := "checksums.txt"
+	checksumURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/v%s/%s", version, checksumFileName)
+	checksumPath := filepath.Join(tempDir, checksumFileName)
+
+	var checksumDownloadErr error
+	checksumAction := func() {
+		if err := downloadFile(checksumURL, checksumPath); err != nil {
+			checksumDownloadErr = fmt.Errorf("failed to download checksum file: %w", err)
+		}
+	}
+	tui.ShowSpinner("Downloading checksum...", checksumAction)
+	if checksumDownloadErr != nil {
+		return checksumDownloadErr
+	}
+
+	var checksumErr error
+	var checksum string
+	var valid bool
+	verifyAction := func() {
+		var err1, err2 error
+		checksum, err1 = getChecksumFromFile(checksumPath, assetName)
+		if err1 != nil {
+			checksumErr = fmt.Errorf("failed to get checksum: %w", err1)
+			return
+		}
+
+		valid, err2 = verifyChecksum(assetPath, checksum)
+		if err2 != nil {
+			checksumErr = fmt.Errorf("failed to verify checksum: %w", err2)
+		}
+	}
+	tui.ShowSpinner("Verifying checksum...", verifyAction)
+	if checksumErr != nil {
+		return checksumErr
+	}
+
+	if !valid {
+		return fmt.Errorf("checksum verification failed")
+	}
+
+	return replaceBinary(ctx, logger, assetPath, version)
 }
 
 func upgradeWithWindowsMsi(ctx context.Context, logger logger.Logger, version string) error {
