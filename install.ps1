@@ -472,8 +472,13 @@ function Install-MSI {
             }
             
             $quietParam = "/qn"
-            $allusersParam = if (Test-Administrator) { "ALLUSERS=1" } else { "ALLUSERS=0" }
-            $arguments = "/i `"$MsiPath`" $quietParam /norestart /log `"$LogPath`" $allusersParam $installDirParam"
+            $installScopeParams = if (Test-Administrator) { 
+                "ALLUSERS=1" 
+            } else { 
+                # For non-admin users, set MSIINSTALLPERUSER=1 to allow uninstallation without admin privileges
+                "ALLUSERS=0 MSIINSTALLPERUSER=1" 
+            }
+            $arguments = "/i `"$MsiPath`" $quietParam /norestart /log `"$LogPath`" $installScopeParams $installDirParam"
             Write-Step "MSI command: msiexec.exe $arguments"
             
             $process = Start-Process -FilePath "msiexec.exe" -ArgumentList $arguments -Wait -PassThru
