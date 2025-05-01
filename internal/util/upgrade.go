@@ -683,7 +683,11 @@ func upgradeWithWindowsUser(ctx context.Context, logger logger.Logger, version s
 	defer os.RemoveAll(tempDir)
 
 	assetName := getReleaseAssetName() // This returns the zip file
-	assetURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/v%s/%s", version, assetName)
+	versionPrefix := "v"
+	if strings.HasPrefix(version, "v") {
+		versionPrefix = ""
+	}
+	assetURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s%s/%s", versionPrefix, version, assetName)
 	assetPath := filepath.Join(tempDir, assetName)
 
 	var downloadErr error
@@ -698,7 +702,7 @@ func upgradeWithWindowsUser(ctx context.Context, logger logger.Logger, version s
 	}
 
 	checksumFileName := "checksums.txt"
-	checksumURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/v%s/%s", version, checksumFileName)
+	checksumURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s%s/%s", versionPrefix, version, checksumFileName)
 	checksumPath := filepath.Join(tempDir, checksumFileName)
 
 	var checksumDownloadErr error
@@ -751,10 +755,11 @@ func upgradeWithWindowsMsi(ctx context.Context, logger logger.Logger, version st
 		defer os.RemoveAll(tempDir)
 
 		installerName := getMsiInstallerName()
+		versionPrefix := "v"
 		if strings.HasPrefix(version, "v") {
-			version = strings.TrimPrefix(version, "v")
+			versionPrefix = ""
 		}
-		installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/v%s/%s", version, installerName)
+		installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s%s/%s", versionPrefix, version, installerName)
 		installerPath := filepath.Join(tempDir, installerName)
 
 		var downloadErr error
@@ -832,10 +837,11 @@ if ($products) {
 	}
 
 	installerName := getMsiInstallerName()
+	versionPrefix := "v"
 	if strings.HasPrefix(version, "v") {
-		version = strings.TrimPrefix(version, "v")
+		versionPrefix = ""
 	}
-	installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/v%s/%s", version, installerName)
+	installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s%s/%s", versionPrefix, version, installerName)
 	installerPath := filepath.Join(tempDir, installerName)
 
 	var downloadErr error
