@@ -35,7 +35,11 @@ abort() {
 success() {
   ohai "Installation complete! Run 'agentuity --help' to get started."
   ohai "For more information, visit: $(url "https://agentuity.dev")"
-  ohai "To apply PATH changes, restart your terminal or run: source ~/.$(basename $SHELL)rc"
+  
+  if ! command -v agentuity >/dev/null 2>&1; then
+    ohai "To apply PATH changes, restart your terminal or run: source ~/.$(basename $SHELL)rc"
+  fi
+  
   exit 0
 }
 
@@ -330,7 +334,11 @@ if [[ ":$PATH:" != *":$INSTALL_PATH:"* ]]; then
   if [[ -n "$SHELL_CONFIG" ]] && [[ -w "$SHELL_CONFIG" ]]; then
     echo "export PATH=\"\$PATH:$INSTALL_PATH\"" >> "$SHELL_CONFIG"
     ohai "Added $INSTALL_PATH to PATH in $SHELL_CONFIG"
-    ohai "To apply changes, restart your terminal or run: source $SHELL_CONFIG"
+    
+    if ! command -v agentuity >/dev/null 2>&1; then
+      ohai "To apply changes, restart your terminal or run: source $SHELL_CONFIG"
+    fi
+    
     export PATH="$PATH:$INSTALL_PATH"
   else
     warn "$INSTALL_PATH is not in your PATH. You may need to add it manually to use the agentuity command."
