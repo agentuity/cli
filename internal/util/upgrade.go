@@ -682,18 +682,7 @@ func upgradeWithWindowsUser(ctx context.Context, logger logger.Logger, version s
 	}
 	defer os.RemoveAll(tempDir)
 
-	var arch string
-	if runtime.GOARCH == "amd64" {
-		arch = "x64"
-	} else if runtime.GOARCH == "386" {
-		arch = "x86"
-	} else if runtime.GOARCH == "arm64" {
-		arch = "arm64"
-	} else {
-		return fmt.Errorf("unsupported architecture: %s", runtime.GOARCH)
-	}
-
-	installerName := fmt.Sprintf("agentuity-%s.msi", arch)
+	installerName := getMsiInstallerName()
 
 	versionPrefix := "v"
 	if strings.HasPrefix(version, "v") {
