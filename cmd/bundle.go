@@ -108,4 +108,16 @@ func init() {
 	bundleCmd.Flags().MarkHidden("deploymentId")
 	bundleCmd.Flags().Bool("ci", false, "Used to track a specific CI job")
 	bundleCmd.Flags().MarkHidden("ci")
+	bundleCmd.Flags().String("ci-remote-url", "", "Used to set the remote repository URL for your deployment metadata")
+	bundleCmd.Flags().String("ci-branch", "", "Used to set the branch name for your deployment metadata")
+	bundleCmd.Flags().String("ci-commit", "", "Used to set the commit hash for your deployment metadata")
+	bundleCmd.Flags().String("ci-message", "", "Used to set the commit message for your deployment metadata")
+	bundleCmd.Flags().String("ci-git-provider", "", "Used to set the git provider for your deployment metadata")
+
+	bundleCmd.Flags().MarkHidden("ci-remote-url")
+	bundleCmd.Flags().MarkHidden("ci-branch")
+	bundleCmd.Flags().MarkHidden("ci-commit")
+	bundleCmd.Flags().MarkHidden("ci-messsage")
+	bundleCmd.Flags().MarkHidden("ci-git-provider")
+
 }
