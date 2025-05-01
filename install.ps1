@@ -539,6 +539,38 @@ function Test-Installation {
     }
 }
 
+function Test-ExecutionPolicy {
+    $currentPolicy = Get-ExecutionPolicy
+    $allowedPolicies = @("Unrestricted", "RemoteSigned", "Bypass")
+
+    if ($allowedPolicies -contains $currentPolicy) {
+        return $true
+    }
+
+    Write-Warning "PowerShell execution policy is set to '$currentPolicy' which may prevent script execution."
+    Write-Warning "Allowed policies are: $($allowedPolicies -join ', ')"
+
+    if ($NoPrompt) {
+        Write-Warning "Skipping PowerShell completion setup due to execution policy restrictions"
+        return $false
+    }
+
+    $message = "Would you like to temporarily set the execution policy to 'RemoteSigned' for this session?"
+    if (Get-UserConfirmation -Message $message -DefaultToYes $true) {
+        try {
+            Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
+            Write-Success "Temporarily set execution policy to RemoteSigned for this session"
+            return $true
+        }
+        catch {
+            Write-Warning "Failed to set execution policy: $_"
+            return $false
+        }
+    }
+
+    return $false
+}
+
 function Set-PowerShellCompletion {
     param (
         [Parameter(Mandatory = $true)]
@@ -547,6 +579,17 @@ function Set-PowerShellCompletion {
     
     Write-Step "Setting up PowerShell completion..."
     
+    # Check execution policy first
+    if (-not (Test-ExecutionPolicy)) {
+        Write-Warning "Skipping PowerShell completion setup due to execution policy restrictions"
+        Write-Warning "You can manually set up completion by running these commands:"
+        Write-Warning "  mkdir -Force $HOME\Documents\WindowsPowerShell\Completion"
+        Write-Warning "  $ExePath completion powershell > $HOME\Documents\WindowsPowerShell\Completion\agentuity.ps1"
+        Write-Warning "  Add '. `"$HOME\Documents\WindowsPowerShell\Completion\agentuity.ps1`"' to your PowerShell profile"
+        Write-Warning "  To edit your profile, run: notepad $PROFILE"
+        return
+    }
+
     try {
         # Verify the executable exists
         if (-not (Test-Path -Path $ExePath)) {
