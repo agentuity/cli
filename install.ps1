@@ -465,25 +465,59 @@ function Install-MSI {
     else {
         # Normal MSI installation for non-CI environments
         try {
-            # Add INSTALLDIR parameter if specified or for non-admin installations
+            # For non-admin users, extract MSI directly to LOCALAPPDATA instead of standard installation
+            if (-not (Test-Administrator)) {
+                $localAppDataPath = [System.IO.Path]::Combine($env:LOCALAPPDATA, "Agentuity")
+                Write-Step "Non-admin user detected, extracting MSI directly to $localAppDataPath"
+                
+                # Create the directory if it doesn't exist
+                if (-not (Test-Path -Path $localAppDataPath)) {
+                    Write-Step "Creating installation directory: $localAppDataPath"
+                    New-Item -Path $localAppDataPath -ItemType Directory -Force | Out-Null
+                }
+                
+                # Use msiexec to extract files to LOCALAPPDATA
+                $extractArgs = "/a `"$MsiPath`" /qn TARGETDIR=`"$localAppDataPath`""
+                Write-Step "Extracting MSI with command: msiexec.exe $extractArgs"
+                $extractProcess = Start-Process -FilePath "msiexec.exe" -ArgumentList $extractArgs -Wait -PassThru
+                
+                if ($extractProcess.ExitCode -ne 0) {
+                    Write-Error "Extraction failed with exit code $($extractProcess.ExitCode). Check the log for details."
+                    return $false
+                }
+                
+                # Add MSIINSTALLPERUSER=1 to registry to allow uninstallation without admin privileges
+                Write-Step "Setting registry keys for non-admin uninstallation"
+                try {
+                    # Create registry key for the application
+                    $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Agentuity"
+                    if (-not (Test-Path -Path $regPath)) {
+                        New-Item -Path $regPath -Force | Out-Null
+                    }
+                    
+                    # Set required properties
+                    New-ItemProperty -Path $regPath -Name "DisplayName" -Value "Agentuity CLI" -PropertyType String -Force | Out-Null
+                    New-ItemProperty -Path $regPath -Name "UninstallString" -Value "msiexec.exe /x {PRODUCT_CODE} /qn" -PropertyType String -Force | Out-Null
+                    New-ItemProperty -Path $regPath -Name "InstallLocation" -Value $localAppDataPath -PropertyType String -Force | Out-Null
+                    New-ItemProperty -Path $regPath -Name "InstallSource" -Value $localAppDataPath -PropertyType String -Force | Out-Null
+                    New-ItemProperty -Path $regPath -Name "NoModify" -Value 1 -PropertyType DWord -Force | Out-Null
+                    New-ItemProperty -Path $regPath -Name "NoRepair" -Value 1 -PropertyType DWord -Force | Out-Null
+                } catch {
+                    Write-Warning "Failed to set registry keys: $_"
+                    # Continue anyway as this is not critical
+                }
+                
+                return $true
+            }
+            
+            # Standard MSI installation for admin users
             $installDirParam = ""
             if (-not [string]::IsNullOrEmpty($InstallDir)) {
                 $installDirParam = "INSTALLDIR=`"$InstallDir`""
-            } elseif (-not (Test-Administrator)) {
-                # For non-admin users, explicitly set INSTALLDIR to LOCALAPPDATA to ensure files are installed there
-                $localAppDataPath = [System.IO.Path]::Combine($env:LOCALAPPDATA, "Agentuity")
-                $installDirParam = "INSTALLDIR=`"$localAppDataPath`""
             }
             
             $quietParam = "/qn"
-            $installScopeParams = if (Test-Administrator) { 
-                "ALLUSERS=1" 
-            } else { 
-                # For non-admin users, set ALLUSERS=0 (per-user installation) and MSIINSTALLPERUSER=1
-                # MSIINSTALLPERUSER=1 ensures per-user installation and allows uninstallation without admin privileges
-                # TARGETDIR explicitly sets the installation root directory
-                "ALLUSERS=0 MSIINSTALLPERUSER=1 TARGETDIR=`"$env:LOCALAPPDATA\Agentuity`"" 
-            }
+            $installScopeParams = "ALLUSERS=1"
             $arguments = "/i `"$MsiPath`" $quietParam /norestart /log `"$LogPath`" $installScopeParams $installDirParam"
             Write-Step "MSI command: msiexec.exe $arguments"
             
