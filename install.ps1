@@ -486,6 +486,60 @@ function Install-MSI {
                     return $false
                 }
                 
+                # Check if extraction created a nested Agentuity directory structure
+                $nestedDir = Join-Path -Path $localAppDataPath -ChildPath "Agentuity"
+                if (Test-Path -Path $nestedDir) {
+                    Write-Step "Found nested Agentuity directory, moving files to correct location"
+                    # Move all files from nested directory to parent
+                    Get-ChildItem -Path $nestedDir -Recurse | ForEach-Object {
+                        $targetPath = $_.FullName.Replace($nestedDir, $localAppDataPath)
+                        $targetDir = Split-Path -Parent $targetPath
+                        
+                        # Create target directory if it doesn't exist
+                        if (-not (Test-Path -Path $targetDir)) {
+                            New-Item -Path $targetDir -ItemType Directory -Force | Out-Null
+                        }
+                        
+                        # Move the item
+                        Move-Item -Path $_.FullName -Destination $targetPath -Force
+                    }
+                    
+                    # Remove the now-empty nested directory
+                    Remove-Item -Path $nestedDir -Recurse -Force
+                }
+                
+                # If no executable found, try to extract files directly
+                $exePath = Join-Path -Path $localAppDataPath -ChildPath "agentuity.exe"
+                if (-not (Test-Path -Path $exePath)) {
+                    Write-Step "Executable not found after extraction, trying direct file copy"
+                    
+                    # Create a temporary directory to extract MSI contents
+                    $tempExtractDir = Join-Path -Path $env:TEMP -ChildPath "AgentuityExtract"
+                    if (Test-Path -Path $tempExtractDir) {
+                        Remove-Item -Path $tempExtractDir -Recurse -Force
+                    }
+                    New-Item -Path $tempExtractDir -ItemType Directory -Force | Out-Null
+                    
+                    # Extract MSI to temp directory
+                    $tempExtractArgs = "/a `"$MsiPath`" /qn TARGETDIR=`"$tempExtractDir`""
+                    Start-Process -FilePath "msiexec.exe" -ArgumentList $tempExtractArgs -Wait -PassThru | Out-Null
+                    
+                    # Search for the executable in the extracted files
+                    $foundExes = Get-ChildItem -Path $tempExtractDir -Recurse -Filter "agentuity.exe" | Select-Object -ExpandProperty FullName
+                    
+                    if ($foundExes.Count -gt 0) {
+                        Write-Step "Found executable in extracted files, copying to installation directory"
+                        $foundExePath = $foundExes[0]
+                        $foundExeDir = Split-Path -Parent $foundExePath
+                        
+                        # Copy all files from the directory containing the executable
+                        Copy-Item -Path "$foundExeDir\*" -Destination $localAppDataPath -Recurse -Force
+                    }
+                    
+                    # Clean up temp directory
+                    Remove-Item -Path $tempExtractDir -Recurse -Force -ErrorAction SilentlyContinue
+                }
+                
                 # Add MSIINSTALLPERUSER=1 to registry to allow uninstallation without admin privileges
                 Write-Step "Setting registry keys for non-admin uninstallation"
                 try {
