@@ -472,7 +472,8 @@ function Install-MSI {
             }
             
             $quietParam = "/qn"
-            $arguments = "/i `"$MsiPath`" $quietParam /norestart /log `"$LogPath`" ALLUSERS=1 $installDirParam"
+            $allusersParam = if (Test-Administrator) { "ALLUSERS=1" } else { "ALLUSERS=0" }
+            $arguments = "/i `"$MsiPath`" $quietParam /norestart /log `"$LogPath`" $allusersParam $installDirParam"
             Write-Step "MSI command: msiexec.exe $arguments"
             
             $process = Start-Process -FilePath "msiexec.exe" -ArgumentList $arguments -Wait -PassThru
