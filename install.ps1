@@ -525,7 +525,7 @@ function Install-MSI {
                     Start-Process -FilePath "msiexec.exe" -ArgumentList $tempExtractArgs -Wait -PassThru | Out-Null
                     
                     # Search for the executable in the extracted files
-                    $foundExes = Get-ChildItem -Path $tempExtractDir -Recurse -Filter "agentuity.exe" | Select-Object -ExpandProperty FullName
+                    $foundExes = Get-ChildItem -Path $tempExtractDir -Recurse -Filter "agentuity.exe" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
                     
                     if ($foundExes.Count -gt 0) {
                         Write-Step "Found executable in extracted files, copying to installation directory"
@@ -562,6 +562,72 @@ function Install-MSI {
                     
                     # Clean up temp directory
                     Remove-Item -Path $tempExtractDir -Recurse -Force -ErrorAction SilentlyContinue
+                }
+                
+                # Final fallback: If executable still not found, download it directly
+                if (-not (Test-Path -Path $exePath)) {
+                    Write-Step "Executable still not found, attempting direct download as final fallback"
+                    
+                    try {
+                        # Set TLS 1.2 for compatibility with GitHub
+                        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+                        
+                        # Get the version from the MSI filename or use latest
+                        $versionFromMsi = if ($MsiPath -match "agentuity_([0-9]+\.[0-9]+\.[0-9]+)_") {
+                            $matches[1]
+                        } else {
+                            "latest"
+                        }
+                        
+                        # Construct the download URL for the executable
+                        $arch = Get-Architecture
+                        $downloadUrl = "https://github.com/agentuity/cli/releases/download/v$versionFromMsi/agentuity_${versionFromMsi}_windows_$arch.exe"
+                        
+                        Write-Step "Downloading executable directly from: $downloadUrl"
+                        
+                        # Create a WebClient to download the file
+                        $webClient = New-Object System.Net.WebClient
+                        $webClient.Headers.Add("User-Agent", "AgentuityInstaller/PowerShell/$ScriptVersion")
+                        
+                        # Download the file directly to the installation directory
+                        $webClient.DownloadFile($downloadUrl, $exePath)
+                        
+                        if (Test-Path -Path $exePath) {
+                            Write-Success "Successfully downloaded executable directly to $exePath"
+                        } else {
+                            Write-Warning "Failed to download executable to $exePath"
+                        }
+                    } catch {
+                        Write-Warning "Failed to download executable directly: $_"
+                        
+                        # Try alternative download method as last resort
+                        try {
+                            Write-Step "Trying alternative download method"
+                            
+                            # Try to get the latest release info
+                            $releaseUrl = "https://agentuity.sh/release/cli"
+                            $response = Invoke-RestMethod -Uri $releaseUrl -Method Get -ErrorAction SilentlyContinue
+                            
+                            if ($null -ne $response -and $null -ne $response.assets) {
+                                # Find the correct asset for Windows and the current architecture
+                                $arch = Get-Architecture
+                                $asset = $response.assets | Where-Object { $_.name -like "*windows*$arch*.exe" } | Select-Object -First 1
+                                
+                                if ($null -ne $asset -and $null -ne $asset.browser_download_url) {
+                                    Write-Step "Found executable download URL: $($asset.browser_download_url)"
+                                    
+                                    # Download the file
+                                    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $exePath -ErrorAction SilentlyContinue
+                                    
+                                    if (Test-Path -Path $exePath) {
+                                        Write-Success "Successfully downloaded executable using alternative method"
+                                    }
+                                }
+                            }
+                        } catch {
+                            Write-Warning "Alternative download method also failed: $_"
+                        }
+                    }
                 }
                 
                 # Add MSIINSTALLPERUSER=1 to registry to allow uninstallation without admin privileges
