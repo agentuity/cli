@@ -121,10 +121,10 @@ func isWindowsUserInstallation() bool {
 		return false
 	}
 
-	exePath := strings.ToLower(strings.ReplaceAll(exe, "\\", "/"))
-	localAppDataPath := strings.ToLower(strings.ReplaceAll(filepath.Join(localAppData, "Agentuity"), "\\", "/"))
+	exePath := strings.ToLower(filepath.Clean(exe))
+	localAppDataPath := strings.ToLower(filepath.Clean(filepath.Join(localAppData, "Agentuity")))
 
-	return strings.HasPrefix(exePath, localAppDataPath)
+	return filepath.HasPrefix(exePath, localAppDataPath)
 }
 
 func getReleaseAssetName() string {
