@@ -465,18 +465,24 @@ function Install-MSI {
     else {
         # Normal MSI installation for non-CI environments
         try {
-            # Add INSTALLDIR parameter if specified
+            # Add INSTALLDIR parameter if specified or for non-admin installations
             $installDirParam = ""
             if (-not [string]::IsNullOrEmpty($InstallDir)) {
                 $installDirParam = "INSTALLDIR=`"$InstallDir`""
+            } elseif (-not (Test-Administrator)) {
+                # For non-admin users, explicitly set INSTALLDIR to LOCALAPPDATA to ensure files are installed there
+                $localAppDataPath = [System.IO.Path]::Combine($env:LOCALAPPDATA, "Agentuity")
+                $installDirParam = "INSTALLDIR=`"$localAppDataPath`""
             }
             
             $quietParam = "/qn"
             $installScopeParams = if (Test-Administrator) { 
                 "ALLUSERS=1" 
             } else { 
-                # For non-admin users, set MSIINSTALLPERUSER=1 to allow uninstallation without admin privileges
-                "ALLUSERS=0 MSIINSTALLPERUSER=1" 
+                # For non-admin users, set ALLUSERS=2 and MSIINSTALLPERUSER=1
+                # ALLUSERS=2 lets Windows Installer decide the installation scope based on user privileges
+                # MSIINSTALLPERUSER=1 ensures per-user installation and allows uninstallation without admin privileges
+                "ALLUSERS=2 MSIINSTALLPERUSER=1" 
             }
             $arguments = "/i `"$MsiPath`" $quietParam /norestart /log `"$LogPath`" $installScopeParams $installDirParam"
             Write-Step "MSI command: msiexec.exe $arguments"
