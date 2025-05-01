@@ -479,10 +479,10 @@ function Install-MSI {
             $installScopeParams = if (Test-Administrator) { 
                 "ALLUSERS=1" 
             } else { 
-                # For non-admin users, set ALLUSERS=2 and MSIINSTALLPERUSER=1
-                # ALLUSERS=2 lets Windows Installer decide the installation scope based on user privileges
+                # For non-admin users, set ALLUSERS=0 (per-user installation) and MSIINSTALLPERUSER=1
                 # MSIINSTALLPERUSER=1 ensures per-user installation and allows uninstallation without admin privileges
-                "ALLUSERS=2 MSIINSTALLPERUSER=1" 
+                # TARGETDIR explicitly sets the installation root directory
+                "ALLUSERS=0 MSIINSTALLPERUSER=1 TARGETDIR=`"$env:LOCALAPPDATA\Agentuity`"" 
             }
             $arguments = "/i `"$MsiPath`" $quietParam /norestart /log `"$LogPath`" $installScopeParams $installDirParam"
             Write-Step "MSI command: msiexec.exe $arguments"
