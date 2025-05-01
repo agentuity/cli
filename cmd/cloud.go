@@ -146,6 +146,11 @@ Examples:
 		transportUrl := context.TransportURL
 		token := context.Token
 		ci, _ := cmd.Flags().GetBool("ci")
+		ciRemoteUrl, _ := cmd.Flags().GetString("ci-remote-url")
+		ciBranch, _ := cmd.Flags().GetString("ci-branch")
+		ciCommit, _ := cmd.Flags().GetString("ci-commit")
+		ciMessage, _ := cmd.Flags().GetString("ci-message")
+		ciGitProvider, _ := cmd.Flags().GetString("ci-git-provider")
 
 		deploymentConfig := project.NewDeploymentConfig()
 		client := util.NewAPIClient(ctx, logger, apiUrl, token)
@@ -355,10 +360,16 @@ Examples:
 
 		var gitInfo deployer.GitInfo
 		var originType string
-		if ci {
+		isOverwritingGitInfo := ciRemoteUrl != "" || ciBranch != "" || ciCommit != "" || ciMessage != "" || ciGitProvider != ""
+		if ci && isOverwritingGitInfo {
 			originType = "ci"
-			if err := json.Unmarshal([]byte("{}"), &gitInfo); err != nil {
-				logger.Debug("Failed to get git info: %v", err)
+			gitInfo = deployer.GitInfo{
+				RemoteURL:     &ciRemoteUrl,
+				Branch:        &ciBranch,
+				Commit:        &ciCommit,
+				CommitMessage: &ciMessage,
+				GitProvider:   &ciGitProvider,
+				IsRepo:        true,
 			}
 		} else {
 			info, err := deployer.GetGitInfo(logger, dir)
@@ -618,6 +629,43 @@ Examples:
 	},
 }
 
+var cloudDeployTestCmd = &cobra.Command{
+	Use:   "deploy-test",
+	Short: "Test deploy flags and print git info as JSON",
+	Run: func(cmd *cobra.Command, args []string) {
+		logger := env.NewLogger(cmd)
+		dir, _ := cmd.Flags().GetString("dir")
+		ci, _ := cmd.Flags().GetBool("ci")
+		ciRemoteUrl, _ := cmd.Flags().GetString("ci-remote-url")
+		ciBranch, _ := cmd.Flags().GetString("ci-branch")
+		ciCommit, _ := cmd.Flags().GetString("ci-commit")
+		ciMessage, _ := cmd.Flags().GetString("ci-message")
+		ciGitProvider, _ := cmd.Flags().GetString("ci-git-provider")
+
+		var gitInfo deployer.GitInfo
+		isOverwritingGitInfo := ciRemoteUrl != "" || ciBranch != "" || ciCommit != "" || ciMessage != "" || ciGitProvider != ""
+		if ci && isOverwritingGitInfo {
+			gitInfo = deployer.GitInfo{
+				RemoteURL:     &ciRemoteUrl,
+				Branch:        &ciBranch,
+				Commit:        &ciCommit,
+				CommitMessage: &ciMessage,
+				GitProvider:   &ciGitProvider,
+				IsRepo:        true,
+			}
+		} else {
+			info, err := deployer.GetGitInfo(logger, dir)
+			if err != nil {
+				logger.Debug("Failed to get git info: %v", err)
+			}
+			gitInfo = *info
+		}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		enc.Encode(gitInfo)
+	},
+}
+
 func updateDeploymentStatus(logger logger.Logger, apiUrl, token, deploymentId, status string) error {
 	client := util.NewAPIClient(context.Background(), logger, apiUrl, token)
 	payload := map[string]string{"state": status}
@@ -637,9 +685,30 @@ func init() {
 	cloudDeployCmd.Flags().StringP("dir", "d", ".", "The directory to the project to deploy")
 	cloudDeployCmd.Flags().String("deploymentId", "", "Used to track a specific deployment")
 	cloudDeployCmd.Flags().Bool("ci", false, "Used to track a specific CI job")
+	cloudDeployCmd.Flags().String("ci-remote-url", "", "Used to set the remote repository URL for your deployment metadata")
+	cloudDeployCmd.Flags().String("ci-branch", "", "Used to set the branch name for your deployment metadata")
+	cloudDeployCmd.Flags().String("ci-commit", "", "Used to set the commit hash for your deployment metadata")
+	cloudDeployCmd.Flags().String("ci-message", "", "Used to set the commit message for your deployment metadata")
+	cloudDeployCmd.Flags().String("ci-git-provider", "", "Used to set the git provider for your deployment metadata")
+
 	cloudDeployCmd.Flags().MarkHidden("deploymentId")
 	cloudDeployCmd.Flags().MarkHidden("ci")
+	cloudDeployCmd.Flags().MarkHidden("ci-remote-url")
+	cloudDeployCmd.Flags().MarkHidden("ci-branch")
+	cloudDeployCmd.Flags().MarkHidden("ci-commit")
+	cloudDeployCmd.Flags().MarkHidden("ci-messsage")
+	cloudDeployCmd.Flags().MarkHidden("ci-git-provider")
+
 	cloudDeployCmd.Flags().String("format", "text", "The output format to use for results which can be either 'text' or 'json'")
 	cloudDeployCmd.Flags().String("org-id", "", "The organization to create the project in")
 	cloudDeployCmd.Flags().String("templates-dir", "", "The directory to load the templates. Defaults to loading them from the github.com/agentuity/templates repository")
+
+	cloudCmd.AddCommand(cloudDeployTestCmd)
+	cloudDeployTestCmd.Flags().StringP("dir", "d", ".", "The directory to the project to deploy")
+	cloudDeployTestCmd.Flags().Bool("ci", false, "Used to track a specific CI job")
+	cloudDeployTestCmd.Flags().String("ci-remote-url", "", "Used to set the remote repository URL for your deployment metadata")
+	cloudDeployTestCmd.Flags().String("ci-branch", "", "Used to set the branch name for your deployment metadata")
+	cloudDeployTestCmd.Flags().String("ci-commit", "", "Used to set the commit hash for your deployment metadata")
+	cloudDeployTestCmd.Flags().String("ci-message", "", "Used to set the commit message for your deployment metadata")
+	cloudDeployTestCmd.Flags().String("ci-git-provider", "", "Used to set the git provider for your deployment metadata")
 }
