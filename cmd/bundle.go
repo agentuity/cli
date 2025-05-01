@@ -106,6 +106,6 @@ func init() {
 	bundleCmd.Flags().Bool("deploy", false, "Whether to deploy after bundling")
 	bundleCmd.Flags().String("deploymentId", "", "Used to track a specific deployment")
 	bundleCmd.Flags().MarkHidden("deploymentId")
-	bundleCmd.Flags().Bool("ci", false, "Used to track a specific CI job")
+	bundleCmd.Flags().String("ci", "", "Used to track a specific CI job")
 	bundleCmd.Flags().MarkHidden("ci")
 }

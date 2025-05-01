@@ -353,14 +353,19 @@ Examples:
 			deploymentId = "/" + deploymentId
 		}
 
-		gitInfo, err := deployer.GetGitInfo(dir)
-		if err != nil {
-			logger.Error("error getting git info: %s", err)
-		}
+		var gitInfo deployer.GitInfo
 		var originType string
 		if ci {
 			originType = "ci"
+			if err := json.Unmarshal([]byte("{}"), &gitInfo); err != nil {
+				logger.Debug("Failed to get git info: %v", err)
+			}
 		} else {
+			info, err := deployer.GetGitInfo(logger, dir)
+			if err != nil {
+				logger.Debug("Failed to get git info: %v", err)
+			}
+			gitInfo = *info
 			originType = "cli"
 		}
 
