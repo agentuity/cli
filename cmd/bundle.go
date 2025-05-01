@@ -69,23 +69,8 @@ Examples:
 			if deploymentId != "" {
 				args = append(args, "--deploymentId", deploymentId)
 			}
-			flags := []string{"log-level", "api-url", "api-key", "dir"}
+			flags := []string{"log-level", "api-url", "api-key", "dir", "ci"}
 			for _, flag := range flags {
-				if cmd.Flags().Changed(flag) {
-					val, _ := cmd.Flags().GetString(flag)
-					args = append(args, "--"+flag, val)
-				}
-			}
-			// Handle bool flags
-			if cmd.Flags().Changed("ci") {
-				ciVal, _ := cmd.Flags().GetBool("ci")
-				if ciVal {
-					args = append(args, "--ci")
-				}
-			}
-			// Pass through CI metadata flags if set
-			ciFlags := []string{"ci-remote-url", "ci-branch", "ci-commit", "ci-message", "ci-git-provider"}
-			for _, flag := range ciFlags {
 				if cmd.Flags().Changed(flag) {
 					val, _ := cmd.Flags().GetString(flag)
 					args = append(args, "--"+flag, val)
@@ -129,8 +114,6 @@ func init() {
 	bundleCmd.Flags().String("ci-message", "", "Used to set the commit message for your deployment metadata")
 	bundleCmd.Flags().String("ci-git-provider", "", "Used to set the git provider for your deployment metadata")
 
-	bundleCmd.Flags().MarkHidden("deploymentId")
-	bundleCmd.Flags().MarkHidden("ci")
 	bundleCmd.Flags().MarkHidden("ci-remote-url")
 	bundleCmd.Flags().MarkHidden("ci-branch")
 	bundleCmd.Flags().MarkHidden("ci-commit")
