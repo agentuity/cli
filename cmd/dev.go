@@ -138,8 +138,8 @@ Examples:
 		build(true)
 
 		restart := func() {
-			build(false)
 			isDeliberateRestart = true
+			build(false)
 			log.Debug("killing project server")
 			dev.KillProjectServer(log, projectServerCmd, pid)
 			log.Debug("killing project server done")
@@ -174,7 +174,9 @@ Examples:
 			for {
 				log.Trace("waiting for project server to exit (pid: %d)", pid)
 				if err := projectServerCmd.Wait(); err != nil {
-					log.Error("project server (pid: %d) exited with error: %s", pid, err)
+					if !isDeliberateRestart {
+						log.Error("project server (pid: %d) exited with error: %s", pid, err)
+					}
 				}
 				if projectServerCmd.ProcessState != nil {
 					log.Debug("project server (pid: %d) exited with code %d", pid, projectServerCmd.ProcessState.ExitCode())
