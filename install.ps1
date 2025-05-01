@@ -465,15 +465,335 @@ function Install-MSI {
     else {
         # Normal MSI installation for non-CI environments
         try {
-            # Add INSTALLDIR parameter if specified
+            # For non-admin users, extract MSI directly to LOCALAPPDATA instead of standard installation
+            if (-not (Test-Administrator)) {
+                $localAppDataPath = [System.IO.Path]::Combine($env:LOCALAPPDATA, "Agentuity")
+                Write-Step "Non-admin user detected, extracting MSI directly to $localAppDataPath"
+                
+                # Create the directory if it doesn't exist
+                if (-not (Test-Path -Path $localAppDataPath)) {
+                    Write-Step "Creating installation directory: $localAppDataPath"
+                    New-Item -Path $localAppDataPath -ItemType Directory -Force | Out-Null
+                }
+                
+                # Use msiexec to extract files to LOCALAPPDATA
+                $extractArgs = "/a `"$MsiPath`" /qn TARGETDIR=`"$localAppDataPath`""
+                Write-Step "Extracting MSI with command: msiexec.exe $extractArgs"
+                $extractProcess = Start-Process -FilePath "msiexec.exe" -ArgumentList $extractArgs -Wait -PassThru
+                
+                if ($extractProcess.ExitCode -ne 0) {
+                    Write-Error "Extraction failed with exit code $($extractProcess.ExitCode). Check the log for details."
+                    return $false
+                }
+                
+                # Check for common nested directory structures
+                $nestedDirs = @(
+                    (Join-Path -Path $localAppDataPath -ChildPath "Agentuity"),
+                    (Join-Path -Path $localAppDataPath -ChildPath "PFiles\Agentuity")
+                )
+                
+                foreach ($nestedDir in $nestedDirs) {
+                    if (Test-Path -Path $nestedDir) {
+                        Write-Step "Found nested directory at $nestedDir, moving files to correct location"
+                        
+                        # Check if the executable exists in this nested directory
+                        $nestedExePath = Join-Path -Path $nestedDir -ChildPath "agentuity.exe"
+                        if (Test-Path -Path $nestedExePath) {
+                            Write-Step "Found executable in nested directory, copying to root installation directory"
+                            try {
+                                Copy-Item -Path $nestedExePath -Destination (Join-Path -Path $localAppDataPath -ChildPath "agentuity.exe") -Force -ErrorAction SilentlyContinue
+                                Write-Success "Successfully copied executable from nested directory"
+                            } catch {
+                                Write-Warning "Failed to copy executable from nested directory: $_"
+                            }
+                        }
+                        
+                        # Move all files from nested directory to parent
+                        Get-ChildItem -Path $nestedDir -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+                            try {
+                                $relativePath = $_.FullName.Substring($nestedDir.Length)
+                                $targetPath = Join-Path -Path $localAppDataPath -ChildPath $relativePath
+                                $targetDir = Split-Path -Parent $targetPath
+                                
+                                # Create target directory if it doesn't exist
+                                if (-not (Test-Path -Path $targetDir)) {
+                                    New-Item -Path $targetDir -ItemType Directory -Force -ErrorAction SilentlyContinue | Out-Null
+                                }
+                                
+                                # Copy the item instead of moving to avoid permission issues
+                                Copy-Item -Path $_.FullName -Destination $targetPath -Force -ErrorAction SilentlyContinue
+                            } catch {
+                                Write-Warning "Failed to copy item from nested directory: $_"
+                            }
+                        }
+                    }
+                }
+                
+                # Also check for PFiles directory without Agentuity subdirectory
+                $pfilesDir = Join-Path -Path $localAppDataPath -ChildPath "PFiles"
+                if (Test-Path -Path $pfilesDir) {
+                    Write-Step "Found PFiles directory, checking for executable"
+                    $exeFiles = Get-ChildItem -Path $pfilesDir -Recurse -Filter "agentuity.exe" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
+                    
+                    if ($exeFiles.Count -gt 0) {
+                        Write-Step "Found executable in PFiles directory, copying to root installation directory"
+                        try {
+                            Copy-Item -Path $exeFiles[0] -Destination (Join-Path -Path $localAppDataPath -ChildPath "agentuity.exe") -Force -ErrorAction SilentlyContinue
+                            Write-Success "Successfully copied executable from PFiles directory"
+                        } catch {
+                            Write-Warning "Failed to copy executable from PFiles directory: $_"
+                        }
+                    }
+                }
+                
+                # If no executable found, try to extract files directly
+                $exePath = Join-Path -Path $localAppDataPath -ChildPath "agentuity.exe"
+                if (-not (Test-Path -Path $exePath)) {
+                    Write-Step "Executable not found after extraction, trying direct file copy"
+                    
+                    # Create a temporary directory to extract MSI contents
+                    $tempExtractDir = Join-Path -Path $env:TEMP -ChildPath "AgentuityExtract"
+                    if (Test-Path -Path $tempExtractDir) {
+                        Remove-Item -Path $tempExtractDir -Recurse -Force
+                    }
+                    New-Item -Path $tempExtractDir -ItemType Directory -Force | Out-Null
+                    
+                    # Extract MSI to temp directory
+                    $tempExtractArgs = "/a `"$MsiPath`" /qn TARGETDIR=`"$tempExtractDir`""
+                    Start-Process -FilePath "msiexec.exe" -ArgumentList $tempExtractArgs -Wait -PassThru | Out-Null
+                    
+                    # Search for the executable in the extracted files
+                    $foundExes = Get-ChildItem -Path $tempExtractDir -Recurse -Filter "agentuity.exe" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
+                    
+                    if ($foundExes.Count -gt 0) {
+                        Write-Step "Found executable in extracted files, copying to installation directory"
+                        $foundExePath = $foundExes[0]
+                        $foundExeDir = Split-Path -Parent $foundExePath
+                        
+                        # Copy all files from the directory containing the executable
+                        # Use error handling to skip files that can't be accessed due to permission issues
+                        Get-ChildItem -Path $foundExeDir -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+                            try {
+                                $targetPath = $_.FullName.Replace($foundExeDir, $localAppDataPath)
+                                $targetDir = Split-Path -Parent $targetPath
+                                
+                                # Create target directory if it doesn't exist
+                                if (-not (Test-Path -Path $targetDir)) {
+                                    New-Item -Path $targetDir -ItemType Directory -Force -ErrorAction SilentlyContinue | Out-Null
+                                }
+                                
+                                # Copy the item, skip if access denied
+                                Copy-Item -Path $_.FullName -Destination $targetPath -Force -ErrorAction SilentlyContinue
+                            } catch {
+                                Write-Warning "Skipping file due to access error: $($_.FullName)"
+                            }
+                        }
+                        
+                        # As a fallback, try to copy just the executable directly
+                        try {
+                            Copy-Item -Path $foundExePath -Destination (Join-Path -Path $localAppDataPath -ChildPath "agentuity.exe") -Force -ErrorAction SilentlyContinue
+                            Write-Step "Copied executable directly to installation directory"
+                        } catch {
+                            Write-Warning "Failed to copy executable directly: $_"
+                        }
+                    }
+                    
+                    # Clean up temp directory
+                    Remove-Item -Path $tempExtractDir -Recurse -Force -ErrorAction SilentlyContinue
+                }
+                
+                # Final fallback: If executable still not found, download it directly
+                if (-not (Test-Path -Path $exePath)) {
+                    Write-Step "Executable still not found, attempting direct download as final fallback"
+                    
+                    try {
+                        # Set TLS 1.2 for compatibility with GitHub
+                        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+                        
+                        # Get the version from the MSI filename or use latest
+                        $versionFromMsi = if ($MsiPath -match "agentuity_([0-9]+\.[0-9]+\.[0-9]+)_") {
+                            $matches[1]
+                        } else {
+                            "latest"
+                        }
+                        
+                        # Construct the download URL for the executable
+                        $arch = Get-Architecture
+                        $downloadUrl = "https://github.com/agentuity/cli/releases/download/v$versionFromMsi/agentuity_${versionFromMsi}_windows_$arch.exe"
+                        
+                        Write-Step "Downloading executable directly from: $downloadUrl"
+                        
+                        # Create a WebClient to download the file
+                        $webClient = New-Object System.Net.WebClient
+                        $webClient.Headers.Add("User-Agent", "AgentuityInstaller/PowerShell/$ScriptVersion")
+                        
+                        # Download the file directly to the installation directory
+                        $webClient.DownloadFile($downloadUrl, $exePath)
+                        
+                        if (Test-Path -Path $exePath) {
+                            Write-Success "Successfully downloaded executable directly to $exePath"
+                        } else {
+                            Write-Warning "Failed to download executable to $exePath"
+                        }
+                    } catch {
+                        Write-Warning "Failed to download executable directly: $_"
+                        
+                        # Try alternative download method as last resort
+                        try {
+                            Write-Step "Trying alternative download method"
+                            
+                            # Try to get the latest release info
+                            $releaseUrl = "https://agentuity.sh/release/cli"
+                            $response = Invoke-RestMethod -Uri $releaseUrl -Method Get -ErrorAction SilentlyContinue
+                            
+                            if ($null -ne $response -and $null -ne $response.assets) {
+                                # Find the correct asset for Windows and the current architecture
+                                $arch = Get-Architecture
+                                $asset = $response.assets | Where-Object { $_.name -like "*windows*$arch*.exe" } | Select-Object -First 1
+                                
+                                if ($null -ne $asset -and $null -ne $asset.browser_download_url) {
+                                    Write-Step "Found executable download URL: $($asset.browser_download_url)"
+                                    
+                                    # Download the file
+                                    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $exePath -ErrorAction SilentlyContinue
+                                    
+                                    if (Test-Path -Path $exePath) {
+                                        Write-Success "Successfully downloaded executable using alternative method"
+                                    }
+                                }
+                            }
+                        } catch {
+                            Write-Warning "Alternative download method also failed: $_"
+                        }
+                    }
+                }
+                
+                # Add registry entries to allow uninstallation without admin privileges
+                Write-Step "Setting registry keys for non-admin uninstallation"
+                try {
+                    # Create registry key for the application
+                    $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Agentuity"
+                    if (-not (Test-Path -Path $regPath)) {
+                        New-Item -Path $regPath -Force | Out-Null
+                    }
+                    
+                    # Try to extract product code from MSI
+                    $productCode = ""
+                    try {
+                        # Create a temporary directory to extract MSI property
+                        $tempDir = Join-Path -Path $env:TEMP -ChildPath "AgentuityMsiInfo"
+                        if (-not (Test-Path -Path $tempDir)) {
+                            New-Item -Path $tempDir -ItemType Directory -Force | Out-Null
+                        }
+                        
+                        # Use Windows Installer automation to get product code
+                        $windowsInstaller = New-Object -ComObject WindowsInstaller.Installer
+                        $database = $windowsInstaller.GetType().InvokeMember("OpenDatabase", "InvokeMethod", $null, $windowsInstaller, @($MsiPath, 0))
+                        
+                        $query = "SELECT `Value` FROM `Property` WHERE `Property` = 'ProductCode'"
+                        $view = $database.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $database, @($query))
+                        $view.GetType().InvokeMember("Execute", "InvokeMethod", $null, $view, $null)
+                        
+                        $record = $view.GetType().InvokeMember("Fetch", "InvokeMethod", $null, $view, $null)
+                        if ($record -ne $null) {
+                            $productCode = $record.GetType().InvokeMember("StringData", "GetProperty", $null, $record, 1)
+                        }
+                        
+                        # Clean up
+                        $view.GetType().InvokeMember("Close", "InvokeMethod", $null, $view, $null)
+                        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($database) | Out-Null
+                        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($windowsInstaller) | Out-Null
+                        
+                        Write-Step "Extracted product code: $productCode"
+                    } catch {
+                        Write-Warning "Failed to extract product code from MSI: $_"
+                    }
+                    
+                    # Create an uninstaller script in the installation directory
+                    $uninstallerPath = Join-Path -Path $localAppDataPath -ChildPath "uninstall.cmd"
+                    $uninstallerContent = @"
+@echo off
+echo Uninstalling Agentuity CLI...
+
+REM Remove the executable and other files
+if exist "$($localAppDataPath -replace '\\', '\\')\agentuity.exe" (
+    echo Removing executable files...
+    del /f /q "$($localAppDataPath -replace '\\', '\\')\agentuity.exe" >nul 2>&1
+)
+
+REM Remove the installation directory
+echo Removing installation directory...
+rd /s /q "$($localAppDataPath -replace '\\', '\\')" >nul 2>&1
+
+REM Remove from PATH
+echo Updating PATH environment variable...
+for /f "tokens=2*" %%a in ('reg query HKCU\Environment /v PATH 2^>nul ^| find "PATH"') do (
+    setx PATH "%%b" | findstr /v "$($localAppDataPath -replace '\\', '\\')" >nul 2>&1
+)
+
+REM Remove registry entries
+echo Removing registry entries...
+reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\Agentuity" /f >nul 2>&1
+
+echo Agentuity CLI has been uninstalled successfully.
+pause
+"@
+                    
+                    # Write the uninstaller script
+                    try {
+                        Set-Content -Path $uninstallerPath -Value $uninstallerContent -Force
+                        Write-Step "Created uninstaller script at $uninstallerPath"
+                    } catch {
+                        Write-Warning "Failed to create uninstaller script: $_"
+                    }
+                    
+                    # Create a direct uninstall command that uses our script
+                    $uninstallCmd = "cmd.exe /c start `"Agentuity CLI Uninstaller`" /wait `"$uninstallerPath`""
+                    
+                    # Set required properties for Add/Remove Programs
+                    New-ItemProperty -Path $regPath -Name "DisplayName" -Value "Agentuity CLI" -PropertyType String -Force | Out-Null
+                    New-ItemProperty -Path $regPath -Name "DisplayVersion" -Value (Get-LatestReleaseVersion) -PropertyType String -Force | Out-Null
+                    New-ItemProperty -Path $regPath -Name "UninstallString" -Value $uninstallCmd -PropertyType String -Force | Out-Null
+                    # Don't set QuietUninstallString to ensure the user sees the uninstall process
+                    New-ItemProperty -Path $regPath -Name "DisplayIcon" -Value "$exePath,0" -PropertyType String -Force | Out-Null
+                    New-ItemProperty -Path $regPath -Name "InstallLocation" -Value $localAppDataPath -PropertyType String -Force | Out-Null
+                    New-ItemProperty -Path $regPath -Name "InstallSource" -Value $localAppDataPath -PropertyType String -Force | Out-Null
+                    New-ItemProperty -Path $regPath -Name "Publisher" -Value "Agentuity" -PropertyType String -Force | Out-Null
+                    New-ItemProperty -Path $regPath -Name "NoModify" -Value 1 -PropertyType DWord -Force | Out-Null
+                    New-ItemProperty -Path $regPath -Name "NoRepair" -Value 1 -PropertyType DWord -Force | Out-Null
+                    New-ItemProperty -Path $regPath -Name "SystemComponent" -Value 0 -PropertyType DWord -Force | Out-Null
+                    
+                    # Add estimated size (in KB)
+                    $sizeInKB = 5000  # Default size if we can't calculate
+                    try {
+                        $exePath = Join-Path -Path $localAppDataPath -ChildPath "agentuity.exe"
+                        if (Test-Path -Path $exePath) {
+                            $fileInfo = Get-Item -Path $exePath
+                            $sizeInKB = [math]::Ceiling($fileInfo.Length / 1024)
+                        }
+                    } catch {
+                        Write-Warning "Failed to get executable size: $_"
+                    }
+                    New-ItemProperty -Path $regPath -Name "EstimatedSize" -Value $sizeInKB -PropertyType DWord -Force | Out-Null
+                    
+                    Write-Success "Successfully set registry keys for uninstallation"
+                } catch {
+                    Write-Warning "Failed to set registry keys: $_"
+                    # Continue anyway as this is not critical
+                }
+                
+                return $true
+            }
+            
+            # Standard MSI installation for admin users
             $installDirParam = ""
             if (-not [string]::IsNullOrEmpty($InstallDir)) {
                 $installDirParam = "INSTALLDIR=`"$InstallDir`""
             }
             
             $quietParam = "/qn"
-            $allusersParam = if (Test-Administrator) { "ALLUSERS=1" } else { "ALLUSERS=0" }
-            $arguments = "/i `"$MsiPath`" $quietParam /norestart /log `"$LogPath`" $allusersParam $installDirParam"
+            $installScopeParams = "ALLUSERS=1"
+            $arguments = "/i `"$MsiPath`" $quietParam /norestart /log `"$LogPath`" $installScopeParams $installDirParam"
             Write-Step "MSI command: msiexec.exe $arguments"
             
             $process = Start-Process -FilePath "msiexec.exe" -ArgumentList $arguments -Wait -PassThru
@@ -840,7 +1160,14 @@ try {
     $programFilesX86Path = [System.IO.Path]::Combine(${env:ProgramFiles(x86)}, "Agentuity")
     $localAppDataPath = [System.IO.Path]::Combine($env:LOCALAPPDATA, "Agentuity")
     
-    $installPaths = @($programFilesX86Path, $programFilesPath, $localAppDataPath, $installDir)
+    # Prioritize paths based on admin status and installation directory
+    if (Test-Administrator) {
+        # For admin users, check Program Files locations first
+        $installPaths = @($programFilesX86Path, $programFilesPath, $localAppDataPath, $installDir)
+    } else {
+        # For non-admin users, check LOCALAPPDATA first
+        $installPaths = @($localAppDataPath, $installDir, $programFilesX86Path, $programFilesPath)
+    }
     $installVerified = $false
     
     # In CI environment, list all paths being checked
