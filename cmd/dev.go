@@ -16,7 +16,6 @@ import (
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	cstr "github.com/agentuity/go-common/string"
-	csys "github.com/agentuity/go-common/sys"
 	"github.com/agentuity/go-common/tui"
 	"github.com/bep/debounce"
 	"github.com/spf13/cobra"
@@ -103,7 +102,10 @@ Examples:
 		}
 		defer websocketConn.Close()
 
-		projectServerCmd, err := dev.CreateRunProjectCmd(ctx, log, theproject, websocketConn, dir, orgId, port)
+		processCtx := context.Background()
+		var pid int
+
+		projectServerCmd, err := dev.CreateRunProjectCmd(processCtx, log, theproject, websocketConn, dir, orgId, port)
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 		}
@@ -139,7 +141,7 @@ Examples:
 			build(false)
 			isDeliberateRestart = true
 			log.Debug("killing project server")
-			dev.KillProjectServer(projectServerCmd)
+			dev.KillProjectServer(log, projectServerCmd, pid)
 			log.Debug("killing project server done")
 		}
 
@@ -160,6 +162,8 @@ Examples:
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start project: %s", err))).ShowErrorAndExit()
 		}
 
+		pid = projectServerCmd.Process.Pid
+
 		websocketConn.StartReadingMessages(ctx, log, port)
 		devUrl := websocketConn.WebURL(appUrl)
 
@@ -168,16 +172,16 @@ Examples:
 
 		go func() {
 			for {
-				log.Trace("waiting for project server to exit")
+				log.Trace("waiting for project server to exit (pid: %d)", pid)
 				if err := projectServerCmd.Wait(); err != nil {
-					log.Error("project server exited with error: %s", err)
+					log.Error("project server (pid: %d) exited with error: %s", pid, err)
 				}
 				if projectServerCmd.ProcessState != nil {
-					log.Debug("project server exited with code %d", projectServerCmd.ProcessState.ExitCode())
+					log.Debug("project server (pid: %d) exited with code %d", pid, projectServerCmd.ProcessState.ExitCode())
 				} else {
-					log.Debug("project server exited")
+					log.Debug("project server (pid: %d) exited", pid)
 				}
-				log.Debug("isDeliberateRestart: %t", isDeliberateRestart)
+				log.Debug("isDeliberateRestart: %t, pid: %d", isDeliberateRestart, pid)
 				if !isDeliberateRestart {
 					return
 				}
@@ -186,31 +190,32 @@ Examples:
 				if isDeliberateRestart {
 					isDeliberateRestart = false
 					log.Trace("restarting project server")
-					projectServerCmd, err = dev.CreateRunProjectCmd(ctx, log, theproject, websocketConn, dir, orgId, port)
+					projectServerCmd, err = dev.CreateRunProjectCmd(processCtx, log, theproject, websocketConn, dir, orgId, port)
 					if err != nil {
 						errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 					}
 					if err := projectServerCmd.Start(); err != nil {
 						errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start project: %s", err))).ShowErrorAndExit()
 					}
+					pid = projectServerCmd.Process.Pid
+					log.Trace("restarted project server (pid: %d)", pid)
 				}
 			}
 		}()
 
+		teardown := func() {
+			watcher.Close(log)
+			websocketConn.Close()
+			dev.KillProjectServer(log, projectServerCmd, pid)
+		}
+
 		select {
 		case <-websocketConn.Done():
 			log.Info("live dev connection closed, shutting down")
-			dev.KillProjectServer(projectServerCmd)
-			watcher.Close(log)
+			teardown()
 		case <-ctx.Done():
 			log.Info("context done, shutting down")
-			websocketConn.Close()
-			watcher.Close(log)
-		case <-csys.CreateShutdownChannel():
-			log.Info("shutdown signal received, shutting down")
-			dev.KillProjectServer(projectServerCmd)
-			websocketConn.Close()
-			watcher.Close(log)
+			teardown()
 		}
 	},
 }

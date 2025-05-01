@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/agentuity/cli/internal/project"
@@ -15,8 +14,20 @@ import (
 	"github.com/agentuity/go-common/logger"
 )
 
-func KillProjectServer(projectServerCmd *exec.Cmd) {
+func KillProjectServer(logger logger.Logger, projectServerCmd *exec.Cmd, pid int) {
+	if pid > 0 {
+		processes, err := getProcessTree(logger, pid)
+		if err != nil {
+			logger.Error("error getting process tree for parent (pid: %d): %s", pid, err)
+		}
+		for _, childPid := range processes {
+			logger.Debug("killing child process (pid: %d)", childPid)
+			kill(logger, childPid)
+		}
+	}
 	if projectServerCmd == nil || projectServerCmd.ProcessState == nil || projectServerCmd.ProcessState.Exited() {
+		logger.Debug("project server already exited (pid: %d)", pid)
+		kill(logger, pid)
 		return
 	}
 	ch := make(chan struct{}, 1)
@@ -26,8 +37,10 @@ func KillProjectServer(projectServerCmd *exec.Cmd) {
 	}()
 
 	if projectServerCmd.Process != nil {
-		// Try SIGINT first (Ctrl+C equivalent)
-		projectServerCmd.Process.Signal(syscall.SIGINT)
+		logger.Debug("killing parent process %d", pid)
+		if err := terminateProcess(logger, projectServerCmd); err != nil {
+			logger.Error("error terminating project server: %s", err)
+		}
 	}
 
 	// Wait a bit longer for SIGTERM to take effect
