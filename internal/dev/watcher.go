@@ -16,6 +16,13 @@ type FileWatcher struct {
 	dir      string
 }
 
+var ignorePatterns = []string{
+	"__pycache__",
+	"__test__",
+	"node_modules",
+	".pyc",
+}
+
 func NewWatcher(logger logger.Logger, dir string, patterns []string, callback func(string)) (*FileWatcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -32,6 +39,11 @@ func NewWatcher(logger logger.Logger, dir string, patterns []string, callback fu
 	err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
+		}
+		for _, ignorePattern := range ignorePatterns {
+			if strings.Contains(path, ignorePattern) {
+				return nil
+			}
 		}
 		if fw.matchesPattern(logger, path) {
 			logger.Trace("Adding path to watcher: %s", path)
