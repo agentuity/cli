@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.115] - 2025-05-02
+
+### Added
+- Added mono repofix ([#267](https://github.com/agentuity/cli/pull/267))
+
+### Changed
+- Add flags for deployment data overwrite from github action ([#266](https://github.com/agentuity/cli/pull/266))
+
+### Fixed
+- Allow non-admin users to uninstall CLI without admin privileges ([#264](https://github.com/agentuity/cli/pull/264))
+
 ## [v0.0.114] - 2025-05-01
 
 ### Fixed
@@ -442,6 +453,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.115]: https://github.com/agentuity/cli/compare/v0.0.114...v0.0.115
 [v0.0.114]: https://github.com/agentuity/cli/compare/v0.0.113...v0.0.114
 [v0.0.113]: https://github.com/agentuity/cli/compare/v0.0.112...v0.0.113
 [v0.0.112]: https://github.com/agentuity/cli/compare/v0.0.111...v0.0.112
