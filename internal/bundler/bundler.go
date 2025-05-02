@@ -100,7 +100,10 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 	if err != nil {
 		return fmt.Errorf("failed to load %s: %w", pkgjson, err)
 	}
-	agentuitypkg := filepath.Join(dir, "node_modules", "@agentuity", "sdk", "package.json")
+	agentuitypkg, err := resolveAgentuity(dir)
+	if err != nil {
+		return err
+	}
 	pkg2, err := util.NewOrderedMapFromFile(util.PackageJsonKeysOrder, agentuitypkg)
 	if err != nil {
 		return fmt.Errorf("failed to load %s: %w", agentuitypkg, err)
@@ -281,4 +284,21 @@ func Bundle(ctx BundleContext) error {
 		return bundlePython(ctx, dir, outdir, theproject)
 	}
 	return fmt.Errorf("unsupported runtime: %s", theproject.Bundler.Runtime)
+}
+
+// resolveAgentuity walks up from startDir looking for node_modules/@agentuity/sdk/package.json
+func resolveAgentuity(startDir string) (string, error) {
+	dir := startDir
+	for {
+		candidate := filepath.Join(dir, "node_modules", "@agentuity", "sdk", "package.json")
+		if util.Exists(candidate) {
+			return candidate, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return "", fmt.Errorf("could not find @agentuity/sdk/package.json in any parent directory of %s", startDir)
 }
