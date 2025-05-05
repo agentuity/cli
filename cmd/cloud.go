@@ -151,6 +151,7 @@ Examples:
 		ciCommit, _ := cmd.Flags().GetString("ci-commit")
 		ciMessage, _ := cmd.Flags().GetString("ci-message")
 		ciGitProvider, _ := cmd.Flags().GetString("ci-git-provider")
+		ciLogsUrl, _ := cmd.Flags().GetString("ci-logs-url")
 
 		deploymentConfig := project.NewDeploymentConfig()
 		client := util.NewAPIClient(ctx, logger, apiUrl, token)
@@ -360,9 +361,13 @@ Examples:
 
 		var gitInfo deployer.GitInfo
 		var originType string
-		isOverwritingGitInfo := ciRemoteUrl != "" || ciBranch != "" || ciCommit != "" || ciMessage != "" || ciGitProvider != ""
+		var ciInfo deployer.CIInfo
+		isOverwritingGitInfo := ciRemoteUrl != "" || ciBranch != "" || ciCommit != "" || ciMessage != "" || ciGitProvider != "" || ciLogsUrl != ""
 		if ci && isOverwritingGitInfo {
 			originType = "ci"
+			ciInfo = deployer.CIInfo{
+				LogsURL: ciLogsUrl,
+			}
 			gitInfo = deployer.GitInfo{
 				RemoteURL:     &ciRemoteUrl,
 				Branch:        &ciBranch,
@@ -380,13 +385,17 @@ Examples:
 			originType = "cli"
 		}
 
+		data := map[string]interface{}{
+			"machine": deployer.GetMachineInfo(),
+			"git":     gitInfo,
+		}
+		if originType == "ci" && ciLogsUrl != "" {
+			data["ci"] = ciInfo
+		}
 		startRequest.Metadata = &deployer.Metadata{
 			Origin: deployer.MetadataOrigin{
 				Type: originType,
-				Data: map[string]interface{}{
-					"machine": deployer.GetMachineInfo(),
-					"git":     gitInfo,
-				},
+				Data: data,
 			},
 		}
 
@@ -653,6 +662,7 @@ func init() {
 	cloudDeployCmd.Flags().String("ci-commit", "", "Used to set the commit hash for your deployment metadata")
 	cloudDeployCmd.Flags().String("ci-message", "", "Used to set the commit message for your deployment metadata")
 	cloudDeployCmd.Flags().String("ci-git-provider", "", "Used to set the git provider for your deployment metadata")
+	cloudDeployCmd.Flags().String("ci-logs-url", "", "Used to set the CI logs URL for your deployment metadata")
 
 	cloudDeployCmd.Flags().MarkHidden("deploymentId")
 	cloudDeployCmd.Flags().MarkHidden("ci")
@@ -661,6 +671,7 @@ func init() {
 	cloudDeployCmd.Flags().MarkHidden("ci-commit")
 	cloudDeployCmd.Flags().MarkHidden("ci-messsage")
 	cloudDeployCmd.Flags().MarkHidden("ci-git-provider")
+	cloudDeployCmd.Flags().MarkHidden("ci-logs-url")
 
 	cloudDeployCmd.Flags().String("format", "text", "The output format to use for results which can be either 'text' or 'json'")
 	cloudDeployCmd.Flags().String("org-id", "", "The organization to create the project in")
