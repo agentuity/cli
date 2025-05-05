@@ -20,7 +20,7 @@ type GitInfo struct {
 	Commit        *string `json:"commit"`
 	CommitMessage *string `json:"commitMessage"`
 	IsRepo        bool    `json:"isRepo"`
-	GitProvider   *string
+	GitProvider   *string `json:"gitProvider"`
 }
 
 type MetadataOrigin struct {
