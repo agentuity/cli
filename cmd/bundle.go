@@ -78,7 +78,7 @@ Examples:
 				"ci-remote-url",
 				"ci-branch",
 				"ci-commit",
-				"ci-messsage",
+				"ci-message",
 				"ci-logs-url",
 				"ci-git-provider",
 				"ci-logs-url",
@@ -139,7 +139,7 @@ func init() {
 	bundleCmd.Flags().MarkHidden("ci-remote-url")
 	bundleCmd.Flags().MarkHidden("ci-branch")
 	bundleCmd.Flags().MarkHidden("ci-commit")
-	bundleCmd.Flags().MarkHidden("ci-messsage")
+	bundleCmd.Flags().MarkHidden("ci-message")
 	bundleCmd.Flags().MarkHidden("ci-git-provider")
 	bundleCmd.Flags().MarkHidden("ci-logs-url")
 }
