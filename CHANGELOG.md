@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed typo in CI flag name (changed "ci-messsage" to "ci-message") ([#277](https://github.com/agentuity/cli/pull/277))
 
+## [v0.0.116] - 2025-05-05
+
+### Fixed
+- Missed annotation on GitInfo ([#275](https://github.com/agentuity/cli/pull/275))
+- AGENT-29 Check mask value for secrets ([#274](https://github.com/agentuity/cli/pull/274))
+- Passing CI logs URL to display GitHub action logs in the UI ([#273](https://github.com/agentuity/cli/pull/273))
+
+### Changed
+- Taking a walk to get the git data 🚶‍♂️‍➡️ ([#272](https://github.com/agentuity/cli/pull/272))
+- Pass on the git info from deploy to bundle when for --deploy ([#271](https://github.com/agentuity/cli/pull/271))
 ## [v0.0.115] - 2025-05-02
 
 ### Added
@@ -458,8 +468,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+<<<<<<< HEAD
 [v0.0.117]: https://github.com/agentuity/cli/compare/v0.0.116...v0.0.117
 [v0.0.116]: https://github.com/agentuity/cli/compare/v0.0.115...v0.0.116
+||||||| 58c8c08
+=======
+[v0.0.116]: https://github.com/agentuity/cli/compare/v0.0.115...v0.0.116
+>>>>>>> origin/main
 [v0.0.115]: https://github.com/agentuity/cli/compare/v0.0.114...v0.0.115
 [v0.0.114]: https://github.com/agentuity/cli/compare/v0.0.113...v0.0.114
 [v0.0.113]: https://github.com/agentuity/cli/compare/v0.0.112...v0.0.113
