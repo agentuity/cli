@@ -378,7 +378,7 @@ Examples:
 				IsRepo:        true,
 			}
 		} else {
-			info, err := deployer.GetGitInfo(logger, dir)
+			info, err := deployer.GetGitInfoRecursive(logger, dir)
 			if err != nil {
 				logger.Debug("Failed to get git info: %v", err)
 			}
