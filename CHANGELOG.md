@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.117] - 2025-05-05
+
+### Fixed
+- Fixed typo in CI flag name (changed "ci-messsage" to "ci-message") ([#277](https://github.com/agentuity/cli/pull/277))
+
 ## [v0.0.116] - 2025-05-05
 
 ### Fixed
@@ -464,6 +469,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.117]: https://github.com/agentuity/cli/compare/v0.0.116...v0.0.117
 [v0.0.116]: https://github.com/agentuity/cli/compare/v0.0.115...v0.0.116
 [v0.0.115]: https://github.com/agentuity/cli/compare/v0.0.114...v0.0.115
 [v0.0.114]: https://github.com/agentuity/cli/compare/v0.0.113...v0.0.114
