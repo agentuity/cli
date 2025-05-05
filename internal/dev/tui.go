@@ -363,10 +363,11 @@ func (m *model) View() string {
 }
 
 type Agent struct {
-	ID        string
-	Name      string
-	LocalURL  string
-	PublicURL string
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	LocalURL    string `json:"local_url,omitempty"`
+	PublicURL   string `json:"public_url,omitempty"`
 }
 
 type DevModeUI struct {
@@ -379,6 +380,7 @@ type DevModeUI struct {
 
 	spinnerCtx    context.Context
 	spinnerCancel context.CancelFunc
+	aborting      bool
 }
 
 type DevModeConfig struct {
@@ -403,11 +405,10 @@ func (d *DevModeUI) Done() <-chan struct{} {
 }
 
 // Close the program which will stop the program and wait for it to exit
-func (d *DevModeUI) Close() {
+func (d *DevModeUI) Close(abort bool) {
 	d.once.Do(func() {
-		d.program.Send(tea.Quit)
-		d.cancel()
-		d.wg.Wait()
+		d.aborting = abort
+		d.program.Quit()
 	})
 }
 
@@ -423,10 +424,15 @@ func (d *DevModeUI) Start() {
 		defer func() {
 			d.cancel()
 			d.wg.Done()
+			if d.aborting {
+				for i := len(d.model.logItems) - 1; i >= 0; i-- {
+					fmt.Println(d.model.logItems[i])
+				}
+			}
 		}()
 		_, err := d.program.Run()
 		if err != nil {
-			fmt.Printf("Error running program: %v", err)
+			fmt.Printf("Error running program: %v\n", err)
 		}
 	}()
 }

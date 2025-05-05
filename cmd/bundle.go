@@ -50,6 +50,7 @@ Examples:
 			Production: production,
 			Install:    install,
 			CI:         ci,
+			Writer:     os.Stderr,
 		}); err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to bundle project")).ShowErrorAndExit()
 		}

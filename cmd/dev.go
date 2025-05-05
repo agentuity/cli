@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -21,7 +22,6 @@ import (
 	"github.com/bep/debounce"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"golang.org/x/term"
 )
 
 var devCmd = &cobra.Command{
@@ -42,13 +42,6 @@ Examples:
   agentuity dev
   agentuity dev --dir /path/to/project`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fd := int(os.Stdin.Fd())
-		oldState, err := term.GetState(fd)
-		if err != nil {
-			panic(err)
-		}
-		defer term.Restore(fd, oldState)
-
 		log := env.NewLogger(cmd)
 		logLevel := env.LogLevel(cmd)
 		apiUrl, appUrl, transportUrl := util.GetURLs(log)
@@ -201,13 +194,14 @@ Examples:
 
 		ui.Start()
 
-		defer ui.Close()
+		defer ui.Close(false)
 
 		tuiLogger := dev.NewTUILogger(logLevel, ui)
 
 		if err := server.Connect(ui, tuiLogger); err != nil {
-			ui.Close()
-			tuiLogger.Fatal("failed to start live dev connection: %s", err)
+			tuiLogger.Error("failed to start live dev connection: %s", err)
+			ui.Close(true)
+			return
 		}
 
 		projectServerCmd, err := dev.CreateRunProjectCmd(processCtx, tuiLogger, theproject, server, dir, orgId, port, tuiLogger)
@@ -215,19 +209,20 @@ Examples:
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 		}
 
-		build := func(initial bool) {
+		build := func(initial bool) bool {
 			started := time.Now()
 			var ok bool
 			ui.ShowSpinner("Building project ...", func() {
+				var w io.Writer = tuiLogger
 				if err := bundler.Bundle(bundler.BundleContext{
 					Context:    ctx,
 					Logger:     tuiLogger,
 					ProjectDir: dir,
 					Production: false,
-					DevMode:    !initial,
+					DevMode:    true,
+					Writer:     w,
 				}); err != nil {
 					if err == bundler.ErrBuildFailed {
-						tuiLogger.Error("build failed ...")
 						return
 					}
 					errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to bundle project: %s", err))).ShowErrorAndExit()
@@ -237,10 +232,14 @@ Examples:
 			if ok && !initial {
 				ui.SetStatusMessage("✨ Built in %s", time.Since(started).Round(time.Millisecond))
 			}
+			return ok
 		}
 
-		// Initial build
-		build(true)
+		// Initial build must exit if it fails
+		if !build(true) {
+			ui.Close(true)
+			return
+		}
 
 		restart := func() {
 			isDeliberateRestart = true
@@ -273,8 +272,9 @@ Examples:
 		pid = projectServerCmd.Process.Pid
 
 		if err := server.HealthCheck(devModeUrl); err != nil {
-			ui.Close()
-			tuiLogger.Fatal("failed to health check connection: %s", err)
+			tuiLogger.Error("failed to health check connection: %s", err)
+			ui.Close(true)
+			return
 		}
 
 		ui.SetStatusMessage("🚀 DevMode ready")

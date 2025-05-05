@@ -2,6 +2,7 @@ package dev
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -88,7 +89,10 @@ func (s *Server) Close() error {
 			}
 		}
 		s.bridge.Close()
-		s.cleanup()
+		if s.cleanup != nil {
+			s.cleanup()
+			s.cleanup = nil
+		}
 	})
 	return nil
 }
@@ -202,10 +206,32 @@ func (s *Server) OnError(client *bridge.Client, err error) {
 	s.logger.Error("an error occurred: %s", err)
 }
 
+type ControlMessage struct {
+	Action string `json:"action"`
+}
+
+type AgentsControlResponse struct {
+	ProjectID   string                `json:"projectId"`
+	ProjectName string                `json:"projectName"`
+	Agents      []project.AgentConfig `json:"agents"`
+}
+
 // OnControl is called when a control event is received from the bridge. you can respond with a control event to the bridge by returning a non-nil value.
 func (s *Server) OnControl(client *bridge.Client, id string, data []byte) ([]byte, error) {
 	s.logger.Debug("on control: id: %s, data: %s", id, string(data))
-	return nil, nil
+	var message ControlMessage
+	if err := json.Unmarshal(data, &message); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal control message: %w", err)
+	}
+	switch message.Action {
+	case "getAgents":
+		return json.Marshal(AgentsControlResponse{
+			ProjectID:   s.Project.Project.ProjectId,
+			ProjectName: s.Project.Project.Name,
+			Agents:      s.Project.Project.Agents,
+		})
+	}
+	return nil, fmt.Errorf("unknown control action: %s", message.Action)
 }
 
 // OnRefresh is called when the bridge client has refreshed its connection

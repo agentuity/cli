@@ -124,7 +124,6 @@ func (l *TuiLogger) Write(p []byte) (n int, err error) {
 			if logger.LevelError < l.logLevel && strings.HasPrefix(prefix, "[ERROR]") {
 				continue
 			}
-			continue
 		}
 		l.ui.AddLog("%s", log)
 	}
