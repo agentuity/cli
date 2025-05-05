@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Taking a walk to get the git data 🚶‍♂️‍➡️ ([#272](https://github.com/agentuity/cli/pull/272))
 - Pass on the git info from deploy to bundle when for --deploy ([#271](https://github.com/agentuity/cli/pull/271))
+
 ## [v0.0.115] - 2025-05-02
 
 ### Added
@@ -468,13 +469,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
-<<<<<<< HEAD
 [v0.0.117]: https://github.com/agentuity/cli/compare/v0.0.116...v0.0.117
 [v0.0.116]: https://github.com/agentuity/cli/compare/v0.0.115...v0.0.116
-||||||| 58c8c08
-=======
-[v0.0.116]: https://github.com/agentuity/cli/compare/v0.0.115...v0.0.116
->>>>>>> origin/main
 [v0.0.115]: https://github.com/agentuity/cli/compare/v0.0.114...v0.0.115
 [v0.0.114]: https://github.com/agentuity/cli/compare/v0.0.113...v0.0.114
 [v0.0.113]: https://github.com/agentuity/cli/compare/v0.0.112...v0.0.113
