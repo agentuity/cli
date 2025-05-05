@@ -102,8 +102,13 @@ func GetGitInfo(logger logger.Logger, dir string) (*GitInfo, error) {
 
 // GetGitInfoRecursive walks up directories until it finds a git repo and returns its info
 func GetGitInfoRecursive(logger logger.Logger, startDir string) (*GitInfo, error) {
+	depth := 0
 	dir := startDir
 	for {
+		if depth >= 100 {
+			logger.Warn("Max depth reached while trying to find git dir")
+			return &GitInfo{}, nil
+		}
 		info, err := GetGitInfo(logger, dir)
 		if err != nil {
 			return nil, err
@@ -117,6 +122,7 @@ func GetGitInfoRecursive(logger logger.Logger, startDir string) (*GitInfo, error
 			break
 		}
 		dir = parent
+		depth++
 	}
 	return &GitInfo{}, nil
 }
