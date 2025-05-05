@@ -79,7 +79,10 @@ Examples:
 				"ci-branch",
 				"ci-commit",
 				"ci-messsage",
-				"ci-git-provider"}
+				"ci-logs-url",
+				"ci-git-provider",
+				"ci-logs-url",
+			}
 
 			f := cmd.Flags()
 			for _, flag := range flags {
@@ -131,11 +134,12 @@ func init() {
 	bundleCmd.Flags().String("ci-commit", "", "Used to set the commit hash for your deployment metadata")
 	bundleCmd.Flags().String("ci-message", "", "Used to set the commit message for your deployment metadata")
 	bundleCmd.Flags().String("ci-git-provider", "", "Used to set the git provider for your deployment metadata")
+	bundleCmd.Flags().String("ci-logs-url", "", "Used to set the CI logs URL for your deployment metadata")
 
 	bundleCmd.Flags().MarkHidden("ci-remote-url")
 	bundleCmd.Flags().MarkHidden("ci-branch")
 	bundleCmd.Flags().MarkHidden("ci-commit")
 	bundleCmd.Flags().MarkHidden("ci-messsage")
 	bundleCmd.Flags().MarkHidden("ci-git-provider")
-
+	bundleCmd.Flags().MarkHidden("ci-logs-url")
 }

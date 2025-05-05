@@ -9,6 +9,10 @@ import (
 	"github.com/go-git/go-git/v5"
 )
 
+type CIInfo struct {
+	LogsURL string `json:"logsUrl"`
+}
+
 // GitInfo contains basic git repository information
 type GitInfo struct {
 	RemoteURL     *string `json:"remoteUrl"`
