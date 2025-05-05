@@ -69,13 +69,31 @@ Examples:
 			if deploymentId != "" {
 				args = append(args, "--deploymentId", deploymentId)
 			}
-			flags := []string{"log-level", "api-url", "api-key", "dir", "ci"}
+			flags := []string{
+				"log-level",
+				"api-url",
+				"api-key",
+				"dir",
+				"ci",
+				"ci-remote-url",
+				"ci-branch",
+				"ci-commit",
+				"ci-messsage",
+				"ci-git-provider"}
+
+			f := cmd.Flags()
 			for _, flag := range flags {
-				if cmd.Flags().Changed(flag) {
-					val, _ := cmd.Flags().GetString(flag)
-					args = append(args, "--"+flag, val)
+				if f.Changed(flag) {
+					switch f.Lookup(flag).Value.Type() {
+					case "string":
+						val, _ := f.GetString(flag)
+						args = append(args, "--"+flag, val)
+					case "bool":
+						args = append(args, "--"+flag)
+					}
 				}
 			}
+
 			started = time.Now()
 			projectContext.Logger.Trace("deploying to cloud with %s and args: %v", bin, args)
 			cwd, err := os.Getwd()
