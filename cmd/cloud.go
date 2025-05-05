@@ -670,7 +670,7 @@ func init() {
 	cloudDeployCmd.Flags().MarkHidden("ci-remote-url")
 	cloudDeployCmd.Flags().MarkHidden("ci-branch")
 	cloudDeployCmd.Flags().MarkHidden("ci-commit")
-	cloudDeployCmd.Flags().MarkHidden("ci-messsage")
+	cloudDeployCmd.Flags().MarkHidden("ci-message")
 	cloudDeployCmd.Flags().MarkHidden("ci-git-provider")
 	cloudDeployCmd.Flags().MarkHidden("ci-logs-url")
 
