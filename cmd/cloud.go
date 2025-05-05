@@ -23,6 +23,7 @@ import (
 	"github.com/agentuity/go-common/crypto"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -227,7 +228,7 @@ Examples:
 					if projectData != nil && projectData.Env != nil && projectData.Env[ev.Key] == ev.Val {
 						continue
 					}
-					if projectData != nil && projectData.Secrets != nil && projectData.Secrets[ev.Key] == ev.Val {
+					if projectData != nil && projectData.Secrets != nil && projectData.Secrets[ev.Key] == cstr.Mask(ev.Val) {
 						continue
 					}
 					foundkeys = append(foundkeys, ev.Key)
