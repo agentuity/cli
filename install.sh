@@ -143,8 +143,7 @@ check_install_path() {
   fi
 
   if [[ "$INSTALL_PATH" == "/usr/local/bin" ]]; then
-    
-    if [[ -d "$HOME/.local/bin" ]] || mkdir -p "$HOME/.local/bin" 2>/dev/null; then
+        if [[ -d "$HOME/.local/bin" ]] || mkdir -p "$HOME/.local/bin" 2>/dev/null; then
       if [[ -w "$HOME/.local/bin" ]]; then
         ohai "Using $HOME/.local/bin instead"
         INSTALL_PATH="$HOME/.local/bin"
@@ -162,8 +161,6 @@ check_install_path() {
     else
       abort "Could not find or create a writable installation directory. Try running with sudo or specify a different directory with --dir."
     fi
-  else
-    abort "No write permission to $INSTALL_PATH. Try running with sudo or specify a different directory with --dir."
   fi
 }
 
