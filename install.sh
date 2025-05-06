@@ -20,116 +20,6 @@ CAT=${CAT:-cat}
 ARCH=$(uname -m)
 OS=$(uname -s)
 
-
-ohai() {
-  printf "${tty_blue}==>${tty_bold} %s${tty_reset}\n" "$1"
-}
-
-url() {
-  printf "${tty_cyan}${tty_underline}%s${tty_reset}" "$1"
-}
-
-warn() {
-  printf "${tty_red}Warning${tty_reset}: %s\n" "$1" >&2
-}
-
-abort() {
-  printf "${tty_red}Error${tty_reset}: %s\n" "$1" >&2
-  exit 1
-}
-
-
-check_known_arch() {
-  if [[ "$ARCH" != "x86_64" ]] && [[ "$ARCH" != "amd64" ]] && [[ "$ARCH" != "arm64" ]] && [[ "$ARCH" != "aarch64" ]]; then
-    abort "Unsupported architecture: $ARCH"
-  fi
-}
-
-is_x86_64() {
-  check_known_arch
-  if [[ "$ARCH" == "x86_64" ]] || [[ "$ARCH" == "amd64" ]]; then
-    return 0
-  else
-    return 1
-  fi
-} 
-
-is_arm64() {
-  check_known_arch
-  if [[ "$ARCH" == "arm64" ]] || [[ "$ARCH" == "aarch64" ]]; then
-    return 0
-  else
-    return 1
-  fi
-}
-
-is_windows() {
-  check_known_arch
-  if [[ "$OS" == "Windows" ]]; then
-    return 0
-  else
-    return 1
-  fi
-}
-
-is_macos() {
-  check_known_arch
-  if [[ "$OS" == "Darwin" ]]; then
-    return 0
-  else
-    return 1
-  fi
-}
-
-is_linux() {
-  check_known_arch
-  if [[ "$OS" == "Linux" ]]; then
-    return 0
-  else
-    return 1
-  fi
-}
-
-setup_extension_var() {
-  if is_macos; then
-    EXTENSION="tar.gz"
-  elif is_linux; then
-    EXTENSION="tar.gz"
-  elif is_windows; then
-    EXTENSION="msi"
-  else
-    abort "Unsupported operating system: $OS"
-  fi
-}
-
-setup_install_path_var() {
-  if is_macos; then
-    if [[ -d "$HOME/.local/bin" ]] && [[ -w "$HOME/.local/bin" ]]; then
-      INSTALL_PATH="$HOME/.local/bin"
-    elif [[ -d "$HOME/.bin" ]] && [[ -w "$HOME/.bin" ]]; then
-      INSTALL_PATH="$HOME/.bin"
-    elif [[ -d "$HOME/bin" ]] && [[ -w "$HOME/bin" ]]; then
-      INSTALL_PATH="$HOME/bin"
-    else
-      INSTALL_PATH="/usr/local/bin"
-    fi
-  elif is_linux; then
-    if [[ -d "$HOME/.local/bin" ]] && [[ -w "$HOME/.local/bin" ]]; then
-      INSTALL_PATH="$HOME/.local/bin"
-    elif [[ -d "$HOME/.bin" ]] && [[ -w "$HOME/.bin" ]]; then
-      INSTALL_PATH="$HOME/.bin"
-    elif [[ -d "$HOME/bin" ]] && [[ -w "$HOME/bin" ]]; then
-      INSTALL_PATH="$HOME/bin"
-    else
-      INSTALL_PATH="/usr/local/bin"
-    fi
-  elif is_windows; then
-    INSTALL_PATH="$HOME/bin"
-  else
-    abort "Unsupported operating system: $OS"
-  fi
-}
-
 usage() {
 $CAT 1>&2 <<EOF
 Usage: install.sh [options]
@@ -159,6 +49,89 @@ parse_cli_args() {
   done
 }
 
+
+ohai() {
+  printf "${tty_blue}==>${tty_bold} %s${tty_reset}\n" "$1"
+}
+
+url() {
+  printf "${tty_cyan}${tty_underline}%s${tty_reset}" "$1"
+}
+
+warn() {
+  printf "${tty_red}Warning${tty_reset}: %s\n" "$1" >&2
+}
+
+abort() {
+  printf "${tty_red}Error${tty_reset}: %s\n" "$1" >&2
+  exit 1
+}
+
+
+check_known_arch() {
+  if [[ "$ARCH" != "x86_64" ]] && [[ "$ARCH" != "amd64" ]] && [[ "$ARCH" != "arm64" ]] && [[ "$ARCH" != "aarch64" ]]; then
+    abort "Unsupported architecture: $ARCH"
+  fi
+}
+
+is_macos() {
+  if [[ "$OS" == "Darwin" ]]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+is_linux() {
+  if [[ "$OS" == "Linux" ]]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+abort_if_windows() {
+  if [[ "$OS" == "Windows" ]]; then
+    abort "Windows is not supported. Please use WSL or a native Windows installation."
+  fi
+}
+
+setup_extension_var() {
+  if is_macos; then
+    EXTENSION="tar.gz"
+  elif is_linux; then
+    EXTENSION="tar.gz"
+  else
+    abort "Unsupported operating system: $OS"
+  fi
+}
+
+setup_install_path_var() {
+  if is_macos; then
+    if [[ -d "$HOME/.local/bin" ]] && [[ -w "$HOME/.local/bin" ]]; then
+      INSTALL_PATH="$HOME/.local/bin"
+    elif [[ -d "$HOME/.bin" ]] && [[ -w "$HOME/.bin" ]]; then
+      INSTALL_PATH="$HOME/.bin"
+    elif [[ -d "$HOME/bin" ]] && [[ -w "$HOME/bin" ]]; then
+      INSTALL_PATH="$HOME/bin"
+    else
+      INSTALL_PATH="/usr/local/bin"
+    fi
+  elif is_linux; then
+    if [[ -d "$HOME/.local/bin" ]] && [[ -w "$HOME/.local/bin" ]]; then
+      INSTALL_PATH="$HOME/.local/bin"
+    elif [[ -d "$HOME/.bin" ]] && [[ -w "$HOME/.bin" ]]; then
+      INSTALL_PATH="$HOME/.bin"
+    elif [[ -d "$HOME/bin" ]] && [[ -w "$HOME/bin" ]]; then
+      INSTALL_PATH="$HOME/bin"
+    else
+      INSTALL_PATH="/usr/local/bin"
+    fi
+  else
+    abort "Unsupported operating system: $OS"
+  fi
+}
+
 check_install_path() {
   if [[ ! -d "$INSTALL_PATH" ]]; then
     ohai "Creating install directory: $INSTALL_PATH"
@@ -166,11 +139,10 @@ check_install_path() {
   fi
 
   if [[ -w "$INSTALL_PATH" ]]; then
-    return
+    ohai "No write permission to $INSTALL_PATH. Trying alternative locations..."
   fi
 
   if [[ "$INSTALL_PATH" == "/usr/local/bin" ]]; then
-    ohai "No write permission to $INSTALL_PATH. Trying alternative locations..."
     
     if [[ -d "$HOME/.local/bin" ]] || mkdir -p "$HOME/.local/bin" 2>/dev/null; then
       if [[ -w "$HOME/.local/bin" ]]; then
@@ -216,19 +188,19 @@ install_mac() {
   if command -v brew >/dev/null 2>&1 && [[ "$NO_BREW" != "true" ]]; then
     ohai "Homebrew detected! Installing Agentuity CLI using Homebrew..."
       
-      if [[ "$VERSION" != "latest" ]]; then
-        ohai "Installing Agentuity CLI version $VERSION using Homebrew..."
-        brew install agentuity/tap/agentuity@${VERSION#v}
-      else
-        ohai "Installing latest Agentuity CLI version using Homebrew..."
-        brew install -q agentuity/tap/agentuity
-      fi
+    if [[ "$VERSION" != "latest" ]]; then
+      ohai "Installing Agentuity CLI version $VERSION using Homebrew..."
+      brew install agentuity/tap/agentuity@${VERSION#v}
+    else
+      ohai "Installing latest Agentuity CLI version using Homebrew..."
+      brew install -q agentuity/tap/agentuity
+    fi
 
-      if command -v agentuity >/dev/null 2>&1; then
-        success
-      else
-        abort "Homebrew installation failed. Please try again or use manual installation."
-      fi
+    if command -v agentuity >/dev/null 2>&1; then
+      success
+    else
+      abort "Homebrew installation failed. Please try again or use manual installation."
+    fi
 
     else
       ohai "Installing Agentuity CLI using curl..."
@@ -239,18 +211,7 @@ install_mac() {
 
 download_release() {
 
-  if [[ is_windows ]]; then
-    if is_x86_64; then
-      DOWNLOAD_FILENAME="agentuity-x64.msi"
-    elif is_arm64; then
-      DOWNLOAD_FILENAME="agentuity-arm64.msi"
-    else
-      DOWNLOAD_FILENAME="agentuity-x86.msi"
-    fi
-  else
-    DOWNLOAD_FILENAME="agentuity_${OS}_${ARCH}.${EXTENSION}"
-  fi
-
+  DOWNLOAD_FILENAME="agentuity_${OS}_${ARCH}.${EXTENSION}"
   DOWNLOAD_URL="https://github.com/agentuity/cli/releases/download/v${VERSION#v}/${DOWNLOAD_FILENAME}"
 
   ohai "Downloading Agentuity CLI v${VERSION} for ${OS}/${ARCH}..."
@@ -259,35 +220,33 @@ download_release() {
 
 download_checksums() {
   CHECKSUMS_URL="https://github.com/agentuity/cli/releases/download/v${VERSION#v}/checksums.txt"
-  if is_windows; then
-    ohai "Downloading checksums for verification..."
-    if ! curl -L --silent "$CHECKSUMS_URL" -o "$TMP_DIR/checksums.txt"; then
-      warn "Failed to download checksums file. Skipping verification."
+  ohai "Downloading checksums for verification..."
+  if ! curl -L --silent "$CHECKSUMS_URL" -o "$TMP_DIR/checksums.txt"; then
+    warn "Failed to download checksums file. Skipping verification."
+  else
+    ohai "Verifying checksum..."
+    if command -v sha256sum >/dev/null 2>&1; then
+      CHECKSUM_TOOL="sha256sum"
+    elif command -v shasum >/dev/null 2>&1; then
+      CHECKSUM_TOOL="shasum -a 256"
     else
-      ohai "Verifying checksum..."
-      if command -v sha256sum >/dev/null 2>&1; then
-        CHECKSUM_TOOL="sha256sum"
-      elif command -v shasum >/dev/null 2>&1; then
-        CHECKSUM_TOOL="shasum -a 256"
-      else
-        warn "Neither sha256sum nor shasum found. Skipping checksum verification."
-        CHECKSUM_TOOL=""
-      fi
+      warn "Neither sha256sum nor shasum found. Skipping checksum verification."
+      CHECKSUM_TOOL=""
+    fi
+    
+    if [[ -n "$CHECKSUM_TOOL" ]]; then
+      cd "$TMP_DIR"
+      COMPUTED_CHECKSUM=$($CHECKSUM_TOOL "$DOWNLOAD_FILENAME" | cut -d ' ' -f 1)
+      EXPECTED_CHECKSUM=$(grep "$DOWNLOAD_FILENAME" checksums.txt | cut -d ' ' -f 1)
       
-      if [[ -n "$CHECKSUM_TOOL" ]]; then
-        cd "$TMP_DIR"
-        COMPUTED_CHECKSUM=$($CHECKSUM_TOOL "$DOWNLOAD_FILENAME" | cut -d ' ' -f 1)
-        EXPECTED_CHECKSUM=$(grep "$DOWNLOAD_FILENAME" checksums.txt | cut -d ' ' -f 1)
-        
-        if [[ -z "$EXPECTED_CHECKSUM" ]]; then
-          warn "Checksum for $DOWNLOAD_FILENAME not found in checksums.txt. Skipping verification."
-        elif [[ "$COMPUTED_CHECKSUM" != "$EXPECTED_CHECKSUM" ]]; then
-          abort "Checksum verification failed. Expected: $EXPECTED_CHECKSUM, Got: $COMPUTED_CHECKSUM"
-        else
-          ohai "Checksum verification passed!"
-        fi
-        cd - > /dev/null
+      if [[ -z "$EXPECTED_CHECKSUM" ]]; then
+        warn "Checksum for $DOWNLOAD_FILENAME not found in checksums.txt. Skipping verification."
+      elif [[ "$COMPUTED_CHECKSUM" != "$EXPECTED_CHECKSUM" ]]; then
+        abort "Checksum verification failed. Expected: $EXPECTED_CHECKSUM, Got: $COMPUTED_CHECKSUM"
+      else
+        ohai "Checksum verification passed!"
       fi
+      cd - > /dev/null
     fi
   fi
 }
@@ -295,7 +254,7 @@ download_checksums() {
 install_agentuity() {
   ohai "Installing to $INSTALL_PATH..."
   if [[ -f "$TMP_DIR/agentuity" ]]; then
-    if [[ is_macos ]] && [[ -f "$INSTALL_PATH/agentuity" ]]; then
+    if is_macos && [[ -f "$INSTALL_PATH/agentuity" ]]; then
       ohai "Removing existing binary to avoid macOS quarantine issues..."
       rm -f "$INSTALL_PATH/agentuity" || abort "Failed to remove existing binary from $INSTALL_PATH"
     fi
@@ -392,8 +351,6 @@ install_completions() {
         fi
       fi
 
-
-
       if is_linux; then
         if [[ -d "/etc/bash_completion.d" ]]; then
           BASH_COMPLETION_DIR="/etc/bash_completion.d"
@@ -424,12 +381,6 @@ install_completions() {
           fi
         fi
       fi
-
-      if is_windows; then
-        ohai "You can manually install PowerShell completion with:"
-        echo "  $INSTALL_PATH/agentuity completion powershell > agentuity.ps1"
-        echo "  Move agentuity.ps1 to a directory in your PowerShell module path"
-      fi
   fi
 }
 
@@ -450,6 +401,9 @@ cleanup() {
 }
 
 main() {
+
+  abort_if_windows
+  check_known_arch
 
   VERSION="latest"
   TMP_DIR="$(mktemp -d)"
