@@ -234,7 +234,7 @@ var testInside bool
 func TransformUrl(urlString string) string {
 	// NOTE: these urls are special cases for local development inside a container
 	if strings.Contains(urlString, "api.agentuity.dev") || strings.Contains(urlString, "localhost:") || strings.Contains(urlString, "127.0.0.1:") {
-		if sys.Exists("/.dockerenv") || sys.Exists("/proc/1/cgroup") || testInside {
+		if sys.IsRunningInsideDocker() || testInside {
 			if strings.HasPrefix(urlString, "https://api.agentuity.dev") {
 				u, _ := url.Parse(urlString)
 				u.Scheme = "http"
