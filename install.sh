@@ -72,6 +72,12 @@ check_known_arch() {
   if [[ "$ARCH" != "x86_64" ]] && [[ "$ARCH" != "amd64" ]] && [[ "$ARCH" != "arm64" ]] && [[ "$ARCH" != "aarch64" ]]; then
     abort "Unsupported architecture: $ARCH"
   fi
+
+  if [[ "$ARCH" == "x86_64" || "$ARCH" == "amd64" ]]; then
+    ARCH="x86_64"
+  else
+    ARCH="arm64"
+  fi
 }
 
 is_macos() {
@@ -248,6 +254,19 @@ download_checksums() {
   fi
 }
 
+extract_release() {
+  if [[ "$EXTENSION" == "tar.gz" ]]; then
+    ohai "Extracting..."
+    tar -xzf "$TMP_DIR/$DOWNLOAD_FILENAME" -C "$TMP_DIR" || abort "Failed to extract archive"
+  elif [[ "$EXTENSION" == "zip" ]]; then
+    ohai "Extracting..."
+    unzip -q "$TMP_DIR/$DOWNLOAD_FILENAME" -d "$TMP_DIR" || abort "Failed to extract archive"
+  else
+    abort "Unknown archive format: $EXTENSION"
+  fi
+}
+
+
 install_agentuity() {
   ohai "Installing to $INSTALL_PATH..."
   if [[ -f "$TMP_DIR/agentuity" ]]; then
@@ -418,6 +437,7 @@ main() {
   check_latest_release
   download_release
   download_checksums
+  extract_release
   install_agentuity
   set_path
   install_completions
