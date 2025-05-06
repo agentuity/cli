@@ -3,6 +3,7 @@ package bundler
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -38,6 +39,7 @@ type BundleContext struct {
 	Install    bool
 	CI         bool
 	DevMode    bool
+	Writer     io.Writer
 }
 
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
@@ -156,11 +158,11 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 	})
 	ctx.Logger.Debug("finished build in %v", time.Since(started))
 	if len(result.Errors) > 0 {
-		fmt.Println("\n" + tui.Warning("Build Failed") + "\n")
+		fmt.Fprintln(ctx.Writer, "\n"+tui.Warning("Build Failed")+"\n")
 
 		for _, err := range result.Errors {
 			formattedError := formatESBuildError(dir, err)
-			fmt.Println(formattedError)
+			fmt.Fprintln(ctx.Writer, formattedError)
 		}
 
 		if ctx.DevMode {
