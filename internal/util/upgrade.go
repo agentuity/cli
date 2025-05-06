@@ -107,6 +107,26 @@ func isWindowsMsiInstallation() bool {
 		strings.Contains(strings.ToLower(exe), "\\program files (x86)\\")
 }
 
+func isWindowsUserInstallation() bool {
+	if runtime.GOOS != "windows" {
+		return false
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return false
+	}
+
+	localAppData := os.Getenv("LOCALAPPDATA")
+	if localAppData == "" {
+		return false
+	}
+
+	exePath := strings.ToLower(filepath.Clean(exe))
+	localAppDataPath := strings.ToLower(filepath.Clean(filepath.Join(localAppData, "Agentuity")))
+
+	return filepath.HasPrefix(exePath, localAppDataPath)
+}
+
 func getReleaseAssetName() string {
 	goos := runtime.GOOS
 	arch := runtime.GOARCH
@@ -187,6 +207,21 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 		}
 
 		return upgradeWithWindowsMsi(ctx, logger, release)
+	}
+
+	if runtime.GOOS == "windows" && isWindowsUserInstallation() {
+		logger.Debug("Detected Windows user installation, upgrading without admin privileges")
+		release, err := GetLatestRelease(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get latest release: %w", err)
+		}
+
+		if Version == release && !force {
+			tui.ShowSuccess("You are already on the latest version (%s)", release)
+			return nil
+		}
+
+		return upgradeWithWindowsUser(ctx, logger, release)
 	}
 
 	release, err := GetLatestRelease(ctx) // Using public function from version.go
@@ -640,6 +675,98 @@ func upgradeWithHomebrew(ctx context.Context, logger logger.Logger) error {
 	return nil
 }
 
+func upgradeWithWindowsUser(ctx context.Context, logger logger.Logger, version string) error {
+	tempDir, err := os.MkdirTemp("", "agentuity-upgrade-msi")
+	if err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+
+	installerName := getMsiInstallerName()
+
+	versionPrefix := "v"
+	if strings.HasPrefix(version, "v") {
+		versionPrefix = ""
+	}
+	installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s%s/%s", versionPrefix, version, installerName)
+	installerPath := filepath.Join(tempDir, installerName)
+
+	var downloadErr error
+	downloadAction := func() {
+		if err := downloadFile(installerURL, installerPath); err != nil {
+			downloadErr = fmt.Errorf("failed to download release asset: %w", err)
+		}
+	}
+	tui.ShowSpinner(fmt.Sprintf("Downloading %s...", version), downloadAction)
+	if downloadErr != nil {
+		os.RemoveAll(tempDir) // Clean up on error
+		return downloadErr
+	}
+
+	checksumFileName := "checksums.txt"
+	checksumURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s%s/%s", versionPrefix, version, checksumFileName)
+	checksumPath := filepath.Join(tempDir, checksumFileName)
+
+	var checksumDownloadErr error
+	checksumAction := func() {
+		if err := downloadFile(checksumURL, checksumPath); err != nil {
+			checksumDownloadErr = fmt.Errorf("failed to download checksum file: %w", err)
+		}
+	}
+	tui.ShowSpinner("Downloading checksum...", checksumAction)
+	if checksumDownloadErr != nil {
+		os.RemoveAll(tempDir) // Clean up on error
+		return checksumDownloadErr
+	}
+
+	var checksumErr error
+	var checksum string
+	var valid bool
+	verifyAction := func() {
+		var err1, err2 error
+		checksum, err1 = getChecksumFromFile(checksumPath, installerName)
+		if err1 != nil {
+			checksumErr = fmt.Errorf("failed to get checksum: %w", err1)
+			return
+		}
+
+		valid, err2 = verifyChecksum(installerPath, checksum)
+		if err2 != nil {
+			checksumErr = fmt.Errorf("failed to verify checksum: %w", err2)
+		}
+	}
+	tui.ShowSpinner("Verifying checksum...", verifyAction)
+	if checksumErr != nil {
+		os.RemoveAll(tempDir) // Clean up on error
+		return checksumErr
+	}
+
+	if !valid {
+		os.RemoveAll(tempDir) // Clean up on error
+		return fmt.Errorf("checksum verification failed")
+	}
+
+	logger.Debug("Installing MSI for current user only")
+
+	var installErr error
+	installAction := func() {
+		cmd := exec.CommandContext(ctx, "msiexec.exe", "/i", installerPath, "/qn", "ALLUSERS=0")
+		cmd.Dir = tempDir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			installErr = fmt.Errorf("failed to install MSI: %w\nOutput: %s", err, string(out))
+		}
+	}
+	tui.ShowSpinner("Installing...", installAction)
+
+	defer os.RemoveAll(tempDir)
+
+	if installErr != nil {
+		return installErr
+	}
+
+	tui.ShowSuccess("Successfully upgraded to version %s", version)
+	return nil
+}
+
 func upgradeWithWindowsMsi(ctx context.Context, logger logger.Logger, version string) error {
 	if os.Getenv("CI") != "" || os.Getenv("GITHUB_ACTIONS") != "" || os.Getenv("NONINTERACTIVE") != "" {
 		tui.ShowWarning("Non-interactive environment detected, skipping automatic MSI installation")
@@ -651,10 +778,11 @@ func upgradeWithWindowsMsi(ctx context.Context, logger logger.Logger, version st
 		defer os.RemoveAll(tempDir)
 
 		installerName := getMsiInstallerName()
+		versionPrefix := "v"
 		if strings.HasPrefix(version, "v") {
-			version = strings.TrimPrefix(version, "v")
+			versionPrefix = ""
 		}
-		installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/v%s/%s", version, installerName)
+		installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s%s/%s", versionPrefix, version, installerName)
 		installerPath := filepath.Join(tempDir, installerName)
 
 		var downloadErr error
@@ -732,10 +860,11 @@ if ($products) {
 	}
 
 	installerName := getMsiInstallerName()
+	versionPrefix := "v"
 	if strings.HasPrefix(version, "v") {
-		version = strings.TrimPrefix(version, "v")
+		versionPrefix = ""
 	}
-	installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/v%s/%s", version, installerName)
+	installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s%s/%s", versionPrefix, version, installerName)
 	installerPath := filepath.Join(tempDir, installerName)
 
 	var downloadErr error
