@@ -1,0 +1,20 @@
+FROM alpine:3.18
+
+# Install dependencies
+RUN apk update && \
+    apk add --no-cache curl tar ca-certificates && \
+    rm -rf /var/cache/apk/*
+
+WORKDIR /workspace
+
+# Copy install.sh into the image
+COPY install.sh ./
+
+# Make it executable
+RUN chmod +x install.sh
+
+# Add a script to run the install and verification steps
+COPY install_test/docker-test-install.sh ./
+RUN chmod +x docker-test-install.sh
+
+CMD ["sh", "./docker-test-install.sh"] 

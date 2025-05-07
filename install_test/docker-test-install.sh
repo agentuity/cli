@@ -1,10 +1,14 @@
 #!/bin/bash
 set -e
 
+source ./install.sh
 
 echo "####################################################################################################"
 echo "### Test Install without arguments (latest version and default install path)"
 ./install.sh 
+
+
+
 # Verify installation
 LATEST_VERSION=$(agentuity --version)
 echo "Installed version: $LATEST_VERSION"

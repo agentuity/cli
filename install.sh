@@ -1,8 +1,9 @@
-#!/bin/bash
+#!/bin/sh
+# shellcheck shell=sh
 
 set -e
 
-if [[ -t 1 ]]; then
+if [ -t 1 ]; then
   tty_escape() { printf "\033[%sm" "$1"; }
 else
   tty_escape() { :; }
@@ -18,6 +19,7 @@ tty_underline="$(tty_escape 4)"
 
 USE_BREW="true"
 CAT=${CAT:-cat}
+CURL=${CURL:-curl}
 ARCH=$(uname -m)
 OS=$(uname -s)
 EXTENSION="tar.gz"
@@ -36,7 +38,7 @@ EOF
 }
 
 parse_cli_args() {
-  while [[ $# -gt 0 ]]; do
+  while [ $# -gt 0 ]; do
     case "$1" in
       -v|--version)
         VERSION="$2"
@@ -63,7 +65,7 @@ parse_cli_args() {
 }
 
 debug() {
-  if [[ "$DEBUG" == "true" ]]; then
+  if [ "$DEBUG" = "true" ]; then
     printf "${tty_magenta}[DEBUG] ${tty_bold} %s${tty_reset}\n" "$1"
   fi
 }
@@ -87,11 +89,11 @@ abort() {
 
 
 check_known_arch() {
-  if [[ "$ARCH" != "x86_64" ]] && [[ "$ARCH" != "amd64" ]] && [[ "$ARCH" != "arm64" ]] && [[ "$ARCH" != "aarch64" ]]; then
+  if [ "$ARCH" != "x86_64" ] && [ "$ARCH" != "amd64" ] && [ "$ARCH" != "arm64" ] && [ "$ARCH" != "aarch64" ]; then
     abort "Unsupported architecture: $ARCH"
   fi
 
-  if [[ "$ARCH" == "x86_64" || "$ARCH" == "amd64" ]]; then
+  if [ "$ARCH" = "x86_64" ] || [ "$ARCH" = "amd64" ]; then
     ARCH="x86_64"
   else
     ARCH="arm64"
@@ -101,7 +103,7 @@ check_known_arch() {
 }
 
 is_macos() {
-  if [[ "$OS" == "Darwin" ]]; then
+  if [ "$OS" = "Darwin" ]; then
     return 0
   else
     return 1
@@ -109,7 +111,7 @@ is_macos() {
 }
 
 is_linux() {
-  if [[ "$OS" == "Linux" ]]; then
+  if [ "$OS" = "Linux" ]; then
     return 0
   else
     return 1
@@ -117,28 +119,28 @@ is_linux() {
 }
 
 abort_if_windows() {
-  if [[ "$OS" == "Windows" ]]; then
+  if [ "$OS" = "Windows" ]; then
     abort "Windows is not supported. Please use WSL or a native Windows installation."
   fi
 }
 
 setup_default_install_path_var() {
   if is_macos; then
-    if [[ -d "$HOME/.local/bin" ]] && [[ -w "$HOME/.local/bin" ]]; then
+    if [ -d "$HOME/.local/bin" ] && [ -w "$HOME/.local/bin" ]; then
       INSTALL_PATH="$HOME/.local/bin"
-    elif [[ -d "$HOME/.bin" ]] && [[ -w "$HOME/.bin" ]]; then
+    elif [ -d "$HOME/.bin" ] && [ -w "$HOME/.bin" ]; then
       INSTALL_PATH="$HOME/.bin"
-    elif [[ -d "$HOME/bin" ]] && [[ -w "$HOME/bin" ]]; then
+    elif [ -d "$HOME/bin" ] && [ -w "$HOME/bin" ]; then
       INSTALL_PATH="$HOME/bin"
     else
       INSTALL_PATH="/usr/local/bin"
     fi
   elif is_linux; then
-    if [[ -d "$HOME/.local/bin" ]] && [[ -w "$HOME/.local/bin" ]]; then
+    if [ -d "$HOME/.local/bin" ] && [ -w "$HOME/.local/bin" ]; then
       INSTALL_PATH="$HOME/.local/bin"
-    elif [[ -d "$HOME/.bin" ]] && [[ -w "$HOME/.bin" ]]; then
+    elif [ -d "$HOME/.bin" ] && [ -w "$HOME/.bin" ]; then
       INSTALL_PATH="$HOME/.bin"
-    elif [[ -d "$HOME/bin" ]] && [[ -w "$HOME/bin" ]]; then
+    elif [ -d "$HOME/bin" ] && [ -w "$HOME/bin" ]; then
       INSTALL_PATH="$HOME/bin"
     else
       INSTALL_PATH="/usr/local/bin"
@@ -152,31 +154,30 @@ setup_default_install_path_var() {
 
 check_install_path() {
 
-  if [[ ! -d "$INSTALL_PATH" ]]; then
+  if [ ! -d "$INSTALL_PATH" ]; then
     ohai "Creating install directory: $INSTALL_PATH"
     mkdir -p "$INSTALL_PATH" 2>/dev/null || true  # Don't abort if mkdir fails
   fi
 
-  if [[ -w "$INSTALL_PATH" ]]; then
+  if [ -w "$INSTALL_PATH" ]; then
     ohai "No write permission to $INSTALL_PATH. Trying alternative locations..."
   fi
 
    
-  if [[ "$INSTALL_PATH" == "/usr/local/bin" ]]; then
-    ohai "No write permission to $INSTALL_PATH. Trying alternative locations..."
+  if [ "$INSTALL_PATH" = "/usr/local/bin" ]; then
     
-    if [[ -d "$HOME/.local/bin" ]] || mkdir -p "$HOME/.local/bin" 2>/dev/null; then
-      if [[ -w "$HOME/.local/bin" ]]; then
+    if [ -d "$HOME/.local/bin" ] || mkdir -p "$HOME/.local/bin" 2>/dev/null; then
+      if [ -w "$HOME/.local/bin" ]; then
         ohai "Using $HOME/.local/bin instead"
         INSTALL_PATH="$HOME/.local/bin"
       fi
-    elif [[ -d "$HOME/.bin" ]] || mkdir -p "$HOME/.bin" 2>/dev/null; then
-      if [[ -w "$HOME/.bin" ]]; then
+    elif [ -d "$HOME/.bin" ] || mkdir -p "$HOME/.bin" 2>/dev/null; then
+      if [ -w "$HOME/.bin" ]; then
         ohai "Using $HOME/.bin instead"
         INSTALL_PATH="$HOME/.bin"
       fi
-    elif [[ -d "$HOME/bin" ]] || mkdir -p "$HOME/bin" 2>/dev/null; then
-      if [[ -w "$HOME/bin" ]]; then
+    elif [ -d "$HOME/bin" ] || mkdir -p "$HOME/bin" 2>/dev/null; then
+      if [ -w "$HOME/bin" ]; then
         ohai "Using $HOME/bin instead"
         INSTALL_PATH="$HOME/bin"
       fi
@@ -186,13 +187,13 @@ check_install_path() {
     debug "  > Install Path Changed: $INSTALL_PATH"
   fi
 
-  if [[ ! -w "$INSTALL_PATH" ]]; then
+  if [ ! -w "$INSTALL_PATH" ]; then
     abort "No write permission to $INSTALL_PATH. Try running with sudo or specify a different directory with --dir."
   fi
 }
 
 check_version() {
-    if [[ -z "$VERSION" ]]; then
+    if [ -z "$VERSION" ]; then
       abort "Version is empty. This should not happen."
     fi
 
@@ -200,10 +201,10 @@ check_version() {
 }
 
 check_latest_release() {
-  if [[ "$VERSION" == "latest" ]]; then
+  if [ "$VERSION" = "latest" ]; then
     ohai "Fetching latest release information..."
-    VERSION=$(curl -s $"https://agentuity.sh/release/cli" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-    if [[ -z "$VERSION" ]]; then
+    VERSION=$($CURL -s "https://agentuity.sh/release/cli" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+    if [ -z "$VERSION" ]; then
       abort "Failed to fetch latest version information"
     fi
   fi
@@ -213,16 +214,14 @@ check_latest_release() {
 }
 
 install_mac() {
-  if command -v brew >/dev/null 2>&1 && [[ "$USE_BREW" == "true" ]]; then
+  if command -v brew >/dev/null 2>&1 && [ "$USE_BREW" = "true" ]; then
 
     ohai "Homebrew detected! Installing Agentuity CLI using Homebrew..."
       
-    if [[ "$VERSION" != "latest" ]]; then
+    if [ "$VERSION" != "latest" ]; then
       ohai "Installing Agentuity CLI version $VERSION using Homebrew..."
       brew install agentuity/tap/agentuity@${VERSION#v}
     else
-
-    debug "  > heloooooooo 2?: $USE_BREW"
       ohai "Installing latest Agentuity CLI version using Homebrew..."
       brew install -q agentuity/tap/agentuity
     fi
@@ -275,14 +274,14 @@ download_checksums() {
       CHECKSUM_TOOL=""
     fi
     
-    if [[ -n "$CHECKSUM_TOOL" ]]; then
+    if [ -n "$CHECKSUM_TOOL" ]; then
       cd "$TMP_DIR"
       COMPUTED_CHECKSUM=$($CHECKSUM_TOOL "$DOWNLOAD_FILENAME" | cut -d ' ' -f 1)
       EXPECTED_CHECKSUM=$(grep "$DOWNLOAD_FILENAME" checksums.txt | cut -d ' ' -f 1)
       
-      if [[ -z "$EXPECTED_CHECKSUM" ]]; then
+      if [ -z "$EXPECTED_CHECKSUM" ]; then
         warn "Checksum for $DOWNLOAD_FILENAME not found in checksums.txt. Skipping verification."
-      elif [[ "$COMPUTED_CHECKSUM" != "$EXPECTED_CHECKSUM" ]]; then
+      elif [ "$COMPUTED_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
         abort "Checksum verification failed. Expected: $EXPECTED_CHECKSUM, Got: $COMPUTED_CHECKSUM"
       else
         ohai "Checksum verification passed!"
@@ -293,10 +292,10 @@ download_checksums() {
 }
 
 extract_release() {
-  if [[ "$EXTENSION" == "tar.gz" ]]; then
+  if [ "$EXTENSION" = "tar.gz" ]; then
     ohai "Extracting..."
     tar -xzf "$TMP_DIR/$DOWNLOAD_FILENAME" -C "$TMP_DIR" || abort "Failed to extract archive"
-  elif [[ "$EXTENSION" == "zip" ]]; then
+  elif [ "$EXTENSION" = "zip" ]; then
     ohai "Extracting..."
     unzip -q "$TMP_DIR/$DOWNLOAD_FILENAME" -d "$TMP_DIR" || abort "Failed to extract archive"
   else
@@ -307,8 +306,8 @@ extract_release() {
 
 install_agentuity() {
   ohai "Installing in path $INSTALL_PATH"
-  if [[ -f "$TMP_DIR/agentuity" ]]; then
-    if is_macos && [[ -f "$INSTALL_PATH/agentuity" ]]; then
+  if [ -f "$TMP_DIR/agentuity" ]; then
+    if is_macos && [ -f "$INSTALL_PATH/agentuity" ]; then
       ohai "Removing existing binary to avoid macOS quarantine issues..."
       rm -f "$INSTALL_PATH/agentuity" || abort "Failed to remove existing binary from $INSTALL_PATH"
     fi
@@ -326,16 +325,12 @@ install_agentuity() {
 }
 
 set_path()  {
-  if [[ ":$PATH:" != *":$INSTALL_PATH:"* ]]; then
-    ohai "Adding $INSTALL_PATH to your PATH..."
-    
-    SHELL_CONFIG=""
+  # Determine the shell config file
+  if [ -n "$SHELL" ]; then
     case "$SHELL" in
       */bash*)
         SHELL_CONFIG="$HOME/.bashrc"
-        if [[ -f "$HOME/.bash_profile" ]]; then
-          SHELL_CONFIG="$HOME/.bash_profile"
-        fi
+        [ -f "$HOME/.bash_profile" ] && SHELL_CONFIG="$HOME/.bash_profile"
         ;;
       */zsh*)
         SHELL_CONFIG="$HOME/.zshrc"
@@ -343,48 +338,33 @@ set_path()  {
       */fish*)
         SHELL_CONFIG="$HOME/.config/fish/config.fish"
         ;;
+      *)
+        SHELL_CONFIG="$HOME/.profile"
+        ;;
     esac
-    
-    if [[ -n "$SHELL_CONFIG" ]] && [[ -w "$SHELL_CONFIG" ]]; then
-      echo "export PATH=\"\$PATH:$INSTALL_PATH\"" >> "$SHELL_CONFIG"
-      ohai "Added $INSTALL_PATH to PATH in $SHELL_CONFIG"
-      
-      if ! command -v agentuity >/dev/null 2>&1; then
-        printf "${tty_blue}==>${tty_bold} ${tty_magenta}To apply changes, restart your terminal or run:${tty_reset} source $SHELL_CONFIG\n"
-      fi
-      
-      export PATH="$PATH:$INSTALL_PATH"
-    else
-      warn "$INSTALL_PATH is not in your PATH. You may need to add it manually to use the agentuity command."
-      case "$SHELL" in
-        */bash*)
-          echo "  echo '\nexport PATH=\"\$PATH:$INSTALL_PATH\"' >> ~/.bashrc"
-          echo "  source ~/.bashrc  # To apply changes immediately"
-          ;;
-        */zsh*)
-          echo "  echo '\nexport PATH=\"\$PATH:$INSTALL_PATH\"' >> ~/.zshrc"
-          echo "  source ~/.zshrc  # To apply changes immediately"
-          ;;
-        */fish*)
-          echo "  echo '\nset -gx PATH \$PATH $INSTALL_PATH' >> ~/.config/fish/config.fish"
-          echo "  source ~/.config/fish/config.fish  # To apply changes immediately"
-          ;;
-        *)
-          echo "  Add $INSTALL_PATH to your PATH"
-          echo "  Then restart your terminal or reload your shell configuration"
-          ;;
-      esac
-    fi
+  else
+    SHELL_CONFIG="$HOME/.profile"
   fi
+
+  # Ensure the config file exists
+  touch "$SHELL_CONFIG"
+
+  # Append the PATH export if not already present
+  if ! grep -q "$INSTALL_PATH" "$SHELL_CONFIG"; then
+    printf "export PATH=\"\$PATH:%s\"\n" "$INSTALL_PATH" >> "$SHELL_CONFIG"
+    ohai "Added $INSTALL_PATH to PATH in $SHELL_CONFIG"
+  fi
+
+  export PATH="$PATH:$INSTALL_PATH"
 }
 
 install_completions() {
   if command -v "$INSTALL_PATH/agentuity" >/dev/null 2>&1; then
     COMPLETION_DIR=""
     if is_macos; then
-        if [[ -d "/usr/local/etc/bash_completion.d" ]]; then
+        if [ -d "/usr/local/etc/bash_completion.d" ]; then
           BASH_COMPLETION_DIR="/usr/local/etc/bash_completion.d"
-          if [[ -w "$BASH_COMPLETION_DIR" ]]; then
+          if [ -w "$BASH_COMPLETION_DIR" ]; then
             ohai "Generating bash completion script..."
             "$INSTALL_PATH/agentuity" completion bash > "$BASH_COMPLETION_DIR/agentuity"
             ohai "Bash completion installed to $BASH_COMPLETION_DIR/agentuity"
@@ -393,9 +373,9 @@ install_completions() {
           fi
         fi
         
-        if [[ -d "/usr/local/share/zsh/site-functions" ]]; then
+        if [ -d "/usr/local/share/zsh/site-functions" ]; then
           ZSH_COMPLETION_DIR="/usr/local/share/zsh/site-functions"
-          if [[ -w "$ZSH_COMPLETION_DIR" ]]; then
+          if [ -w "$ZSH_COMPLETION_DIR" ]; then
             ohai "Generating zsh completion script..."
             "$INSTALL_PATH/agentuity" completion zsh > "$ZSH_COMPLETION_DIR/_agentuity"
             ohai "Zsh completion installed to $ZSH_COMPLETION_DIR/_agentuity"
@@ -406,9 +386,9 @@ install_completions() {
       fi
 
       if is_linux; then
-        if [[ -d "/etc/bash_completion.d" ]]; then
+        if [ -d "/etc/bash_completion.d" ]; then
           BASH_COMPLETION_DIR="/etc/bash_completion.d"
-          if [[ -w "$BASH_COMPLETION_DIR" ]]; then
+          if [ -w "$BASH_COMPLETION_DIR" ]; then
             ohai "Generating bash completion script..."
             "$INSTALL_PATH/agentuity" completion bash > "$BASH_COMPLETION_DIR/agentuity"
             ohai "Bash completion installed to $BASH_COMPLETION_DIR/agentuity"
@@ -419,9 +399,9 @@ install_completions() {
           fi
         fi
         
-        if [[ -d "/usr/share/zsh/vendor-completions" ]]; then
+        if [ -d "/usr/share/zsh/vendor-completions" ]; then
           ZSH_COMPLETION_DIR="/usr/share/zsh/vendor-completions"
-          if [[ -w "$ZSH_COMPLETION_DIR" ]]; then
+          if [ -w "$ZSH_COMPLETION_DIR" ]; then
             ohai "Generating zsh completion script..."
             "$INSTALL_PATH/agentuity" completion zsh > "$ZSH_COMPLETION_DIR/_agentuity"
             ohai "Zsh completion installed to $ZSH_COMPLETION_DIR/_agentuity"
@@ -443,7 +423,7 @@ success() {
   ohai "For more information, visit: $(url "https://agentuity.dev")"
   
   if ! command -v agentuity >/dev/null 2>&1; then
-    printf "${tty_blue}==>${tty_bold} ${tty_magenta}To apply PATH changes, restart your terminal or run:${tty_reset} source ~/.$(basename $SHELL)rc\n"
+    printf "${tty_blue}==>${tty_bold} ${tty_magenta}To apply PATH changes, restart your terminal or run:${tty_reset} source ~/.$(basename $SHELL 2>/dev/null)rc\n"
   fi
   
   exit 0
