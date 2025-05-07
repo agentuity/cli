@@ -242,7 +242,7 @@ install_mac() {
 download_release() {
 
   DOWNLOAD_FILENAME="agentuity_${OS}_${ARCH}.${EXTENSION}"
-  DOWNLOAD_URL="https://github.com/agentuity/cli/releases/download/v${VERSION#v}/${DOWNLOAD_FILENAME}"
+  DOWNLOAD_URL="https://agentuity.sh/release/cli/v${VERSION#v}/${DOWNLOAD_FILENAME}"
 
   debug "  > DOWNLOAD_URL: $DOWNLOAD_URL"
   debug "  > DOWNLOAD_FILENAME: $DOWNLOAD_FILENAME"
@@ -259,7 +259,7 @@ download_release() {
 }
 
 download_checksums() {
-  CHECKSUMS_URL="https://github.com/agentuity/cli/releases/download/v${VERSION#v}/checksums.txt"
+  CHECKSUMS_URL="https://agentuity.sh/release/cli/v${VERSION#v}/checksums.txt"
   ohai "Downloading checksums for verification..."
   if ! curl -L --silent "$CHECKSUMS_URL" -o "$TMP_DIR/checksums.txt"; then
     warn "Failed to download checksums file. Skipping verification."
