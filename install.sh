@@ -16,9 +16,12 @@ tty_cyan="$(tty_mkbold 36)"
 tty_magenta="$(tty_mkbold 35)"
 tty_underline="$(tty_escape 4)"
 
+USE_BREW="true"
 CAT=${CAT:-cat}
 ARCH=$(uname -m)
 OS=$(uname -s)
+EXTENSION="tar.gz"
+DEBUG="false"
 
 usage() {
 $CAT 1>&2 <<EOF
@@ -28,6 +31,7 @@ Options:
   -v, --version VERSION    Install specific version
   -d, --dir DIRECTORY      Install to specific directory
   -h, --help               Show this help message
+  -n, --no-brew            Do not use Homebrew to install Agentuity CLI (default: false)
 EOF
 }
 
@@ -45,10 +49,24 @@ parse_cli_args() {
       -h|--help)
         usage
         exit 0
+        ;;
+      -n|--no-brew)
+        USE_BREW="false"
+        shift
+        ;;
     esac
   done
+
+  debug "  > VERSION: $VERSION"
+  debug "  > INSTALL_PATH: $INSTALL_PATH"
+  debug "  > USE_BREW: $USE_BREW"
 }
 
+debug() {
+  if [[ "$DEBUG" == "true" ]]; then
+    printf "${tty_magenta}[DEBUG] ${tty_bold} %s${tty_reset}\n" "$1"
+  fi
+}
 
 ohai() {
   printf "${tty_blue}==>${tty_bold} %s${tty_reset}\n" "$1"
@@ -78,6 +96,8 @@ check_known_arch() {
   else
     ARCH="arm64"
   fi
+
+  debug "  > Architecture: $ARCH"
 }
 
 is_macos() {
@@ -102,43 +122,36 @@ abort_if_windows() {
   fi
 }
 
-setup_extension_var() {
+setup_default_install_path_var() {
   if is_macos; then
-    EXTENSION="tar.gz"
+    if [[ -d "$HOME/.local/bin" ]] && [[ -w "$HOME/.local/bin" ]]; then
+      INSTALL_PATH="$HOME/.local/bin"
+    elif [[ -d "$HOME/.bin" ]] && [[ -w "$HOME/.bin" ]]; then
+      INSTALL_PATH="$HOME/.bin"
+    elif [[ -d "$HOME/bin" ]] && [[ -w "$HOME/bin" ]]; then
+      INSTALL_PATH="$HOME/bin"
+    else
+      INSTALL_PATH="/usr/local/bin"
+    fi
   elif is_linux; then
-    EXTENSION="tar.gz"
+    if [[ -d "$HOME/.local/bin" ]] && [[ -w "$HOME/.local/bin" ]]; then
+      INSTALL_PATH="$HOME/.local/bin"
+    elif [[ -d "$HOME/.bin" ]] && [[ -w "$HOME/.bin" ]]; then
+      INSTALL_PATH="$HOME/.bin"
+    elif [[ -d "$HOME/bin" ]] && [[ -w "$HOME/bin" ]]; then
+      INSTALL_PATH="$HOME/bin"
+    else
+      INSTALL_PATH="/usr/local/bin"
+    fi
   else
     abort "Unsupported operating system: $OS"
   fi
-}
 
-setup_install_path_var() {
-  if is_macos; then
-    if [[ -d "$HOME/.local/bin" ]] && [[ -w "$HOME/.local/bin" ]]; then
-      INSTALL_PATH="$HOME/.local/bin"
-    elif [[ -d "$HOME/.bin" ]] && [[ -w "$HOME/.bin" ]]; then
-      INSTALL_PATH="$HOME/.bin"
-    elif [[ -d "$HOME/bin" ]] && [[ -w "$HOME/bin" ]]; then
-      INSTALL_PATH="$HOME/bin"
-    else
-      INSTALL_PATH="/usr/local/bin"
-    fi
-  elif is_linux; then
-    if [[ -d "$HOME/.local/bin" ]] && [[ -w "$HOME/.local/bin" ]]; then
-      INSTALL_PATH="$HOME/.local/bin"
-    elif [[ -d "$HOME/.bin" ]] && [[ -w "$HOME/.bin" ]]; then
-      INSTALL_PATH="$HOME/.bin"
-    elif [[ -d "$HOME/bin" ]] && [[ -w "$HOME/bin" ]]; then
-      INSTALL_PATH="$HOME/bin"
-    else
-      INSTALL_PATH="/usr/local/bin"
-    fi
-  else
-    abort "Unsupported operating system: $OS"
-  fi
+  debug "  > Install Path: $INSTALL_PATH"
 }
 
 check_install_path() {
+
   if [[ ! -d "$INSTALL_PATH" ]]; then
     ohai "Creating install directory: $INSTALL_PATH"
     mkdir -p "$INSTALL_PATH" 2>/dev/null || true  # Don't abort if mkdir fails
@@ -148,53 +161,71 @@ check_install_path() {
     ohai "No write permission to $INSTALL_PATH. Trying alternative locations..."
   fi
 
-  if [[ "$INSTALL_PATH" == "/usr/local/bin" ]]; then
-        if [[ -d "$HOME/.local/bin" ]] || mkdir -p "$HOME/.local/bin" 2>/dev/null; then
-      if [[ -w "$HOME/.local/bin" ]]; then
-        ohai "Using $HOME/.local/bin instead"
-        INSTALL_PATH="$HOME/.local/bin"
-      fi
-    elif [[ -d "$HOME/.bin" ]] || mkdir -p "$HOME/.bin" 2>/dev/null; then
-      if [[ -w "$HOME/.bin" ]]; then
-        ohai "Using $HOME/.bin instead"
-        INSTALL_PATH="$HOME/.bin"
-      fi
-    elif [[ -d "$HOME/bin" ]] || mkdir -p "$HOME/bin" 2>/dev/null; then
-      if [[ -w "$HOME/bin" ]]; then
-        ohai "Using $HOME/bin instead"
-        INSTALL_PATH="$HOME/bin"
+  if [[ ! -d "$INSTALL_PATH" ]]; then
+    
+    if [[ "$INSTALL_PATH" == "/usr/local/bin" ]]; then
+      ohai "1No write permission to $INSTALL_PATH. Trying alternative locations..."
+      
+      if [[ -d "$HOME/.local/bin" ]] || mkdir -p "$HOME/.local/bin" 2>/dev/null; then
+        if [[ -w "$HOME/.local/bin" ]]; then
+          ohai "Using $HOME/.local/bin instead"
+          INSTALL_PATH="$HOME/.local/bin"
+        fi
+      elif [[ -d "$HOME/.bin" ]] || mkdir -p "$HOME/.bin" 2>/dev/null; then
+        if [[ -w "$HOME/.bin" ]]; then
+          ohai "Using $HOME/.bin instead"
+          INSTALL_PATH="$HOME/.bin"
+        fi
+      elif [[ -d "$HOME/bin" ]] || mkdir -p "$HOME/bin" 2>/dev/null; then
+        if [[ -w "$HOME/bin" ]]; then
+          ohai "Using $HOME/bin instead"
+          INSTALL_PATH="$HOME/bin"
+        fi
+      else
+        abort "Could not find or create a writable installation directory. Try running with sudo or specify a different directory with --dir."
       fi
     else
-      abort "Could not find or create a writable installation directory. Try running with sudo or specify a different directory with --dir."
+      abort "No write permission to $INSTALL_PATH. Try running with sudo or specify a different directory with --dir."
     fi
+    debug "  > Install Path Changed: $INSTALL_PATH"
+  else 
+    debug "  > Install Path Not Changed"
   fi
+
 }
 
 check_version() {
     if [[ -z "$VERSION" ]]; then
       abort "Version is empty. This should not happen."
     fi
+
+    debug "  > Version: $VERSION"
 }
 
 check_latest_release() {
   if [[ "$VERSION" == "latest" ]]; then
     ohai "Fetching latest release information..."
-    RELEASE_URL="https://agentuity.sh/release/cli"
-    VERSION=$(curl -s $RELEASE_URL | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+    VERSION=$(curl -s $"https://agentuity.sh/release/cli" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
     if [[ -z "$VERSION" ]]; then
       abort "Failed to fetch latest version information"
     fi
   fi
+
+  debug "  > Version: $VERSION"
+
 }
 
 install_mac() {
-  if command -v brew >/dev/null 2>&1 && [[ "$NO_BREW" != "true" ]]; then
+  if command -v brew >/dev/null 2>&1 && [[ "$USE_BREW" == "true" ]]; then
+
     ohai "Homebrew detected! Installing Agentuity CLI using Homebrew..."
       
     if [[ "$VERSION" != "latest" ]]; then
       ohai "Installing Agentuity CLI version $VERSION using Homebrew..."
       brew install agentuity/tap/agentuity@${VERSION#v}
     else
+
+    debug "  > heloooooooo 2?: $USE_BREW"
       ohai "Installing latest Agentuity CLI version using Homebrew..."
       brew install -q agentuity/tap/agentuity
     fi
@@ -205,20 +236,30 @@ install_mac() {
       abort "Homebrew installation failed. Please try again or use manual installation."
     fi
 
-    else
+  else
       ohai "Installing Agentuity CLI using curl..."
-      curl -fsSL https://agentuity.sh/install.sh | bash
   fi
 
 }
+
 
 download_release() {
 
   DOWNLOAD_FILENAME="agentuity_${OS}_${ARCH}.${EXTENSION}"
   DOWNLOAD_URL="https://github.com/agentuity/cli/releases/download/v${VERSION#v}/${DOWNLOAD_FILENAME}"
 
-  ohai "Downloading Agentuity CLI v${VERSION} for ${OS}/${ARCH}..."
-  curl -L --progress-bar "$DOWNLOAD_URL" -o "$TMP_DIR/$DOWNLOAD_FILENAME" || abort "Failed to download from $DOWNLOAD_URL"
+  debug "  > DOWNLOAD_URL: $DOWNLOAD_URL"
+  debug "  > DOWNLOAD_FILENAME: $DOWNLOAD_FILENAME"
+  debug "  > TMP_DIR: $TMP_DIR"
+
+  if curl --head --silent --fail "$DOWNLOAD_URL" > /dev/null 2>&1; then
+    ohai "Downloading Agentuity CLI v${VERSION} for ${OS}/${ARCH}..."
+    curl -L --progress-bar "$DOWNLOAD_URL" -o "$TMP_DIR/$DOWNLOAD_FILENAME" || abort "Failed to download from $DOWNLOAD_URL"
+  else
+    abort "Failed to download from $DOWNLOAD_URL"
+  fi
+
+
 }
 
 download_checksums() {
@@ -268,7 +309,7 @@ extract_release() {
 
 
 install_agentuity() {
-  ohai "Installing to $INSTALL_PATH..."
+  ohai "Installing in path $INSTALL_PATH"
   if [[ -f "$TMP_DIR/agentuity" ]]; then
     if is_macos && [[ -f "$INSTALL_PATH/agentuity" ]]; then
       ohai "Removing existing binary to avoid macOS quarantine issues..."
@@ -320,15 +361,15 @@ set_path()  {
       warn "$INSTALL_PATH is not in your PATH. You may need to add it manually to use the agentuity command."
       case "$SHELL" in
         */bash*)
-          echo "  echo 'export PATH=\"\$PATH:$INSTALL_PATH\"' >> ~/.bashrc"
+          echo "  echo '\nexport PATH=\"\$PATH:$INSTALL_PATH\"' >> ~/.bashrc"
           echo "  source ~/.bashrc  # To apply changes immediately"
           ;;
         */zsh*)
-          echo "  echo 'export PATH=\"\$PATH:$INSTALL_PATH\"' >> ~/.zshrc"
+          echo "  echo '\nexport PATH=\"\$PATH:$INSTALL_PATH\"' >> ~/.zshrc"
           echo "  source ~/.zshrc  # To apply changes immediately"
           ;;
         */fish*)
-          echo "  echo 'set -gx PATH \$PATH $INSTALL_PATH' >> ~/.config/fish/config.fish"
+          echo "  echo '\nset -gx PATH \$PATH $INSTALL_PATH' >> ~/.config/fish/config.fish"
           echo "  source ~/.config/fish/config.fish  # To apply changes immediately"
           ;;
         *)
@@ -419,28 +460,56 @@ cleanup() {
 main() {
 
   abort_if_windows
+
+  debug "1 check_known_arch"
   check_known_arch
+
 
   VERSION="latest"
   TMP_DIR="$(mktemp -d)"
 
   trap cleanup EXIT
-  setup_extension_var
-  setup_install_path_var
+  
+  debug "2 setup_install_path_var"
+  setup_default_install_path_var
 
+  debug "3 parse_cli_args: $@"
   parse_cli_args "$@"
+
+  debug "4 check_install_path"
   check_install_path
+
+  debug "5 check_version"
   check_version
+
+
   if is_macos; then
+    debug "6 install_mac"
     install_mac
   fi
+
+  debug "7 check_latest_release"
   check_latest_release
+
+  debug "8 download_release"
   download_release
+
+  debug "9 download_checksums"
   download_checksums
+
+  debug "10 extract_release"
   extract_release
+
+  debug "11 install_agentuity"
   install_agentuity
+
+  debug "12 set_path"
   set_path
+
+  debug "13 install_completions"
   install_completions
+
+  debug "14 success"
   success
 }
 
