@@ -159,7 +159,7 @@ check_install_path() {
     mkdir -p "$INSTALL_PATH" 2>/dev/null || true  # Don't abort if mkdir fails
   fi
 
-  if [ -w "$INSTALL_PATH" ]; then
+  if [ ! -w "$INSTALL_PATH" ]; then
     ohai "No write permission to $INSTALL_PATH. Trying alternative locations..."
   fi
 
