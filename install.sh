@@ -161,37 +161,34 @@ check_install_path() {
     ohai "No write permission to $INSTALL_PATH. Trying alternative locations..."
   fi
 
-  if [[ ! -d "$INSTALL_PATH" ]]; then
+   
+  if [[ "$INSTALL_PATH" == "/usr/local/bin" ]]; then
+    ohai "No write permission to $INSTALL_PATH. Trying alternative locations..."
     
-    if [[ "$INSTALL_PATH" == "/usr/local/bin" ]]; then
-      ohai "1No write permission to $INSTALL_PATH. Trying alternative locations..."
-      
-      if [[ -d "$HOME/.local/bin" ]] || mkdir -p "$HOME/.local/bin" 2>/dev/null; then
-        if [[ -w "$HOME/.local/bin" ]]; then
-          ohai "Using $HOME/.local/bin instead"
-          INSTALL_PATH="$HOME/.local/bin"
-        fi
-      elif [[ -d "$HOME/.bin" ]] || mkdir -p "$HOME/.bin" 2>/dev/null; then
-        if [[ -w "$HOME/.bin" ]]; then
-          ohai "Using $HOME/.bin instead"
-          INSTALL_PATH="$HOME/.bin"
-        fi
-      elif [[ -d "$HOME/bin" ]] || mkdir -p "$HOME/bin" 2>/dev/null; then
-        if [[ -w "$HOME/bin" ]]; then
-          ohai "Using $HOME/bin instead"
-          INSTALL_PATH="$HOME/bin"
-        fi
-      else
-        abort "Could not find or create a writable installation directory. Try running with sudo or specify a different directory with --dir."
+    if [[ -d "$HOME/.local/bin" ]] || mkdir -p "$HOME/.local/bin" 2>/dev/null; then
+      if [[ -w "$HOME/.local/bin" ]]; then
+        ohai "Using $HOME/.local/bin instead"
+        INSTALL_PATH="$HOME/.local/bin"
+      fi
+    elif [[ -d "$HOME/.bin" ]] || mkdir -p "$HOME/.bin" 2>/dev/null; then
+      if [[ -w "$HOME/.bin" ]]; then
+        ohai "Using $HOME/.bin instead"
+        INSTALL_PATH="$HOME/.bin"
+      fi
+    elif [[ -d "$HOME/bin" ]] || mkdir -p "$HOME/bin" 2>/dev/null; then
+      if [[ -w "$HOME/bin" ]]; then
+        ohai "Using $HOME/bin instead"
+        INSTALL_PATH="$HOME/bin"
       fi
     else
-      abort "No write permission to $INSTALL_PATH. Try running with sudo or specify a different directory with --dir."
+      abort "Could not find or create a writable installation directory. Try running with sudo or specify a different directory with --dir."
     fi
     debug "  > Install Path Changed: $INSTALL_PATH"
-  else 
-    debug "  > Install Path Not Changed"
   fi
 
+  if [[ ! -w "$INSTALL_PATH" ]]; then
+    abort "No write permission to $INSTALL_PATH. Try running with sudo or specify a different directory with --dir."
+  fi
 }
 
 check_version() {
