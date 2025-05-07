@@ -18,3 +18,6 @@ test_install_alpine:
 	@docker build -t agentuity-test-install-alpine -f install_test/Dockerfile-Alpine .
 	@docker run -it agentuity-test-install-alpine
 
+test_install_debian:
+	@docker build -t agentuity-test-install-debian -f install_test/Dockerfile-Debian .
+	@docker run -it agentuity-test-install-debian
