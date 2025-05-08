@@ -37,7 +37,7 @@ _args = _newargs;`, index, inject)
 }
 
 func generateEnvGuard(name string, inject string) string {
-	return fmt.Sprintf(`if (!process.env.%[1]s) {
+	return fmt.Sprintf(`if (!process.env.%[1]s || process.env.%[1]s  ===  process.env.AGENTUITY_API_KEY) {
 %[2]s
 }`, name, inject)
 }

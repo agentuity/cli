@@ -144,10 +144,10 @@ func initProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 	return result
 }
 
-func promptForProjectDetail(ctx context.Context, logger logger.Logger, apiUrl, apikey string, name string, description string) (string, string) {
+func promptForProjectDetail(ctx context.Context, logger logger.Logger, apiUrl, apikey string, name string, description string, orgId string) (string, string) {
 	var nameOK bool
 	if name != "" {
-		if exists, err := project.ProjectWithNameExists(ctx, logger, apiUrl, apikey, name); err != nil {
+		if exists, err := project.ProjectWithNameExists(ctx, logger, apiUrl, apikey, orgId, name); err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to check if project name exists")).ShowErrorAndExit()
 		} else if exists {
 			tui.ShowWarning("project %s already exists in this organization. please choose another name", name)
@@ -164,7 +164,7 @@ func promptForProjectDetail(ctx context.Context, logger logger.Logger, apiUrl, a
 					}
 				}
 			}
-			if exists, err := project.ProjectWithNameExists(ctx, logger, apiUrl, apikey, name); err != nil {
+			if exists, err := project.ProjectWithNameExists(ctx, logger, apiUrl, apikey, orgId, name); err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to check if project name exists")).ShowErrorAndExit()
 			} else if exists {
 				return fmt.Errorf("project %s already exists in this organization. please choose another name", name)
@@ -415,7 +415,7 @@ Examples:
 						}
 					}
 				}
-				exists, err := project.ProjectWithNameExists(ctx, logger, apiUrl, apikey, name)
+				exists, err := project.ProjectWithNameExists(ctx, logger, apiUrl, apikey, orgId, name)
 				if err != nil {
 					return false, err
 				}
@@ -471,7 +471,7 @@ Examples:
 			}
 			projectDir = absDir
 		} else {
-			projectDir = tui.InputWithPlaceholder(logger, "What directory should the project be created in?", "The directory to create the project in", projectDir)
+			projectDir = tui.InputWithPathCompletion(logger, "What directory should the project be created in?", "The directory to create the project in", projectDir)
 		}
 
 		force, _ := cmd.Flags().GetBool("force")

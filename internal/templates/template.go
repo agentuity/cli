@@ -26,9 +26,12 @@ type TemplateContext struct {
 	AgentuityCommand string
 }
 
-func funcTemplates(t *template.Template) *template.Template {
+func funcTemplates(t *template.Template, isPython bool) *template.Template {
 	return t.Funcs(template.FuncMap{
 		"safe_filename": func(s string) string {
+			if isPython {
+				return util.SafePythonFilename(s)
+			}
 			return util.SafeFilename(s)
 		},
 	})
@@ -40,7 +43,7 @@ func (t *TemplateContext) Interpolate(val any) any {
 	if s, ok := val.(string); ok && s != "" && strings.Contains(s, "{{") {
 		tmpl := template.New(t.Name)
 		if strings.Contains(s, "|") { // slight optimization to avoid loading if not needed
-			tmpl = funcTemplates(tmpl)
+			tmpl = funcTemplates(tmpl, t.Template.Language == "python")
 		}
 		tmpl, err := tmpl.Parse(s)
 		if err != nil {
@@ -156,6 +159,9 @@ func (t *TemplateRules) NewProject(ctx TemplateContext) error {
 }
 
 func (t *TemplateRules) NewAgent(ctx TemplateContext) error {
+	if ctx.Template == nil {
+		return fmt.Errorf("template is nil and is required")
+	}
 	for _, step := range t.NewAgentSteps.Steps {
 		if command, ok := resolveStep(ctx, step); ok {
 			if err := command.Run(ctx); err != nil {

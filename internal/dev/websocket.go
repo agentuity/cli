@@ -80,31 +80,51 @@ func (c *Websocket) Done() <-chan struct{} {
 	return c.done
 }
 
+const maxHealthCheckDuration = time.Second * 30
+
+func isConnectionErrorRetryable(err error) bool {
+	if strings.Contains(err.Error(), "connection refused") {
+		return true
+	}
+	if strings.Contains(err.Error(), "connection reset by peer") {
+		return true
+	}
+	if strings.Contains(err.Error(), "No connection could be made because the target machine actively refused it") { // windows
+		return true
+	}
+	return false
+}
+
 func (c *Websocket) getAgentProtocol(ctx context.Context, port int) (bool, error) {
-	url := fmt.Sprintf("http://localhost:%d/_health", port)
-	for i := 0; i < 5; i++ {
+	url := fmt.Sprintf("http://127.0.0.1:%d/_health", port)
+	started := time.Now()
+	var i int
+	for time.Since(started) < maxHealthCheckDuration {
+		i++
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
 			return false, err
 		}
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			if strings.Contains(err.Error(), "connection refused") {
+			c.logger.Debug("healthcheck attempt #%d failed: %s", i, err)
+			if isConnectionErrorRetryable(err) {
 				time.Sleep(time.Millisecond * time.Duration(100*i+1))
 				continue
 			}
 			return false, err
 		}
+		c.logger.Debug("healthcheck attempt #%d succeeded with status code %d", i, resp.StatusCode)
 		defer resp.Body.Close()
 		if resp.StatusCode == 200 {
 			return resp.Header.Get("x-agentuity-binary") == "true", nil
 		}
 	}
-	return false, fmt.Errorf("failed to inspect agents after 5 attempts")
+	return false, fmt.Errorf("failed to inspect agents after %s", maxHealthCheckDuration)
 }
 
 func (c *Websocket) getAgentWelcome(ctx context.Context, port int) (map[string]Welcome, error) {
-	url := fmt.Sprintf("http://localhost:%d/welcome", port)
+	url := fmt.Sprintf("http://127.0.0.1:%d/welcome", port)
 	for i := 0; i < 5; i++ {
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
@@ -112,7 +132,7 @@ func (c *Websocket) getAgentWelcome(ctx context.Context, port int) (map[string]W
 		}
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			if strings.Contains(err.Error(), "connection refused") {
+			if isConnectionErrorRetryable(err) {
 				time.Sleep(time.Millisecond * time.Duration(100*i+1))
 				continue
 			}
@@ -135,7 +155,7 @@ func (c *Websocket) StartReadingMessages(ctx context.Context, logger logger.Logg
 	var err error
 	c.binaryProtocol, err = c.getAgentProtocol(ctx, port)
 	if err != nil {
-		logger.Error("failed to healthcheck agents: %s", err)
+		logger.Fatal("Your project failed to start. This typically happens when the project cannot compile or this is an underlying issue with starting the project.")
 		return
 	}
 
@@ -353,10 +373,12 @@ func (c *Websocket) SendMessage(logger logger.Logger, msg Message) error {
 
 func (c *Websocket) Close() error {
 	c.SendMessage(c.logger, NewCloseMessage(uuid.New().String(), c.Project.Project.ProjectId))
-	closeHandler := c.conn.CloseHandler()
-	if err := closeHandler(1000, "User requested shutdown"); err != nil {
-		c.logger.Error("failed to close connection: %s", err)
-		return err
+	if c.conn != nil {
+		closeHandler := c.conn.CloseHandler()
+		if err := closeHandler(1000, "User requested shutdown"); err != nil {
+			c.logger.Error("failed to close connection: %s", err)
+			return err
+		}
 	}
 	if c.cleanup != nil {
 		c.cleanup()
@@ -537,30 +559,39 @@ func processInputMessage(plogger logger.Logger, c *Websocket, m []byte, port int
 		return
 	}
 
-	url := fmt.Sprintf("http://localhost:%d/%s", port, inputMsg.Payload.AgentID)
+	var inputPayload []byte
+	url := fmt.Sprintf("http://127.0.0.1:%d/%s", port, inputMsg.Payload.AgentID)
+	contentType := "application/json"
 
-	// make a json object with the payload
-	payload := map[string]any{
-		"contentType": inputMsg.Payload.ContentType,
-		"payload":     inputMsg.Payload.Payload,
-		"trigger":     "manual",
+	if !c.binaryProtocol {
+		// TODO: remove this once were all off the old protocol
+		// make a json object with the payload
+		payload := map[string]any{
+			"contentType": inputMsg.Payload.ContentType,
+			"payload":     inputMsg.Payload.Payload,
+			"trigger":     "manual",
+		}
+
+		var lerr error
+		inputPayload, lerr = json.Marshal(payload)
+		if lerr != nil {
+			logger.Error("failed to marshal payload: %s", lerr)
+			err = fmt.Errorf("failed to marshal payload: %w", lerr)
+			return
+		}
+	} else {
+		contentType = inputMsg.Payload.ContentType
+		inputPayload = inputMsg.Payload.Payload
 	}
+	logger.Debug("sending payload: %s to %s", string(inputPayload), url)
 
-	jsonPayload, lerr := json.Marshal(payload)
-	if lerr != nil {
-		logger.Error("failed to marshal payload: %s", lerr)
-		err = fmt.Errorf("failed to marshal payload: %w", lerr)
-		return
-	}
-	logger.Debug("sending payload: %s to %s", string(jsonPayload), url)
-
-	req, lerr := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonPayload))
+	req, lerr := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(inputPayload))
 	if lerr != nil {
 		logger.Error("failed to create request: %s", lerr)
 		err = fmt.Errorf("failed to create HTTP request: %w", lerr)
 		return
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("User-Agent", "Agentuity CLI/"+c.version)
 	propagator.Inject(ctx, propagation.HeaderCarrier(req.Header))
 
@@ -615,7 +646,6 @@ func processInputMessage(plogger logger.Logger, c *Websocket, m []byte, port int
 	logger.Debug("response: %s (status code: %d)", string(body), resp.StatusCode)
 
 	var trigger string
-	var contentType string
 	if c.binaryProtocol {
 		trigger = resp.Header.Get("x-agentuity-trigger")
 		contentType = resp.Header.Get("content-type")

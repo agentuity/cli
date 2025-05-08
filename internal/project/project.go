@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Masterminds/semver"
 	"github.com/agentuity/cli/internal/errsystem"
@@ -259,11 +260,11 @@ type Response[T any] struct {
 
 type ProjectResponse = Response[ProjectData]
 
-func ProjectWithNameExists(ctx context.Context, logger logger.Logger, baseUrl string, token string, name string) (bool, error) {
+func ProjectWithNameExists(ctx context.Context, logger logger.Logger, baseUrl string, token string, orgId string, name string) (bool, error) {
 	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var resp Response[bool]
-	if err := client.Do("GET", fmt.Sprintf("/cli/project/exists/%s", url.PathEscape(name)), nil, &resp); err != nil {
+	if err := client.Do("GET", fmt.Sprintf("/cli/project/exists/%s?orgId=%s", url.PathEscape(name), url.PathEscape(orgId)), nil, &resp); err != nil {
 		var apiErr *util.APIError
 		if errors.As(err, &apiErr) {
 			if apiErr.Status == http.StatusConflict {
@@ -489,6 +490,13 @@ func LoadProject(logger logger.Logger, dir string, apiUrl string, appUrl string,
 	}
 }
 
+func isVersionCheckRequired(ver string) bool {
+	if ver != "" && ver != "dev" && !strings.Contains(ver, "-next") {
+		return true
+	}
+	return false
+}
+
 func EnsureProject(ctx context.Context, cmd *cobra.Command) ProjectContext {
 	logger := env.NewLogger(cmd)
 	dir := ResolveProjectDir(logger, cmd, true)
@@ -501,7 +509,7 @@ func EnsureProject(ctx context.Context, cmd *cobra.Command) ProjectContext {
 		token, _ = util.EnsureLoggedIn(ctx, logger, cmd)
 	}
 	p := LoadProject(logger, dir, apiUrl, appUrl, transportUrl, token)
-	if !p.NewProject && Version != "" && Version != "dev" && p.Project.Version != "" {
+	if !p.NewProject && isVersionCheckRequired(Version) && p.Project.Version != "" {
 		v := semver.MustParse(Version)
 		c, err := semver.NewConstraint(p.Project.Version)
 		if err != nil {
@@ -541,7 +549,7 @@ func TryProject(ctx context.Context, cmd *cobra.Command) ProjectContext {
 		}
 	}
 	p := LoadProject(logger, dir, apiUrl, appUrl, transportUrl, token)
-	if !p.NewProject && Version != "" && Version != "dev" && p.Project.Version != "" {
+	if !p.NewProject && isVersionCheckRequired(Version) && p.Project.Version != "" {
 		v := semver.MustParse(Version)
 		c, err := semver.NewConstraint(p.Project.Version)
 		if err != nil {
@@ -559,7 +567,7 @@ func ResolveProjectDir(logger logger.Logger, cmd *cobra.Command, required bool) 
 	cwd, err := os.Getwd()
 	if err != nil {
 		errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
-			errsystem.WithUserMessage(fmt.Sprintf("Failed to get current directory: %s", err))).ShowErrorAndExit()
+			errsystem.WithUserMessage("Failed to get current working directory: %s", err)).ShowErrorAndExit()
 	}
 	dir := cwd
 	dirFlag, _ := cmd.Flags().GetString("dir")
@@ -573,12 +581,12 @@ func ResolveProjectDir(logger logger.Logger, cmd *cobra.Command, required bool) 
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
-			errsystem.WithUserMessage(fmt.Sprintf("Failed to get absolute path: %s", err))).ShowErrorAndExit()
+			errsystem.WithUserMessage("Failed to get absolute path to %s: %s", dir, err)).ShowErrorAndExit()
 	}
 	if !ProjectExists(abs) && required {
 		dir = viper.GetString("preferences.project_dir")
 		if ProjectExists(dir) {
-			tui.ShowWarning("Using your last used project directory. You should change into the correct directory or use the --dir flag.")
+			tui.ShowWarning("Using your last used project directory (%s). You should change into the correct directory or use the --dir flag.", dir)
 			return dir
 		}
 		tui.ShowBanner("Agentuity Project Not Found", "No Agentuity project file not found in the directory "+abs+"\n\nMake sure you are in an Agentuity project directory or use the --dir flag to specify a project directory.", false)

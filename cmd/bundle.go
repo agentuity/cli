@@ -69,13 +69,34 @@ Examples:
 			if deploymentId != "" {
 				args = append(args, "--deploymentId", deploymentId)
 			}
-			flags := []string{"log-level", "api-url", "api-key", "dir", "ci"}
+			flags := []string{
+				"log-level",
+				"api-url",
+				"api-key",
+				"dir",
+				"ci",
+				"ci-remote-url",
+				"ci-branch",
+				"ci-commit",
+				"ci-message",
+				"ci-logs-url",
+				"ci-git-provider",
+				"ci-logs-url",
+			}
+
+			f := cmd.Flags()
 			for _, flag := range flags {
-				if cmd.Flags().Changed(flag) {
-					val, _ := cmd.Flags().GetString(flag)
-					args = append(args, "--"+flag, val)
+				if f.Changed(flag) {
+					switch f.Lookup(flag).Value.Type() {
+					case "string":
+						val, _ := f.GetString(flag)
+						args = append(args, "--"+flag, val)
+					case "bool":
+						args = append(args, "--"+flag)
+					}
 				}
 			}
+
 			started = time.Now()
 			projectContext.Logger.Trace("deploying to cloud with %s and args: %v", bin, args)
 			cwd, err := os.Getwd()
@@ -108,4 +129,17 @@ func init() {
 	bundleCmd.Flags().MarkHidden("deploymentId")
 	bundleCmd.Flags().Bool("ci", false, "Used to track a specific CI job")
 	bundleCmd.Flags().MarkHidden("ci")
+	bundleCmd.Flags().String("ci-remote-url", "", "Used to set the remote repository URL for your deployment metadata")
+	bundleCmd.Flags().String("ci-branch", "", "Used to set the branch name for your deployment metadata")
+	bundleCmd.Flags().String("ci-commit", "", "Used to set the commit hash for your deployment metadata")
+	bundleCmd.Flags().String("ci-message", "", "Used to set the commit message for your deployment metadata")
+	bundleCmd.Flags().String("ci-git-provider", "", "Used to set the git provider for your deployment metadata")
+	bundleCmd.Flags().String("ci-logs-url", "", "Used to set the CI logs URL for your deployment metadata")
+
+	bundleCmd.Flags().MarkHidden("ci-remote-url")
+	bundleCmd.Flags().MarkHidden("ci-branch")
+	bundleCmd.Flags().MarkHidden("ci-commit")
+	bundleCmd.Flags().MarkHidden("ci-message")
+	bundleCmd.Flags().MarkHidden("ci-git-provider")
+	bundleCmd.Flags().MarkHidden("ci-logs-url")
 }

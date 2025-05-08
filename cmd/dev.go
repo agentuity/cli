@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -15,8 +16,8 @@ import (
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	cstr "github.com/agentuity/go-common/string"
-	csys "github.com/agentuity/go-common/sys"
 	"github.com/agentuity/go-common/tui"
+	"github.com/bep/debounce"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -44,7 +45,12 @@ Examples:
 		websocketUrl := viper.GetString("overrides.websocket_url")
 		websocketId, _ := cmd.Flags().GetString("websocket-id")
 
-		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		signals := []os.Signal{os.Interrupt, syscall.SIGINT}
+		if runtime.GOOS != "windows" {
+			signals = append(signals, syscall.SIGTERM)
+		}
+
+		ctx, cancel := signal.NotifyContext(context.Background(), signals...)
 		defer cancel()
 
 		apiKey, userId := util.EnsureLoggedIn(ctx, log, cmd)
@@ -64,13 +70,21 @@ Examples:
 
 		project, err := theproject.Project.GetProject(ctx, log, theproject.APIURL, apiKey)
 		if err != nil {
-			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to get project: %s", err))).ShowErrorAndExit()
+			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithUserMessage("Failed to validate project (%s) using the provided API key from the .env file in %s. This is most likely due to the API key being invalid or the project has been deleted.\n\nYou can import this project using the following command:\n\n"+tui.Command("project import"), theproject.Project.ProjectId, dir), errsystem.WithContextMessage(fmt.Sprintf("Failed to get project: %s", err))).ShowErrorAndExit()
 		}
 
 		orgId := project.OrgId
 
 		if websocketId == "" {
 			websocketId = cstr.NewHash(orgId, userId)
+		}
+
+		port, _ := cmd.Flags().GetInt("port")
+		if port == 0 {
+			port, err = dev.FindAvailablePort(theproject)
+			if err != nil {
+				log.Fatal("failed to find available port: %s", err)
+			}
 		}
 
 		websocketConn, err := dev.NewWebsocket(dev.WebsocketArgs{
@@ -88,40 +102,56 @@ Examples:
 		}
 		defer websocketConn.Close()
 
-		port, err := dev.FindAvailablePort(theproject)
-		if err != nil {
-			log.Fatal("failed to find available port: %s", err)
-		}
+		processCtx := context.Background()
+		var pid int
 
-		projectServerCmd, err := dev.CreateRunProjectCmd(ctx, log, theproject, websocketConn, dir, orgId, port)
+		projectServerCmd, err := dev.CreateRunProjectCmd(processCtx, log, theproject, websocketConn, dir, orgId, port)
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 		}
 
-		build := func() {
+		build := func(initial bool) {
 			started := time.Now()
+			var ok bool
 			tui.ShowSpinner("Building project ...", func() {
 				if err := bundler.Bundle(bundler.BundleContext{
 					Context:    ctx,
 					Logger:     log,
 					ProjectDir: dir,
 					Production: false,
+					DevMode:    !initial,
 				}); err != nil {
+					if err == bundler.ErrBuildFailed {
+						log.Error("build failed ...")
+						return
+					}
 					errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to bundle project: %s", err))).ShowErrorAndExit()
 				}
+				ok = true
 			})
-			fmt.Println(tui.Text(fmt.Sprintf("✨ Built in %s", time.Since(started).Round(time.Millisecond))))
+			if ok {
+				fmt.Println(tui.Text(fmt.Sprintf("✨ Built in %s", time.Since(started).Round(time.Millisecond))))
+			}
 		}
 
 		// Initial build
-		build()
+		build(true)
+
+		restart := func() {
+			isDeliberateRestart = true
+			build(false)
+			log.Debug("killing project server")
+			dev.KillProjectServer(log, projectServerCmd, pid)
+			log.Debug("killing project server done")
+		}
+
+		// debounce a lot of changes at once to avoid multiple restarts in succession
+		debounced := debounce.New(250 * time.Millisecond)
 
 		// Watch for changes
 		watcher, err := dev.NewWatcher(log, dir, theproject.Project.Development.Watch.Files, func(path string) {
-			build()
-			isDeliberateRestart = true
-			log.Debug("killing project server")
-			dev.KillProjectServer(projectServerCmd)
+			log.Trace("%s has changed", path)
+			debounced(restart)
 		})
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start watcher: %s", err))).ShowErrorAndExit()
@@ -132,6 +162,8 @@ Examples:
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start project: %s", err))).ShowErrorAndExit()
 		}
 
+		pid = projectServerCmd.Process.Pid
+
 		websocketConn.StartReadingMessages(ctx, log, port)
 		devUrl := websocketConn.WebURL(appUrl)
 
@@ -140,10 +172,18 @@ Examples:
 
 		go func() {
 			for {
-				defer cancel()
-				projectServerCmd.Wait()
-				log.Debug("project server exited")
-				log.Debug("isDeliberateRestart: %t", isDeliberateRestart)
+				log.Trace("waiting for project server to exit (pid: %d)", pid)
+				if err := projectServerCmd.Wait(); err != nil {
+					if !isDeliberateRestart {
+						log.Error("project server (pid: %d) exited with error: %s", pid, err)
+					}
+				}
+				if projectServerCmd.ProcessState != nil {
+					log.Debug("project server (pid: %d) exited with code %d", pid, projectServerCmd.ProcessState.ExitCode())
+				} else {
+					log.Debug("project server (pid: %d) exited", pid)
+				}
+				log.Debug("isDeliberateRestart: %t, pid: %d", isDeliberateRestart, pid)
 				if !isDeliberateRestart {
 					return
 				}
@@ -151,31 +191,33 @@ Examples:
 				// If it was a deliberate restart, start the new process here
 				if isDeliberateRestart {
 					isDeliberateRestart = false
-					projectServerCmd, err = dev.CreateRunProjectCmd(ctx, log, theproject, websocketConn, dir, orgId, port)
+					log.Trace("restarting project server")
+					projectServerCmd, err = dev.CreateRunProjectCmd(processCtx, log, theproject, websocketConn, dir, orgId, port)
 					if err != nil {
 						errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 					}
 					if err := projectServerCmd.Start(); err != nil {
 						errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start project: %s", err))).ShowErrorAndExit()
 					}
+					pid = projectServerCmd.Process.Pid
+					log.Trace("restarted project server (pid: %d)", pid)
 				}
 			}
 		}()
 
+		teardown := func() {
+			watcher.Close(log)
+			websocketConn.Close()
+			dev.KillProjectServer(log, projectServerCmd, pid)
+		}
+
 		select {
 		case <-websocketConn.Done():
 			log.Info("live dev connection closed, shutting down")
-			dev.KillProjectServer(projectServerCmd)
-			watcher.Close(log)
+			teardown()
 		case <-ctx.Done():
 			log.Info("context done, shutting down")
-			websocketConn.Close()
-			watcher.Close(log)
-		case <-csys.CreateShutdownChannel():
-			log.Info("shutdown signal received, shutting down")
-			dev.KillProjectServer(projectServerCmd)
-			websocketConn.Close()
-			watcher.Close(log)
+			teardown()
 		}
 	},
 }
@@ -203,7 +245,7 @@ func displayLocalInstructions(port int, agents []project.AgentConfig, devModeUrl
 		sampleAgentID = agents[0].ID
 	}
 
-	curlCommand := fmt.Sprintf("curl -v http://localhost:%d/run/%s --json '{\"input\": \"Hello, world!\"}'", port, sampleAgentID)
+	curlCommand := fmt.Sprintf("curl -v http://127.0.0.1:%d/%s --json '{\"input\": \"Hello, world!\"}'", port, sampleAgentID)
 
 	fmt.Println()
 	fmt.Println(tui.Text("To interact with your agents locally, you can use:"))
@@ -222,6 +264,7 @@ func init() {
 	devCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
 	devCmd.Flags().String("websocket-id", "", "The websocket room id to use for the development agent")
 	devCmd.Flags().String("org-id", "", "The organization to run the project")
+	devCmd.Flags().Int("port", 0, "The port to run the development server on (uses project default if not provided)")
 	devCmd.Flags().MarkHidden("websocket-id")
 	devCmd.Flags().MarkHidden("org-id")
 }

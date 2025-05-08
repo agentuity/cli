@@ -15,27 +15,32 @@ The command line tools for the Agentuity Agent Cloud Platform.  These tools are 
 
 ## Installation
 
-You can install the CLI using the install script:
+You can install the CLI using the install script (Linux, macOS, or WSL):
 
 ```bash
-curl -fsSL https://agentuity.sh/install.sh | bash
+curl -fsSL https://agentuity.sh/install.sh | sh
 ```
 
-If you are on a Mac, you can install the CLI using Homebrew:
+If you are on a Mac, you can install the CLI using Homebrew (by default, the install script will use Homebrew if it is installed and not disabled):
 
 ```bash
- brew install agentuity/tap/agentuity
+brew install agentuity/tap/agentuity
 ```
 
-Note: The install script will automatically use Homebrew if it is available.
-
-For Windows, you can install the CLI using the install script:
+You can force the install script to use the direct binary install (not Homebrew) with:
 
 ```bash
-irm https://agentuity.sh/install.ps1 | iex
+curl -fsSL https://agentuity.sh/install.sh | sh -s -- --no-brew
 ```
+
+**Windows:** Native Windows installation is no longer supported. Please use [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/) and run the install script from your WSL terminal.
 
 For other platforms, please download the binary from the [Releases](https://github.com/agentuity/cli/releases) page.
+
+**Supported platforms:**
+- Linux
+- macOS
+- Windows (via WSL only)
 
 ## Upgrade
 

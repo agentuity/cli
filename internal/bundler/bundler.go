@@ -22,6 +22,8 @@ import (
 
 var Version = "dev"
 
+var ErrBuildFailed = fmt.Errorf("build failed")
+
 type AgentConfig struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
@@ -35,6 +37,7 @@ type BundleContext struct {
 	Production bool
 	Install    bool
 	CI         bool
+	DevMode    bool
 }
 
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
@@ -74,6 +77,10 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		ctx.Logger.Debug("installed dependencies: %s", strings.TrimSpace(string(out)))
 	}
 
+	if err := checkForBreakingChanges(ctx, "javascript", theproject.Bundler.Runtime); err != nil {
+		return err
+	}
+
 	var entryPoints []string
 	entryPoints = append(entryPoints, filepath.Join(dir, "index.js"))
 	files, err := util.ListDir(filepath.Join(dir, theproject.Bundler.AgentConfig.Dir))
@@ -93,7 +100,10 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 	if err != nil {
 		return fmt.Errorf("failed to load %s: %w", pkgjson, err)
 	}
-	agentuitypkg := filepath.Join(dir, "node_modules", "@agentuity", "sdk", "package.json")
+	agentuitypkg, err := resolveAgentuity(dir)
+	if err != nil {
+		return err
+	}
 	pkg2, err := util.NewOrderedMapFromFile(util.PackageJsonKeysOrder, agentuitypkg)
 	if err != nil {
 		return fmt.Errorf("failed to load %s: %w", agentuitypkg, err)
@@ -116,7 +126,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 			defines["process.env.AGENTUITY_ENVIRONMENT"] = fmt.Sprintf("'%s'", "development")
 		}
 	}
-	defines["process.env.AGENTUITY_CLOUD_AGENTS_JSON"] = fmt.Sprintf("'%s'", cstr.JSONStringify(agents))
+	defines["process.env.AGENTUITY_CLOUD_AGENTS_JSON"] = cstr.JSONStringify(cstr.JSONStringify(agents))
 
 	ctx.Logger.Debug("starting build")
 	started := time.Now()
@@ -151,6 +161,10 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		for _, err := range result.Errors {
 			formattedError := formatESBuildError(dir, err)
 			fmt.Println(formattedError)
+		}
+
+		if ctx.DevMode {
+			return ErrBuildFailed
 		}
 
 		os.Exit(2)
@@ -192,6 +206,10 @@ func bundlePython(ctx BundleContext, dir string, outdir string, theproject *proj
 		ctx.Logger.Debug("installed dependencies: %s", strings.TrimSpace(string(out)))
 	}
 
+	if err := checkForBreakingChanges(ctx, "python", theproject.Bundler.Runtime); err != nil {
+		return err
+	}
+
 	config := map[string]any{
 		"agents":      getAgents(theproject, "agent.py"),
 		"cli_version": Version,
@@ -223,10 +241,16 @@ func bundlePython(ctx BundleContext, dir string, outdir string, theproject *proj
 func getAgents(theproject *project.Project, filename string) []AgentConfig {
 	var agents []AgentConfig
 	for _, agent := range theproject.Agents {
+		var agentfilename string
+		if theproject.Bundler.Language == "python" {
+			agentfilename = util.SafePythonFilename(agent.Name)
+		} else {
+			agentfilename = util.SafeFilename(agent.Name)
+		}
 		agents = append(agents, AgentConfig{
 			ID:       agent.ID,
 			Name:     agent.Name,
-			Filename: filepath.Join(theproject.Bundler.AgentConfig.Dir, util.SafeFilename(agent.Name), filename),
+			Filename: filepath.Join(theproject.Bundler.AgentConfig.Dir, agentfilename, filename),
 		})
 	}
 	return agents
@@ -260,4 +284,21 @@ func Bundle(ctx BundleContext) error {
 		return bundlePython(ctx, dir, outdir, theproject)
 	}
 	return fmt.Errorf("unsupported runtime: %s", theproject.Bundler.Runtime)
+}
+
+// resolveAgentuity walks up from startDir looking for node_modules/@agentuity/sdk/package.json
+func resolveAgentuity(startDir string) (string, error) {
+	dir := startDir
+	for {
+		candidate := filepath.Join(dir, "node_modules", "@agentuity", "sdk", "package.json")
+		if util.Exists(candidate) {
+			return candidate, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return "", fmt.Errorf("could not find @agentuity/sdk/package.json in any parent directory of %s", startDir)
 }
