@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"internal/goarch"
 	"io"
 	"net/http"
 	"os"
@@ -118,7 +117,7 @@ func getReleaseAssetName() string {
 }
 
 func getWindowsExecutableZip() string {
-	return fmt.Sprintf("agentuity_Windows_%s.zip", goarch.GOARCH)
+	return fmt.Sprintf("agentuity_Windows_%s.zip", runtime.GOARCH)
 }
 
 func isAdmin(ctx context.Context) bool {
