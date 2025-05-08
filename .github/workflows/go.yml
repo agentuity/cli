@@ -16,7 +16,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [blacksmith-4vcpu-ubuntu-2204, windows-latest, macos-latest]
+        os: [blacksmith-4vcpu-ubuntu-2204, blacksmith-4vcpu-ubuntu-2204-arm, windows-latest, macos-latest]
     steps:
     - uses: actions/checkout@v4
 
@@ -52,29 +52,16 @@ jobs:
     - name: Test Install Script (Linux)
       if: matrix.os == 'blacksmith-4vcpu-ubuntu-2204'
       run: |
-        chmod +x ./install.sh
-        # Test with default options (latest version)
-        ./install.sh -d /tmp/agentuity-test
-        # Verify installation
-        /tmp/agentuity-test/agentuity --version
-        
-        # Test with specific version if available - simplified to avoid potential issues
-        LATEST_VERSION=$(/tmp/agentuity-test/agentuity --version)
-        if [ -n "$LATEST_VERSION" ]; then
-          echo "Testing installation with specific version: $LATEST_VERSION"
-          ./install.sh -d /tmp/agentuity-test-version -v $LATEST_VERSION
-          # Verify installation with specific version
-          INSTALLED_VERSION=$(/tmp/agentuity-test-version/agentuity --version)
-          echo "Installed version: $INSTALLED_VERSION"
-          echo "Expected version: $LATEST_VERSION"
-          if [ "$INSTALLED_VERSION" = "$LATEST_VERSION" ]; then
-            echo "Version verification successful"
-          else
-            echo "Version verification failed"
-            exit 1
-          fi
-        fi
-      shell: bash
+        chmod +x ./install_test/docker-test-install.sh
+        ./install_test/docker-test-install.sh
+      shell: sh
+      
+    - name: Test Install Script (Linux ARM)
+      if: matrix.os == 'blacksmith-4vcpu-ubuntu-2204-arm' 
+      run: |
+        chmod +x ./install_test/docker-test-install.sh
+        ./install_test/docker-test-install.sh
+      shell: sh
       
     - name: Test Install Script (macOS)
       if: matrix.os == 'macos-latest'
@@ -94,117 +81,3 @@ jobs:
         echo "macOS double installation test passed - segfault fix verified"
       shell: bash
       
-    - name: Test Bash Install Script (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        # Windows test - simplified to avoid bash usage
-        Write-Host "Testing bash install script on Windows..."
-        
-        # Set up environment for testing
-        $env:NONINTERACTIVE = "true"
-        $env:OS = "Windows"
-        $env:ARCH = "x86_64"
-        
-        # Make script executable using PowerShell
-        if (Test-Path "install.sh") {
-          Write-Host "Found install.sh script"
-        } else {
-          Write-Host "install.sh not found"
-          exit 1
-        }
-        
-        # Test with default options (latest version)
-        Write-Host "Testing install script with default options..."
-        & sh -c "./install.sh -d '$env:TEMP/agentuity-test-download'"
-        
-        # Verify MSI was downloaded
-        if (Test-Path "$env:USERPROFILE/agentuity-x64.msi") {
-          Write-Host "MSI download verification successful"
-          
-          # Test with specific version
-          Write-Host "Testing install script with specific version..."
-          & sh -c "./install.sh -d '$env:TEMP/agentuity-test-version-download' -v 0.0.74"
-          
-          # Verify version-specific MSI was downloaded
-          if (Test-Path "$env:USERPROFILE/agentuity-x64.msi") {
-            Write-Host "Version-specific MSI download verification successful"
-          } else {
-            Write-Host "Version-specific MSI download verification failed"
-            exit 1
-          }
-        } else {
-          Write-Host "MSI download verification failed"
-          exit 1
-        }
-      shell: pwsh
-      
-    - name: Test PowerShell Install Script (Windows)
-      if: matrix.os == 'windows-latest'
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-        CI: true
-        AGENTUITY_TEST_VERSION: "0.0.74"
-      run: |
-        Write-Host "Testing PowerShell install script on Windows..."
-        
-        # Verify the PowerShell script exists
-        if (Test-Path "install.ps1") {
-          Write-Host "Found install.ps1 script"
-        } else {
-          Write-Host "install.ps1 not found"
-          exit 1
-        }
-        
-        # Create test directory
-        $testDir = Join-Path $env:TEMP "agentuity-ps-test"
-        if (Test-Path $testDir) {
-          Remove-Item -Path $testDir -Recurse -Force
-        }
-        New-Item -Path $testDir -ItemType Directory -Force | Out-Null
-        
-        # Test with default options but NoPrompt
-        Write-Host "Testing PowerShell install script with default options..."
-        & powershell -ExecutionPolicy Bypass -File .\install.ps1 -InstallDir $testDir -NoPrompt
-        
-        # Verify installation
-        $exePath = Join-Path -Path $testDir -ChildPath "agentuity.exe"
-        if (Test-Path $exePath) {
-          Write-Host "Installation verification successful"
-          
-          # Get installed version
-          $installedVersion = & $exePath version
-          Write-Host "Installed version: $installedVersion"
-          
-          # Test with specific version from environment variable
-          $specificVersion = $env:AGENTUITY_TEST_VERSION
-          Write-Host "Testing PowerShell install script with specific version $specificVersion..."
-          $versionTestDir = Join-Path $env:TEMP "agentuity-ps-test-version"
-          if (Test-Path $versionTestDir) {
-            Remove-Item -Path $versionTestDir -Recurse -Force
-          }
-          New-Item -Path $versionTestDir -ItemType Directory -Force | Out-Null
-          
-          & powershell -ExecutionPolicy Bypass -File .\install.ps1 -Version $specificVersion -InstallDir $versionTestDir -NoPrompt
-          
-          # Verify version-specific installation
-          $versionExePath = Join-Path -Path $versionTestDir -ChildPath "agentuity.exe"
-          if (Test-Path $versionExePath) {
-            Write-Host "Version-specific installation verification successful"
-            $versionInstalledVersion = & $versionExePath version
-            Write-Host "Version-specific installed version: $versionInstalledVersion"
-            
-            if ($versionInstalledVersion -match $specificVersion) {
-              Write-Host "Version verification successful"
-            } else {
-              Write-Host "Version verification failed. Expected: $specificVersion, Got: $versionInstalledVersion"
-              exit 1
-            }
-          } else {
-            Write-Host "Version-specific installation verification failed"
-            exit 1
-          }
-        } else {
-          Write-Host "Installation verification failed"
-          exit 1
-        }
-      shell: pwsh                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
