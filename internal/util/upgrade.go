@@ -260,7 +260,7 @@ func replaceBinary(ctx context.Context, logger logger.Logger, assetPath, version
 	fileMode := info.Mode()
 
 	if err := checkWritePermission(currentExe); err != nil {
-		if strings.Contains(err.Error(), "binary is currently running") {
+		if strings.Contains(err.Error(), "binary is currently running") || strings.Contains(err.Error(), "is being used by another process") {
 			var updateErr error
 			updateAction := func() {
 				updateErr = updateRunningBinary(currentExe, binaryPath, fileMode)
@@ -272,6 +272,7 @@ func replaceBinary(ctx context.Context, logger logger.Logger, assetPath, version
 			tui.ShowSuccess("Successfully scheduled update to %s. The update will complete when this process exits.", version)
 			return nil
 		}
+
 		return fmt.Errorf("insufficient permissions to update binary: %w", err)
 	}
 
