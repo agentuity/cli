@@ -117,7 +117,18 @@ func getReleaseAssetName() string {
 }
 
 func getWindowsExecutableZip() string {
-	return fmt.Sprintf("agentuity_Windows_%s.zip", runtime.GOARCH)
+	arch := runtime.GOARCH
+
+	var msiArch string
+	if arch == "amd64" {
+		msiArch = "x86_64"
+	} else if arch == "386" {
+		msiArch = "i386"
+	} else {
+		msiArch = arch
+	}
+
+	return fmt.Sprintf("agentuity_Windows_%s.zip", msiArch)
 }
 
 func isAdmin(ctx context.Context) bool {
