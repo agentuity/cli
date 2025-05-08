@@ -1,7 +1,7 @@
 #!/bin/bash
-set -ex
+set -e
 
-source ./install.sh
+chmod +x ./install.sh
 
 echo "####################################################################################################"
 echo "### Test Install without arguments (latest version and default install path)"
@@ -10,7 +10,7 @@ echo "### Test Install without arguments (latest version and default install pat
 
 
 # Verify installation
-LATEST_VERSION=$(agentuity --version)
+LATEST_VERSION=$(/root/.local/bin/agentuity --version)
 echo "Installed version: $LATEST_VERSION"
 echo "####################################################################################################"
 echo ""
@@ -20,7 +20,7 @@ echo "### Test Install with version"
 ./install.sh -v 0.0.118
 
 # Verify installation
-CURRENT_VERSION=$(agentuity --version)
+CURRENT_VERSION=$(/root/.local/bin/agentuity --version)
 echo "Installed version (specific): $LATEST_VERSION"
 if [ "$CURRENT_VERSION" != "0.0.118" ]; then
   echo "Version verification failed"

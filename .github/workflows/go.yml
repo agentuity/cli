@@ -50,7 +50,14 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Test Install Script (Linux)
-      if: matrix.os == 'blacksmith-4vcpu-ubuntu-2204' || matrix.os == 'blacksmith-4vcpu-ubuntu-2204-arm' 
+      if: matrix.os == 'blacksmith-4vcpu-ubuntu-2204'
+      run: |
+        chmod +x ./install_test/docker-test-install.sh
+        ./install_test/docker-test-install.sh
+      shell: sh
+      
+    - name: Test Install Script (Linux ARM)
+      if: matrix.os == 'blacksmith-4vcpu-ubuntu-2204-arm' 
       run: |
         chmod +x ./install_test/docker-test-install.sh
         ./install_test/docker-test-install.sh
