@@ -458,7 +458,7 @@ Examples:
 			}
 			projectDir = absDir
 		} else {
-			projectDir = tui.InputWithPlaceholder(logger, "What directory should the project be created in?", "The directory to create the project in", projectDir)
+			projectDir = tui.InputWithPathCompletion(logger, "What directory should the project be created in?", "The directory to create the project in", projectDir)
 		}
 
 		force, _ := cmd.Flags().GetBool("force")
