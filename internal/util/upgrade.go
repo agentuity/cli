@@ -116,35 +116,6 @@ func getReleaseAssetName() string {
 	return fmt.Sprintf("agentuity_%s_%s.%s", strings.Title(goos), archName, extension)
 }
 
-func getWindowsExecutableZip() string {
-	arch := runtime.GOARCH
-
-	var msiArch string
-	if arch == "amd64" {
-		msiArch = "x86_64"
-	} else if arch == "386" {
-		msiArch = "i386"
-	} else {
-		msiArch = arch
-	}
-
-	return fmt.Sprintf("agentuity_Windows_%s.zip", msiArch)
-}
-
-func isAdmin(ctx context.Context) bool {
-	if runtime.GOOS != "windows" {
-		return false
-	}
-
-	cmd := exec.CommandContext(ctx, "powershell", "-Command", "([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)")
-	output, err := cmd.Output()
-	if err != nil {
-		return false
-	}
-
-	return strings.TrimSpace(string(output)) == "True"
-}
-
 func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 	if runtime.GOOS == "darwin" {
 		exe, err := os.Executable()
@@ -162,20 +133,6 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 				return upgradeWithHomebrew(ctx, logger)
 			}
 		}
-	}
-
-	if runtime.GOOS == "windows" {
-		release, err := GetLatestRelease(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get latest release: %w", err)
-		}
-
-		if Version == release && !force {
-			tui.ShowSuccess("You are already on the latest version (%s)", release)
-			return nil
-		}
-
-		return upgradeWithWindows(ctx, logger, release)
 	}
 
 	release, err := GetLatestRelease(ctx) // Using public function from version.go
@@ -626,88 +583,5 @@ func upgradeWithHomebrew(ctx context.Context, logger logger.Logger) error {
 	}
 
 	tui.ShowSuccess("Successfully upgraded to version %s via Homebrew", newVersion)
-	return nil
-}
-
-func upgradeWithWindows(ctx context.Context, logger logger.Logger, version string) error {
-	tui.ShowWarning("Non-interactive environment detected, skipping automatic MSI installation")
-
-	tempDir, err := os.MkdirTemp("", "agentuity-upgrade")
-	if err != nil {
-		return fmt.Errorf("failed to create temp directory: %w", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	zipFileName := getWindowsExecutableZip()
-	if strings.HasPrefix(version, "v") {
-		version = strings.TrimPrefix(version, "v")
-	}
-
-	zipFileURL := fmt.Sprintf("https://agentuity.sh/release/cli/v%s/%s", version, zipFileName)
-	zipFilePath := filepath.Join(tempDir, zipFileName)
-
-	var downloadErr error
-	downloadAction := func() {
-		if err := downloadFile(zipFileURL, zipFilePath); err != nil {
-			downloadErr = fmt.Errorf("failed to download executable: %w", err)
-		}
-	}
-	tui.ShowSpinner("Downloading Executable installer...", downloadAction)
-	if downloadErr != nil {
-		return downloadErr
-	}
-
-	// unzip the file without action
-	zipReader, err := zip.OpenReader(zipFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to open zip file: %w", err)
-	}
-	defer zipReader.Close()
-
-	var tmpExecutablePath string
-	for _, file := range zipReader.File {
-		if file.Name == getBinaryName() {
-			err := func() error {
-				f, err := file.Open()
-				if err != nil {
-					return fmt.Errorf("failed to open file: %w", err)
-				}
-				defer f.Close()
-
-				tmpExecutablePath = filepath.Join(tempDir, file.Name)
-				destFile, err := os.Create(tmpExecutablePath)
-				if err != nil {
-					return fmt.Errorf("failed to create file: %w", err)
-				}
-				defer destFile.Close()
-
-				_, err = io.Copy(destFile, f)
-				return err
-			}()
-			if err != nil {
-				return err
-			}
-			break
-		}
-	}
-
-	if tmpExecutablePath == "" {
-		return fmt.Errorf("agentuity.exe not found in zip file")
-	}
-
-	homePath := os.Getenv("HOME")
-	if homePath == "" {
-		homePath = os.Getenv("USERPROFILE")
-	}
-	if homePath == "" {
-		return fmt.Errorf("unable to determine home directory")
-	}
-
-	destPath := filepath.Join(homePath, getBinaryName())
-	if err := copyFile(tmpExecutablePath, destPath); err != nil {
-		return fmt.Errorf("failed to copy executable to %s: %w", destPath, err)
-	}
-
-	tui.ShowSuccess("Executable copied to %s", destPath)
 	return nil
 }
