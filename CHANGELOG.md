@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.118] - 2025-05-06
+
+### Fixed
+- Fixed check on dev for Linux by using `sys.IsRunningInsideDocker()` instead of checking for specific Docker files ([#279](https://github.com/agentuity/cli/pull/279))
+
 ## [v0.0.117] - 2025-05-05
 
 ### Fixed
@@ -469,6 +474,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.118]: https://github.com/agentuity/cli/compare/v0.0.117...v0.0.118
 [v0.0.117]: https://github.com/agentuity/cli/compare/v0.0.116...v0.0.117
 [v0.0.116]: https://github.com/agentuity/cli/compare/v0.0.115...v0.0.116
 [v0.0.115]: https://github.com/agentuity/cli/compare/v0.0.114...v0.0.115
