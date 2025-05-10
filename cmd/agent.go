@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/agentuity/cli/internal/agent"
+	"github.com/agentuity/cli/internal/codeagent"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/templates"
@@ -333,6 +334,23 @@ var agentCreateCmd = &cobra.Command{
 			if err := theproject.Project.Save(theproject.Dir); err != nil {
 				errsystem.New(errsystem.ErrSaveProject, err, errsystem.WithContextMessage("Failed to save project to disk")).ShowErrorAndExit()
 			}
+
+			// --- New: ask what the agent should do & generate code ---------------------
+			goal, _ := cmd.Flags().GetString("goal")
+			if goal == "" && tui.HasTTY {
+				goal = tui.Input(logger, "Describe what the "+name+" Agent should do", "Enter a brief description or objective for the Agent (multi-line supported; hit <enter> on an empty line to finish)")
+			}
+			if goal != "" {
+				dir := filepath.Join(theproject.Dir, theproject.Project.Bundler.AgentConfig.Dir, util.SafeFilename(name))
+				genOpts := codeagent.Options{Dir: dir, Goal: goal, Logger: logger}
+				codegenAction := func() {
+					if err := codeagent.Generate(ctx, genOpts); err != nil {
+						tui.ShowWarning("Agent code generation failed: %s", err)
+					}
+				}
+				tui.ShowSpinner("Crafting Agent code ...", codegenAction)
+			}
+			// ---------------------------------------------------------------------------
 		}
 		tui.ShowSpinner("Creating Agent ...", action)
 
@@ -716,4 +734,5 @@ func init() {
 	for _, cmd := range []*cobra.Command{agentCreateCmd, agentDeleteCmd} {
 		cmd.Flags().Bool("force", false, "Force the creation of the agent even if it already exists")
 	}
+	agentCreateCmd.Flags().String("goal", "", "A description of what the agent should do (optional)")
 }
