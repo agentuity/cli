@@ -54,9 +54,10 @@ Developers run `agentuity dev` to iterate on agents locally. When the process en
 | 5 | Fork existing `codeagent` → `debugagent` (read-only tools). |  | In Progress | Core scaffold (`Analyze`, tools, prompt) committed. |
 | 6 | Craft debugging system prompt template (can embed with `go:embed`). |  | Not Started |  |
 | 7 | Wire monitor ↔ debug agent in `cmd/dev.go` behind flag `--debug-assist`. |  | In Progress | Dev command patched with monitor, flag, and output tee. |
-| 8 | Pretty-print suggestions to terminal (use `tui` helpers). |  | Not Started |  |
+| 8 | Pretty-print suggestions to terminal (use `glamour` for markdown). |  | Done | Glamour renderer integrated. |
 | 9 | Unit tests: error detection & secure-join read protection. |  | Not Started |  |
 | 10 | Documentation & README update. |  | Not Started |  |
+| 11 | Handle non-convergence by returning last assistant text. |  | Done | Fallback implemented + default iterations 8. |
 
 ## 5. MVP Acceptance Criteria
 - Running `agentuity dev --debug-assist` prints additional advice after an error appears.
@@ -84,7 +85,7 @@ Developers run `agentuity dev` to iterate on agents locally. When the process en
 ## 9. Progress Log
 
 - **{{TODAY}}** – Scaffolded `internal/dev/debugmon`, added `internal/debugagent`, and integrated `--debug-assist` flag & monitor wiring in `cmd/dev.go`. 
-- **{{TODAY}}** – Added truncation safeguards to debug agent (limits error length, file content to 16 KiB, list to 500 files, response tokens to 4096). 
+- **{{TODAY}}** – Improved Analyze loop: returns last assistant message even if tool loop exceeds iterations; default iterations now 8. 
 
 ---
 Owner: TBD

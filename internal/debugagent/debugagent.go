@@ -29,7 +29,7 @@ func init() {
 // Options controls the debug analysis session.
 // Dir: project root.
 // Error: the raw error snippet that triggered the debug session.
-// MaxIterations: LLM tool loop iterations (default 5).
+// MaxIterations: LLM tool loop iterations (default 8).
 // Logger: std Agentuity logger.
 
 type Options struct {
@@ -50,7 +50,7 @@ func Analyze(ctx context.Context, opts Options) (string, error) {
 		return "", errors.New("debugagent: Error must be provided")
 	}
 	if opts.MaxIterations <= 0 {
-		opts.MaxIterations = 5
+		opts.MaxIterations = 8
 	}
 
 	absDir, err := filepath.Abs(opts.Dir)
@@ -79,6 +79,7 @@ func Analyze(ctx context.Context, opts Options) (string, error) {
 		anthropic.NewUserMessage(anthropic.NewTextBlock(fmt.Sprintf("Here is the error I saw while running the dev server:\n\n%s", errSnippet))),
 	}
 
+	var lastMsg *anthropic.Message
 	for i := 0; i < opts.MaxIterations; i++ {
 		// Map tools to anthropic schema.
 		var anthropicTools []anthropic.ToolUnionParam
@@ -104,6 +105,7 @@ func Analyze(ctx context.Context, opts Options) (string, error) {
 		}
 
 		conversation = append(conversation, message.ToParam())
+		lastMsg = message
 
 		var toolResults []anthropic.ContentBlockParamUnion
 		for _, c := range message.Content {
@@ -135,6 +137,10 @@ func Analyze(ctx context.Context, opts Options) (string, error) {
 		}
 
 		conversation = append(conversation, anthropic.NewUserMessage(toolResults...))
+	}
+
+	if lastMsg != nil {
+		return collectAssistantResponse(lastMsg), nil
 	}
 
 	return "", errors.New("debugagent: reached max iterations without convergence")

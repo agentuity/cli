@@ -24,6 +24,8 @@ import (
 
 	"github.com/agentuity/cli/internal/debugagent"
 	debugmon "github.com/agentuity/cli/internal/dev/debugmon"
+
+	"github.com/charmbracelet/glamour"
 )
 
 var devCmd = &cobra.Command{
@@ -130,17 +132,41 @@ Examples:
 			go func() {
 				for evt := range monitorOutChan {
 					log.Info("🛠  Debug Assist triggered – analysing error …")
-					analysis, err := debugagent.Analyze(context.Background(), debugagent.Options{
-						Dir:    dir,
-						Error:  evt.Raw,
-						Logger: log,
+					var analysis string
+					var derr error
+					tui.ShowSpinner("Analyzing error ...", func() {
+						analysis, derr = debugagent.Analyze(context.Background(), debugagent.Options{
+							Dir:    dir,
+							Error:  evt.Raw,
+							Logger: log,
+						})
 					})
-					if err != nil {
-						log.Error("debug assist failed: %s", err)
+					if derr != nil {
+						log.Error("debug assist failed: %s", derr)
 						continue
 					}
-					fmt.Println(tui.Title("🧑‍💻 Debug Agent Suggests"))
-					fmt.Println(tui.Text(analysis))
+					fmt.Println()
+					fmt.Println(tui.Title("🧑‍💻 Debug Agent Suggestions"))
+					fmt.Println()
+
+					// Render markdown nicely using glamour
+					renderer, err := glamour.NewTermRenderer(
+						glamour.WithAutoStyle(),
+						glamour.WithWordWrap(120),
+					)
+					if err != nil {
+						// Fallback to plain output
+						fmt.Println(tui.Text(analysis))
+					} else {
+						rendered, err := renderer.Render(analysis)
+						if err != nil {
+							fmt.Println(tui.Text(analysis))
+						} else {
+							fmt.Print(rendered)
+						}
+					}
+
+					fmt.Println()
 				}
 			}()
 		}
