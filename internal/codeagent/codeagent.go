@@ -15,13 +15,15 @@ import (
 	"github.com/invopop/jsonschema"
 )
 
-// Just reading this in for the system prompt for now.
+// NOTE: I think we should be able to use that fancy go:embed thing here
+// but the import gets nuked when we build the CLI, so doing this nasty
+// init() thing instead.
 var systemPrompt string
 
 func init() {
 	_, file, _, _ := runtime.Caller(0)
 	base := filepath.Dir(file)
-	p := filepath.Join(base, "../../docs/code-system-prompt.txt")
+	p := filepath.Join(base, "./code-system-prompt.txt")
 	if data, err := os.ReadFile(p); err == nil {
 		systemPrompt = string(data)
 	} else {

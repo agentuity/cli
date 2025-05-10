@@ -114,4 +114,9 @@ var (
 		Code:    "CLI-0028",
 		Message: "Failed to delete API key",
 	}
+	// ErrAgentCodegen represents failures during local code generation for a newly created Agent.
+	ErrAgentCodegen = errorType{
+		Code:    "CLI-0029",
+		Message: "Failed to generate agent code",
+	}
 )

@@ -11,6 +11,7 @@ import (
 	"sort"
 	"syscall"
 
+	"github.com/agentuity/cli/internal/codeagent"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/mcp"
 	"github.com/agentuity/cli/internal/organization"
@@ -326,7 +327,7 @@ Examples:
 
 		orgId := promptForOrganization(ctx, logger, cmd, apiUrl, apikey)
 
-		var name, description, agentName, agentDescription, authType, githubAction string
+		var name, description, agentName, agentDescription, authType, githubAction, agentGoal string
 
 		if len(args) > 0 {
 			name = args[0]
@@ -340,6 +341,8 @@ Examples:
 		if len(args) > 3 {
 			agentDescription = args[3]
 		}
+		goalFlag, _ := cmd.Flags().GetString("goal")
+		agentGoal = goalFlag
 
 		authType, _ = cmd.Flags().GetString("auth")
 		githubAction, _ = cmd.Flags().GetString("action")
@@ -446,6 +449,9 @@ Examples:
 				templateName = resp.Template
 				providerName = resp.Runtime
 				provider = resp.Provider
+				if agentGoal == "" {
+					agentGoal = tui.Input(logger, "Describe what the initial agent should do", "Enter a brief description of the agent's functionality")
+				}
 			}
 		}
 
@@ -551,8 +557,23 @@ Examples:
 
 		})
 
-		// run the git flow
 		projectGitFlow(ctx, provider, tmplContext, githubAction)
+
+		// run code generation for the initial agent if a goal is provided
+		if agentGoal != "" {
+			// determine the agent source directory via template rules
+			dirRule, err := templates.LoadTemplateRuleForIdentifier(tmplDir, provider.Identifier)
+			if err == nil {
+				dir := filepath.Join(projectDir, dirRule.SrcDir, util.SafeFilename(agentName))
+				genOpts := codeagent.Options{Dir: dir, Goal: agentGoal, Logger: logger}
+				codegenAction := func() {
+					if err := codeagent.Generate(ctx, genOpts); err != nil {
+						errsystem.New(errsystem.ErrAgentCodegen, err).ShowErrorAndExit()
+					}
+				}
+				tui.ShowSpinner("Crafting Agent code ...", codegenAction)
+			}
+		}
 
 		if format == "json" {
 			json.NewEncoder(os.Stdout).Encode(projectData)
@@ -813,4 +834,5 @@ func init() {
 	projectNewCmd.Flags().String("templates-dir", "", "The directory to load the templates. Defaults to loading them from the github.com/agentuity/templates repository")
 	projectNewCmd.Flags().String("auth", "bearer", "The authentication type for the agent (bearer or none)")
 	projectNewCmd.Flags().String("action", "github-app", "The action to take for the project (github-action, github-app, none)")
+	projectNewCmd.Flags().String("goal", "", "A description of what the initial agent should do (optional)")
 }
