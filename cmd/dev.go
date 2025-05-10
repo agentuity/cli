@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"runtime"
@@ -20,6 +21,9 @@ import (
 	"github.com/bep/debounce"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/agentuity/cli/internal/debugagent"
+	debugmon "github.com/agentuity/cli/internal/dev/debugmon"
 )
 
 var devCmd = &cobra.Command{
@@ -87,6 +91,8 @@ Examples:
 			}
 		}
 
+		debugAssist, _ := cmd.Flags().GetBool("debug-assist")
+
 		websocketConn, err := dev.NewWebsocket(dev.WebsocketArgs{
 			Ctx:          ctx,
 			Logger:       log,
@@ -108,6 +114,35 @@ Examples:
 		projectServerCmd, err := dev.CreateRunProjectCmd(processCtx, log, theproject, websocketConn, dir, orgId, port)
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
+		}
+
+		var monitorOutChan chan debugmon.ErrorEvent
+		if debugAssist {
+			monitorOutChan = make(chan debugmon.ErrorEvent, 8)
+
+			r, w := io.Pipe()
+			projectServerCmd.Stdout = io.MultiWriter(os.Stdout, w)
+			projectServerCmd.Stderr = io.MultiWriter(os.Stderr, w)
+
+			mon := debugmon.New(log, monitorOutChan)
+			go mon.Run(r)
+
+			go func() {
+				for evt := range monitorOutChan {
+					log.Info("🛠  Debug Assist triggered – analysing error …")
+					analysis, err := debugagent.Analyze(context.Background(), debugagent.Options{
+						Dir:    dir,
+						Error:  evt.Raw,
+						Logger: log,
+					})
+					if err != nil {
+						log.Error("debug assist failed: %s", err)
+						continue
+					}
+					fmt.Println(tui.Title("🧑‍💻 Debug Agent Suggests"))
+					fmt.Println(tui.Text(analysis))
+				}
+			}()
 		}
 
 		build := func(initial bool) {
@@ -265,6 +300,7 @@ func init() {
 	devCmd.Flags().String("websocket-id", "", "The websocket room id to use for the development agent")
 	devCmd.Flags().String("org-id", "", "The organization to run the project")
 	devCmd.Flags().Int("port", 0, "The port to run the development server on (uses project default if not provided)")
+	devCmd.Flags().Bool("debug-assist", false, "Enable LLM-based runtime error assistance")
 	devCmd.Flags().MarkHidden("websocket-id")
 	devCmd.Flags().MarkHidden("org-id")
 }
