@@ -31,12 +31,6 @@ func init() {
 	}
 }
 
-// Options encapsulates configuration for the Generate routine.
-// Dir must point at the root directory that contains the freshly-scaffolded
-// Agent source (e.g. /path/to/project/src/agents/myagent).
-// Goal is the free-form user description of what the Agent should do.
-// MaxIterations controls how many request/response tool loops the agent can perform.
-// Logger is the standard Agentuity logger.
 type Options struct {
 	Dir           string
 	Goal          string
@@ -44,10 +38,6 @@ type Options struct {
 	MaxIterations int
 }
 
-// Generate takes the scaffold located at opts.Dir and applies LLM-driven edits so
-// that the skeleton reflects the user-provided Goal.  It does this by running a
-// minimal RAG-style tool-calling loop with Claude 3.  All file edits are scoped
-// inside opts.Dir.
 func Generate(ctx context.Context, opts Options) error {
 	if opts.Dir == "" {
 		return errors.New("codeagent: Dir must be provided")

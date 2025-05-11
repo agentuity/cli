@@ -17,6 +17,9 @@ import (
 	"github.com/invopop/jsonschema"
 )
 
+// NOTE: I think we should be able to use that fancy go:embed thing here
+// but the import gets nuked when we build the CLI, so doing this nasty
+// init() thing instead.
 var systemPrompt string
 
 func init() {
@@ -28,21 +31,12 @@ func init() {
 	}
 }
 
-// Options controls the debug analysis session.
-// Dir: project root.
-// Error: the raw error snippet that triggered the debug session.
-// MaxIterations: LLM tool loop iterations (default 8).
-// Logger: std Agentuity logger.
-
 type Options struct {
 	Dir           string
 	Error         string
 	Logger        logger.Logger
 	MaxIterations int
 }
-
-// Analyze runs the debug agent loop and returns the assistant's final response
-// (natural-language analysis & suggestions). It does not modify files.
 
 func Analyze(ctx context.Context, opts Options) (string, error) {
 	if opts.Dir == "" {
