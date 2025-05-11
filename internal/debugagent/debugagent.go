@@ -1,6 +1,7 @@
 package debugagent
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -15,6 +16,7 @@ import (
 	"github.com/agentuity/cli/internal/tools"
 	"github.com/agentuity/go-common/logger"
 	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/charmbracelet/glamour"
 )
 
 // NOTE: I think we should be able to use that fancy go:embed thing here
@@ -182,22 +184,99 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 		}
 
 		startCall := time.Now()
-		message, err := client.Messages.New(ctx, anthropic.MessageNewParams{
+		var message anthropic.Message
+		stream := client.Messages.NewStreaming(ctx, anthropic.MessageNewParams{
 			Model:     anthropic.ModelClaude3_7SonnetLatest,
 			System:    []anthropic.TextBlockParam{{Text: systemPrompt}},
 			Messages:  conversation,
 			Tools:     anthropicTools,
 			MaxTokens: int64(64000),
 		})
-		if err != nil {
-			trace("LLM call failed: %v", err)
-			return Result{}, fmt.Errorf("debugagent: LLM error: %w", err)
+
+		var textBuf strings.Builder
+		var toolBuf strings.Builder
+		currentToolIdx := -1
+
+		flushText := func() {
+			if textBuf.Len() == 0 {
+				return
+			}
+			line := strings.TrimSpace(textBuf.String())
+			if line != "" {
+				// Glamour render
+				if renderer, err := glamour.NewTermRenderer(glamour.WithAutoStyle(), glamour.WithWordWrap(120)); err == nil {
+					if out, rerr := renderer.Render(line); rerr == nil {
+						line = strings.TrimSuffix(out, "\n")
+					}
+				}
+				fmt.Println(line)
+			}
+			textBuf.Reset()
 		}
+
+		flushTool := func() {
+			if currentToolIdx == -1 || toolBuf.Len() == 0 {
+				return
+			}
+			payload := strings.TrimSpace(toolBuf.String())
+			var compactBuf bytes.Buffer
+			if err := json.Compact(&compactBuf, []byte(payload)); err == nil {
+				payload = compactBuf.String()
+			}
+			// shorten if huge
+			if len(payload) > 400 {
+				payload = payload[:400] + "…"
+			}
+			toolBuf.Reset()
+			currentToolIdx = -1
+		}
+
+		processStartTool := func(name string, idx int) {
+			flushText()
+			flushTool()
+			currentToolIdx = idx
+			fmt.Printf("⨺ tool_use %s\n", name)
+		}
+
+		for stream.Next() {
+			evt := stream.Current()
+			if aerr := message.Accumulate(evt); aerr != nil {
+				trace("accumulate error: %v", aerr)
+			}
+
+			if opts.Logger != nil {
+				switch v := evt.AsAny().(type) {
+				case anthropic.ContentBlockStartEvent:
+					if v.ContentBlock.Type == "tool_use" {
+						processStartTool(v.ContentBlock.Name, int(v.Index))
+					} else {
+						flushText()
+					}
+				case anthropic.ContentBlockDeltaEvent:
+					switch d := v.Delta.AsAny().(type) {
+					case anthropic.TextDelta:
+						textBuf.WriteString(d.Text)
+					case anthropic.InputJSONDelta:
+						if int(v.Index) == currentToolIdx {
+							toolBuf.WriteString(d.PartialJSON)
+						}
+					}
+				case anthropic.ContentBlockStopEvent:
+					if int(v.Index) == currentToolIdx {
+						flushTool()
+					} else {
+						flushText()
+					}
+				}
+			}
+		}
+		flushText()
+		flushTool()
 
 		trace("LLM call succeeded in %s – received %d content blocks", time.Since(startCall).Round(time.Millisecond), len(message.Content))
 
 		conversation = append(conversation, message.ToParam())
-		lastMsg = message
+		lastMsg = &message
 
 		var toolResults []anthropic.ContentBlockParamUnion
 		for _, c := range message.Content {
@@ -235,7 +314,7 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 		if len(toolResults) == 0 {
 			trace("Iteration %d complete – no further tool requests", i+1)
 			// No more tool requests – return assistant text.
-			analysis := collectAssistantResponse(message)
+			analysis := collectAssistantResponse(lastMsg)
 			if useCache {
 				keyHash := hash(opts.Error)
 				cachePath := filepath.Join(cacheDir, keyHash+".txt")

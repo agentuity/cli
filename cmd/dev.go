@@ -135,24 +135,14 @@ Examples:
 
 			go func() {
 				for evt := range monitorOutChan {
-					log.Info("Debug Assist triggered – analysing error …")
-					var res debugagent.Result
-					var derr error
-					var analysis string
+					fmt.Println(tui.Text("Analyzing error ..."))
+					res, derr := debugagent.Analyze(context.Background(), debugagent.Options{
+						Dir:    dir,
+						Error:  evt.Raw,
+						Logger: log,
+					})
+					analysis := linkify.LinkifyMarkdown(res.Analysis, dir)
 
-					uiAction := func() {
-						res, derr = debugagent.Analyze(context.Background(), debugagent.Options{
-							Dir:    dir,
-							Error:  evt.Raw,
-							Logger: log,
-						})
-						analysis = linkify.LinkifyMarkdown(res.Analysis, dir)
-					}
-					tui.ShowSpinner("Analyzing error ...", uiAction)
-					if derr != nil {
-						log.Error("debug assist failed: %s", derr)
-						continue
-					}
 					fmt.Println()
 					fmt.Println(tui.Title("Debug Agent Suggestions"))
 					fmt.Println()
@@ -203,16 +193,14 @@ Examples:
 
 						extraPrompt := composeExtra(userGuidance)
 
-						fixAction := func() {
-							res, derr = debugagent.Analyze(context.Background(), debugagent.Options{
-								Dir:         dir,
-								Error:       evt.Raw,
-								Extra:       extraPrompt,
-								Logger:      log,
-								AllowWrites: true,
-							})
-						}
-						tui.ShowSpinner("Applying fix ...", fixAction)
+						fmt.Println(tui.Text("Applying fix ..."))
+						res, derr = debugagent.Analyze(context.Background(), debugagent.Options{
+							Dir:         dir,
+							Error:       evt.Raw,
+							Extra:       extraPrompt,
+							Logger:      log,
+							AllowWrites: true,
+						})
 						if derr != nil {
 							log.Error("auto-fix failed: %v", derr)
 						} else if res.Edited {
