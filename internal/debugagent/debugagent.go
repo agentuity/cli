@@ -132,6 +132,15 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 		conversation = append(conversation, anthropic.NewUserMessage(anthropic.NewTextBlock(fmt.Sprintf("Additional guidance from user:\n\n%s", opts.Extra))))
 	}
 
+	// Prune conversation to avoid exceeding token limits. Keep initial
+	// context (first two messages) and the most recent 28 exchanges.
+	const keepRecent = 28
+	if len(conversation) > 2+keepRecent {
+		head := conversation[:2]
+		tail := conversation[len(conversation)-keepRecent:]
+		conversation = append(head, tail...)
+	}
+
 	var lastMsg *anthropic.Message
 	var edited bool
 	for i := 0; i < opts.MaxIterations; i++ {
@@ -145,6 +154,13 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 					InputSchema: t.InputSchema,
 				},
 			})
+		}
+
+		// Apply the same pruning rule before each LLM call as well.
+		if len(conversation) > 2+keepRecent {
+			head := conversation[:2]
+			tail := conversation[len(conversation)-keepRecent:]
+			conversation = append(head, tail...)
 		}
 
 		message, err := client.Messages.New(ctx, anthropic.MessageNewParams{

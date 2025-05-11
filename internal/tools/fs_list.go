@@ -29,6 +29,27 @@ func FSList(root string) Tool {
 				start = p
 			}
 			var files []string
+			skipDirs := map[string]struct{}{
+				"node_modules": {},
+				".git":         {},
+				"dist":         {},
+				"build":        {},
+				".next":        {},
+				// Python / general caches
+				"venv":          {},
+				".venv":         {},
+				"env":           {},
+				"__pycache__":   {},
+				".pytest_cache": {},
+				".mypy_cache":   {},
+				".cache":        {},
+				"coverage":      {},
+				// Go / other language vendoring
+				"vendor": {},
+				// Rust / Java build output
+				"target": {},
+			}
+
 			err := filepath.Walk(start, func(p string, info os.FileInfo, err error) error {
 				if err != nil {
 					return err
@@ -41,6 +62,9 @@ func FSList(root string) Tool {
 					return nil
 				}
 				if info.IsDir() {
+					if _, ok := skipDirs[info.Name()]; ok {
+						return filepath.SkipDir
+					}
 					files = append(files, rel+"/")
 				} else {
 					files = append(files, rel)
@@ -49,6 +73,11 @@ func FSList(root string) Tool {
 			})
 			if err != nil {
 				return "", err
+			}
+			// Cap the result size to avoid large prompts. Keep first 400 entries.
+			const maxEntries = 400
+			if len(files) > maxEntries {
+				files = append(files[:maxEntries], "...[truncated]")
 			}
 			out, _ := json.Marshal(files)
 			return string(out), nil

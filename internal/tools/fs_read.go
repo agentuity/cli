@@ -32,7 +32,7 @@ func FSRead(root string) Tool {
 			if err != nil {
 				return "", err
 			}
-			const maxLen = 16 * 1024
+			const maxLen = 8 * 1024
 			if len(data) > maxLen {
 				return string(data[:maxLen]) + "\n...[truncated]", nil
 			}
