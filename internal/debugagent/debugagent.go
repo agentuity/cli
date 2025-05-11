@@ -2,6 +2,7 @@ package debugagent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -34,6 +35,7 @@ type Options struct {
 	Dir           string
 	Error         string
 	Extra         string
+	AllowWrites   bool
 	Logger        logger.Logger
 	MaxIterations int
 }
@@ -41,6 +43,12 @@ type Options struct {
 type Result struct {
 	Analysis string
 	Patch    string // empty if no patch proposed
+	Edited   bool
+}
+
+// cacheEntry stored on disk
+type cacheEntry struct {
+	Analysis string `json:"analysis"`
 }
 
 func Analyze(ctx context.Context, opts Options) (Result, error) {
@@ -64,29 +72,39 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 	}
 
 	// ----- Cache Check -----
+	// We only use the cache for read-only analyses (no writes, no extra guidance).
+	useCache := !opts.AllowWrites && opts.Extra == ""
+
 	const cacheTTL = 24 * time.Hour
 	cacheDir := filepath.Join(opts.Dir, ".agentcache")
-	_ = os.MkdirAll(cacheDir, 0o755)
+	if useCache {
+		_ = os.MkdirAll(cacheDir, 0o755)
 
-	// Add cache dir to .gitignore if inside project git repo
-	giPath := filepath.Join(opts.Dir, ".gitignore")
-	if data, err := os.ReadFile(giPath); err == nil {
-		if !strings.Contains(string(data), ".agentcache") {
-			_ = os.WriteFile(giPath, append(data, []byte("\n# Agentuity cache\n.agentcache/\n")...), 0644)
-		}
-	}
-
-	keyHash := hash(opts.Error)
-	cachePath := filepath.Join(cacheDir, keyHash+".txt")
-	if fi, err := os.Stat(cachePath); err == nil {
-		if time.Since(fi.ModTime()) < cacheTTL {
-			if data, err := os.ReadFile(cachePath); err == nil {
-				return Result{Analysis: string(data), Patch: ""}, nil
+		// Add cache dir to .gitignore if inside project git repo
+		giPath := filepath.Join(opts.Dir, ".gitignore")
+		if data, err := os.ReadFile(giPath); err == nil {
+			if !strings.Contains(string(data), ".agentcache") {
+				_ = os.WriteFile(giPath, append(data, []byte("\n# Agentuity cache\n.agentcache/\n")...), 0644)
 			}
 		}
-	} else if !errors.Is(err, fs.ErrNotExist) {
-		// non-fatal
-		opts.Logger.Warn("debugagent: cache stat error: %v", err)
+
+		keyHash := hash(opts.Error)
+		cachePath := filepath.Join(cacheDir, keyHash+".txt")
+		if fi, err := os.Stat(cachePath); err == nil {
+			if time.Since(fi.ModTime()) < cacheTTL {
+				if data, err := os.ReadFile(cachePath); err == nil {
+					var ce cacheEntry
+					if json.Unmarshal(data, &ce) == nil && ce.Analysis != "" {
+						return Result{Analysis: ce.Analysis, Patch: ""}, nil
+					}
+					// legacy plain-text
+					return Result{Analysis: string(data), Patch: ""}, nil
+				}
+			}
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			// non-fatal
+			opts.Logger.Warn("debugagent: cache stat error: %v", err)
+		}
 	}
 
 	client := anthropic.NewClient()
@@ -97,8 +115,9 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 		tools.FSList(absDir),
 		tools.Grep(absDir),
 		tools.GitDiff(absDir),
-		tools.GeneratePatch(),
-		tools.ApplyPatch(absDir),
+	}
+	if opts.AllowWrites {
+		tk = append(tk, tools.FSEdit(absDir))
 	}
 
 	const maxErr = 8000
@@ -114,7 +133,7 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 	}
 
 	var lastMsg *anthropic.Message
-	var patchDiff string
+	var edited bool
 	for i := 0; i < opts.MaxIterations; i++ {
 		// Map tools to anthropic schema.
 		var anthropicTools []anthropic.ToolUnionParam
@@ -159,8 +178,8 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 				continue
 			}
 			res, execErr := tool.Exec(c.Input)
-			if tool.Name == "generate_patch" && execErr == nil {
-				patchDiff = res
+			if tool.Name == "edit_file" && execErr == nil {
+				edited = true
 			}
 			if execErr != nil {
 				toolResults = append(toolResults, anthropic.NewToolResultBlock(c.ID, execErr.Error(), true))
@@ -172,9 +191,12 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 		if len(toolResults) == 0 {
 			// No more tool requests – return assistant text.
 			analysis := collectAssistantResponse(message)
-			// write cache (best effort)
-			_ = os.WriteFile(cachePath, []byte(analysis), 0o644)
-			return Result{Analysis: analysis, Patch: patchDiff}, nil
+			if useCache {
+				keyHash := hash(opts.Error)
+				cachePath := filepath.Join(cacheDir, keyHash+".txt")
+				_ = writeCache(cachePath, cacheEntry{Analysis: analysis})
+			}
+			return Result{Analysis: analysis, Patch: "", Edited: edited}, nil
 		}
 
 		conversation = append(conversation, anthropic.NewUserMessage(toolResults...))
@@ -182,8 +204,12 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 
 	if lastMsg != nil {
 		analysis := collectAssistantResponse(lastMsg)
-		_ = os.WriteFile(cachePath, []byte(analysis), 0o644)
-		return Result{Analysis: analysis, Patch: patchDiff}, nil
+		if useCache {
+			keyHash := hash(opts.Error)
+			cachePath := filepath.Join(cacheDir, keyHash+".txt")
+			_ = writeCache(cachePath, cacheEntry{Analysis: analysis})
+		}
+		return Result{Analysis: analysis, Patch: "", Edited: edited}, nil
 	}
 
 	return Result{}, errors.New("debugagent: reached max iterations without convergence")
@@ -208,4 +234,12 @@ func hash(s string) string {
 		h *= prime
 	}
 	return fmt.Sprintf("%x", h)
+}
+
+func writeCache(path string, ce cacheEntry) error {
+	data, err := json.Marshal(ce)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o644)
 }

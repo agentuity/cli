@@ -26,10 +26,7 @@ import (
 	"github.com/agentuity/cli/internal/debugagent"
 	debugmon "github.com/agentuity/cli/internal/dev/debugmon"
 
-	"encoding/json"
-
 	"github.com/agentuity/cli/internal/dev/linkify"
-	"github.com/agentuity/cli/internal/tools"
 	"github.com/charmbracelet/glamour"
 )
 
@@ -141,7 +138,6 @@ Examples:
 					var res debugagent.Result
 					var derr error
 					var analysis string
-					var patch string
 
 					uiAction := func() {
 						res, derr = debugagent.Analyze(context.Background(), debugagent.Options{
@@ -150,7 +146,6 @@ Examples:
 							Logger: log,
 						})
 						analysis = linkify.LinkifyMarkdown(res.Analysis, dir)
-						patch = res.Patch
 					}
 					tui.ShowSpinner("Analyzing error ...", uiAction)
 					if derr != nil {
@@ -178,42 +173,35 @@ Examples:
 						}
 					}
 
-					// If patch proposed
-					if patch != "" {
-						fmt.Println()
-						fmt.Println(tui.Title("Proposed Patch"))
-						fmt.Println(tui.Text(patch))
+					// Ask user if we should attempt an automatic fix
+					choice := tui.Select(log, "Attempt automatic fix?", "Choose an option", []tui.Option{
+						{ID: "y", Text: "Yes"},
+						{ID: "e", Text: "Provide extra guidance then fix"},
+						{ID: "n", Text: "No"},
+					})
 
-						choice := tui.Select(log, "What next?", "Choose an option", []tui.Option{
-							{ID: "y", Text: "Apply patch"},
-							{ID: "e", Text: "Edit instructions and regenerate"},
-							{ID: "n", Text: "Skip"},
-						})
+					if choice == "y" || choice == "e" {
+						extra := ""
+						if choice == "e" {
+							extra = tui.Input(log, "Provide additional guidance", "Describe how to tweak the fix")
+						}
 
-						if choice == "y" {
-							apply := tools.ApplyPatch(dir)
-							if _, err := apply.Exec(json.RawMessage(fmt.Sprintf(`{"diff":%q}`, patch))); err != nil {
-								log.Error("patch apply failed: %v", err)
-							} else {
-								cmd := exec.Command("git", "-C", dir, "diff", "--color", "--", ".")
-								cmd.Stdout = os.Stdout
-								cmd.Run()
-							}
-						} else if choice == "e" {
-							extra := tui.Input(log, "Provide additional guidance", "Describe how to tweak the fix")
-							// re-run analysis with extra instructions
-							redo := func() {
-								res, derr = debugagent.Analyze(context.Background(), debugagent.Options{
-									Dir:    dir,
-									Error:  evt.Raw,
-									Extra:  extra,
-									Logger: log,
-								})
-								analysis = linkify.LinkifyMarkdown(res.Analysis, dir)
-								patch = res.Patch
-							}
-							tui.ShowSpinner("Regenerating patch ...", redo)
-							// loop will display new suggestions/patch on next iteration
+						fixAction := func() {
+							res, derr = debugagent.Analyze(context.Background(), debugagent.Options{
+								Dir:         dir,
+								Error:       evt.Raw,
+								Extra:       extra,
+								Logger:      log,
+								AllowWrites: true,
+							})
+						}
+						tui.ShowSpinner("Applying fix ...", fixAction)
+						if derr != nil {
+							log.Error("auto-fix failed: %v", derr)
+						} else if res.Edited {
+							cmd := exec.Command("git", "-C", dir, "diff", "--color", "--", ".")
+							cmd.Stdout = os.Stdout
+							cmd.Run()
 						}
 					}
 					fmt.Println()
