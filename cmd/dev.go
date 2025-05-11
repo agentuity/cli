@@ -121,7 +121,7 @@ Examples:
 
 		var monitorOutChan chan debugmon.ErrorEvent
 		if experimentalDebug {
-			log.Info("🧑‍💻 Debug Agent enabled")
+			log.Info("Debug Agent enabled")
 			monitorOutChan = make(chan debugmon.ErrorEvent, 8)
 
 			r, w := io.Pipe()
@@ -133,7 +133,7 @@ Examples:
 
 			go func() {
 				for evt := range monitorOutChan {
-					log.Info("🛠  Debug Assist triggered – analysing error …")
+					log.Info("Debug Assist triggered – analysing error …")
 					var analysis string
 					var derr error
 					tui.ShowSpinner("Analyzing error ...", func() {
@@ -150,7 +150,7 @@ Examples:
 						continue
 					}
 					fmt.Println()
-					fmt.Println(tui.Title("🧑‍💻 Debug Agent Suggestions"))
+					fmt.Println(tui.Title("Debug Agent Suggestions"))
 					fmt.Println()
 
 					// Render markdown nicely using glamour
