@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/agentuity/go-common/logger"
 	"github.com/anthropics/anthropic-sdk-go"
@@ -60,6 +62,32 @@ func Analyze(ctx context.Context, opts Options) (string, error) {
 
 	if os.Getenv("ANTHROPIC_API_KEY") == "" {
 		return "", errors.New("debugagent: ANTHROPIC_API_KEY env var not set")
+	}
+
+	// ----- Cache Check -----
+	const cacheTTL = 24 * time.Hour
+	cacheDir := filepath.Join(opts.Dir, ".agentcache")
+	_ = os.MkdirAll(cacheDir, 0o755)
+
+	// Add cache dir to .gitignore if inside project git repo
+	giPath := filepath.Join(opts.Dir, ".gitignore")
+	if data, err := os.ReadFile(giPath); err == nil {
+		if !strings.Contains(string(data), ".agentcache") {
+			_ = os.WriteFile(giPath, append(data, []byte("\n# Agentuity cache\n.agentcache/\n")...), 0644)
+		}
+	}
+
+	keyHash := hash(opts.Error)
+	cachePath := filepath.Join(cacheDir, keyHash+".txt")
+	if fi, err := os.Stat(cachePath); err == nil {
+		if time.Since(fi.ModTime()) < cacheTTL {
+			if data, err := os.ReadFile(cachePath); err == nil {
+				return string(data), nil
+			}
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		// non-fatal
+		opts.Logger.Warn("debugagent: cache stat error: %v", err)
 	}
 
 	client := anthropic.NewClient()
@@ -133,14 +161,19 @@ func Analyze(ctx context.Context, opts Options) (string, error) {
 
 		if len(toolResults) == 0 {
 			// No more tool requests – return assistant text.
-			return collectAssistantResponse(message), nil
+			analysis := collectAssistantResponse(message)
+			// write cache (best effort)
+			_ = os.WriteFile(cachePath, []byte(analysis), 0o644)
+			return analysis, nil
 		}
 
 		conversation = append(conversation, anthropic.NewUserMessage(toolResults...))
 	}
 
 	if lastMsg != nil {
-		return collectAssistantResponse(lastMsg), nil
+		analysis := collectAssistantResponse(lastMsg)
+		_ = os.WriteFile(cachePath, []byte(analysis), 0o644)
+		return analysis, nil
 	}
 
 	return "", errors.New("debugagent: reached max iterations without convergence")
@@ -286,4 +319,15 @@ func secureJoin(base, relPath string) (string, error) {
 		return "", errors.New("invalid path – outside root")
 	}
 	return p, nil
+}
+
+// hash generates a stable hex hash for cache keys.
+func hash(s string) string {
+	var h uint64 = 14695981039346656037
+	const prime uint64 = 1099511628211
+	for i := 0; i < len(s); i++ {
+		h ^= uint64(s[i])
+		h *= prime
+	}
+	return fmt.Sprintf("%x", h)
 }

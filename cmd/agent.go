@@ -337,10 +337,11 @@ var agentCreateCmd = &cobra.Command{
 
 			// --- New: ask what the agent should do & generate code ---------------------
 			goal, _ := cmd.Flags().GetString("goal")
+			codeOptIn, _ := cmd.Flags().GetBool("experimental-code-agent")
 			if goal == "" && tui.HasTTY {
 				goal = tui.Input(logger, "Describe what the "+name+" Agent should do", "Enter a brief description or objective for the Agent (multi-line supported; hit <enter> on an empty line to finish)")
 			}
-			if goal != "" {
+			if goal != "" && codeOptIn {
 				dir := filepath.Join(theproject.Dir, theproject.Project.Bundler.AgentConfig.Dir, util.SafeFilename(name))
 				genOpts := codeagent.Options{Dir: dir, Goal: goal, Logger: logger}
 				codegenAction := func() {
@@ -735,4 +736,5 @@ func init() {
 		cmd.Flags().Bool("force", false, "Force the creation of the agent even if it already exists")
 	}
 	agentCreateCmd.Flags().String("goal", "", "A description of what the agent should do (optional)")
+	agentCreateCmd.Flags().Bool("experimental-code-agent", false, "Enable experimental code agent")
 }

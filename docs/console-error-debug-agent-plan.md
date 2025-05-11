@@ -48,19 +48,22 @@ Developers run `agentuity dev` to iterate on agents locally. When the process en
 | # | Task | Owner | Status | Notes |
 |---|------|-------|--------|-------|
 | 1 | Create `internal/dev/debugmon` package that wraps `exec.Cmd` and streams output lines with callbacks. |  | In Progress | Initial scaffold committed (`Monitor`, `ErrorEvent`). |
-| 2 | Implement error pattern detection (basic regex for `panic:`, `ERROR`, stack trace). |  | In Progress | Basic regex patterns implemented in `debugmon`. |
+| 2 | Implement error pattern detection (basic regex for `panic:`, `ERROR`, stack trace). |  | Done | Multi-line capture & timeout flush implemented. |
 | 3 | Add prompt-size safeguards (truncate error, file contents, list size). |  | Done | Guard rails added in `debugagent`. |
 | 4 | Define `ErrorEvent` struct and channel between monitor and debug agent. |  | Done | Struct defined. Channel usage placeholder. |
 | 5 | Fork existing `codeagent` → `debugagent` (read-only tools). |  | In Progress | Core scaffold (`Analyze`, tools, prompt) committed. |
 | 6 | Craft debugging system prompt template (can embed with `go:embed`). |  | Not Started |  |
-| 7 | Wire monitor ↔ debug agent in `cmd/dev.go` behind flag `--debug-assist`. |  | In Progress | Dev command patched with monitor, flag, and output tee. |
+| 7 | Wire monitor ↔ debug agent in `cmd/dev.go` behind flag `--experimental-debug-agent`. |  | In Progress | Flag renamed to experimental namespace; monitor & glamour output wired. |
 | 8 | Pretty-print suggestions to terminal (use `glamour` for markdown). |  | Done | Glamour renderer integrated. |
-| 9 | Unit tests: error detection & secure-join read protection. |  | Not Started |  |
-| 10 | Documentation & README update. |  | Not Started |  |
-| 11 | Handle non-convergence by returning last assistant text. |  | Done | Fallback implemented + default iterations 8. |
+| 9 | Unit tests: error detection & secure-join read protection. |  | In Progress | Added tests for Monitor single & multi-line capture. |
+| 10 | Rename flags to experimental namespace (`--experimental-debug-agent`, `--experimental-code-agent`). |  | Done | Flags implemented in dev, agent create, project new commands. |
+| 11 | Implement on-disk cache for past error analyses (`.agentcache` JSON). |  | In Progress | Cache implemented with TTL, auto gitignore append. |
+| 12 | Auto-link file paths/line numbers for popular IDEs (VS Code, Goland). |  | Not Started |  |
+| 13 | Extend test coverage (debugagent Analyze flow + secureJoin). |  | In Progress | Added monitor duplicate and secureJoin tests. |
+| 14 | Handle non-convergence by returning last assistant text. |  | Done | Fallback implemented + default iterations 8. |
 
 ## 5. MVP Acceptance Criteria
-- Running `agentuity dev --debug-assist` prints additional advice after an error appears.
+- Running `agentuity dev --experimental-debug-agent` prints additional advice after an error appears.
 - Advice includes: summary sentence + ≥1 actionable suggestion.
 - No source files are modified automatically.
 
@@ -84,8 +87,8 @@ Developers run `agentuity dev` to iterate on agents locally. When the process en
 
 ## 9. Progress Log
 
-- **{{TODAY}}** – Scaffolded `internal/dev/debugmon`, added `internal/debugagent`, and integrated `--debug-assist` flag & monitor wiring in `cmd/dev.go`. 
-- **{{TODAY}}** – Improved Analyze loop: returns last assistant message even if tool loop exceeds iterations; default iterations now 8. 
+- **{{TODAY}}** – Renamed CLI flag to `--experimental-debug-agent`, drafted plan for caching, IDE link generation, and expanded test suite.
+- **{{TODAY}}** – Skipped cache unit-tests; moving focus to IDE deep-link generation feature.
 
 ---
 Owner: TBD

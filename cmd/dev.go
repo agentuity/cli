@@ -25,6 +25,7 @@ import (
 	"github.com/agentuity/cli/internal/debugagent"
 	debugmon "github.com/agentuity/cli/internal/dev/debugmon"
 
+	"github.com/agentuity/cli/internal/dev/linkify"
 	"github.com/charmbracelet/glamour"
 )
 
@@ -93,7 +94,7 @@ Examples:
 			}
 		}
 
-		debugAssist, _ := cmd.Flags().GetBool("debug-assist")
+		experimentalDebug, _ := cmd.Flags().GetBool("experimental-debug-agent")
 
 		websocketConn, err := dev.NewWebsocket(dev.WebsocketArgs{
 			Ctx:          ctx,
@@ -119,7 +120,8 @@ Examples:
 		}
 
 		var monitorOutChan chan debugmon.ErrorEvent
-		if debugAssist {
+		if experimentalDebug {
+			log.Info("🧑‍💻 Debug Agent enabled")
 			monitorOutChan = make(chan debugmon.ErrorEvent, 8)
 
 			r, w := io.Pipe()
@@ -140,6 +142,8 @@ Examples:
 							Error:  evt.Raw,
 							Logger: log,
 						})
+						// Convert file:line occurrences into clickable OSC-8 links
+						analysis = linkify.LinkifyMarkdown(analysis, dir)
 					})
 					if derr != nil {
 						log.Error("debug assist failed: %s", derr)
@@ -326,7 +330,7 @@ func init() {
 	devCmd.Flags().String("websocket-id", "", "The websocket room id to use for the development agent")
 	devCmd.Flags().String("org-id", "", "The organization to run the project")
 	devCmd.Flags().Int("port", 0, "The port to run the development server on (uses project default if not provided)")
-	devCmd.Flags().Bool("debug-assist", false, "Enable LLM-based runtime error assistance")
+	devCmd.Flags().Bool("experimental-debug-agent", false, "Enable LLM-based runtime error assistance")
 	devCmd.Flags().MarkHidden("websocket-id")
 	devCmd.Flags().MarkHidden("org-id")
 }

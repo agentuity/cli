@@ -343,6 +343,7 @@ Examples:
 		}
 		goalFlag, _ := cmd.Flags().GetString("goal")
 		agentGoal = goalFlag
+		experimentalCode, _ := cmd.Flags().GetBool("experimental-code-agent")
 
 		authType, _ = cmd.Flags().GetString("auth")
 		githubAction, _ = cmd.Flags().GetString("action")
@@ -560,7 +561,7 @@ Examples:
 		projectGitFlow(ctx, provider, tmplContext, githubAction)
 
 		// run code generation for the initial agent if a goal is provided
-		if agentGoal != "" {
+		if agentGoal != "" && experimentalCode {
 			// determine the agent source directory via template rules
 			dirRule, err := templates.LoadTemplateRuleForIdentifier(tmplDir, provider.Identifier)
 			if err == nil {
@@ -835,4 +836,5 @@ func init() {
 	projectNewCmd.Flags().String("auth", "bearer", "The authentication type for the agent (bearer or none)")
 	projectNewCmd.Flags().String("action", "github-app", "The action to take for the project (github-action, github-app, none)")
 	projectNewCmd.Flags().String("goal", "", "A description of what the initial agent should do (optional)")
+	projectNewCmd.Flags().Bool("experimental-code-agent", false, "Enable experimental code agent generation")
 }

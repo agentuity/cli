@@ -29,11 +29,14 @@ type ErrorEvent struct {
 // provided channel when a line matches error patterns.
 
 type Monitor struct {
-	log      logger.Logger
-	patterns []*regexp.Regexp
-	out      chan<- ErrorEvent
-	mu       sync.Mutex
-	lastHash string
+	log          logger.Logger
+	patterns     []*regexp.Regexp
+	out          chan<- ErrorEvent
+	mu           sync.Mutex
+	lastHash     string
+	capture      bool
+	bufLines     []string
+	lastActivity time.Time
 }
 
 // New creates a monitor with a preconfigured set of regex patterns.
@@ -61,20 +64,50 @@ func (m *Monitor) Run(r io.Reader) {
 
 	for scanner.Scan() {
 		line := scanner.Text()
+		now := time.Now()
+
+		if m.capture {
+			// continue collecting lines until blank or timeout 500ms
+			if strings.TrimSpace(line) == "" || now.Sub(m.lastActivity) > 500*time.Millisecond {
+				// flush buffer
+				joined := strings.Join(m.bufLines, "\n")
+				evt := ErrorEvent{Raw: joined, Timestamp: now, ID: hash(joined)}
+				if !m.isDuplicate(evt.ID) {
+					m.out <- evt
+				}
+				m.capture = false
+				m.bufLines = nil
+			} else {
+				m.bufLines = append(m.bufLines, line)
+				m.lastActivity = now
+			}
+			continue
+		}
+
 		if m.match(line) {
-			evt := ErrorEvent{
-				Raw:       line,
-				Timestamp: time.Now(),
-				ID:        hash(line),
+			// Immediate event for single-line detection
+			evt := ErrorEvent{Raw: line, Timestamp: now, ID: hash(line)}
+			if !m.isDuplicate(evt.ID) {
+				m.out <- evt
 			}
-			if m.isDuplicate(evt.ID) {
-				continue
-			}
-			m.out <- evt
+
+			// Start multi-line capture for additional context
+			m.capture = true
+			m.bufLines = []string{line}
+			m.lastActivity = now
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		m.log.Error("debugmon: scanner error: %s", err)
+	}
+
+	// Flush any pending buffered lines on EOF
+	if m.capture && len(m.bufLines) > 0 {
+		joined := strings.Join(m.bufLines, "\n")
+		evt := ErrorEvent{Raw: joined, Timestamp: time.Now(), ID: hash(joined)}
+		if !m.isDuplicate(evt.ID) {
+			m.out <- evt
+		}
 	}
 }
 
