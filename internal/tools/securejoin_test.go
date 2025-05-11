@@ -1,4 +1,4 @@
-package debugagent
+package tools
 
 import "testing"
 

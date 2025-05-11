@@ -2,7 +2,6 @@ package debugagent
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -12,9 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agentuity/cli/internal/tools"
 	"github.com/agentuity/go-common/logger"
 	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/invopop/jsonschema"
 )
 
 // NOTE: I think we should be able to use that fancy go:embed thing here
@@ -86,10 +85,12 @@ func Analyze(ctx context.Context, opts Options) (string, error) {
 
 	client := anthropic.NewClient()
 
-	// Tools: read_file & list_files only.
-	tools := []ToolDefinition{
-		readFileDefinition(absDir),
-		listFilesDefinition(absDir),
+	// Tools: read-only set
+	tk := []tools.Tool{
+		tools.FSRead(absDir),
+		tools.FSList(absDir),
+		tools.Grep(absDir),
+		tools.GitDiff(absDir),
 	}
 
 	const maxErr = 8000
@@ -105,7 +106,7 @@ func Analyze(ctx context.Context, opts Options) (string, error) {
 	for i := 0; i < opts.MaxIterations; i++ {
 		// Map tools to anthropic schema.
 		var anthropicTools []anthropic.ToolUnionParam
-		for _, t := range tools {
+		for _, t := range tk {
 			anthropicTools = append(anthropicTools, anthropic.ToolUnionParam{
 				OfTool: &anthropic.ToolParam{
 					Name:        t.Name,
@@ -134,10 +135,10 @@ func Analyze(ctx context.Context, opts Options) (string, error) {
 			if c.Type != "tool_use" {
 				continue
 			}
-			var tool *ToolDefinition
-			for _, t := range tools {
-				if t.Name == c.Name {
-					tool = &t
+			var tool *tools.Tool
+			for i := range tk {
+				if tk[i].Name == c.Name {
+					tool = &tk[i]
 					break
 				}
 			}
@@ -145,7 +146,7 @@ func Analyze(ctx context.Context, opts Options) (string, error) {
 				toolResults = append(toolResults, anthropic.NewToolResultBlock(c.ID, "tool not found", true))
 				continue
 			}
-			res, execErr := tool.Function(c.Input)
+			res, execErr := tool.Exec(c.Input)
 			if execErr != nil {
 				toolResults = append(toolResults, anthropic.NewToolResultBlock(c.ID, execErr.Error(), true))
 			} else {
@@ -181,138 +182,6 @@ func collectAssistantResponse(msg *anthropic.Message) string {
 		}
 	}
 	return strings.Join(parts, "\n")
-}
-
-/* ----------------- tool layer (copied from codeagent, minus edit) --------- */
-
-type ToolDefinition struct {
-	Name        string                         `json:"name"`
-	Description string                         `json:"description"`
-	InputSchema anthropic.ToolInputSchemaParam `json:"input_schema"`
-	Function    func(input json.RawMessage) (string, error)
-}
-
-// Schema helper.
-func generateSchema[T any]() anthropic.ToolInputSchemaParam {
-	reflector := jsonschema.Reflector{
-		AllowAdditionalProperties: false,
-		DoNotReference:            true,
-	}
-	var v T
-	schema := reflector.Reflect(v)
-	return anthropic.ToolInputSchemaParam{Properties: schema.Properties}
-}
-
-// read_file implementation
-
-type readFileInput struct {
-	Path string `json:"path" jsonschema_description:"Relative file path inside the agent directory."`
-}
-
-func readFileDefinition(root string) ToolDefinition {
-	return ToolDefinition{
-		Name:        "read_file",
-		Description: "Read the contents of a file relative to the agent root directory.",
-		InputSchema: generateSchema[readFileInput](),
-		Function:    makeReadFileFunc(root),
-	}
-}
-
-func makeReadFileFunc(root string) func(input json.RawMessage) (string, error) {
-	return func(input json.RawMessage) (string, error) {
-		var in readFileInput
-		if err := json.Unmarshal(input, &in); err != nil {
-			return "", err
-		}
-		if in.Path == "" {
-			return "", errors.New("path is required")
-		}
-		abs, err := secureJoin(root, in.Path)
-		if err != nil {
-			return "", err
-		}
-		data, err := os.ReadFile(abs)
-		if err != nil {
-			return "", err
-		}
-		const maxLen = 16384 // 16 KiB
-		if len(data) > maxLen {
-			return string(data[:maxLen]) + "\n...[truncated]", nil
-		}
-		return string(data), nil
-	}
-}
-
-// list_files implementation
-
-type listFilesInput struct {
-	Path string `json:"path,omitempty" jsonschema_description:"Optional relative path to list files from."`
-}
-
-func listFilesDefinition(root string) ToolDefinition {
-	return ToolDefinition{
-		Name:        "list_files",
-		Description: "Recursively list files/directories relative to the agent root directory.",
-		InputSchema: generateSchema[listFilesInput](),
-		Function:    makeListFilesFunc(root),
-	}
-}
-
-func makeListFilesFunc(root string) func(input json.RawMessage) (string, error) {
-	return func(input json.RawMessage) (string, error) {
-		var in listFilesInput
-		if err := json.Unmarshal(input, &in); err != nil {
-			return "", err
-		}
-		start := root
-		if in.Path != "" {
-			p, err := secureJoin(root, in.Path)
-			if err != nil {
-				return "", err
-			}
-			start = p
-		}
-		var files []string
-		err := filepath.Walk(start, func(p string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			rel, err := filepath.Rel(root, p)
-			if err != nil {
-				return err
-			}
-			if rel == "." {
-				return nil
-			}
-			if info.IsDir() {
-				files = append(files, rel+"/")
-			} else {
-				files = append(files, rel)
-			}
-			return nil
-		})
-		if err != nil {
-			return "", err
-		}
-		const maxFiles = 50
-		if len(files) > maxFiles {
-			files = append(files[:maxFiles], "...etc (truncated)")
-		}
-		out, _ := json.Marshal(files)
-		return string(out), nil
-	}
-}
-
-// secureJoin duplicated (private in codeagent)
-func secureJoin(base, relPath string) (string, error) {
-	if filepath.IsAbs(relPath) {
-		return "", errors.New("absolute paths are not allowed")
-	}
-	p := filepath.Clean(filepath.Join(base, relPath))
-	if !strings.HasPrefix(p, base) {
-		return "", errors.New("invalid path – outside root")
-	}
-	return p, nil
 }
 
 // hash generates a stable hex hash for cache keys.
