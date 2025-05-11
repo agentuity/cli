@@ -199,6 +199,9 @@ Examples:
 						if derr != nil {
 							log.Error("auto-fix failed: %v", derr)
 						} else if res.Edited {
+							// Suppress monitor for a short period to avoid picking up diff/build noise.
+							mon.SuppressFor(5 * time.Second)
+
 							cmd := exec.Command("git", "-C", dir, "diff", "--color", "--", ".")
 							cmd.Stdout = os.Stdout
 							cmd.Run()

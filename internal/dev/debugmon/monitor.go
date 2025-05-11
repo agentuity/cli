@@ -29,14 +29,15 @@ type ErrorEvent struct {
 // provided channel when a line matches error patterns.
 
 type Monitor struct {
-	log          logger.Logger
-	patterns     []*regexp.Regexp
-	out          chan<- ErrorEvent
-	mu           sync.Mutex
-	lastHash     string
-	capture      bool
-	bufLines     []string
-	lastActivity time.Time
+	log             logger.Logger
+	patterns        []*regexp.Regexp
+	out             chan<- ErrorEvent
+	mu              sync.Mutex
+	lastHash        string
+	capture         bool
+	bufLines        []string
+	lastActivity    time.Time
+	suppressedUntil time.Time // if set in future, events are ignored until then
 }
 
 // New creates a monitor with a preconfigured set of regex patterns.
@@ -54,6 +55,26 @@ func New(log logger.Logger, out chan<- ErrorEvent) *Monitor {
 	}
 }
 
+// SuppressFor ignores all new error detections for the given duration.
+// Useful to avoid false-positives right after an automatic code fix / reload.
+func (m *Monitor) SuppressFor(d time.Duration) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if d <= 0 {
+		return
+	}
+	until := time.Now().Add(d)
+	if until.After(m.suppressedUntil) {
+		m.suppressedUntil = until
+	}
+}
+
+func (m *Monitor) isSuppressed(now time.Time) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return now.Before(m.suppressedUntil)
+}
+
 // Run begins streaming the reader and blocks until it returns EOF. Should be
 // called in a goroutine if non-blocking behaviour is desired.
 func (m *Monitor) Run(r io.Reader) {
@@ -65,6 +86,13 @@ func (m *Monitor) Run(r io.Reader) {
 	for scanner.Scan() {
 		line := scanner.Text()
 		now := time.Now()
+
+		if m.isSuppressed(now) {
+			// Clear any in-flight capture to avoid partial buffers.
+			m.capture = false
+			m.bufLines = nil
+			continue
+		}
 
 		if m.capture {
 			// continue collecting lines until blank or timeout 500ms
