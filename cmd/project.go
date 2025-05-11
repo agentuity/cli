@@ -569,7 +569,7 @@ Examples:
 				genOpts := codeagent.Options{Dir: dir, Goal: agentGoal, Logger: logger}
 				codegenAction := func() {
 					if err := codeagent.Generate(ctx, genOpts); err != nil {
-						errsystem.New(errsystem.ErrAgentCodegen, err).ShowErrorAndExit()
+						logger.Warn("Agent code generation failed: %s", err)
 					}
 				}
 				tui.ShowSpinner("Crafting Agent code ...", codegenAction)
