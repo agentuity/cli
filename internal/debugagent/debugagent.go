@@ -52,6 +52,15 @@ type cacheEntry struct {
 }
 
 func Analyze(ctx context.Context, opts Options) (Result, error) {
+	// Helper for conditional trace logging.
+	trace := func(format string, args ...interface{}) {
+		if opts.Logger != nil {
+			opts.Logger.Trace(format, args...)
+		}
+	}
+
+	trace("Analyze called (allowWrites=%t, extraProvided=%t)", opts.AllowWrites, opts.Extra != "")
+
 	if opts.Dir == "" {
 		return Result{}, errors.New("debugagent: Dir must be provided")
 	}
@@ -67,6 +76,8 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 		return Result{}, fmt.Errorf("debugagent: failed to resolve dir: %w", err)
 	}
 
+	trace("Resolved dir: %s", absDir)
+
 	if os.Getenv("ANTHROPIC_API_KEY") == "" {
 		return Result{}, errors.New("debugagent: ANTHROPIC_API_KEY env var not set")
 	}
@@ -78,6 +89,7 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 	const cacheTTL = 24 * time.Hour
 	cacheDir := filepath.Join(opts.Dir, ".agentcache")
 	if useCache {
+		trace("Cache enabled – looking for previous analysis")
 		_ = os.MkdirAll(cacheDir, 0o755)
 
 		// Add cache dir to .gitignore if inside project git repo
@@ -92,6 +104,7 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 		cachePath := filepath.Join(cacheDir, keyHash+".txt")
 		if fi, err := os.Stat(cachePath); err == nil {
 			if time.Since(fi.ModTime()) < cacheTTL {
+				trace("Cache hit (file %s is fresh)", cachePath)
 				if data, err := os.ReadFile(cachePath); err == nil {
 					var ce cacheEntry
 					if json.Unmarshal(data, &ce) == nil && ce.Analysis != "" {
@@ -102,6 +115,7 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 				}
 			}
 		} else if !errors.Is(err, fs.ErrNotExist) {
+			trace("Cache miss – file does not exist or expired")
 			// non-fatal
 			opts.Logger.Warn("debugagent: cache stat error: %v", err)
 		}
@@ -119,6 +133,8 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 	if opts.AllowWrites {
 		tk = append(tk, tools.FSEdit(absDir))
 	}
+
+	trace("Building tool set (writes allowed=%t)", opts.AllowWrites)
 
 	const maxErr = 8000
 	errSnippet := opts.Error
@@ -141,9 +157,11 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 		conversation = append(head, tail...)
 	}
 
+	trace("Preparing initial conversation")
 	var lastMsg *anthropic.Message
 	var edited bool
 	for i := 0; i < opts.MaxIterations; i++ {
+		trace("Iteration %d – conversation messages: %d", i+1, len(conversation))
 		// Map tools to anthropic schema.
 		var anthropicTools []anthropic.ToolUnionParam
 		for _, t := range tk {
@@ -163,6 +181,7 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 			conversation = append(head, tail...)
 		}
 
+		startCall := time.Now()
 		message, err := client.Messages.New(ctx, anthropic.MessageNewParams{
 			Model:     anthropic.ModelClaude3_7SonnetLatest,
 			System:    []anthropic.TextBlockParam{{Text: systemPrompt}},
@@ -171,8 +190,11 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 			MaxTokens: int64(64000),
 		})
 		if err != nil {
+			trace("LLM call failed: %v", err)
 			return Result{}, fmt.Errorf("debugagent: LLM error: %w", err)
 		}
+
+		trace("LLM call succeeded in %s – received %d content blocks", time.Since(startCall).Round(time.Millisecond), len(message.Content))
 
 		conversation = append(conversation, message.ToParam())
 		lastMsg = message
@@ -194,17 +216,24 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 				continue
 			}
 			res, execErr := tool.Exec(c.Input)
+			const maxToolRes = 8 * 1024 // 8KB per tool result to avoid token bloat
+			if execErr == nil && len(res) > maxToolRes {
+				res = res[:maxToolRes] + "\n...[truncated]"
+			}
 			if tool.Name == "edit_file" && execErr == nil {
 				edited = true
 			}
 			if execErr != nil {
+				trace("Tool %s error: %v", tool.Name, execErr)
 				toolResults = append(toolResults, anthropic.NewToolResultBlock(c.ID, execErr.Error(), true))
 			} else {
+				trace("Tool %s executed (result len %d)", tool.Name, len(res))
 				toolResults = append(toolResults, anthropic.NewToolResultBlock(c.ID, res, false))
 			}
 		}
 
 		if len(toolResults) == 0 {
+			trace("Iteration %d complete – no further tool requests", i+1)
 			// No more tool requests – return assistant text.
 			analysis := collectAssistantResponse(message)
 			if useCache {
@@ -228,6 +257,7 @@ func Analyze(ctx context.Context, opts Options) (Result, error) {
 		return Result{Analysis: analysis, Patch: "", Edited: edited}, nil
 	}
 
+	trace("Max iterations reached without convergence")
 	return Result{}, errors.New("debugagent: reached max iterations without convergence")
 }
 

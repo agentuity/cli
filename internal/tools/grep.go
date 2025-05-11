@@ -66,7 +66,12 @@ func Grep(root string) Tool {
 				for i, l := range lines {
 					if re.Match(l) {
 						rel, _ := filepath.Rel(root, path)
-						matches = append(matches, grepMatch{File: rel, Line: i + 1, Text: string(l)})
+						text := string(l)
+						const maxLine = 256
+						if len(text) > maxLine {
+							text = text[:maxLine] + "...[truncated]"
+						}
+						matches = append(matches, grepMatch{File: rel, Line: i + 1, Text: text})
 						if len(matches) >= 50 {
 							return fs.SkipDir
 						}
