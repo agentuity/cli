@@ -12,21 +12,11 @@ import (
 	"github.com/agentuity/go-common/logger"
 )
 
-// ErrorEvent represents a detected runtime error from the dev server output.
-// Raw contains the entire captured snippet (potentially multi-line) that
-// triggered the detection.
-// Timestamp is when the first triggering line was seen.
-// ID is a simple hash to deduplicate identical consecutive errors.
-// Future versions may include parsed stack information.
-
 type ErrorEvent struct {
 	Raw       string
 	Timestamp time.Time
 	ID        string
 }
-
-// Monitor watches an io.Reader of process output and emits ErrorEvents to the
-// provided channel when a line matches error patterns.
 
 type Monitor struct {
 	log             logger.Logger

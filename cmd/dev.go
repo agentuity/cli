@@ -126,7 +126,8 @@ Examples:
 			monitorOutChan = make(chan debugmon.ErrorEvent, 8)
 
 			r, w := io.Pipe()
-			projectServerCmd.Stdout = io.MultiWriter(os.Stdout, w)
+			// Capture only stderr for error monitoring; stdout goes directly to console.
+			projectServerCmd.Stdout = os.Stdout
 			projectServerCmd.Stderr = io.MultiWriter(os.Stderr, w)
 
 			mon := debugmon.New(log, monitorOutChan)
@@ -202,8 +203,9 @@ Examples:
 							// Suppress monitor for a short period to avoid picking up diff/build noise.
 							mon.SuppressFor(5 * time.Second)
 
-							cmd := exec.Command("git", "-C", dir, "diff", "--color", "--", ".")
+							cmd := exec.Command("git", "--no-pager", "-C", dir, "diff", "--color", "--", ".")
 							cmd.Stdout = os.Stdout
+							cmd.Env = append(os.Environ(), "GIT_PAGER=cat")
 							cmd.Run()
 						}
 					}
