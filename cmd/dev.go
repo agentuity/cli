@@ -217,12 +217,15 @@ Examples:
 							log.Error("auto-fix failed: %v", derr)
 						} else if res.Edited {
 							// Suppress monitor for a short period to avoid picking up diff/build noise.
-							mon.SuppressFor(5 * time.Second)
+							mon.SuppressFor(3 * time.Second)
 
+							fmt.Println()
+							fmt.Println(tui.Title("Applied Changes"))
 							cmd := exec.Command("git", "--no-pager", "-C", dir, "diff", "--color", "--", ".")
 							cmd.Stdout = os.Stdout
 							cmd.Env = append(os.Environ(), "GIT_PAGER=cat")
 							cmd.Run()
+							fmt.Println(tui.Text("(end of diff)"))
 						}
 					}
 					fmt.Println()
