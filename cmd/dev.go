@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime"
 	"syscall"
@@ -25,7 +26,10 @@ import (
 	"github.com/agentuity/cli/internal/debugagent"
 	debugmon "github.com/agentuity/cli/internal/dev/debugmon"
 
+	"encoding/json"
+
 	"github.com/agentuity/cli/internal/dev/linkify"
+	"github.com/agentuity/cli/internal/tools"
 	"github.com/charmbracelet/glamour"
 )
 
@@ -134,17 +138,21 @@ Examples:
 			go func() {
 				for evt := range monitorOutChan {
 					log.Info("Debug Assist triggered – analysing error …")
-					var analysis string
+					var res debugagent.Result
 					var derr error
-					tui.ShowSpinner("Analyzing error ...", func() {
-						analysis, derr = debugagent.Analyze(context.Background(), debugagent.Options{
+					var analysis string
+					var patch string
+
+					uiAction := func() {
+						res, derr = debugagent.Analyze(context.Background(), debugagent.Options{
 							Dir:    dir,
 							Error:  evt.Raw,
 							Logger: log,
 						})
-						// Convert file:line occurrences into clickable OSC-8 links
-						analysis = linkify.LinkifyMarkdown(analysis, dir)
-					})
+						analysis = linkify.LinkifyMarkdown(res.Analysis, dir)
+						patch = res.Patch
+					}
+					tui.ShowSpinner("Analyzing error ...", uiAction)
 					if derr != nil {
 						log.Error("debug assist failed: %s", derr)
 						continue
@@ -170,6 +178,44 @@ Examples:
 						}
 					}
 
+					// If patch proposed
+					if patch != "" {
+						fmt.Println()
+						fmt.Println(tui.Title("Proposed Patch"))
+						fmt.Println(tui.Text(patch))
+
+						choice := tui.Select(log, "What next?", "Choose an option", []tui.Option{
+							{ID: "y", Text: "Apply patch"},
+							{ID: "e", Text: "Edit instructions and regenerate"},
+							{ID: "n", Text: "Skip"},
+						})
+
+						if choice == "y" {
+							apply := tools.ApplyPatch(dir)
+							if _, err := apply.Exec(json.RawMessage(fmt.Sprintf(`{"diff":%q}`, patch))); err != nil {
+								log.Error("patch apply failed: %v", err)
+							} else {
+								cmd := exec.Command("git", "-C", dir, "diff", "--color", "--", ".")
+								cmd.Stdout = os.Stdout
+								cmd.Run()
+							}
+						} else if choice == "e" {
+							extra := tui.Input(log, "Provide additional guidance", "Describe how to tweak the fix")
+							// re-run analysis with extra instructions
+							redo := func() {
+								res, derr = debugagent.Analyze(context.Background(), debugagent.Options{
+									Dir:    dir,
+									Error:  evt.Raw,
+									Extra:  extra,
+									Logger: log,
+								})
+								analysis = linkify.LinkifyMarkdown(res.Analysis, dir)
+								patch = res.Patch
+							}
+							tui.ShowSpinner("Regenerating patch ...", redo)
+							// loop will display new suggestions/patch on next iteration
+						}
+					}
 					fmt.Println()
 				}
 			}()

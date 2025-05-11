@@ -33,16 +33,22 @@ func init() {
 type Options struct {
 	Dir           string
 	Error         string
+	Extra         string
 	Logger        logger.Logger
 	MaxIterations int
 }
 
-func Analyze(ctx context.Context, opts Options) (string, error) {
+type Result struct {
+	Analysis string
+	Patch    string // empty if no patch proposed
+}
+
+func Analyze(ctx context.Context, opts Options) (Result, error) {
 	if opts.Dir == "" {
-		return "", errors.New("debugagent: Dir must be provided")
+		return Result{}, errors.New("debugagent: Dir must be provided")
 	}
 	if opts.Error == "" {
-		return "", errors.New("debugagent: Error must be provided")
+		return Result{}, errors.New("debugagent: Error must be provided")
 	}
 	if opts.MaxIterations <= 0 {
 		opts.MaxIterations = 8
@@ -50,11 +56,11 @@ func Analyze(ctx context.Context, opts Options) (string, error) {
 
 	absDir, err := filepath.Abs(opts.Dir)
 	if err != nil {
-		return "", fmt.Errorf("debugagent: failed to resolve dir: %w", err)
+		return Result{}, fmt.Errorf("debugagent: failed to resolve dir: %w", err)
 	}
 
 	if os.Getenv("ANTHROPIC_API_KEY") == "" {
-		return "", errors.New("debugagent: ANTHROPIC_API_KEY env var not set")
+		return Result{}, errors.New("debugagent: ANTHROPIC_API_KEY env var not set")
 	}
 
 	// ----- Cache Check -----
@@ -75,7 +81,7 @@ func Analyze(ctx context.Context, opts Options) (string, error) {
 	if fi, err := os.Stat(cachePath); err == nil {
 		if time.Since(fi.ModTime()) < cacheTTL {
 			if data, err := os.ReadFile(cachePath); err == nil {
-				return string(data), nil
+				return Result{Analysis: string(data), Patch: ""}, nil
 			}
 		}
 	} else if !errors.Is(err, fs.ErrNotExist) {
@@ -91,6 +97,8 @@ func Analyze(ctx context.Context, opts Options) (string, error) {
 		tools.FSList(absDir),
 		tools.Grep(absDir),
 		tools.GitDiff(absDir),
+		tools.GeneratePatch(),
+		tools.ApplyPatch(absDir),
 	}
 
 	const maxErr = 8000
@@ -101,8 +109,12 @@ func Analyze(ctx context.Context, opts Options) (string, error) {
 	conversation := []anthropic.MessageParam{
 		anthropic.NewUserMessage(anthropic.NewTextBlock(fmt.Sprintf("Here is the error I saw while running the dev server:\n\n%s", errSnippet))),
 	}
+	if opts.Extra != "" {
+		conversation = append(conversation, anthropic.NewUserMessage(anthropic.NewTextBlock(fmt.Sprintf("Additional guidance from user:\n\n%s", opts.Extra))))
+	}
 
 	var lastMsg *anthropic.Message
+	var patchDiff string
 	for i := 0; i < opts.MaxIterations; i++ {
 		// Map tools to anthropic schema.
 		var anthropicTools []anthropic.ToolUnionParam
@@ -124,7 +136,7 @@ func Analyze(ctx context.Context, opts Options) (string, error) {
 			MaxTokens: int64(64000),
 		})
 		if err != nil {
-			return "", fmt.Errorf("debugagent: LLM error: %w", err)
+			return Result{}, fmt.Errorf("debugagent: LLM error: %w", err)
 		}
 
 		conversation = append(conversation, message.ToParam())
@@ -147,6 +159,9 @@ func Analyze(ctx context.Context, opts Options) (string, error) {
 				continue
 			}
 			res, execErr := tool.Exec(c.Input)
+			if tool.Name == "generate_patch" && execErr == nil {
+				patchDiff = res
+			}
 			if execErr != nil {
 				toolResults = append(toolResults, anthropic.NewToolResultBlock(c.ID, execErr.Error(), true))
 			} else {
@@ -159,7 +174,7 @@ func Analyze(ctx context.Context, opts Options) (string, error) {
 			analysis := collectAssistantResponse(message)
 			// write cache (best effort)
 			_ = os.WriteFile(cachePath, []byte(analysis), 0o644)
-			return analysis, nil
+			return Result{Analysis: analysis, Patch: patchDiff}, nil
 		}
 
 		conversation = append(conversation, anthropic.NewUserMessage(toolResults...))
@@ -168,10 +183,10 @@ func Analyze(ctx context.Context, opts Options) (string, error) {
 	if lastMsg != nil {
 		analysis := collectAssistantResponse(lastMsg)
 		_ = os.WriteFile(cachePath, []byte(analysis), 0o644)
-		return analysis, nil
+		return Result{Analysis: analysis, Patch: patchDiff}, nil
 	}
 
-	return "", errors.New("debugagent: reached max iterations without convergence")
+	return Result{}, errors.New("debugagent: reached max iterations without convergence")
 }
 
 func collectAssistantResponse(msg *anthropic.Message) string {
