@@ -182,16 +182,32 @@ Examples:
 					})
 
 					if choice == "y" || choice == "e" {
-						extra := ""
-						if choice == "e" {
-							extra = tui.Input(log, "Provide additional guidance", "Describe how to tweak the fix")
+						// Compose an extra prompt containing the previous analysis and optional user guidance.
+						composeExtra := func(userInput string) string {
+							// Limit analysis length to keep prompt compact.
+							const maxAnalysis = 4000
+							prior := res.Analysis
+							if len(prior) > maxAnalysis {
+								prior = prior[:maxAnalysis] + "\n...[truncated]"
+							}
+							if userInput == "" {
+								return fmt.Sprintf("Here is the previous analysis you produced (for reference, not to repeat):\n\n%s", prior)
+							}
+							return fmt.Sprintf("Here is the previous analysis you produced (for reference, not to repeat):\n\n%s\n\nAdditional user guidance:\n\n%s", prior, userInput)
 						}
+
+						userGuidance := ""
+						if choice == "e" {
+							userGuidance = tui.Input(log, "Provide additional guidance", "Describe how to tweak the fix")
+						}
+
+						extraPrompt := composeExtra(userGuidance)
 
 						fixAction := func() {
 							res, derr = debugagent.Analyze(context.Background(), debugagent.Options{
 								Dir:         dir,
 								Error:       evt.Raw,
-								Extra:       extra,
+								Extra:       extraPrompt,
 								Logger:      log,
 								AllowWrites: true,
 							})
