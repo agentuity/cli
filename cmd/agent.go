@@ -165,7 +165,7 @@ var agentDeleteCmd = &cobra.Command{
 func getAgentAuthType(logger logger.Logger, authType string) string {
 	if authType != "" {
 		switch authType {
-		case "bearer", "none":
+		case "project", "bearer", "none":
 			return authType
 		default:
 		}

@@ -77,9 +77,10 @@ func InitProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 		})
 	}
 	payload := map[string]any{
-		"organization_id":   args.OrgId,
-		"provider":          args.Provider,
-		"name":              args.Name,
+		"organization_id": args.OrgId,
+		"provider":        args.Provider,
+		"name":            args.Name,
+
 		"description":       args.Description,
 		"enableWebhookAuth": args.EnableWebhookAuth,
 		"agents":            agents,
