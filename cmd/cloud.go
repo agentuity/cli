@@ -25,6 +25,7 @@ import (
 	"github.com/agentuity/go-common/logger"
 	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/tui"
+	"github.com/gosimple/slug"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -163,9 +164,6 @@ Examples:
 		ciMessage, _ := cmd.Flags().GetString("ci-message")
 		ciGitProvider, _ := cmd.Flags().GetString("ci-git-provider")
 		ciLogsUrl, _ := cmd.Flags().GetString("ci-logs-url")
-		tag, _ := cmd.Flags().GetString("tag")
-		tagMessage, _ := cmd.Flags().GetString("tag-message")
-		tagDescription, _ := cmd.Flags().GetString("tag-description")
 
 		deploymentConfig := project.NewDeploymentConfig()
 		client := util.NewAPIClient(ctx, logger, apiUrl, token)
@@ -372,6 +370,52 @@ Examples:
 			logger.Debug("deploymentId flag provided: %s", deploymentId)
 			deploymentId = "/" + deploymentId
 		}
+
+		// get a tag, ask the user for a tag if they didn't provide one or use the commit hash if we're in CI
+		tag, _ := cmd.Flags().GetString("tag")
+		if tag == "" {
+			if tui.HasTTY {
+				randomTag := util.RandStringBytes(8)
+				tag = tui.Select(logger, "Select a tag", "", []tui.Option{
+					tui.Option{
+						Text: "latest",
+						ID:   "latest",
+					}, {
+						Text: randomTag,
+						ID:   randomTag,
+					}, {
+						Text: "Enter manually",
+						ID:   "__custom",
+					}})
+
+				if tag == "__custom" {
+					tag = tui.Input(logger, "Enter a custom tag", "")
+					if tag == "" {
+						errsystem.New(errsystem.ErrDeployProject, fmt.Errorf("tag cannot be empty"),
+							errsystem.WithContextMessage("Tag cannot be empty")).ShowErrorAndExit()
+					}
+					tag = slug.Make(tag)
+				}
+			} else {
+				if ciCommit != "" {
+					tag = ciCommit
+				} else {
+					tag = "latest"
+				}
+			}
+		}
+
+		// get a tag message, ask the user for a tag message if they didn't provide one or use the commit message if we're in CI
+		tagMessage, _ := cmd.Flags().GetString("tag-message")
+		if tagMessage == "" {
+			if tui.HasTTY {
+				tagMessage = tui.Input(logger, "Enter a tag message", "")
+			} else {
+				tagMessage = ciMessage
+			}
+		}
+
+		tagDescription, _ := cmd.Flags().GetString("tag-description")
 
 		var gitInfo deployer.GitInfo
 		var originType string

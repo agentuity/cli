@@ -643,7 +643,7 @@ Examples:
 				fmt.Println(tui.Bold(orgNames[orgId]) + " " + tui.Muted("("+orgId+")"))
 				fmt.Println()
 
-				headers := []string{tui.Title("Project Id"), tui.Title("Name"), tui.Title("Description")}
+				headers := []string{tui.Title("Project Id"), tui.Title("Name"), tui.Title("Description"), tui.Title("Tag"), tui.Title("Tag Message")}
 				rows := [][]string{}
 				for _, project := range orgProjects[orgId] {
 					desc := project.Description
@@ -654,12 +654,14 @@ Examples:
 						tui.Muted(project.ID),
 						tui.Bold(project.Name),
 						tui.Text(tui.MaxWidth(desc, 30)),
+						tui.Muted(project.Tag),
+						tui.Muted(project.TagMessage),
 					})
 				}
 				tui.Table(headers, rows)
 			}
 		} else {
-			headers := []string{tui.Title("Project Id"), tui.Title("Name"), tui.Title("Description")}
+			headers := []string{tui.Title("Project Id"), tui.Title("Name"), tui.Title("Description"), tui.Title("Tag"), tui.Title("Tag Message")}
 			rows := [][]string{}
 			for _, project := range projects {
 				desc := project.Description
@@ -670,6 +672,8 @@ Examples:
 					tui.Muted(project.ID),
 					tui.Bold(project.Name),
 					tui.Text(tui.MaxWidth(desc, 30)),
+					tui.Muted(project.Tag),
+					tui.Muted(project.TagMessage),
 				})
 			}
 			tui.Table(headers, rows)
