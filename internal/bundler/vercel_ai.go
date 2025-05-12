@@ -5,7 +5,7 @@ import "fmt"
 func generateVercelAIProvider(name string, envkey string) string {
 	return generateJSArgsPatch(0, "") + fmt.Sprintf(`const opts = {...(_args[0] ?? {}) };
 if (!opts.baseURL) {
-	const apikey = process.env.AGENTUITY_API_KEY;
+	const apikey = process.env.AGENTUITY_API_KEY || process.env.AGENTUITY_SDK_KEY;
 	const url = process.env.AGENTUITY_TRANSPORT_URL;
 	if (url && apikey) {
 		opts.apiKey = apikey;

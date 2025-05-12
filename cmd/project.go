@@ -43,6 +43,7 @@ func saveEnv(dir string, apikey string, projectKey string) {
 		errsystem.New(errsystem.ErrReadConfigurationFile, err, errsystem.WithContextMessage("Failed to parse .env file")).ShowErrorAndExit()
 	}
 	var found map[string]bool = map[string]bool{
+		"AGENTUITY_SDK_KEY":     false,
 		"AGENTUITY_API_KEY":     false,
 		"AGENTUITY_PROJECT_KEY": false,
 	}
@@ -52,13 +53,21 @@ func saveEnv(dir string, apikey string, projectKey string) {
 			envLines[i].Val = apikey
 			found["AGENTUITY_API_KEY"] = true
 		}
+		if envLine.Key == "AGENTUITY_SDK_KEY" {
+			envLines[i].Val = apikey
+			found["AGENTUITY_SDK_KEY"] = true
+		}
 		if envLine.Key == "AGENTUITY_PROJECT_KEY" {
 			envLines[i].Val = projectKey
 			found["AGENTUITY_PROJECT_KEY"] = true
 		}
 	}
+
+	if !found["AGENTUITY_SDK_KEY"] {
+		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_SDK_KEY", Val: apikey})
+	}
 	if !found["AGENTUITY_API_KEY"] {
-		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_API_KEY", Val: apikey})
+		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_SDK_KEY", Val: apikey})
 	}
 	if !found["AGENTUITY_PROJECT_KEY"] {
 		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_PROJECT_KEY", Val: projectKey})
