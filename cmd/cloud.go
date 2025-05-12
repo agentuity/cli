@@ -69,9 +69,12 @@ type startAgent struct {
 }
 
 type startRequest struct {
-	Agents    []startAgent       `json:"agents"`
-	Resources *Resources         `json:"resources,omitempty"`
-	Metadata  *deployer.Metadata `json:"metadata,omitempty"`
+	Agents         []startAgent       `json:"agents"`
+	Resources      *Resources         `json:"resources,omitempty"`
+	Metadata       *deployer.Metadata `json:"metadata,omitempty"`
+	Tag            string             `json:"tag,omitempty"`
+	TagMessage     string             `json:"tagMessage,omitempty"`
+	TagDescription string             `json:"tagDescription,omitempty"`
 }
 
 func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.Command, apiUrl, apikey, projectId string, project *project.Project, dir string, isImport bool) {
@@ -95,9 +98,13 @@ func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.
 	project.Name = name
 	project.Description = description
 	var createWebhookAuth bool
-	auth := getAgentAuthType(logger, "")
-	if auth == "bearer" {
-		createWebhookAuth = true
+	if project.Development != nil && !tui.HasTTY {
+		createWebhookAuth = false
+	} else {
+		auth := getAgentAuthType(logger, "")
+		if auth == "bearer" {
+			createWebhookAuth = true
+		}
 	}
 	tui.ClearScreen()
 	tui.ShowSpinner("Importing project ...", func() {
@@ -129,11 +136,14 @@ between local and remote agents.
 
 Flags:
   --dir    The directory containing the project to deploy
+  --tag    An optional tag for this deployment
+  --tag-message    An optional message for the tag
+  --tag-description    An optional description for the tag
 
 Examples:
   agentuity cloud deploy
   agentuity deploy
-  agentuity cloud deploy --dir /path/to/project`,
+  agentuity cloud deploy --dir /path/to/project --tag v1.2.3 --tag-message "Release 1.2.3" --tag-description "Stable release"`,
 	Run: func(cmd *cobra.Command, args []string) {
 		parentCtx := context.Background()
 		ctx, cancel := signal.NotifyContext(parentCtx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -153,6 +163,9 @@ Examples:
 		ciMessage, _ := cmd.Flags().GetString("ci-message")
 		ciGitProvider, _ := cmd.Flags().GetString("ci-git-provider")
 		ciLogsUrl, _ := cmd.Flags().GetString("ci-logs-url")
+		tag, _ := cmd.Flags().GetString("tag")
+		tagMessage, _ := cmd.Flags().GetString("tag-message")
+		tagDescription, _ := cmd.Flags().GetString("tag-description")
 
 		deploymentConfig := project.NewDeploymentConfig()
 		client := util.NewAPIClient(ctx, logger, apiUrl, token)
@@ -398,6 +411,16 @@ Examples:
 				Type: originType,
 				Data: data,
 			},
+		}
+
+		if tag != "" {
+			startRequest.Tag = tag
+		}
+		if tagMessage != "" {
+			startRequest.TagMessage = tagMessage
+		}
+		if tagDescription != "" {
+			startRequest.TagDescription = tagDescription
 		}
 
 		// Start deployment
@@ -664,6 +687,9 @@ func init() {
 	cloudDeployCmd.Flags().String("ci-message", "", "Used to set the commit message for your deployment metadata")
 	cloudDeployCmd.Flags().String("ci-git-provider", "", "Used to set the git provider for your deployment metadata")
 	cloudDeployCmd.Flags().String("ci-logs-url", "", "Used to set the CI logs URL for your deployment metadata")
+	cloudDeployCmd.Flags().String("tag", "", "An optional tag for this deployment")
+	cloudDeployCmd.Flags().String("tag-message", "", "An optional message for the tag")
+	cloudDeployCmd.Flags().String("tag-description", "", "An optional description for the tag")
 
 	cloudDeployCmd.Flags().MarkHidden("deploymentId")
 	cloudDeployCmd.Flags().MarkHidden("ci")
