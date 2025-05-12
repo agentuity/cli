@@ -43,7 +43,7 @@ type initProjectResult struct {
 
 type ProjectData struct {
 	APIKey           string            `json:"api_key"`
-	AgentsKey        string            `json:"agentsKey"`
+	ProjectKey       string            `json:"projectKey"`
 	ProjectId        string            `json:"id"`
 	OrgId            string            `json:"orgId"`
 	Env              map[string]string `json:"env"`
@@ -378,7 +378,7 @@ type ProjectImportResponse struct {
 	ID          string        `json:"id"`
 	Agents      []AgentConfig `json:"agents"`
 	APIKey      string        `json:"apiKey"`
-	AgentsKey   string        `json:"agentsKey"`
+	ProjectKey  string        `json:"projectKey"`
 	IOAuthToken string        `json:"ioAuthToken"`
 }
 

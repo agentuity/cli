@@ -309,7 +309,7 @@ func initialProjectModel(initialForm ProjectForm) projectFormModel {
 			authCursor = 0
 		} else if agentAuthType == "project" {
 			authCursor = 1
-		} else if agentAuthType == "agent" {
+		} else if agentAuthType == "bearer" {
 			authCursor = 2
 		}
 	}

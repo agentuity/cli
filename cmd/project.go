@@ -36,15 +36,15 @@ Use the subcommands to manage your projects.`,
 	},
 }
 
-func saveEnv(dir string, apikey string, agentsKey string) {
+func saveEnv(dir string, apikey string, projectKey string) {
 	filename := filepath.Join(dir, ".env")
 	envLines, err := env.ParseEnvFile(filename)
 	if err != nil {
 		errsystem.New(errsystem.ErrReadConfigurationFile, err, errsystem.WithContextMessage("Failed to parse .env file")).ShowErrorAndExit()
 	}
 	var found map[string]bool = map[string]bool{
-		"AGENTUITY_API_KEY":    false,
-		"AGENTUITY_AGENTS_KEY": false,
+		"AGENTUITY_API_KEY":     false,
+		"AGENTUITY_PROJECT_KEY": false,
 	}
 
 	for i, envLine := range envLines {
@@ -52,16 +52,16 @@ func saveEnv(dir string, apikey string, agentsKey string) {
 			envLines[i].Val = apikey
 			found["AGENTUITY_API_KEY"] = true
 		}
-		if envLine.Key == "AGENTUITY_AGENTS_KEY" {
-			envLines[i].Val = apikey
-			found["AGENTUITY_AGENTS_KEY"] = true
+		if envLine.Key == "AGENTUITY_PROJECT_KEY" {
+			envLines[i].Val = projectKey
+			found["AGENTUITY_PROJECT_KEY"] = true
 		}
 	}
 	if !found["AGENTUITY_API_KEY"] {
 		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_API_KEY", Val: apikey})
 	}
-	if !found["AGENTUITY_AGENTS_KEY"] {
-		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_AGENTS_KEY", Val: apikey})
+	if !found["AGENTUITY_PROJECT_KEY"] {
+		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_PROJECT_KEY", Val: projectKey})
 	}
 	if err := env.WriteEnvFile(filename, envLines); err != nil {
 		errsystem.New(errsystem.ErrWriteConfigurationFile, err, errsystem.WithContextMessage("Failed to write .env file")).ShowErrorAndExit()
@@ -139,7 +139,7 @@ func initProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 		errsystem.New(errsystem.ErrSaveProject, err, errsystem.WithContextMessage("Failed to save project to disk")).ShowErrorAndExit()
 	}
 
-	saveEnv(args.Dir, result.APIKey, result.AgentsKey)
+	saveEnv(args.Dir, result.APIKey, result.ProjectKey)
 
 	return result
 }
@@ -553,7 +553,7 @@ Examples:
 				Description:       description,
 				Provider:          rules,
 				Agents:            agents,
-				EnableWebhookAuth: authType == "project" || authType == "agent",
+				EnableWebhookAuth: authType == "project" || authType == "webhook",
 				AuthType:          authType,
 			})
 
@@ -576,7 +576,7 @@ Examples:
 			para = append(para, tui.Secondary("1. Switch into the project directory at ")+tui.Directory(projectDir))
 			para = append(para, tui.Secondary("2. Run ")+tui.Command("dev")+tui.Secondary(" to run the project locally in development mode"))
 			para = append(para, tui.Secondary("3. Run ")+tui.Command("deploy")+tui.Secondary(" to deploy the project to the Agentuity Agent Cloud"))
-			if authType == "project" || authType == "agent" {
+			if authType == "project" || authType == "webhook" {
 				para = append(para, tui.Secondary("4. Run ")+tui.Command("agent apikey")+tui.Secondary(" to fetch the Webhook API key for the agent"))
 			}
 			para = append(para, tui.Secondary("🏠 Access your project at ")+tui.Link("%s/projects/%s", appUrl, projectData.ProjectId))
@@ -825,6 +825,6 @@ func init() {
 	projectNewCmd.Flags().StringP("template", "t", "", "The template to use for the project")
 	projectNewCmd.Flags().Bool("force", false, "Force the project to be created even if the directory already exists")
 	projectNewCmd.Flags().String("templates-dir", "", "The directory to load the templates. Defaults to loading them from the github.com/agentuity/templates repository")
-	projectNewCmd.Flags().String("auth", "project", "The authentication type for the agent (project, agent, or none)")
+	projectNewCmd.Flags().String("auth", "project", "The authentication type for the agent (project, webhook, or none)")
 	projectNewCmd.Flags().String("action", "github-app", "The action to take for the project (github-action, github-app, none)")
 }
