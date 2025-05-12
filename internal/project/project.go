@@ -283,6 +283,8 @@ type ProjectListData struct {
 	Description string `json:"description"`
 	OrgId       string `json:"orgId"`
 	OrgName     string `json:"orgName"`
+	Tag         string `json:"tag"`
+	TagMessage  string `json:"tagMessage"`
 }
 
 func ListProjects(ctx context.Context, logger logger.Logger, baseUrl string, token string) ([]ProjectListData, error) {
