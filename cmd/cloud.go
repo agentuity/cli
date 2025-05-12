@@ -139,7 +139,7 @@ Flags:
 Examples:
   agentuity cloud deploy
   agentuity deploy
-  agentuity cloud deploy --dir /path/to/project --tag v1.2.3 --tag-message "Release 1.2.3" --tag-description "Stable release"`,
+  agentuity cloud deploy --dir /path/to/project --tag latest --tag-message "Latest Release" --tag-description "Some longer description"`,
 	Run: func(cmd *cobra.Command, args []string) {
 		parentCtx := context.Background()
 		ctx, cancel := signal.NotifyContext(parentCtx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
