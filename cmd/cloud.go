@@ -98,13 +98,9 @@ func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.
 	project.Name = name
 	project.Description = description
 	var createWebhookAuth bool
-	if project.Development != nil && !tui.HasTTY {
-		createWebhookAuth = false
-	} else {
-		auth := getAgentAuthType(logger, "")
-		if auth == "bearer" {
-			createWebhookAuth = true
-		}
+	auth := getAgentAuthType(logger, "")
+	if auth == "bearer" {
+		createWebhookAuth = true
 	}
 	tui.ClearScreen()
 	tui.ShowSpinner("Importing project ...", func() {
