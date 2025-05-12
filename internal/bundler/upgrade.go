@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Masterminds/semver"
 	"github.com/agentuity/cli/internal/util"
@@ -70,7 +71,7 @@ func checkForBreakingChanges(ctx BundleContext, language string, runtime string)
 			}
 			for _, pkg := range lockfile.Packages {
 				ctx.Logger.Trace("Checking for breaking changes in %s", pkg.Name)
-				if pkg.Name == "agentuity" {
+				if pkg.Name == "agentuity" && !strings.Contains(pkg.Version, "+") {
 					currentVersion := semver.MustParse(pkg.Version)
 					for _, change := range breakingChanges {
 						if change.Runtime != runtime {
@@ -102,6 +103,9 @@ func checkForBreakingChanges(ctx BundleContext, language string, runtime string)
 			}
 			if err := json.Unmarshal(content, &pkg); err != nil {
 				return err
+			}
+			if strings.Contains(pkg.Version, "-pre") {
+				return nil
 			}
 			currentVersion := semver.MustParse(pkg.Version)
 			for _, change := range breakingChanges {
