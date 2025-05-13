@@ -43,6 +43,11 @@ func saveEnv(bcxt bundler.BundleContext, dir string, apikey string, projectKey s
 	envLines, err := env.ParseEnvFile(filename)
 	version, err := bundler.GetSDKVersion(language, bcxt)
 
+	versions := map[string]string{
+		"python":     "0.0.83",
+		"javascript": "0.0.114",
+	}
+
 	if err != nil {
 		errsystem.New(errsystem.ErrReadConfigurationFile, err, errsystem.WithContextMessage("Failed to parse .env file")).ShowErrorAndExit()
 	}
@@ -67,7 +72,7 @@ func saveEnv(bcxt bundler.BundleContext, dir string, apikey string, projectKey s
 		}
 	}
 
-	gtVersion := version.GreaterThan(semver.MustParse("0.0.114"))
+	gtVersion := version.GreaterThan(semver.MustParse(versions[language]))
 	if gtVersion && found["AGENTUITY_API_KEY"] {
 		// Remove AGENTUITY_API_KEY since it's deprecated in newer SDK versions
 		for i := len(envLines) - 1; i >= 0; i-- {
@@ -85,9 +90,6 @@ func saveEnv(bcxt bundler.BundleContext, dir string, apikey string, projectKey s
 		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_SDK_KEY", Val: apikey})
 	}
 
-	if !found["AGENTUITY_PROJECT_KEY"] {
-		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_PROJECT_KEY", Val: projectKey})
-	}
 	if err := env.WriteEnvFile(filename, envLines); err != nil {
 		errsystem.New(errsystem.ErrWriteConfigurationFile, err, errsystem.WithContextMessage("Failed to write .env file")).ShowErrorAndExit()
 	}
