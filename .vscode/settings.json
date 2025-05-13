@@ -1,15 +1,9 @@
 {
 	"files.associations": {
-		"*.ts": "typescript",
-		"**/internal/templates/data/**/*.yaml": "yaml"
+		"*.ts": "typescript"
 	},
 	"[typescript]": {
 		"editor.formatOnSave": false
-	},
-	"yaml.schemas": {
-		".vscode/agentuity-schema.json": [
-			"**/internal/templates/data/templates.yaml"
-		]
 	},
 	"yaml.validate": true,
 	"yaml.customTags": [

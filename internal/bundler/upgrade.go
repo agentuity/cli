@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Masterminds/semver"
 	"github.com/agentuity/cli/internal/util"
@@ -85,7 +86,7 @@ func getSDKVersionPython(ctx BundleContext) (*semver.Version, error) {
 		return nil, err
 	}
 	for _, pkg := range lockfile.Packages {
-		if pkg.Name == "agentuity" {
+		if pkg.Name == "agentuity" && !strings.Contains(pkg.Version, "+") {
 			currentVersion := semver.MustParse(pkg.Version)
 			return currentVersion, nil
 		}
@@ -141,6 +142,9 @@ func checkForBreakingChanges(ctx BundleContext, language string, runtime string)
 			c, err := semver.NewConstraint(change.Version)
 			if err != nil {
 				return fmt.Errorf("error parsing semver constraint %s: %w", change.Version, err)
+			}
+			if strings.Contains(currentVersion.String(), "-pre") {
+				return nil
 			}
 			if c.Check(currentVersion) {
 				if tui.HasTTY {
