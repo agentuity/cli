@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/agentuity/cli/internal/agent"
-	"github.com/agentuity/cli/internal/bundler"
 	"github.com/agentuity/cli/internal/deployer"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/ignore"
@@ -114,14 +113,7 @@ func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.
 			errsystem.New(errsystem.ErrSaveProject, err,
 				errsystem.WithContextMessage("Error saving project after import")).ShowErrorAndExit()
 		}
-		saveEnv(bundler.BundleContext{
-			Context:    ctx,
-			Logger:     logger,
-			ProjectDir: dir,
-			Production: true, // TODO: need to come back and look at this
-			Install:    false,
-			CI:         false,
-		}, dir, result.APIKey, result.ProjectKey, project.Bundler.Language)
+		saveEnv(dir, result.APIKey, result.ProjectKey)
 	})
 	tui.ShowSuccess("Project imported successfully")
 }

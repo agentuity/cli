@@ -5,7 +5,7 @@ func init() {
 		Module:   "@anthropic-ai",
 		Filename: "sdk\\/index.*",
 		Body: &patchAction{
-			Before: generateEnvGuard("ANTHROPIC_API_KEY", generateGatewayEnvGuard("ANTHROPIC_API_KEY", "process.env.AGENTUITY_API_KEY || process.env.AGENTUITY_SDK_KEY", "ANTHROPIC_BASE_URL", "anthropic")),
+			Before: generateEnvGuard("ANTHROPIC_API_KEY", generateGatewayEnvGuard("ANTHROPIC_API_KEY", "process.env.AGENTUITY_SDK_KEY", "ANTHROPIC_BASE_URL", "anthropic")),
 		},
 	}
 }

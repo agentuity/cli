@@ -11,8 +11,6 @@ import (
 	"sort"
 	"syscall"
 
-	"github.com/Masterminds/semver"
-	"github.com/agentuity/cli/internal/bundler"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/mcp"
 	"github.com/agentuity/cli/internal/organization"
@@ -38,16 +36,9 @@ Use the subcommands to manage your projects.`,
 	},
 }
 
-func saveEnv(bcxt bundler.BundleContext, dir string, apikey string, projectKey string, language string) {
+func saveEnv(dir string, apikey string, projectKey string) {
 	filename := filepath.Join(dir, ".env")
 	envLines, err := env.ParseEnvFile(filename)
-	version, err := bundler.GetSDKVersion(language, bcxt)
-
-	versions := map[string]string{
-		"python":     "0.0.83",
-		"javascript": "0.0.114",
-	}
-
 	if err != nil {
 		errsystem.New(errsystem.ErrReadConfigurationFile, err, errsystem.WithContextMessage("Failed to parse .env file")).ShowErrorAndExit()
 	}
@@ -72,8 +63,7 @@ func saveEnv(bcxt bundler.BundleContext, dir string, apikey string, projectKey s
 		}
 	}
 
-	gtVersion := version.GreaterThan(semver.MustParse(versions[language]))
-	if gtVersion && found["AGENTUITY_API_KEY"] {
+	if found["AGENTUITY_API_KEY"] {
 		// Remove AGENTUITY_API_KEY since it's deprecated in newer SDK versions
 		for i := len(envLines) - 1; i >= 0; i-- {
 			if envLines[i].Key == "AGENTUITY_API_KEY" {
@@ -82,12 +72,12 @@ func saveEnv(bcxt bundler.BundleContext, dir string, apikey string, projectKey s
 		}
 		found["AGENTUITY_API_KEY"] = false
 	}
-	if !found["AGENTUITY_API_KEY"] && !gtVersion {
-		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_API_KEY", Val: apikey})
-	}
 
 	if !found["AGENTUITY_SDK_KEY"] {
 		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_SDK_KEY", Val: apikey})
+	}
+	if !found["AGENTUITY_PROJECT_KEY"] {
+		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_PROJECT_KEY", Val: projectKey})
 	}
 
 	if err := env.WriteEnvFile(filename, envLines); err != nil {
@@ -166,14 +156,7 @@ func initProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 		errsystem.New(errsystem.ErrSaveProject, err, errsystem.WithContextMessage("Failed to save project to disk")).ShowErrorAndExit()
 	}
 
-	saveEnv(bundler.BundleContext{
-		Context:    ctx,
-		Logger:     logger,
-		ProjectDir: args.Dir,
-		Production: true, // TODO: need to come back and look at this
-		Install:    false,
-		CI:         false,
-	}, args.Dir, result.APIKey, result.ProjectKey, proj.Bundler.Language)
+	saveEnv(args.Dir, result.APIKey, result.ProjectKey)
 
 	return result
 }

@@ -37,14 +37,14 @@ _args = _newargs;`, index, inject)
 }
 
 func generateEnvGuard(name string, inject string) string {
-	return fmt.Sprintf(`if (!process.env.%[1]s || process.env.%[1]s  ===  (process.env.AGENTUITY_API_KEY || process.env.AGENTUITY_SDK_KEY)) {
+	return fmt.Sprintf(`if (!process.env.%[1]s || process.env.%[1]s  ===  process.env.AGENTUITY_SDK_KEY) {
 %[2]s
 }`, name, inject)
 }
 
 func generateGatewayEnvGuard(apikey string, apikeyval string, apibase string, provider string) string {
 	return fmt.Sprintf(`{
-	const apikey = process.env.AGENTUITY_API_KEY || process.env.AGENTUITY_SDK_KEY;
+	const apikey =  process.env.AGENTUITY_SDK_KEY;
 	const url = process.env.AGENTUITY_TRANSPORT_URL;
 	if (url && apikey) {
 		process.env.%[1]s = %[2]s;
