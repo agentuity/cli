@@ -118,6 +118,9 @@ agentuity agent list
 
 # Delete one or more Agents
 agentuity agent delete
+
+# Test an Agent by sending a payload to its webhook
+agentuity agent test --agent-id <agent_id> --payload '{"key": "value"}'
 ```
 
 ### Development and Deployment
