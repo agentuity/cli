@@ -53,72 +53,101 @@ type UVLockfile struct {
 	Packages []UVPackage `toml:"package"`
 }
 
+func getSDKVersionJavascript(ctx BundleContext) (*semver.Version, error) {
+	var pkg packageJSON
+	pkgjson := filepath.Join(ctx.ProjectDir, "node_modules", "@agentuity", "sdk", "package.json")
+	if !util.Exists(pkgjson) {
+		return nil, fmt.Errorf("package.json not found: %s", pkgjson)
+	}
+	content, err := os.ReadFile(pkgjson)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(content, &pkg); err != nil {
+		return nil, err
+	}
+	currentVersion := semver.MustParse(pkg.Version)
+	return currentVersion, nil
+}
+
+func getSDKVersionPython(ctx BundleContext) (*semver.Version, error) {
+	uvlock := filepath.Join(ctx.ProjectDir, "uv.lock")
+	if !util.Exists(uvlock) {
+		return nil, fmt.Errorf("uv.lock not found: %s", uvlock)
+	}
+	file, err := os.Open(uvlock)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	var lockfile UVLockfile
+	if err := toml.NewDecoder(file).Decode(&lockfile); err != nil {
+		return nil, err
+	}
+	for _, pkg := range lockfile.Packages {
+		if pkg.Name == "agentuity" {
+			currentVersion := semver.MustParse(pkg.Version)
+			return currentVersion, nil
+		}
+	}
+	return nil, fmt.Errorf("agentuity package not found in uv.lock")
+}
+
+func GetSDKVersion(language string, ctx BundleContext) (*semver.Version, error) {
+	switch language {
+	case "python":
+		return getSDKVersionPython(ctx)
+	case "javascript":
+		return getSDKVersionJavascript(ctx)
+	default:
+		return nil, fmt.Errorf("unsupported language: %s", language)
+	}
+}
+
 func checkForBreakingChanges(ctx BundleContext, language string, runtime string) error {
 	ctx.Logger.Trace("Checking for breaking changes in %s, runtime: %s", language, runtime)
 	switch language {
 	case "python":
-		uvlock := filepath.Join(ctx.ProjectDir, "uv.lock")
-		ctx.Logger.Trace("Checking for breaking changes in %s, exists: %t", uvlock, util.Exists(uvlock))
-		if util.Exists(uvlock) {
-			var lockfile UVLockfile
-			content, err := os.Open(uvlock)
+		currentVersion, err := getSDKVersionPython(ctx)
+		if err != nil {
+			return err
+		}
+		for _, change := range breakingChanges {
+			if change.Runtime != runtime {
+				continue
+			}
+			c, err := semver.NewConstraint(change.Version)
 			if err != nil {
-				return err
+				return fmt.Errorf("error parsing semver constraint %s: %w", change.Version, err)
 			}
-			if err := toml.NewDecoder(content).Decode(&lockfile); err != nil {
-				return err
-			}
-			for _, pkg := range lockfile.Packages {
-				ctx.Logger.Trace("Checking for breaking changes in %s", pkg.Name)
-				if pkg.Name == "agentuity" {
-					currentVersion := semver.MustParse(pkg.Version)
-					for _, change := range breakingChanges {
-						if change.Runtime != runtime {
-							continue
-						}
-						c, err := semver.NewConstraint(change.Version)
-						if err != nil {
-							return fmt.Errorf("error parsing semver constraint %s: %w", change.Version, err)
-						}
-						if c.Check(currentVersion) {
-							if tui.HasTTY {
-								tui.ShowBanner(change.Title, change.Message, true)
-								os.Exit(1)
-							} else {
-								ctx.Logger.Fatal(change.Message)
-							}
-						}
-					}
+			if c.Check(currentVersion) {
+				if tui.HasTTY {
+					tui.ShowBanner(change.Title, change.Message, true)
+					os.Exit(1)
+				} else {
+					ctx.Logger.Fatal(change.Message)
 				}
 			}
 		}
 	case "javascript":
-		pkgjson := filepath.Join(ctx.ProjectDir, "node_modules", "@agentuity", "sdk", "package.json")
-		if util.Exists(pkgjson) {
-			var pkg packageJSON
-			content, err := os.ReadFile(pkgjson)
+		currentVersion, err := getSDKVersionJavascript(ctx)
+		if err != nil {
+			return err
+		}
+		for _, change := range breakingChanges {
+			if change.Runtime != runtime {
+				continue
+			}
+			c, err := semver.NewConstraint(change.Version)
 			if err != nil {
-				return err
+				return fmt.Errorf("error parsing semver constraint %s: %w", change.Version, err)
 			}
-			if err := json.Unmarshal(content, &pkg); err != nil {
-				return err
-			}
-			currentVersion := semver.MustParse(pkg.Version)
-			for _, change := range breakingChanges {
-				if change.Runtime != runtime {
-					continue
-				}
-				c, err := semver.NewConstraint(change.Version)
-				if err != nil {
-					return fmt.Errorf("error parsing semver constraint %s: %w", change.Version, err)
-				}
-				if c.Check(currentVersion) {
-					if tui.HasTTY {
-						tui.ShowBanner(change.Title, change.Message, true)
-						os.Exit(1)
-					} else {
-						ctx.Logger.Fatal(change.Message)
-					}
+			if c.Check(currentVersion) {
+				if tui.HasTTY {
+					tui.ShowBanner(change.Title, change.Message, true)
+					os.Exit(1)
+				} else {
+					ctx.Logger.Fatal(change.Message)
 				}
 			}
 		}
