@@ -171,10 +171,6 @@ func getAgentAuthType(logger logger.Logger, authType string) string {
 		}
 	}
 
-	if !tui.HasTTY {
-		// error out with a message
-		logger.Fatal("No TTY detected, please specify an Agent authentication type from the command line")
-	}
 	auth := tui.Select(logger, "Select your Agent's webhook authentication method", "Do you want to secure the webhook or make it publicly available?", []tui.Option{
 		{Text: tui.PadRight("API Key", 10, " ") + tui.Muted("Bearer Token (will be generated for you)"), ID: "bearer"},
 		{Text: tui.PadRight("None", 10, " ") + tui.Muted("No Authentication Required"), ID: "none"},
