@@ -227,7 +227,7 @@ func checkForBreakingChanges(ctx BundleContext, language string, runtime string)
 					if err := change.Callback(ctx); err != nil {
 						return err
 					}
-					return nil
+					os.Exit(1)
 				} else {
 					return fmt.Errorf("migration required")
 				}
