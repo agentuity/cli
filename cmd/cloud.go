@@ -69,9 +69,12 @@ type startAgent struct {
 }
 
 type startRequest struct {
-	Agents    []startAgent       `json:"agents"`
-	Resources *Resources         `json:"resources,omitempty"`
-	Metadata  *deployer.Metadata `json:"metadata,omitempty"`
+	Agents         []startAgent       `json:"agents"`
+	Resources      *Resources         `json:"resources,omitempty"`
+	Metadata       *deployer.Metadata `json:"metadata,omitempty"`
+	Tags           []string           `json:"tags,omitempty"`
+	TagDescription string             `json:"description,omitempty"`
+	TagMessage     string             `json:"message,omitempty"`
 }
 
 func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.Command, apiUrl, apikey, projectId string, project *project.Project, dir string, isImport bool) {
@@ -153,6 +156,18 @@ Examples:
 		ciMessage, _ := cmd.Flags().GetString("ci-message")
 		ciGitProvider, _ := cmd.Flags().GetString("ci-git-provider")
 		ciLogsUrl, _ := cmd.Flags().GetString("ci-logs-url")
+		tags, _ := cmd.Flags().GetStringArray("tag")
+		description, _ := cmd.Flags().GetString("description")
+		message, _ := cmd.Flags().GetString("message")
+
+		// remove duplicates and empty strings
+		tags = util.RemoveDuplicates(tags)
+		tags = util.RemoveEmpty(tags)
+
+		// If no tags are provided, default to ["latest"]
+		if len(tags) == 0 {
+			tags = []string{"latest"}
+		}
 
 		deploymentConfig := project.NewDeploymentConfig()
 		client := util.NewAPIClient(ctx, logger, apiUrl, token)
@@ -399,6 +414,10 @@ Examples:
 				Data: data,
 			},
 		}
+
+		startRequest.Tags = tags
+		startRequest.TagDescription = description
+		startRequest.TagMessage = message
 
 		// Start deployment
 		if err := client.Do("PUT", fmt.Sprintf("/cli/deploy/start/%s%s", theproject.ProjectId, deploymentId), startRequest, &startResponse); err != nil {
@@ -664,6 +683,9 @@ func init() {
 	cloudDeployCmd.Flags().String("ci-message", "", "Used to set the commit message for your deployment metadata")
 	cloudDeployCmd.Flags().String("ci-git-provider", "", "Used to set the git provider for your deployment metadata")
 	cloudDeployCmd.Flags().String("ci-logs-url", "", "Used to set the CI logs URL for your deployment metadata")
+	cloudDeployCmd.Flags().StringArray("tag", nil, "Tag(s) to associate with this deployment (can be specified multiple times)")
+	cloudDeployCmd.Flags().String("description", "", "Description for the deployment")
+	cloudDeployCmd.Flags().String("message", "", "A shorter description for the deployment")
 
 	cloudDeployCmd.Flags().MarkHidden("deploymentId")
 	cloudDeployCmd.Flags().MarkHidden("ci")
