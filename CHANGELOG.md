@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.120] - 2025-05-14
+
+### Added
+- Add project key for agent comms ([#285](https://github.com/agentuity/cli/pull/285))
+
+### Changed
+- Shorten install script, skip prebuilds on breaking change check ([#287](https://github.com/agentuity/cli/pull/287))
+- Cleanup: remove old vscode settings, move release to use blacksmith now that we dont need MSI build ([#289](https://github.com/agentuity/cli/pull/289))
+- Update copy in upgrade.go for upgrade
+
+### Fixed
+- [AGENT-163] Update command for Windows ([#284](https://github.com/agentuity/cli/pull/284))
+
+### Documentation
+- Update changelog for v0.0.119 ([#283](https://github.com/agentuity/cli/pull/283))
+
 ## [v0.0.119] - 2025-05-08
 
 ### Added
@@ -485,6 +501,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.120]: https://github.com/agentuity/cli/compare/v0.0.119...v0.0.120
+[v0.0.119]: https://github.com/agentuity/cli/compare/v0.0.118...v0.0.119
 [v0.0.118]: https://github.com/agentuity/cli/compare/v0.0.117...v0.0.118
 [v0.0.117]: https://github.com/agentuity/cli/compare/v0.0.116...v0.0.117
 [v0.0.116]: https://github.com/agentuity/cli/compare/v0.0.115...v0.0.116
