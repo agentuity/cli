@@ -715,7 +715,8 @@ var agentTestCmd = &cobra.Command{
 		agentID, _ := cmd.Flags().GetString("agent-id")
 		payload, _ := cmd.Flags().GetString("payload")
 		local, _ := cmd.Flags().GetBool("local")
-
+		contentType, _ := cmd.Flags().GetString("content-type")
+		route, _ := cmd.Flags().GetString("route")
 		if agentID == "" {
 			keys, state := reconcileAgentList(logger, cmd, theproject.APIURL, theproject.Token, theproject)
 			if len(keys) == 0 {
@@ -742,7 +743,7 @@ var agentTestCmd = &cobra.Command{
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent API key")).ShowErrorAndExit()
 		}
-		endpoint := fmt.Sprintf("%s/webhook/%s", theproject.TransportURL, agentID)
+		endpoint := fmt.Sprintf("%s/%s/%s", theproject.TransportURL, route, agentID)
 		if local {
 			port, _ := dev.FindAvailablePort(theproject)
 			endpoint = fmt.Sprintf("http://localhost:%d/agent_%s", port, agentID)
@@ -753,16 +754,19 @@ var agentTestCmd = &cobra.Command{
 		if err != nil {
 			logger.Fatal("Failed to create request: %s", err)
 		}
-		// check if payload is json
-		if json.Valid([]byte(payload)) {
-			req.Header.Set("Content-Type", "application/json")
+		if contentType == "" {
+			// check if payload is json
+			if json.Valid([]byte(payload)) {
+				req.Header.Set("Content-Type", "application/json")
+			} else {
+				req.Header.Set("Content-Type", "text/plain")
+			}
 		} else {
-			req.Header.Set("Content-Type", "application/octet-stream")
+			req.Header.Set("Content-Type", contentType)
 		}
 		if apikey != "" {
 			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apikey))
 		}
-
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			logger.Fatal("Failed to send request: %s", err)
@@ -792,6 +796,8 @@ func init() {
 	agentTestCmd.Flags().String("agent-id", "", "The ID of the agent to test")
 	agentTestCmd.Flags().String("payload", "", "The payload to send to the agent")
 	agentTestCmd.Flags().Bool("local", false, "Enable local testing")
+	agentTestCmd.Flags().String("content-type", "", "The content type to use for the request, will try to detect if not provided")
+	agentTestCmd.Flags().String("route", "api", "The route to use for the request when --local is false, can be either 'api' or 'webhook'")
 
 	agentCmd.AddCommand(agentTestCmd)
 
