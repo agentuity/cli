@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 	"syscall"
 
 	"github.com/agentuity/cli/internal/agent"
+	"github.com/agentuity/cli/internal/dev"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/templates"
@@ -700,13 +703,106 @@ Examples:
 	},
 }
 
+var agentTestCmd = &cobra.Command{
+	Use:   "test",
+	Short: "Test an agent",
+	Run: func(cmd *cobra.Command, args []string) {
+		logger := env.NewLogger(cmd)
+
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		theproject := project.EnsureProject(ctx, cmd)
+
+		agentID, _ := cmd.Flags().GetString("agent-id")
+		payload, _ := cmd.Flags().GetString("payload")
+		local, _ := cmd.Flags().GetBool("local")
+		contentType, _ := cmd.Flags().GetString("content-type")
+		route, _ := cmd.Flags().GetString("route")
+		if agentID == "" {
+			keys, state := reconcileAgentList(logger, cmd, theproject.APIURL, theproject.Token, theproject)
+			if len(keys) == 0 {
+				tui.ShowWarning("no Agents found")
+				tui.ShowBanner("Create a new Agent", tui.Text("Use the ")+tui.Command("agent new")+tui.Text(" command to create a new Agent"), false)
+				return
+			}
+			var options []tui.Option
+			for _, v := range keys {
+				options = append(options, tui.Option{
+					ID:   state[v].Agent.ID,
+					Text: tui.PadRight(state[v].Agent.Name, 20, " ") + tui.Muted(state[v].Agent.ID),
+				})
+			}
+			agentID = tui.Select(logger, "Select an agent", "Select the agent you want to test", options)
+			agentID = strings.Replace(agentID, "agent_", "", 1)
+		}
+
+		if payload == "" {
+			payload = tui.Input(logger, "Enter the payload to send to the agent", "{\"hello\": \"world\"}")
+		}
+
+		apikey, err := agent.GetApiKey(context.Background(), logger, theproject.APIURL, theproject.Token, agentID)
+		if err != nil {
+			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent API key")).ShowErrorAndExit()
+		}
+		endpoint := fmt.Sprintf("%s/%s/%s", theproject.TransportURL, route, agentID)
+		if local {
+			port, _ := dev.FindAvailablePort(theproject)
+			endpoint = fmt.Sprintf("http://localhost:%d/agent_%s", port, agentID)
+		}
+
+		// use http package to send a POST request to the agent
+		req, err := http.NewRequest("POST", endpoint, strings.NewReader(payload))
+		if err != nil {
+			logger.Fatal("Failed to create request: %s", err)
+		}
+		if contentType == "" {
+			// check if payload is json
+			if json.Valid([]byte(payload)) {
+				req.Header.Set("Content-Type", "application/json")
+			} else {
+				req.Header.Set("Content-Type", "text/plain")
+			}
+		} else {
+			req.Header.Set("Content-Type", contentType)
+		}
+		if apikey != "" {
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apikey))
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			logger.Fatal("Failed to send request: %s", err)
+		}
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			logger.Fatal("Failed to read response: %s", err)
+		}
+		var jsonBody map[string]interface{}
+		if json.Unmarshal(body, &jsonBody) == nil {
+			stringified, _ := json.MarshalIndent(jsonBody, "", "  ")
+			tui.ShowSuccess("Agent Test: %s", tui.Paragraph(tui.Bold(string(stringified))))
+		} else {
+			tui.ShowSuccess("Agent Test: %s", tui.Paragraph(tui.Bold(string(body))))
+		}
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(agentCmd)
 	agentCmd.AddCommand(agentCreateCmd)
 	agentCmd.AddCommand(agentListCmd)
 	agentCmd.AddCommand(agentDeleteCmd)
 	agentCmd.AddCommand(agentGetApiKeyCmd)
-	for _, cmd := range []*cobra.Command{agentListCmd, agentCreateCmd, agentDeleteCmd, agentGetApiKeyCmd} {
+
+	agentTestCmd.Flags().String("agent-id", "", "The ID of the agent to test")
+	agentTestCmd.Flags().String("payload", "", "The payload to send to the agent")
+	agentTestCmd.Flags().Bool("local", false, "Enable local testing")
+	agentTestCmd.Flags().String("content-type", "", "The content type to use for the request, will try to detect if not provided")
+	agentTestCmd.Flags().String("route", "api", "The route to use for the request when --local is false, can be either 'api' or 'webhook'")
+
+	agentCmd.AddCommand(agentTestCmd)
+
+	for _, cmd := range []*cobra.Command{agentListCmd, agentCreateCmd, agentDeleteCmd, agentGetApiKeyCmd, agentTestCmd} {
 		cmd.Flags().StringP("dir", "d", "", "The project directory")
 		cmd.Flags().String("templates-dir", "", "The directory to load the templates. Defaults to loading them from the github.com/agentuity/templates repository")
 	}
@@ -717,4 +813,5 @@ func init() {
 	for _, cmd := range []*cobra.Command{agentCreateCmd, agentDeleteCmd} {
 		cmd.Flags().Bool("force", false, "Force the creation of the agent even if it already exists")
 	}
+
 }
