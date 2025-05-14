@@ -55,11 +55,11 @@ func saveEnv(dir string, apikey string, projectKey string) {
 		}
 		if envLine.Key == "AGENTUITY_SDK_KEY" {
 			envLines[i].Val = apikey
-			found["AGENTUITY_SDK_KEY"] = true
+			found[envLine.Key] = true
 		}
 		if envLine.Key == "AGENTUITY_PROJECT_KEY" {
 			envLines[i].Val = projectKey
-			found["AGENTUITY_PROJECT_KEY"] = true
+			found[envLine.Key] = true
 		}
 	}
 
