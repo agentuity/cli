@@ -42,7 +42,7 @@ func saveEnv(dir string, apikey string, projectKey string) {
 	if err != nil {
 		errsystem.New(errsystem.ErrReadConfigurationFile, err, errsystem.WithContextMessage("Failed to parse .env file")).ShowErrorAndExit()
 	}
-	var found map[string]bool = map[string]bool{
+	found := map[string]bool{
 		"AGENTUITY_SDK_KEY":     false,
 		"AGENTUITY_API_KEY":     false,
 		"AGENTUITY_PROJECT_KEY": false,
