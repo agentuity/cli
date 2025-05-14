@@ -43,6 +43,7 @@ type initProjectResult struct {
 
 type ProjectData struct {
 	APIKey           string            `json:"api_key"`
+	ProjectKey       string            `json:"projectKey"`
 	ProjectId        string            `json:"id"`
 	OrgId            string            `json:"orgId"`
 	Env              map[string]string `json:"env"`
@@ -61,6 +62,7 @@ type InitProjectArgs struct {
 	Description       string
 	EnableWebhookAuth bool
 	Agents            []AgentConfig
+	AuthType          string
 }
 
 // InitProject will create a new project in the organization.
@@ -75,12 +77,14 @@ func InitProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 		})
 	}
 	payload := map[string]any{
-		"organization_id":   args.OrgId,
-		"provider":          args.Provider,
-		"name":              args.Name,
+		"organization_id": args.OrgId,
+		"provider":        args.Provider,
+		"name":            args.Name,
+
 		"description":       args.Description,
 		"enableWebhookAuth": args.EnableWebhookAuth,
 		"agents":            agents,
+		"authType":          args.AuthType,
 	}
 	logger.Trace("sending new project payload: %s", cstr.JSONStringify(payload))
 
@@ -90,7 +94,6 @@ func InitProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 	if err := client.Do("POST", initPath, payload, &result); err != nil {
 		return nil, err
 	}
-
 	return &result.Data, nil
 }
 
@@ -376,6 +379,7 @@ type ProjectImportResponse struct {
 	ID          string        `json:"id"`
 	Agents      []AgentConfig `json:"agents"`
 	APIKey      string        `json:"apiKey"`
+	ProjectKey  string        `json:"projectKey"`
 	IOAuthToken string        `json:"ioAuthToken"`
 }
 

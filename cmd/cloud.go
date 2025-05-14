@@ -113,7 +113,7 @@ func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.
 			errsystem.New(errsystem.ErrSaveProject, err,
 				errsystem.WithContextMessage("Error saving project after import")).ShowErrorAndExit()
 		}
-		saveEnv(dir, result.APIKey)
+		saveEnv(dir, result.APIKey, result.ProjectKey)
 	})
 	tui.ShowSuccess("Project imported successfully")
 }

@@ -165,14 +165,15 @@ var agentDeleteCmd = &cobra.Command{
 func getAgentAuthType(logger logger.Logger, authType string) string {
 	if authType != "" {
 		switch authType {
-		case "bearer", "none":
+		case "project", "bearer", "none":
 			return authType
 		default:
 		}
 	}
 	auth := tui.Select(logger, "Select your Agent's webhook authentication method", "Do you want to secure the webhook or make it publicly available?", []tui.Option{
-		{Text: tui.PadRight("API Key", 10, " ") + tui.Muted("Bearer Token (will be generated for you)"), ID: "bearer"},
-		{Text: tui.PadRight("None", 10, " ") + tui.Muted("No Authentication Required"), ID: "none"},
+		{Text: tui.PadRight("API Key", 20, " ") + tui.Muted("Bearer Token (will be generated for you)"), ID: "bearer"},
+		{Text: tui.PadRight("Project API Key", 20, " ") + tui.Muted("The Project Key attched to your project"), ID: "project"},
+		{Text: tui.PadRight("None", 20, " ") + tui.Muted("No Authentication Required"), ID: "none"},
 	})
 	return auth
 }
