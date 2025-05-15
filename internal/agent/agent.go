@@ -10,9 +10,10 @@ import (
 )
 
 type Agent struct {
-	ID          string `json:"id" yaml:"id"`
-	Name        string `json:"name" yaml:"name"`
-	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+	ID          string   `json:"id" yaml:"id"`
+	Name        string   `json:"name" yaml:"name"`
+	Description string   `json:"description,omitempty" yaml:"description,omitempty"`
+	IOTypes     []string `json:"io_types,omitempty" yaml:"io_types,omitempty"`
 }
 
 type Response[T any] struct {

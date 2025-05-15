@@ -104,7 +104,6 @@ Examples:
 				if ciCommit, _ := f.GetString("ci-commit"); ciCommit != "" {
 					args = append(args, "--tag", ciCommit)
 				}
-				args = append(args, "--tag", "latest")
 			}
 
 			started = time.Now()
