@@ -680,7 +680,7 @@ Examples:
 			tui.ShowWarning("Agent not found")
 			return
 		}
-		apikey, err := agent.GetApiKey(context.Background(), logger, apiUrl, project.Token, theagent.Agent.ID)
+		apikey, err := agent.GetApiKey(context.Background(), logger, apiUrl, project.Token, theagent.Agent.ID, theagent.Agent.Types[0])
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent API key")).ShowErrorAndExit()
 		}
@@ -736,39 +736,38 @@ var agentTestCmd = &cobra.Command{
 			selected := tui.Select(logger, "Select an agent", "Select the agent you want to test", options)
 			selectedAgent = state[selected].Agent
 			agentID = selectedAgent.ID
-			agentID = strings.Replace(agentID, "agent_", "", 1)
 		}
 
-		if len(selectedAgent.IOTypes) == 0 {
+		if len(selectedAgent.Types) == 0 {
 			// error out
-			logger.Fatal("Agent %s has no IO types", selectedAgent.Name)
+			logger.Fatal("Agent %s has no running types (webhook or api)", selectedAgent.Name)
 		}
 		var route string
-		if len(selectedAgent.IOTypes) > 1 {
+		if len(selectedAgent.Types) > 1 {
 			options := []tui.Option{}
-			for _, route := range selectedAgent.IOTypes {
+			for _, route := range selectedAgent.Types {
 				options = append(options, tui.Option{
 					ID:   route,
 					Text: route,
 				})
 			}
-			route = tui.Select(logger, "Select an IO type", "Select the IO type you want to use", options)
+			route = tui.Select(logger, "Select an running type", "Select the running type you want to use", options)
 		} else {
-			route = selectedAgent.IOTypes[0]
+			route = selectedAgent.Types[0]
 		}
 
 		if payload == "" {
 			payload = tui.Input(logger, "Enter the payload to send to the agent", "{\"hello\": \"world\"}")
 		}
 
-		apikey, err := agent.GetApiKey(context.Background(), logger, theproject.APIURL, theproject.Token, agentID)
+		apikey, err := agent.GetApiKey(context.Background(), logger, theproject.APIURL, theproject.Token, agentID, route)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent API key")).ShowErrorAndExit()
 		}
 		endpoint := fmt.Sprintf("%s/%s/%s", theproject.TransportURL, route, agentID)
 		if local {
 			port, _ := dev.FindAvailablePort(theproject)
-			endpoint = fmt.Sprintf("http://localhost:%d/agent_%s", port, agentID)
+			endpoint = fmt.Sprintf("http://localhost:%d/%s", port, agentID)
 		}
 
 		if tag != "" {

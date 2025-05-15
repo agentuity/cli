@@ -138,7 +138,7 @@ type AgentConfig struct {
 	ID          string   `json:"id" yaml:"id" hc:"The ID of the Agent which is automatically generated"`
 	Name        string   `json:"name" yaml:"name" hc:"The name of the Agent which is editable"`
 	Description string   `json:"description,omitempty" yaml:"description,omitempty" hc:"The description of the Agent which is editable"`
-	IOTypes     []string `json:"io_types,omitempty" yaml:"io_types,omitempty" hc:"The IO types of the Agent which is editable"`
+	Types       []string `json:"io_types,omitempty" yaml:"io_types,omitempty" hc:"The IO types of the Agent which is editable"`
 }
 
 type Project struct {

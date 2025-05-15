@@ -13,7 +13,7 @@ type Agent struct {
 	ID          string   `json:"id" yaml:"id"`
 	Name        string   `json:"name" yaml:"name"`
 	Description string   `json:"description,omitempty" yaml:"description,omitempty"`
-	IOTypes     []string `json:"io_types,omitempty" yaml:"io_types,omitempty"`
+	Types       []string `json:"io_types,omitempty" yaml:"io_types,omitempty"`
 }
 
 type Response[T any] struct {
@@ -75,11 +75,11 @@ type AgentAPIKey struct {
 	Config map[string]any `json:"config"`
 }
 
-func GetApiKey(ctx context.Context, logger logger.Logger, baseUrl string, token string, agentId string) (string, error) {
+func GetApiKey(ctx context.Context, logger logger.Logger, baseUrl string, token string, agentId string, route string) (string, error) {
 	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var resp Response[*AgentAPIKey]
-	if err := client.Do("GET", fmt.Sprintf("/cli/agent/%s/io/source/webhook", url.PathEscape(agentId)), nil, &resp); err != nil {
+	if err := client.Do("GET", fmt.Sprintf("/cli/agent/%s/io/source/%s", url.PathEscape(agentId), route), nil, &resp); err != nil {
 		return "", fmt.Errorf("error getting Agent API key: %s", err)
 	}
 

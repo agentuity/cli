@@ -617,7 +617,7 @@ Examples:
 					errsystem.WithContextMessage("Error updating deployment status to completed")).ShowErrorAndExit()
 			}
 			if len(theproject.Agents) == 1 {
-				webhookToken, err = agent.GetApiKey(ctx, logger, apiUrl, token, theproject.Agents[0].ID)
+				webhookToken, err = agent.GetApiKey(ctx, logger, apiUrl, token, theproject.Agents[0].ID, theproject.Agents[0].Types[0])
 				if err != nil {
 					errsystem.New(errsystem.ErrApiRequest, err,
 						errsystem.WithContextMessage("Error getting Agent API key")).ShowErrorAndExit()
