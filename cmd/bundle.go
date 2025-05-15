@@ -97,6 +97,16 @@ Examples:
 				}
 			}
 
+			if ci {
+				if ciMessage, _ := f.GetString("ci-message"); ciMessage != "" {
+					args = append(args, "--message", ciMessage)
+				}
+				if ciCommit, _ := f.GetString("ci-commit"); ciCommit != "" {
+					args = append(args, "--tag", ciCommit)
+				}
+				args = append(args, "--tag", "latest")
+			}
+
 			started = time.Now()
 			projectContext.Logger.Trace("deploying to cloud with %s and args: %v", bin, args)
 			cwd, err := os.Getwd()
