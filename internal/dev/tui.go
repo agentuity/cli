@@ -46,7 +46,7 @@ type model struct {
 	paused        bool
 	showhelp      bool
 	showagents    bool
-	agents        []Agent
+	agents        []*Agent
 	selectedLog   *logItem
 	spinner       spinner.Model
 	spinning      bool
@@ -163,6 +163,11 @@ func (m *model) generateInfoBox() string {
 		AlignHorizontal(lipgloss.Left).
 		Foreground(labelColor)
 
+	url := "loading..."
+	if m.publicUrl != "" {
+		url = tui.Link("%s", m.publicUrl) + "  " + tui.Muted("(only accessible while running)")
+	}
+
 	content := fmt.Sprintf(`%s
 
 %s  %s
@@ -171,7 +176,7 @@ func (m *model) generateInfoBox() string {
 		tui.Bold("⨺ Agentuity DevMode")+" "+statusStyle.Render(tui.PadLeft("⏺", m.windowSize.Width-25, " ")),
 		label("Dashboard"), tui.Link("%s", m.appUrl),
 		label("Local"), tui.Link("%s", m.devModeUrl),
-		label("Public"), tui.Link("%s", m.publicUrl)+"  "+tui.Muted("(only accessible in devmode)"),
+		label("Public"), url,
 	)
 	return devmodeBox.Render(content)
 }
@@ -387,7 +392,7 @@ type DevModeConfig struct {
 	DevModeUrl string
 	PublicUrl  string
 	AppUrl     string
-	Agents     []Agent
+	Agents     []*Agent
 }
 
 func NewDevModeUI(ctx context.Context, config DevModeConfig) *DevModeUI {
@@ -397,6 +402,10 @@ func NewDevModeUI(ctx context.Context, config DevModeConfig) *DevModeUI {
 		cancel: cancel,
 		model:  initialModel(config),
 	}
+}
+
+func (d *DevModeUI) SetPublicURL(url string) {
+	d.model.publicUrl = url
 }
 
 // Done returns a channel that will be closed when the program is done

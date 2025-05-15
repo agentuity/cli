@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"runtime"
 	"syscall"
 	"time"
@@ -16,12 +15,10 @@ import (
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
-	"github.com/agentuity/go-common/bridge"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/tui"
 	"github.com/bep/debounce"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var devCmd = &cobra.Command{
@@ -74,27 +71,6 @@ Examples:
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithUserMessage("Failed to validate project (%s) using the provided API key from the .env file in %s. This is most likely due to the API key being invalid or the project has been deleted.\n\nYou can import this project using the following command:\n\n"+tui.Command("project import"), theproject.Project.ProjectId, dir), errsystem.WithContextMessage(fmt.Sprintf("Failed to get project: %s", err))).ShowErrorAndExit()
 		}
 
-		projectToken := os.Getenv("AGENTUITY_API_KEY")
-		if projectToken == "" {
-			envFile := filepath.Join(dir, ".env")
-			if util.Exists(envFile) {
-				envs, err := env.ParseEnvFile(envFile)
-				if err != nil {
-					log.Fatal("failed to parse .env file: %s", err)
-				}
-				for _, kv := range envs {
-					if kv.Key == "AGENTUITY_API_KEY" {
-						projectToken = kv.Val
-						break
-					}
-				}
-			}
-		}
-
-		if projectToken == "" {
-			log.Fatal("failed to find AGENTUITY_API_KEY in .env file or system environment variable")
-		}
-
 		orgId := project.OrgId
 
 		port, _ := cmd.Flags().GetInt("port")
@@ -105,48 +81,7 @@ Examples:
 			}
 		}
 
-		var connection *bridge.BridgeConnectionInfo
-
-		settings := viper.Get("devmode." + orgId)
-		if val, ok := settings.(map[string]any); ok {
-			connection = &bridge.BridgeConnectionInfo{}
-			for k, v := range val {
-				switch k {
-				case "expires_at":
-					if val, ok := v.(string); ok {
-						expiresAt, err := time.Parse(time.RFC3339, val)
-						if err != nil {
-							log.Fatal("failed to parse expires_at: %s", err)
-						}
-						connection.ExpiresAt = &expiresAt
-					}
-				case "websocket_url":
-					if val, ok := v.(string); ok {
-						connection.WebsocketURL = val
-					}
-				case "stream_url":
-					if val, ok := v.(string); ok {
-						connection.StreamURL = val
-					}
-				case "client_url":
-					if val, ok := v.(string); ok {
-						connection.ClientURL = val
-					}
-				case "replies_url":
-					if val, ok := v.(string); ok {
-						connection.RepliesURL = val
-					}
-				case "refresh_url":
-					if val, ok := v.(string); ok {
-						connection.RefreshURL = val
-					}
-				case "control_url":
-					if val, ok := v.(string); ok {
-						connection.ControlURL = val
-					}
-				}
-			}
-		}
+		serverAddr, _ := cmd.Flags().GetString("server")
 
 		server, err := dev.New(dev.ServerArgs{
 			Ctx:          ctx,
@@ -155,13 +90,12 @@ Examples:
 			APIURL:       apiUrl,
 			TransportURL: transportUrl,
 			APIKey:       apiKey,
-			ProjectToken: projectToken,
+			OrgId:        orgId,
 			Project:      theproject,
 			Version:      Version,
-			OrgId:        orgId,
 			UserId:       userId,
-			Connection:   connection,
 			Port:         port,
+			ServerAddr:   serverAddr,
 		})
 		if err != nil {
 			log.Fatal("failed to create live dev connection: %s", err)
@@ -172,22 +106,19 @@ Examples:
 		var pid int
 
 		consoleUrl := server.WebURL(appUrl)
-		publicUrl := server.PublicURL(appUrl)
 		devModeUrl := fmt.Sprintf("http://127.0.0.1:%d", port)
 
-		agents := make([]dev.Agent, 0)
+		agents := make([]*dev.Agent, 0)
 		for _, agent := range theproject.Project.Agents {
-			agents = append(agents, dev.Agent{
-				ID:        agent.ID,
-				Name:      agent.Name,
-				LocalURL:  fmt.Sprintf("%s/%s", devModeUrl, agent.ID),
-				PublicURL: fmt.Sprintf("%s/%s", publicUrl, agent.ID),
+			agents = append(agents, &dev.Agent{
+				ID:       agent.ID,
+				Name:     agent.Name,
+				LocalURL: fmt.Sprintf("%s/%s", devModeUrl, agent.ID),
 			})
 		}
 
 		ui := dev.NewDevModeUI(ctx, dev.DevModeConfig{
 			DevModeUrl: devModeUrl,
-			PublicUrl:  publicUrl,
 			AppUrl:     consoleUrl,
 			Agents:     agents,
 		})
@@ -199,9 +130,16 @@ Examples:
 		tuiLogger := dev.NewTUILogger(logLevel, ui)
 
 		if err := server.Connect(ui, tuiLogger); err != nil {
-			tuiLogger.Error("failed to start live dev connection: %s", err)
+			log.Error("failed to start live dev connection: %s", err)
 			ui.Close(true)
 			return
+		}
+
+		publicUrl := server.PublicURL(appUrl)
+		ui.SetPublicURL(publicUrl)
+
+		for _, agent := range agents {
+			agent.PublicURL = fmt.Sprintf("%s/%s", publicUrl, agent.ID)
 		}
 
 		projectServerCmd, err := dev.CreateRunProjectCmd(processCtx, tuiLogger, theproject, server, dir, orgId, port, tuiLogger)
@@ -333,7 +271,7 @@ Examples:
 func init() {
 	rootCmd.AddCommand(devCmd)
 	devCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
-	devCmd.Flags().String("org-id", "", "The organization to run the project")
 	devCmd.Flags().Int("port", 0, "The port to run the development server on (uses project default if not provided)")
-	devCmd.Flags().MarkHidden("org-id")
+	devCmd.Flags().String("server", "echo.agentuity.cloud:12001", "the echo server to connect to")
+	devCmd.Flags().MarkHidden("server")
 }

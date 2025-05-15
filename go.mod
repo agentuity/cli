@@ -4,7 +4,7 @@ go 1.24.2
 
 require (
 	github.com/Masterminds/semver v1.5.0
-	github.com/agentuity/go-common v1.0.46
+	github.com/agentuity/go-common v1.0.55
 	github.com/agentuity/mcp-golang/v2 v2.0.2
 	github.com/bep/debounce v1.2.1
 	github.com/bmatcuk/doublestar/v4 v4.8.1
@@ -22,6 +22,7 @@ require (
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
+	github.com/xtaci/smux v1.5.34
 	github.com/zijiren233/yaml-comment v0.2.2
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	golang.org/x/term v0.30.0
