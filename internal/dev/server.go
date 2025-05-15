@@ -105,7 +105,7 @@ func (s *Server) Close() error {
 
 func (s *Server) refreshConnection() error {
 	var resp ConnectionResponse
-	if err := s.apiclient.Do("GET", "/cli/devmode/"+s.Project.Project.ProjectId, nil, &resp); err != nil {
+	if err := s.apiclient.Do("GET", "/cli/devmode/"+s.Project.Project.ProjectId+"/"+s.ID, nil, &resp); err != nil {
 		return fmt.Errorf("failed to refresh connection: %w", err)
 	}
 	s.otelUrl = resp.Data.OtelUrl
