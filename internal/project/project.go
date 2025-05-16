@@ -63,6 +63,7 @@ type InitProjectArgs struct {
 	EnableWebhookAuth bool
 	Agents            []AgentConfig
 	AuthType          string
+	Framework         string
 }
 
 // InitProject will create a new project in the organization.
@@ -77,14 +78,14 @@ func InitProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 		})
 	}
 	payload := map[string]any{
-		"organization_id": args.OrgId,
-		"provider":        args.Provider,
-		"name":            args.Name,
-
+		"organization_id":   args.OrgId,
+		"provider":          args.Provider,
+		"name":              args.Name,
 		"description":       args.Description,
 		"enableWebhookAuth": args.EnableWebhookAuth,
 		"agents":            agents,
 		"authType":          args.AuthType,
+		"framework":         args.Framework,
 	}
 	logger.Trace("sending new project payload: %s", cstr.JSONStringify(payload))
 
