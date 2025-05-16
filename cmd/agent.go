@@ -680,7 +680,7 @@ Examples:
 			tui.ShowWarning("Agent not found")
 			return
 		}
-		apikey, err := agent.GetApiKey(context.Background(), logger, apiUrl, project.Token, theagent.Agent.ID)
+		apikey, err := agent.GetApiKey(context.Background(), logger, apiUrl, project.Token, theagent.Agent.ID, theagent.Agent.Types[0])
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent API key")).ShowErrorAndExit()
 		}
@@ -717,7 +717,8 @@ var agentTestCmd = &cobra.Command{
 		payload, _ := cmd.Flags().GetString("payload")
 		local, _ := cmd.Flags().GetBool("local")
 		contentType, _ := cmd.Flags().GetString("content-type")
-		route, _ := cmd.Flags().GetString("route")
+		tag, _ := cmd.Flags().GetString("tag")
+		var selectedAgent *agent.Agent
 		if agentID == "" {
 			keys, state := reconcileAgentList(logger, cmd, theproject.APIURL, theproject.Token, theproject)
 			if len(keys) == 0 {
@@ -728,26 +729,50 @@ var agentTestCmd = &cobra.Command{
 			var options []tui.Option
 			for _, v := range keys {
 				options = append(options, tui.Option{
-					ID:   state[v].Agent.ID,
+					ID:   v,
 					Text: tui.PadRight(state[v].Agent.Name, 20, " ") + tui.Muted(state[v].Agent.ID),
 				})
 			}
-			agentID = tui.Select(logger, "Select an agent", "Select the agent you want to test", options)
-			agentID = strings.Replace(agentID, "agent_", "", 1)
+			selected := tui.Select(logger, "Select an agent", "Select the agent you want to test", options)
+			selectedAgent = state[selected].Agent
+			agentID = selectedAgent.ID
+		}
+
+		if len(selectedAgent.Types) == 0 {
+			// this should never ever happen
+			tui.ShowError("Agent %s has no running types (webhook or api)", selectedAgent.Name)
+			os.Exit(1)
+		}
+		var route string
+		if len(selectedAgent.Types) > 1 {
+			options := []tui.Option{}
+			for _, route := range selectedAgent.Types {
+				options = append(options, tui.Option{
+					ID:   route,
+					Text: route,
+				})
+			}
+			route = tui.Select(logger, "Select an running type", "Select the running type you want to use", options)
+		} else {
+			route = selectedAgent.Types[0]
 		}
 
 		if payload == "" {
 			payload = tui.Input(logger, "Enter the payload to send to the agent", "{\"hello\": \"world\"}")
 		}
 
-		apikey, err := agent.GetApiKey(context.Background(), logger, theproject.APIURL, theproject.Token, agentID)
+		apikey, err := agent.GetApiKey(context.Background(), logger, theproject.APIURL, theproject.Token, agentID, route)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent API key")).ShowErrorAndExit()
 		}
 		endpoint := fmt.Sprintf("%s/%s/%s", theproject.TransportURL, route, agentID)
 		if local {
 			port, _ := dev.FindAvailablePort(theproject)
-			endpoint = fmt.Sprintf("http://localhost:%d/agent_%s", port, agentID)
+			endpoint = fmt.Sprintf("http://127.0.0.1:%d/%s", port, agentID)
+		}
+
+		if tag != "" {
+			endpoint = fmt.Sprintf("%s/%s", endpoint, tag)
 		}
 
 		// use http package to send a POST request to the agent
@@ -768,6 +793,7 @@ var agentTestCmd = &cobra.Command{
 		if apikey != "" {
 			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apikey))
 		}
+
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			logger.Fatal("Failed to send request: %s", err)
@@ -798,8 +824,7 @@ func init() {
 	agentTestCmd.Flags().String("payload", "", "The payload to send to the agent")
 	agentTestCmd.Flags().Bool("local", false, "Enable local testing")
 	agentTestCmd.Flags().String("content-type", "", "The content type to use for the request, will try to detect if not provided")
-	agentTestCmd.Flags().String("route", "api", "The route to use for the request when --local is false, can be either 'api' or 'webhook'")
-
+	agentTestCmd.Flags().String("tag", "", "The tag to use for the deployment")
 	agentCmd.AddCommand(agentTestCmd)
 
 	for _, cmd := range []*cobra.Command{agentListCmd, agentCreateCmd, agentDeleteCmd, agentGetApiKeyCmd, agentTestCmd} {
