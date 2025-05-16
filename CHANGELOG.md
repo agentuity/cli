@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.122] - 2025-05-16
+
+### Changed
+- Initial Refactor for DevMode to use new Bridge API and new TUI ([#270](https://github.com/agentuity/cli/pull/270))
+
 ## [v0.0.121] - 2025-05-16
 
 ### Added
@@ -578,3 +583,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.0.58]: https://github.com/agentuity/cli/compare/v0.0.57...v0.0.58
 [v0.0.57]: https://github.com/agentuity/cli/compare/v0.0.56...v0.0.57
 [v0.0.56]: https://github.com/agentuity/cli/compare/v0.0.55...v0.0.56
+[v0.0.121]: https://github.com/agentuity/cli/compare/v0.0.120...v0.0.121
+[v0.0.122]: https://github.com/agentuity/cli/compare/v0.0.121...v0.0.122
