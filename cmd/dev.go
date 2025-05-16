@@ -272,6 +272,6 @@ func init() {
 	rootCmd.AddCommand(devCmd)
 	devCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
 	devCmd.Flags().Int("port", 0, "The port to run the development server on (uses project default if not provided)")
-	devCmd.Flags().String("server", "echo.agentuity.cloud:12001", "the echo server to connect to")
+	devCmd.Flags().String("server", "echo.agentuity.cloud", "the echo server to connect to")
 	devCmd.Flags().MarkHidden("server")
 }

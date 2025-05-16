@@ -166,6 +166,10 @@ func (s *Server) connect(initial bool) {
 		tlsConfig.InsecureSkipVerify = true
 	}
 
+	if !strings.Contains(s.serverAddr, ":") {
+		s.serverAddr = fmt.Sprintf("%s:443", s.serverAddr)
+	}
+
 	conn, err := tls.Dial("tcp", s.serverAddr, &tlsConfig)
 	if err != nil {
 		gerr = err
