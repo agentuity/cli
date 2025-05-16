@@ -739,8 +739,9 @@ var agentTestCmd = &cobra.Command{
 		}
 
 		if len(selectedAgent.Types) == 0 {
-			// error out
-			logger.Fatal("Agent %s has no running types (webhook or api)", selectedAgent.Name)
+			// this should never ever happen
+			tui.ShowError("Agent %s has no running types (webhook or api)", selectedAgent.Name)
+			os.Exit(1)
 		}
 		var route string
 		if len(selectedAgent.Types) > 1 {
@@ -767,7 +768,7 @@ var agentTestCmd = &cobra.Command{
 		endpoint := fmt.Sprintf("%s/%s/%s", theproject.TransportURL, route, agentID)
 		if local {
 			port, _ := dev.FindAvailablePort(theproject)
-			endpoint = fmt.Sprintf("http://localhost:%d/%s", port, agentID)
+			endpoint = fmt.Sprintf("http://127.0.0.1:%d/%s", port, agentID)
 		}
 
 		if tag != "" {
