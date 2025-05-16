@@ -36,22 +36,50 @@ Use the subcommands to manage your projects.`,
 	},
 }
 
-func saveEnv(dir string, apikey string) {
+func saveEnv(dir string, apikey string, projectKey string) {
 	filename := filepath.Join(dir, ".env")
 	envLines, err := env.ParseEnvFile(filename)
 	if err != nil {
 		errsystem.New(errsystem.ErrReadConfigurationFile, err, errsystem.WithContextMessage("Failed to parse .env file")).ShowErrorAndExit()
 	}
-	var found bool
+	found := map[string]bool{
+		"AGENTUITY_SDK_KEY":     false,
+		"AGENTUITY_API_KEY":     false,
+		"AGENTUITY_PROJECT_KEY": false,
+	}
+
 	for i, envLine := range envLines {
 		if envLine.Key == "AGENTUITY_API_KEY" {
 			envLines[i].Val = apikey
-			found = true
+			found["AGENTUITY_API_KEY"] = true
+		}
+		if envLine.Key == "AGENTUITY_SDK_KEY" {
+			envLines[i].Val = apikey
+			found[envLine.Key] = true
+		}
+		if envLine.Key == "AGENTUITY_PROJECT_KEY" {
+			envLines[i].Val = projectKey
+			found[envLine.Key] = true
 		}
 	}
-	if !found {
-		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_API_KEY", Val: apikey})
+
+	if found["AGENTUITY_API_KEY"] {
+		// Remove AGENTUITY_API_KEY since it's deprecated in newer SDK versions
+		for i := len(envLines) - 1; i >= 0; i-- {
+			if envLines[i].Key == "AGENTUITY_API_KEY" {
+				envLines = append(envLines[:i], envLines[i+1:]...)
+			}
+		}
+		found["AGENTUITY_API_KEY"] = false
 	}
+
+	if !found["AGENTUITY_SDK_KEY"] {
+		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_SDK_KEY", Val: apikey})
+	}
+	if !found["AGENTUITY_PROJECT_KEY"] {
+		envLines = append(envLines, env.EnvLine{Key: "AGENTUITY_PROJECT_KEY", Val: projectKey})
+	}
+
 	if err := env.WriteEnvFile(filename, envLines); err != nil {
 		errsystem.New(errsystem.ErrWriteConfigurationFile, err, errsystem.WithContextMessage("Failed to write .env file")).ShowErrorAndExit()
 	}
@@ -65,6 +93,7 @@ type InitProjectArgs struct {
 	Name              string
 	Description       string
 	EnableWebhookAuth bool
+	AuthType          string
 	Provider          *templates.TemplateRules
 	Agents            []project.AgentConfig
 }
@@ -78,6 +107,7 @@ func initProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 		Name:              args.Name,
 		Description:       args.Description,
 		EnableWebhookAuth: args.EnableWebhookAuth,
+		AuthType:          args.AuthType,
 		Dir:               args.Dir,
 		Provider:          args.Provider.Identifier,
 		Agents:            args.Agents,
@@ -126,7 +156,7 @@ func initProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 		errsystem.New(errsystem.ErrSaveProject, err, errsystem.WithContextMessage("Failed to save project to disk")).ShowErrorAndExit()
 	}
 
-	saveEnv(args.Dir, result.APIKey)
+	saveEnv(args.Dir, result.APIKey, result.ProjectKey)
 
 	return result
 }
@@ -458,7 +488,7 @@ Examples:
 			}
 			projectDir = absDir
 		} else {
-			projectDir = tui.InputWithPlaceholder(logger, "What directory should the project be created in?", "The directory to create the project in", projectDir)
+			projectDir = tui.InputWithPathCompletion(logger, "What directory should the project be created in?", "The directory to create the project in", projectDir)
 		}
 
 		force, _ := cmd.Flags().GetBool("force")
@@ -540,7 +570,8 @@ Examples:
 				Description:       description,
 				Provider:          rules,
 				Agents:            agents,
-				EnableWebhookAuth: authType != "none",
+				EnableWebhookAuth: authType == "project" || authType == "webhook",
+				AuthType:          authType,
 			})
 
 			// remember our choices
@@ -562,7 +593,7 @@ Examples:
 			para = append(para, tui.Secondary("1. Switch into the project directory at ")+tui.Directory(projectDir))
 			para = append(para, tui.Secondary("2. Run ")+tui.Command("dev")+tui.Secondary(" to run the project locally in development mode"))
 			para = append(para, tui.Secondary("3. Run ")+tui.Command("deploy")+tui.Secondary(" to deploy the project to the Agentuity Agent Cloud"))
-			if authType != "none" {
+			if authType == "project" || authType == "webhook" {
 				para = append(para, tui.Secondary("4. Run ")+tui.Command("agent apikey")+tui.Secondary(" to fetch the Webhook API key for the agent"))
 			}
 			para = append(para, tui.Secondary("🏠 Access your project at ")+tui.Link("%s/projects/%s", appUrl, projectData.ProjectId))
@@ -811,6 +842,6 @@ func init() {
 	projectNewCmd.Flags().StringP("template", "t", "", "The template to use for the project")
 	projectNewCmd.Flags().Bool("force", false, "Force the project to be created even if the directory already exists")
 	projectNewCmd.Flags().String("templates-dir", "", "The directory to load the templates. Defaults to loading them from the github.com/agentuity/templates repository")
-	projectNewCmd.Flags().String("auth", "bearer", "The authentication type for the agent (bearer or none)")
+	projectNewCmd.Flags().String("auth", "project", "The authentication type for the agent (project, webhook, or none)")
 	projectNewCmd.Flags().String("action", "github-app", "The action to take for the project (github-action, github-app, none)")
 }

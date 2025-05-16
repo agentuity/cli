@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 	"syscall"
 
 	"github.com/agentuity/cli/internal/agent"
+	"github.com/agentuity/cli/internal/dev"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/templates"
@@ -165,14 +168,15 @@ var agentDeleteCmd = &cobra.Command{
 func getAgentAuthType(logger logger.Logger, authType string) string {
 	if authType != "" {
 		switch authType {
-		case "bearer", "none":
+		case "project", "bearer", "none":
 			return authType
 		default:
 		}
 	}
 	auth := tui.Select(logger, "Select your Agent's webhook authentication method", "Do you want to secure the webhook or make it publicly available?", []tui.Option{
-		{Text: tui.PadRight("API Key", 10, " ") + tui.Muted("Bearer Token (will be generated for you)"), ID: "bearer"},
-		{Text: tui.PadRight("None", 10, " ") + tui.Muted("No Authentication Required"), ID: "none"},
+		{Text: tui.PadRight("API Key", 20, " ") + tui.Muted("Bearer Token (will be generated for you)"), ID: "bearer"},
+		{Text: tui.PadRight("Project API Key", 20, " ") + tui.Muted("The Project Key attched to your project"), ID: "project"},
+		{Text: tui.PadRight("None", 20, " ") + tui.Muted("No Authentication Required"), ID: "none"},
 	})
 	return auth
 }
@@ -676,7 +680,7 @@ Examples:
 			tui.ShowWarning("Agent not found")
 			return
 		}
-		apikey, err := agent.GetApiKey(context.Background(), logger, apiUrl, project.Token, theagent.Agent.ID)
+		apikey, err := agent.GetApiKey(context.Background(), logger, apiUrl, project.Token, theagent.Agent.ID, theagent.Agent.Types[0])
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent API key")).ShowErrorAndExit()
 		}
@@ -699,13 +703,131 @@ Examples:
 	},
 }
 
+var agentTestCmd = &cobra.Command{
+	Use:   "test",
+	Short: "Test an agent",
+	Run: func(cmd *cobra.Command, args []string) {
+		logger := env.NewLogger(cmd)
+
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		theproject := project.EnsureProject(ctx, cmd)
+
+		agentID, _ := cmd.Flags().GetString("agent-id")
+		payload, _ := cmd.Flags().GetString("payload")
+		local, _ := cmd.Flags().GetBool("local")
+		contentType, _ := cmd.Flags().GetString("content-type")
+		tag, _ := cmd.Flags().GetString("tag")
+		var selectedAgent *agent.Agent
+		if agentID == "" {
+			keys, state := reconcileAgentList(logger, cmd, theproject.APIURL, theproject.Token, theproject)
+			if len(keys) == 0 {
+				tui.ShowWarning("no Agents found")
+				tui.ShowBanner("Create a new Agent", tui.Text("Use the ")+tui.Command("agent new")+tui.Text(" command to create a new Agent"), false)
+				return
+			}
+			var options []tui.Option
+			for _, v := range keys {
+				options = append(options, tui.Option{
+					ID:   v,
+					Text: tui.PadRight(state[v].Agent.Name, 20, " ") + tui.Muted(state[v].Agent.ID),
+				})
+			}
+			selected := tui.Select(logger, "Select an agent", "Select the agent you want to test", options)
+			selectedAgent = state[selected].Agent
+			agentID = selectedAgent.ID
+		}
+
+		if len(selectedAgent.Types) == 0 {
+			// this should never ever happen
+			tui.ShowError("Agent %s has no running types (webhook or api)", selectedAgent.Name)
+			os.Exit(1)
+		}
+		var route string
+		if len(selectedAgent.Types) > 1 {
+			options := []tui.Option{}
+			for _, route := range selectedAgent.Types {
+				options = append(options, tui.Option{
+					ID:   route,
+					Text: route,
+				})
+			}
+			route = tui.Select(logger, "Select an running type", "Select the running type you want to use", options)
+		} else {
+			route = selectedAgent.Types[0]
+		}
+
+		if payload == "" {
+			payload = tui.Input(logger, "Enter the payload to send to the agent", "{\"hello\": \"world\"}")
+		}
+
+		apikey, err := agent.GetApiKey(context.Background(), logger, theproject.APIURL, theproject.Token, agentID, route)
+		if err != nil {
+			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get agent API key")).ShowErrorAndExit()
+		}
+		endpoint := fmt.Sprintf("%s/%s/%s", theproject.TransportURL, route, agentID)
+		if local {
+			port, _ := dev.FindAvailablePort(theproject)
+			endpoint = fmt.Sprintf("http://127.0.0.1:%d/%s", port, agentID)
+		}
+
+		if tag != "" {
+			endpoint = fmt.Sprintf("%s/%s", endpoint, tag)
+		}
+
+		// use http package to send a POST request to the agent
+		req, err := http.NewRequest("POST", endpoint, strings.NewReader(payload))
+		if err != nil {
+			logger.Fatal("Failed to create request: %s", err)
+		}
+		if contentType == "" {
+			// check if payload is json
+			if json.Valid([]byte(payload)) {
+				req.Header.Set("Content-Type", "application/json")
+			} else {
+				req.Header.Set("Content-Type", "text/plain")
+			}
+		} else {
+			req.Header.Set("Content-Type", contentType)
+		}
+		if apikey != "" {
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apikey))
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			logger.Fatal("Failed to send request: %s", err)
+		}
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			logger.Fatal("Failed to read response: %s", err)
+		}
+		var jsonBody map[string]interface{}
+		if json.Unmarshal(body, &jsonBody) == nil {
+			stringified, _ := json.MarshalIndent(jsonBody, "", "  ")
+			tui.ShowSuccess("Agent Test: %s", tui.Paragraph(tui.Bold(string(stringified))))
+		} else {
+			tui.ShowSuccess("Agent Test: %s", tui.Paragraph(tui.Bold(string(body))))
+		}
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(agentCmd)
 	agentCmd.AddCommand(agentCreateCmd)
 	agentCmd.AddCommand(agentListCmd)
 	agentCmd.AddCommand(agentDeleteCmd)
 	agentCmd.AddCommand(agentGetApiKeyCmd)
-	for _, cmd := range []*cobra.Command{agentListCmd, agentCreateCmd, agentDeleteCmd, agentGetApiKeyCmd} {
+
+	agentTestCmd.Flags().String("agent-id", "", "The ID of the agent to test")
+	agentTestCmd.Flags().String("payload", "", "The payload to send to the agent")
+	agentTestCmd.Flags().Bool("local", false, "Enable local testing")
+	agentTestCmd.Flags().String("content-type", "", "The content type to use for the request, will try to detect if not provided")
+	agentTestCmd.Flags().String("tag", "", "The tag to use for the deployment")
+	agentCmd.AddCommand(agentTestCmd)
+
+	for _, cmd := range []*cobra.Command{agentListCmd, agentCreateCmd, agentDeleteCmd, agentGetApiKeyCmd, agentTestCmd} {
 		cmd.Flags().StringP("dir", "d", "", "The project directory")
 		cmd.Flags().String("templates-dir", "", "The directory to load the templates. Defaults to loading them from the github.com/agentuity/templates repository")
 	}
@@ -716,4 +838,5 @@ func init() {
 	for _, cmd := range []*cobra.Command{agentCreateCmd, agentDeleteCmd} {
 		cmd.Flags().Bool("force", false, "Force the creation of the agent even if it already exists")
 	}
+
 }

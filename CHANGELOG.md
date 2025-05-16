@@ -5,6 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.121] - 2025-05-16
+
+### Added
+- [AGENT-133] Added "test" command ([#290](https://github.com/agentuity/cli/pull/290))
+- [AGENT-129] Multiple tags for a deployment ([#291](https://github.com/agentuity/cli/pull/291))
+
+### Changed
+- Add tag and message to deployments in CI ([#293](https://github.com/agentuity/cli/pull/293))
+
+### Fixed
+- [AGENT-179] Call the agent from the correct endpoint ([#294](https://github.com/agentuity/cli/pull/294))
+
+## [v0.0.120] - 2025-05-14
+
+### Added
+- Add project key for agent comms ([#285](https://github.com/agentuity/cli/pull/285))
+
+### Changed
+- Shorten install script, skip prebuilds on breaking change check ([#287](https://github.com/agentuity/cli/pull/287))
+- Cleanup: remove old vscode settings, move release to use blacksmith now that we dont need MSI build ([#289](https://github.com/agentuity/cli/pull/289))
+- Update copy in upgrade.go for upgrade
+
+### Fixed
+- [AGENT-163] Update command for Windows ([#284](https://github.com/agentuity/cli/pull/284))
+
+### Documentation
+- Update changelog for v0.0.119 ([#283](https://github.com/agentuity/cli/pull/283))
+
+## [v0.0.119] - 2025-05-08
+
+### Added
+- Added path completion to the CLI ([#282](https://github.com/agentuity/cli/pull/282))
+
+### Changed
+- Cleanup install script ([#281](https://github.com/agentuity/cli/pull/281))
+  - Removed Windows native support (WSL is now recommended)
+  - Improved installation testing with Docker
+  - Restructured installation script for better maintainability
+
+## [v0.0.118] - 2025-05-06
+
+### Fixed
+- Fixed check on dev for Linux by using `sys.IsRunningInsideDocker()` instead of checking for specific Docker files ([#279](https://github.com/agentuity/cli/pull/279))
+
+## [v0.0.117] - 2025-05-05
+
+### Fixed
+- Fixed typo in CI flag name (changed "ci-messsage" to "ci-message") ([#277](https://github.com/agentuity/cli/pull/277))
+
+## [v0.0.116] - 2025-05-05
+
+### Fixed
+- Missed annotation on GitInfo ([#275](https://github.com/agentuity/cli/pull/275))
+- AGENT-29 Check mask value for secrets ([#274](https://github.com/agentuity/cli/pull/274))
+- Passing CI logs URL to display GitHub action logs in the UI ([#273](https://github.com/agentuity/cli/pull/273))
+
+### Changed
+- Taking a walk to get the git data 🚶‍♂️‍➡️ ([#272](https://github.com/agentuity/cli/pull/272))
+- Pass on the git info from deploy to bundle when for --deploy ([#271](https://github.com/agentuity/cli/pull/271))
+
 ## [v0.0.115] - 2025-05-02
 
 ### Added
@@ -453,6 +513,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.120]: https://github.com/agentuity/cli/compare/v0.0.119...v0.0.120
+[v0.0.119]: https://github.com/agentuity/cli/compare/v0.0.118...v0.0.119
+[v0.0.118]: https://github.com/agentuity/cli/compare/v0.0.117...v0.0.118
+[v0.0.117]: https://github.com/agentuity/cli/compare/v0.0.116...v0.0.117
+[v0.0.116]: https://github.com/agentuity/cli/compare/v0.0.115...v0.0.116
 [v0.0.115]: https://github.com/agentuity/cli/compare/v0.0.114...v0.0.115
 [v0.0.114]: https://github.com/agentuity/cli/compare/v0.0.113...v0.0.114
 [v0.0.113]: https://github.com/agentuity/cli/compare/v0.0.112...v0.0.113

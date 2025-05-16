@@ -95,18 +95,6 @@ func getBinaryName() string {
 	return binaryName
 }
 
-func isWindowsMsiInstallation() bool {
-	if runtime.GOOS != "windows" {
-		return false
-	}
-	exe, err := os.Executable()
-	if err != nil {
-		return false
-	}
-	return strings.Contains(strings.ToLower(exe), "\\program files\\") ||
-		strings.Contains(strings.ToLower(exe), "\\program files (x86)\\")
-}
-
 func getReleaseAssetName() string {
 	goos := runtime.GOOS
 	arch := runtime.GOARCH
@@ -128,34 +116,6 @@ func getReleaseAssetName() string {
 	return fmt.Sprintf("agentuity_%s_%s.%s", strings.Title(goos), archName, extension)
 }
 
-func getMsiInstallerName() string {
-	arch := runtime.GOARCH
-	var msiArch string
-	if arch == "amd64" {
-		msiArch = "x64"
-	} else if arch == "386" {
-		msiArch = "x86"
-	} else {
-		msiArch = arch
-	}
-
-	return fmt.Sprintf("agentuity-%s.msi", msiArch)
-}
-
-func isAdmin(ctx context.Context) bool {
-	if runtime.GOOS != "windows" {
-		return false
-	}
-
-	cmd := exec.CommandContext(ctx, "powershell", "-Command", "([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)")
-	output, err := cmd.Output()
-	if err != nil {
-		return false
-	}
-
-	return strings.TrimSpace(string(output)) == "True"
-}
-
 func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 	if runtime.GOOS == "darwin" {
 		exe, err := os.Executable()
@@ -173,20 +133,6 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 				return upgradeWithHomebrew(ctx, logger)
 			}
 		}
-	}
-
-	if isWindowsMsiInstallation() {
-		release, err := GetLatestRelease(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get latest release: %w", err)
-		}
-
-		if Version == release && !force {
-			tui.ShowSuccess("You are already on the latest version (%s)", release)
-			return nil
-		}
-
-		return upgradeWithWindowsMsi(ctx, logger, release)
 	}
 
 	release, err := GetLatestRelease(ctx) // Using public function from version.go
@@ -208,8 +154,8 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 	}
 	defer os.RemoveAll(tempDir)
 
-	assetURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/v%s/%s", release, assetName)
-	checksumURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/v%s/%s", release, checksumFileName)
+	assetURL := fmt.Sprintf("https://agentuity.sh/release/cli/v%s/%s", release, assetName)
+	checksumURL := fmt.Sprintf("https://agentuity.sh/release/cli/v%s/%s", release, checksumFileName)
 
 	assetPath := filepath.Join(tempDir, assetName)
 	checksumPath := filepath.Join(tempDir, checksumFileName)
@@ -314,7 +260,7 @@ func replaceBinary(ctx context.Context, logger logger.Logger, assetPath, version
 	fileMode := info.Mode()
 
 	if err := checkWritePermission(currentExe); err != nil {
-		if strings.Contains(err.Error(), "binary is currently running") {
+		if strings.Contains(err.Error(), "binary is currently running") || strings.Contains(err.Error(), "is being used by another process") {
 			var updateErr error
 			updateAction := func() {
 				updateErr = updateRunningBinary(currentExe, binaryPath, fileMode)
@@ -326,6 +272,7 @@ func replaceBinary(ctx context.Context, logger logger.Logger, assetPath, version
 			tui.ShowSuccess("Successfully scheduled update to %s. The update will complete when this process exits.", version)
 			return nil
 		}
+
 		return fmt.Errorf("insufficient permissions to update binary: %w", err)
 	}
 
@@ -637,157 +584,5 @@ func upgradeWithHomebrew(ctx context.Context, logger logger.Logger) error {
 	}
 
 	tui.ShowSuccess("Successfully upgraded to version %s via Homebrew", newVersion)
-	return nil
-}
-
-func upgradeWithWindowsMsi(ctx context.Context, logger logger.Logger, version string) error {
-	if os.Getenv("CI") != "" || os.Getenv("GITHUB_ACTIONS") != "" || os.Getenv("NONINTERACTIVE") != "" {
-		tui.ShowWarning("Non-interactive environment detected, skipping automatic MSI installation")
-
-		tempDir, err := os.MkdirTemp("", "agentuity-upgrade-msi")
-		if err != nil {
-			return fmt.Errorf("failed to create temp directory: %w", err)
-		}
-		defer os.RemoveAll(tempDir)
-
-		installerName := getMsiInstallerName()
-		if strings.HasPrefix(version, "v") {
-			version = strings.TrimPrefix(version, "v")
-		}
-		installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/v%s/%s", version, installerName)
-		installerPath := filepath.Join(tempDir, installerName)
-
-		var downloadErr error
-		downloadAction := func() {
-			if err := downloadFile(installerURL, installerPath); err != nil {
-				downloadErr = fmt.Errorf("failed to download MSI installer: %w", err)
-			}
-		}
-		tui.ShowSpinner("Downloading MSI installer...", downloadAction)
-		if downloadErr != nil {
-			return downloadErr
-		}
-
-		homePath := os.Getenv("HOME")
-		if homePath == "" {
-			homePath = os.Getenv("USERPROFILE")
-		}
-		if homePath == "" {
-			return fmt.Errorf("unable to determine home directory")
-		}
-
-		destPath := filepath.Join(homePath, installerName)
-		if err := copyFile(installerPath, destPath); err != nil {
-			return fmt.Errorf("failed to copy MSI to %s: %w", destPath, err)
-		}
-
-		tui.ShowSuccess("MSI installer copied to %s", destPath)
-		tui.ShowWarning("To install manually, run the MSI installer at: %s", destPath)
-		return nil
-	}
-
-	if !isAdmin(ctx) {
-		tui.ShowWarning("Administrator privileges required to upgrade the CLI on Windows")
-		tui.ShowWarning("Please restart the CLI with administrator privileges and try again")
-		return fmt.Errorf("administrator privileges required")
-	}
-
-	tempDir, err := os.MkdirTemp("", "agentuity-upgrade-msi")
-	if err != nil {
-		return fmt.Errorf("failed to create temp directory: %w", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	var uninstallErr error
-	uninstallAction := func() {
-		uninstallScriptPath := filepath.Join(tempDir, "uninstall.ps1")
-		uninstallScript := `
-$products = Get-CimInstance -Class Win32_Product | Where-Object { $_.Name -like "*Agentuity*" }
-if ($products) {
-    foreach ($product in $products) {
-        $result = $product | Invoke-CimMethod -MethodName Uninstall
-        if ($result.ReturnValue -ne 0) {
-            throw "Failed to uninstall $($product.Name) with return code $($result.ReturnValue)"
-        }
-    }
-}
-`
-		if err := os.WriteFile(uninstallScriptPath, []byte(uninstallScript), 0644); err != nil {
-			uninstallErr = fmt.Errorf("failed to create uninstall script: %w", err)
-			return
-		}
-
-		uninstallCmd := exec.CommandContext(ctx, "powershell", "-ExecutionPolicy", "Bypass", "-File", uninstallScriptPath)
-		output, err := uninstallCmd.CombinedOutput()
-		if err != nil {
-			uninstallErr = fmt.Errorf("failed to run uninstall script: %w, output: %s", err, string(output))
-			return
-		}
-		logger.Trace(strings.TrimSpace(string(output)))
-		tui.ShowSuccess("Uninstalled existing installation")
-	}
-	tui.ShowSpinner("Checking for existing installations...", uninstallAction)
-	if uninstallErr != nil {
-		tui.ShowWarning("Uninstall failed, continuing with installation: %v", uninstallErr)
-	}
-
-	installerName := getMsiInstallerName()
-	if strings.HasPrefix(version, "v") {
-		version = strings.TrimPrefix(version, "v")
-	}
-	installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/v%s/%s", version, installerName)
-	installerPath := filepath.Join(tempDir, installerName)
-
-	var downloadErr error
-	downloadAction := func() {
-		if err := downloadFile(installerURL, installerPath); err != nil {
-			downloadErr = fmt.Errorf("failed to download MSI installer: %w", err)
-		}
-	}
-	tui.ShowSpinner("Downloading MSI installer...", downloadAction)
-	if downloadErr != nil {
-		return downloadErr
-	}
-
-	var installErr error
-	installAction := func() {
-		installCmd := exec.CommandContext(ctx, "msiexec", "/i", installerPath, "/qn", "/norestart")
-		if err := installCmd.Run(); err != nil {
-			tui.ShowWarning("Direct install failed, trying with update approach: %v", err)
-
-			updateCmd := exec.CommandContext(ctx, "msiexec", "/update", installerPath, "/qn")
-			if err := updateCmd.Run(); err != nil {
-				tui.ShowWarning("Update approach failed, trying install with reinstall: %v", err)
-
-				reinstallCmd := exec.CommandContext(ctx, "msiexec", "/i", installerPath, "/qn", "REINSTALLMODE=amus", "REINSTALL=ALL")
-				if err := reinstallCmd.Run(); err != nil {
-					installErr = fmt.Errorf("failed to run MSI installer: %w", err)
-				}
-			}
-		}
-	}
-	tui.ShowSpinner("Installing upgrade...", installAction)
-	if installErr != nil {
-		tui.ShowWarning("Automatic installation failed: %v", installErr)
-
-		homePath := os.Getenv("HOME")
-		if homePath == "" {
-			homePath = os.Getenv("USERPROFILE")
-		}
-		if homePath == "" {
-			return fmt.Errorf("unable to determine home directory: %w", installErr)
-		}
-
-		destPath := filepath.Join(homePath, installerName)
-		if err := copyFile(installerPath, destPath); err != nil {
-			return fmt.Errorf("failed to copy MSI to %s: %w", destPath, err)
-		}
-
-		tui.ShowSuccess("MSI installer copied to %s", destPath)
-		tui.ShowWarning("To install manually, run the MSI installer at: %s", destPath)
-		return nil
-	}
-
-	tui.ShowSuccess("Successfully upgraded to version %s", version)
 	return nil
 }

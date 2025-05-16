@@ -23,6 +23,7 @@ import (
 	"github.com/agentuity/go-common/crypto"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -68,9 +69,12 @@ type startAgent struct {
 }
 
 type startRequest struct {
-	Agents    []startAgent       `json:"agents"`
-	Resources *Resources         `json:"resources,omitempty"`
-	Metadata  *deployer.Metadata `json:"metadata,omitempty"`
+	Agents         []startAgent       `json:"agents"`
+	Resources      *Resources         `json:"resources,omitempty"`
+	Metadata       *deployer.Metadata `json:"metadata,omitempty"`
+	Tags           []string           `json:"tags,omitempty"`
+	TagDescription string             `json:"description,omitempty"`
+	TagMessage     string             `json:"message,omitempty"`
 }
 
 func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.Command, apiUrl, apikey, projectId string, project *project.Project, dir string, isImport bool) {
@@ -112,7 +116,7 @@ func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.
 			errsystem.New(errsystem.ErrSaveProject, err,
 				errsystem.WithContextMessage("Error saving project after import")).ShowErrorAndExit()
 		}
-		saveEnv(dir, result.APIKey)
+		saveEnv(dir, result.APIKey, result.ProjectKey)
 	})
 	tui.ShowSuccess("Project imported successfully")
 }
@@ -151,6 +155,19 @@ Examples:
 		ciCommit, _ := cmd.Flags().GetString("ci-commit")
 		ciMessage, _ := cmd.Flags().GetString("ci-message")
 		ciGitProvider, _ := cmd.Flags().GetString("ci-git-provider")
+		ciLogsUrl, _ := cmd.Flags().GetString("ci-logs-url")
+		tags, _ := cmd.Flags().GetStringArray("tag")
+		description, _ := cmd.Flags().GetString("description")
+		message, _ := cmd.Flags().GetString("message")
+
+		// remove duplicates and empty strings
+		tags = util.RemoveDuplicates(tags)
+		tags = util.RemoveEmpty(tags)
+
+		// If no tags are provided, default to ["latest"]
+		if len(tags) == 0 {
+			tags = []string{"latest"}
+		}
 
 		deploymentConfig := project.NewDeploymentConfig()
 		client := util.NewAPIClient(ctx, logger, apiUrl, token)
@@ -226,7 +243,7 @@ Examples:
 					if projectData != nil && projectData.Env != nil && projectData.Env[ev.Key] == ev.Val {
 						continue
 					}
-					if projectData != nil && projectData.Secrets != nil && projectData.Secrets[ev.Key] == ev.Val {
+					if projectData != nil && projectData.Secrets != nil && projectData.Secrets[ev.Key] == cstr.Mask(ev.Val) {
 						continue
 					}
 					foundkeys = append(foundkeys, ev.Key)
@@ -360,9 +377,13 @@ Examples:
 
 		var gitInfo deployer.GitInfo
 		var originType string
-		isOverwritingGitInfo := ciRemoteUrl != "" || ciBranch != "" || ciCommit != "" || ciMessage != "" || ciGitProvider != ""
+		var ciInfo deployer.CIInfo
+		isOverwritingGitInfo := ciRemoteUrl != "" || ciBranch != "" || ciCommit != "" || ciMessage != "" || ciGitProvider != "" || ciLogsUrl != ""
 		if ci && isOverwritingGitInfo {
 			originType = "ci"
+			ciInfo = deployer.CIInfo{
+				LogsURL: ciLogsUrl,
+			}
 			gitInfo = deployer.GitInfo{
 				RemoteURL:     &ciRemoteUrl,
 				Branch:        &ciBranch,
@@ -372,7 +393,7 @@ Examples:
 				IsRepo:        true,
 			}
 		} else {
-			info, err := deployer.GetGitInfo(logger, dir)
+			info, err := deployer.GetGitInfoRecursive(logger, dir)
 			if err != nil {
 				logger.Debug("Failed to get git info: %v", err)
 			}
@@ -380,15 +401,23 @@ Examples:
 			originType = "cli"
 		}
 
+		data := map[string]interface{}{
+			"machine": deployer.GetMachineInfo(),
+			"git":     gitInfo,
+		}
+		if originType == "ci" && ciLogsUrl != "" {
+			data["ci"] = ciInfo
+		}
 		startRequest.Metadata = &deployer.Metadata{
 			Origin: deployer.MetadataOrigin{
 				Type: originType,
-				Data: map[string]interface{}{
-					"machine": deployer.GetMachineInfo(),
-					"git":     gitInfo,
-				},
+				Data: data,
 			},
 		}
+
+		startRequest.Tags = tags
+		startRequest.TagDescription = description
+		startRequest.TagMessage = message
 
 		// Start deployment
 		if err := client.Do("PUT", fmt.Sprintf("/cli/deploy/start/%s%s", theproject.ProjectId, deploymentId), startRequest, &startResponse); err != nil {
@@ -588,7 +617,7 @@ Examples:
 					errsystem.WithContextMessage("Error updating deployment status to completed")).ShowErrorAndExit()
 			}
 			if len(theproject.Agents) == 1 {
-				webhookToken, err = agent.GetApiKey(ctx, logger, apiUrl, token, theproject.Agents[0].ID)
+				webhookToken, err = agent.GetApiKey(ctx, logger, apiUrl, token, theproject.Agents[0].ID, theproject.Agents[0].Types[0])
 				if err != nil {
 					errsystem.New(errsystem.ErrApiRequest, err,
 						errsystem.WithContextMessage("Error getting Agent API key")).ShowErrorAndExit()
@@ -653,14 +682,19 @@ func init() {
 	cloudDeployCmd.Flags().String("ci-commit", "", "Used to set the commit hash for your deployment metadata")
 	cloudDeployCmd.Flags().String("ci-message", "", "Used to set the commit message for your deployment metadata")
 	cloudDeployCmd.Flags().String("ci-git-provider", "", "Used to set the git provider for your deployment metadata")
+	cloudDeployCmd.Flags().String("ci-logs-url", "", "Used to set the CI logs URL for your deployment metadata")
+	cloudDeployCmd.Flags().StringArray("tag", nil, "Tag(s) to associate with this deployment (can be specified multiple times)")
+	cloudDeployCmd.Flags().String("description", "", "Description for the deployment")
+	cloudDeployCmd.Flags().String("message", "", "A shorter description for the deployment")
 
 	cloudDeployCmd.Flags().MarkHidden("deploymentId")
 	cloudDeployCmd.Flags().MarkHidden("ci")
 	cloudDeployCmd.Flags().MarkHidden("ci-remote-url")
 	cloudDeployCmd.Flags().MarkHidden("ci-branch")
 	cloudDeployCmd.Flags().MarkHidden("ci-commit")
-	cloudDeployCmd.Flags().MarkHidden("ci-messsage")
+	cloudDeployCmd.Flags().MarkHidden("ci-message")
 	cloudDeployCmd.Flags().MarkHidden("ci-git-provider")
+	cloudDeployCmd.Flags().MarkHidden("ci-logs-url")
 
 	cloudDeployCmd.Flags().String("format", "text", "The output format to use for results which can be either 'text' or 'json'")
 	cloudDeployCmd.Flags().String("org-id", "", "The organization to create the project in")

@@ -305,8 +305,12 @@ func initialProjectModel(initialForm ProjectForm) projectFormModel {
 	}
 	if initialForm.AgentAuthType != "" {
 		agentAuthType = initialForm.AgentAuthType
-		if agentAuthType == "apikey" {
+		if agentAuthType == "none" {
+			authCursor = 0
+		} else if agentAuthType == "project" {
 			authCursor = 1
+		} else if agentAuthType == "bearer" {
+			authCursor = 2
 		}
 	}
 
@@ -583,10 +587,15 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "left", "esc":
 			if m.step == 3 && !m.agentName.Focused() && !m.agentDesc.Focused() {
-				if m.authCursor == 1 {
-					// When on auth options and API Key is selected, focus None
-					m.authCursor = 0
-					m.agentAuthType = "none"
+				if m.authCursor > 0 {
+					m.authCursor--
+					if m.authCursor == 0 {
+						m.agentAuthType = "none"
+					} else if m.authCursor == 1 {
+						m.agentAuthType = "project"
+					} else if m.authCursor == 2 {
+						m.agentAuthType = "agent"
+					}
 					break
 				}
 			}
@@ -635,9 +644,17 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "right":
 			if m.step == 3 && !m.agentName.Focused() && !m.agentDesc.Focused() {
-				// Toggle between None and API Key
-				m.authCursor = 1
-				m.agentAuthType = "apikey"
+				// Toggle between None, Project API Key, and Agent API Key
+				if m.authCursor < 2 {
+					m.authCursor++
+					if m.authCursor == 0 {
+						m.agentAuthType = "none"
+					} else if m.authCursor == 1 {
+						m.agentAuthType = "project"
+					} else if m.authCursor == 2 {
+						m.agentAuthType = "agent"
+					}
+				}
 			} else {
 				// Only advance if current step is valid
 				if m.step == 0 && m.cursor < len(m.choices) {
@@ -829,8 +846,10 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// When on auth options, confirm selection and move to deployment step
 					if m.authCursor == 0 {
 						m.agentAuthType = "none"
-					} else {
-						m.agentAuthType = "apikey"
+					} else if m.authCursor == 1 {
+						m.agentAuthType = "project"
+					} else if m.authCursor == 2 {
+						m.agentAuthType = "agent"
 					}
 					m.step++
 					m.cursor = m.stepCursors[m.step]
@@ -1260,15 +1279,19 @@ func (m projectFormModel) View() string {
 		content.WriteString(selectedItemStyle.Render("Authentication") + "\n")
 		if !m.agentName.Focused() && !m.agentDesc.Focused() {
 			if m.authCursor == 0 {
-				content.WriteString(selectedItemStyle.UnsetForeground().Render("> [•] None") + "    " + itemStyle.UnsetForeground().Render("  [ ] API Key") + "\n")
-			} else {
-				content.WriteString(itemStyle.UnsetForeground().Render("  [ ] None") + "    " + selectedItemStyle.UnsetForeground().Render("> [•] API Key") + "\n")
+				content.WriteString(itemStyle.UnsetForeground().Render("  [•] None      [ ] Project API Key      [ ] Agent API Key\n"))
+			} else if m.authCursor == 1 {
+				content.WriteString(itemStyle.UnsetForeground().Render("  [ ] None      [•] Project API Key      [ ] Agent API Key\n"))
+			} else if m.authCursor == 2 {
+				content.WriteString(itemStyle.UnsetForeground().Render("  [ ] None      [ ] Project API Key      [•] Agent API Key\n"))
 			}
 		} else {
 			if m.authCursor == 0 {
-				content.WriteString(itemStyle.UnsetForeground().Render("  [•] None      [ ] API Key\n"))
-			} else {
-				content.WriteString(itemStyle.UnsetForeground().Render("  [ ] None      [•] API Key\n"))
+				content.WriteString(itemStyle.UnsetForeground().Render("  [•] None      [ ] Project API Key      [ ] Agent API Key\n"))
+			} else if m.authCursor == 1 {
+				content.WriteString(itemStyle.UnsetForeground().Render("  [ ] None      [•] Project API Key      [ ] Agent API Key\n"))
+			} else if m.authCursor == 2 {
+				content.WriteString(itemStyle.UnsetForeground().Render("  [ ] None      [ ] Project API Key      [•] Agent API Key\n"))
 			}
 		}
 
