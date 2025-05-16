@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.121] - 2025-05-16
+
+### Added
+- [AGENT-133] Added "test" command ([#290](https://github.com/agentuity/cli/pull/290))
+- [AGENT-129] Multiple tags for a deployment ([#291](https://github.com/agentuity/cli/pull/291))
+
+### Changed
+- Add tag and message to deployments in CI ([#293](https://github.com/agentuity/cli/pull/293))
+
+### Fixed
+- [AGENT-179] Call the agent from the correct endpoint ([#294](https://github.com/agentuity/cli/pull/294))
+
 ## [v0.0.120] - 2025-05-14
 
 ### Added
