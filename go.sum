@@ -9,8 +9,8 @@ github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERo
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/ProtonMail/go-crypto v1.1.5 h1:eoAQfK2dwL+tFSFpr7TbOaPNUbPiJj4fLYwwGE1FQO4=
 github.com/ProtonMail/go-crypto v1.1.5/go.mod h1:rA3QumHc/FZ8pAHreoekgiAbzpNsfQAosU5td4SnOrE=
-github.com/agentuity/go-common v1.0.55 h1:ZaNh200F9TW0apb9UIhvfNDk76wAFAw5ufIU9VW3weU=
-github.com/agentuity/go-common v1.0.55/go.mod h1:cy1EPYpZUkp3JSMgTb+Sa3sLnS7vQQupj/RwO4An6L4=
+github.com/agentuity/go-common v1.0.59 h1:WOR35IDV6X7qSBr+E7ztF1PygENO305/nEKd+rDAX2A=
+github.com/agentuity/go-common v1.0.59/go.mod h1:cy1EPYpZUkp3JSMgTb+Sa3sLnS7vQQupj/RwO4An6L4=
 github.com/agentuity/mcp-golang/v2 v2.0.2 h1:wZqS/aHWZsQoU/nd1E1/iMsVY2dywWT9+PFlf+3YJxo=
 github.com/agentuity/mcp-golang/v2 v2.0.2/go.mod h1:U105tZXyTatxxOBlcObRgLb/ULvGgT2DJ1nq/8++P6Q=
 github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be h1:9AeTilPcZAjCFIImctFaOjnTIavg87rW78vTPkQqLI8=
@@ -266,8 +266,6 @@ github.com/xhit/go-str2duration/v2 v2.1.0 h1:lxklc02Drh6ynqX+DdPyp5pCKLUQpRT8bp8
 github.com/xhit/go-str2duration/v2 v2.1.0/go.mod h1:ohY8p+0f07DiV6Em5LKB0s2YpLtXVyJfNt1+BlmyAsU=
 github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e h1:JVG44RsyaB9T2KIHavMF/ppJZNG9ZpyihvCd0w101no=
 github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e/go.mod h1:RbqR21r5mrJuqunuUZ/Dhy/avygyECGrLceyNeo4LiM=
-github.com/xtaci/smux v1.5.34 h1:OUA9JaDFHJDT8ZT3ebwLWPAgEfE6sWo2LaTy3anXqwg=
-github.com/xtaci/smux v1.5.34/go.mod h1:OMlQbT5vcgl2gb49mFkYo6SMf+zP3rcjcwQz7ZU7IGY=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/zijiren233/yaml-comment v0.2.2 h1:5ghs8huXFVb/kWCi66P+xbXq0GnOE2XVCnhaWd7mTs8=
