@@ -17,6 +17,7 @@ import (
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
+	"github.com/agentuity/go-common/message"
 	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/telemetry"
 	"go.opentelemetry.io/otel"
@@ -213,6 +214,9 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch r.URL.Path {
+	case "/":
+		message.CustomErrorResponse(w, "Agents, Not Humans, Live Here", "Hi! I'm an Agentuity Agent running in development mode.", "", http.StatusOK)
+		return
 	case "/_health":
 		w.WriteHeader(http.StatusOK)
 		return
