@@ -336,8 +336,6 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 	nr.Header.Set("User-Agent", "Agentuity CLI/"+s.version)
 	propagator.Inject(newctx, propagation.HeaderCarrier(nr.Header))
 
-	logger.Info("sending headers: %+v", nr.Header)
-
 	url, err := url.Parse(r.URL.String())
 	if err != nil {
 		logger.Error("failed to parse url: %s", err)
@@ -348,7 +346,7 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 	url.Host = fmt.Sprintf("127.0.0.1:%d", s.port)
 	url.Path = "" // proxy sets so this acts like the base
 
-	logger.Info("sending to: %s", url)
+	logger.Trace("sending to: %s", url)
 
 	proxy := httputil.NewSingleHostReverseProxy(url)
 	proxy.FlushInterval = -1 // no buffering so we can stream
