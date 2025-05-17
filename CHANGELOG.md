@@ -1,3 +1,8 @@
+## [v0.0.123] - 2025-05-17
+
+### Fixed
+- Auto switch to local echo if using localhost, fix terminal reset issues ([#298](https://github.com/agentuity/cli/pull/298))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
