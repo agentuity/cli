@@ -272,7 +272,8 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		agents, err := s.getAgents(r.Context(), s.Project.Project)
 		if err != nil {
 			s.logger.Error("failed to marshal agents control response: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(fmt.Sprintf("event: error\ndata: %q\n\n", err.Error())))
+			rc.Flush()
 			return
 		}
 		w.Write([]byte(fmt.Sprintf("event: agents\ndata: %s\n\n", cstr.JSONStringify(agents))))
