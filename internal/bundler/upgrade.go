@@ -216,11 +216,10 @@ func checkForBreakingChanges(ctx BundleContext, language string, runtime string)
 		if c.Check(currentVersion) {
 			if change.Callback != nil {
 				var proceed bool
-				if tui.HasTTY {
+				if tui.HasTTY && !ctx.DevMode {
 					tui.ShowBanner(change.Title, change.Message, true)
 				} else {
-					tui.Text(change.Title + " - " + change.Message)
-					return fmt.Errorf("migration required")
+					return fmt.Errorf("migration required: %s. %s", change.Title, change.Message)
 				}
 				proceed = tui.AskForConfirm("Would you like to migrate your project now?", 'y') == 'y'
 				if proceed {
@@ -232,7 +231,7 @@ func checkForBreakingChanges(ctx BundleContext, language string, runtime string)
 					return fmt.Errorf("migration required")
 				}
 			} else {
-				if tui.HasTTY {
+				if tui.HasTTY && !ctx.DevMode {
 					tui.ShowBanner(change.Title, change.Message, true)
 					os.Exit(1)
 				} else {

@@ -418,6 +418,8 @@ func (d *DevModeUI) Close(abort bool) {
 	d.once.Do(func() {
 		d.aborting = abort
 		d.program.Quit()
+		<-d.Done()
+		fmt.Fprint(os.Stdout, "\033c")
 	})
 }
 

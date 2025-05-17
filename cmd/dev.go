@@ -168,6 +168,7 @@ Examples:
 					if err == bundler.ErrBuildFailed {
 						return
 					}
+					ui.Close(true)
 					errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to bundle project: %s", err))).ShowErrorAndExit()
 				}
 				ok = true
