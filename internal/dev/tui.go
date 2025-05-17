@@ -157,13 +157,13 @@ func label(s string) string {
 	return labelStyle.Render(tui.PadRight(s, 10, " "))
 }
 
-func (m *model) generateInfoBox() string {
+func generateInfoBox(width int, showPause bool, paused bool, publicUrl string, appUrl string, devModeUrl string) string {
 	var statusStyle = runningStyle
-	if m.paused {
+	if paused {
 		statusStyle = pausedStyle
 	}
 	var devmodeBox = lipgloss.NewStyle().
-		Width(m.windowSize.Width-2).
+		Width(width-2).
 		Border(lipgloss.NormalBorder()).
 		BorderForeground(logoColor).
 		Padding(1, 2).
@@ -172,8 +172,13 @@ func (m *model) generateInfoBox() string {
 		Foreground(labelColor)
 
 	url := "loading..."
-	if m.publicUrl != "" {
-		url = tui.Link("%s", m.publicUrl) + "  " + tui.Muted("(only accessible while running)")
+	if publicUrl != "" {
+		url = tui.Link("%s", publicUrl) + "  " + tui.Muted("(only accessible while running)")
+	}
+
+	var pauseLabel string
+	if showPause {
+		pauseLabel = statusStyle.Render(tui.PadLeft("⏺", width-25, " "))
 	}
 
 	content := fmt.Sprintf(`%s
@@ -181,12 +186,16 @@ func (m *model) generateInfoBox() string {
 %s  %s
 %s  %s
 %s  %s`,
-		tui.Bold("⨺ Agentuity DevMode")+" "+statusStyle.Render(tui.PadLeft("⏺", m.windowSize.Width-25, " ")),
-		label("DevMode"), tui.Link("%s", m.appUrl),
-		label("Local"), tui.Link("%s", m.devModeUrl),
+		tui.Bold("⨺ Agentuity DevMode")+" "+pauseLabel,
+		label("DevMode"), tui.Link("%s", appUrl),
+		label("Local"), tui.Link("%s", devModeUrl),
 		label("Public"), url,
 	)
 	return devmodeBox.Render(content)
+}
+
+func (m *model) generateInfoBox() string {
+	return generateInfoBox(m.windowSize.Width, true, m.paused, m.publicUrl, m.appUrl, m.devModeUrl)
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -415,6 +424,10 @@ type DevModeUI struct {
 	spinnerCtx    context.Context
 	spinnerCancel context.CancelFunc
 	aborting      bool
+	enabled       bool
+	publicUrl     string
+	devModeUrl    string
+	appUrl        string
 }
 
 type DevModeConfig struct {
@@ -424,17 +437,39 @@ type DevModeConfig struct {
 	Agents     []*Agent
 }
 
+func isVSCodeTerminal() bool {
+	return os.Getenv("TERM_PROGRAM") == "vscode"
+}
+
 func NewDevModeUI(ctx context.Context, config DevModeConfig) *DevModeUI {
 	ctx, cancel := context.WithCancel(ctx)
+	enabled := true
+	var model *model
+	if !tui.HasTTY || isVSCodeTerminal() {
+		enabled = false
+	} else {
+		model = initialModel(config)
+	}
 	return &DevModeUI{
-		ctx:    ctx,
-		cancel: cancel,
-		model:  initialModel(config),
+		ctx:        ctx,
+		cancel:     cancel,
+		model:      model,
+		enabled:    enabled,
+		publicUrl:  config.PublicUrl,
+		devModeUrl: config.DevModeUrl,
+		appUrl:     config.AppUrl,
 	}
 }
 
 func (d *DevModeUI) SetPublicURL(url string) {
-	d.model.publicUrl = url
+	d.publicUrl = url
+	if d.model != nil {
+		d.model.publicUrl = url
+	}
+	if !d.enabled {
+		width, _, _ := term.GetSize(int(os.Stdout.Fd()))
+		fmt.Println(generateInfoBox(width, false, false, d.publicUrl, d.appUrl, d.devModeUrl))
+	}
 }
 
 // Done returns a channel that will be closed when the program is done
@@ -446,18 +481,27 @@ func (d *DevModeUI) Done() <-chan struct{} {
 func (d *DevModeUI) Close(abort bool) {
 	d.once.Do(func() {
 		d.aborting = abort
-		d.program.Quit()
+		if d.enabled {
+			d.program.Quit()
+		} else {
+			d.cancel()
+		}
 		<-d.Done()
-		fmt.Fprint(os.Stdout, "\033c")
-		tui.ClearScreen()
-		for _, item := range d.model.logItems {
-			fmt.Println(item.(logItem).raw)
+		if d.enabled {
+			fmt.Fprint(os.Stdout, "\033c")
+			tui.ClearScreen()
+			for _, item := range d.model.logItems {
+				fmt.Println(item.(logItem).raw)
+			}
 		}
 	})
 }
 
 // Start the program
 func (d *DevModeUI) Start() {
+	if !d.enabled {
+		return
+	}
 	zone.NewGlobal()
 	d.program = tea.NewProgram(
 		d.model,
@@ -479,6 +523,10 @@ func (d *DevModeUI) Start() {
 
 // Add a log message to the log list
 func (d *DevModeUI) AddLog(log string, args ...any) {
+	if !d.enabled {
+		fmt.Println(fmt.Sprintf(log, args...))
+		return
+	}
 	raw := fmt.Sprintf(log, args...)
 	d.program.Send(addLogMsg{
 		id:        uuid.New().String(),
@@ -490,6 +538,9 @@ func (d *DevModeUI) AddLog(log string, args ...any) {
 
 func (d *DevModeUI) SetStatusMessage(msg string, args ...any) {
 	val := fmt.Sprintf(msg, args...)
+	if !d.enabled {
+		return
+	}
 	d.program.Send(statusMessageMsg(val))
 	if val != "" {
 		go func() {
@@ -506,6 +557,10 @@ func (d *DevModeUI) SetStatusMessage(msg string, args ...any) {
 }
 
 func (d *DevModeUI) ShowSpinner(msg string, fn func()) {
+	if !d.enabled {
+		fn()
+		return
+	}
 	d.SetSpinner(true)
 	d.SetStatusMessage("%s", msg)
 	fn()
@@ -514,6 +569,9 @@ func (d *DevModeUI) ShowSpinner(msg string, fn func()) {
 }
 
 func (d *DevModeUI) SetSpinner(spinning bool) {
+	if !d.enabled {
+		return
+	}
 	if spinning {
 		d.program.Send(spinnerStartMsg{})
 		ctx, cancel := context.WithCancel(d.ctx)

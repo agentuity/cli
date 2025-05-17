@@ -75,11 +75,9 @@ Examples:
 		orgId := project.OrgId
 
 		port, _ := cmd.Flags().GetInt("port")
-		if port == 0 {
-			port, err = dev.FindAvailablePort(theproject)
-			if err != nil {
-				log.Fatal("failed to find available port: %s", err)
-			}
+		port, err = dev.FindAvailablePort(theproject, port)
+		if err != nil {
+			log.Fatal("failed to find available port: %s", err)
 		}
 
 		serverAddr, _ := cmd.Flags().GetString("server")
