@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.124] - 2025-05-17
+
+### Added
+- Mouse support for developer UI (scrolling and log selection) ([#300](https://github.com/agentuity/cli/pull/300))
+- Agent welcome messages and optional prompts for richer metadata ([#300](https://github.com/agentuity/cli/pull/300))
+- Support for non-TUI mode in VS Code terminals and pipe environments ([#300](https://github.com/agentuity/cli/pull/300))
+
+### Changed
+- Renamed interface label from "Dashboard" to "DevMode" for clarity ([#300](https://github.com/agentuity/cli/pull/300))
+- Enhanced log display with timestamps and improved formatting ([#300](https://github.com/agentuity/cli/pull/300))
+- Don't use alt screen so content is preserved on exit ([#300](https://github.com/agentuity/cli/pull/300))
+- Modified CI workflows to ignore documentation-only PRs ([#300](https://github.com/agentuity/cli/pull/300))
+- Updated port selection logic for dev server and agent testing ([#300](https://github.com/agentuity/cli/pull/300))
+
+### Fixed
+- Fixed port binding conflicts when running multiple agents ([#300](https://github.com/agentuity/cli/pull/300))
+- Fixed escape key behavior in main screen ([#300](https://github.com/agentuity/cli/pull/300))
+- Fixed log filtering issue ([#300](https://github.com/agentuity/cli/pull/300))
+- Fixed regression in welcome prompt not showing up ([#300](https://github.com/agentuity/cli/pull/300))
+
 ## [v0.0.123] - 2025-05-17
 
 ### Fixed
