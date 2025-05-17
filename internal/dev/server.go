@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"net/http/httputil"
@@ -192,10 +193,37 @@ func (s *Server) connect(initial bool) {
 
 }
 
+type AgentWelcome struct {
+	project.AgentConfig
+	Welcome
+}
+
 type AgentsControlResponse struct {
-	ProjectID   string                `json:"projectId"`
-	ProjectName string                `json:"projectName"`
-	Agents      []project.AgentConfig `json:"agents"`
+	ProjectID   string         `json:"projectId"`
+	ProjectName string         `json:"projectName"`
+	Agents      []AgentWelcome `json:"agents"`
+}
+
+func (s *Server) getAgents(ctx context.Context, project *project.Project) (*AgentsControlResponse, error) {
+	var resp = &AgentsControlResponse{
+		ProjectID:   project.ProjectId,
+		ProjectName: project.Name,
+	}
+	welcome, err := s.getWelcome(ctx, s.port)
+	if err != nil {
+		return nil, err
+	}
+	for _, agent := range project.Agents {
+		var w Welcome
+		if welcome != nil {
+			w = welcome[agent.ID]
+		}
+		resp.Agents = append(resp.Agents, AgentWelcome{
+			AgentConfig: agent,
+			Welcome:     w,
+		})
+	}
+	return resp, nil
 }
 
 func sendCORSHeaders(headers http.Header) {
@@ -226,18 +254,14 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		return
 	case "/_agents":
 		sendCORSHeaders(w.Header())
-		buf, err := json.Marshal(AgentsControlResponse{
-			ProjectID:   s.Project.Project.ProjectId,
-			ProjectName: s.Project.Project.Name,
-			Agents:      s.Project.Project.Agents,
-		})
+		agents, err := s.getAgents(r.Context(), s.Project.Project)
 		if err != nil {
 			s.logger.Error("failed to marshal agents control response: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(buf)
+		io.WriteString(w, cstr.JSONStringify(agents))
 		return
 	case "/_control":
 		sendCORSHeaders(w.Header())
@@ -247,7 +271,16 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		rc := http.NewResponseController(w)
 		rc.Flush()
+		s.HealthCheck(fmt.Sprintf("http://127.0.0.1:%d", s.port)) // make sure the server is running
 		w.Write([]byte("event: start\ndata: connected\n\n"))
+		agents, err := s.getAgents(r.Context(), s.Project.Project)
+		if err != nil {
+			s.logger.Error("failed to marshal agents control response: %s", err)
+			w.Write([]byte(fmt.Sprintf("event: error\ndata: %q\n\n", err.Error())))
+			rc.Flush()
+			return
+		}
+		w.Write([]byte(fmt.Sprintf("event: agents\ndata: %s\n\n", cstr.JSONStringify(agents))))
 		rc.Flush()
 		select {
 		case <-s.ctx.Done():
@@ -255,12 +288,6 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Write([]byte("event: stop\ndata: disconnected\n\n"))
 		rc.Flush()
-		return
-	}
-
-	if r.Method != "POST" {
-		sendCORSHeaders(w.Header())
-		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -278,6 +305,11 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		s.logger.Error("agent not found with id: %s", agentId)
 		sendCORSHeaders(w.Header())
 		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	if r.Method == "GET" {
+		message.CustomErrorResponse(w, "Agents, Not Humans, Live Here", "Hi! I'm an Agentuity Agent running in development mode.", "", http.StatusOK)
 		return
 	}
 
@@ -371,6 +403,55 @@ func (s *Server) PublicURL(appUrl string) string {
 
 func (s *Server) AgentURL(agentId string) string {
 	return fmt.Sprintf("http://127.0.0.1:%d/%s", s.port, agentId)
+}
+
+func isConnectionErrorRetryable(err error) bool {
+	if strings.Contains(err.Error(), "connection refused") {
+		return true
+	}
+	if strings.Contains(err.Error(), "connection reset by peer") {
+		return true
+	}
+	if strings.Contains(err.Error(), "No connection could be made because the target machine actively refused it") { // windows
+		return true
+	}
+	return false
+}
+
+type Welcome struct {
+	Message string `json:"welcome"`
+	Prompts []struct {
+		Data        string `json:"data"`
+		ContentType string `json:"contentType"`
+	} `json:"prompts,omitempty"`
+}
+
+func (s *Server) getWelcome(ctx context.Context, port int) (map[string]Welcome, error) {
+	url := fmt.Sprintf("http://127.0.0.1:%d/welcome", port)
+	for i := 0; i < 5; i++ {
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			if isConnectionErrorRetryable(err) {
+				time.Sleep(time.Millisecond * time.Duration(100*i+1))
+				continue
+			}
+			return nil, err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode == 404 {
+			return nil, nil // this is ok, just means no agents have inspect
+		}
+		res := make(map[string]Welcome)
+		if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+			return nil, err
+		}
+		return res, nil
+	}
+	return nil, fmt.Errorf("failed to inspect agents after 5 attempts")
 }
 
 func (s *Server) HealthCheck(devModeUrl string) error {

@@ -767,7 +767,7 @@ var agentTestCmd = &cobra.Command{
 		}
 		endpoint := fmt.Sprintf("%s/%s/%s", theproject.TransportURL, route, agentID)
 		if local {
-			port, _ := dev.FindAvailablePort(theproject)
+			port, _ := dev.FindAvailablePort(theproject, 0)
 			endpoint = fmt.Sprintf("http://127.0.0.1:%d/%s", port, agentID)
 		}
 

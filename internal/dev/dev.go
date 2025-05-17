@@ -56,12 +56,13 @@ func KillProjectServer(logger logger.Logger, projectServerCmd *exec.Cmd, pid int
 }
 
 func isPortAvailable(port int) bool {
-	listener, err := net.Listen("tcp4", fmt.Sprintf("0.0.0.0:%d", port))
+	timeout := time.Second
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("0.0.0.0:%d", port), timeout)
 	if err != nil {
-		return false
+		return true
 	}
-	listener.Close()
-	return true
+	defer conn.Close()
+	return false
 }
 
 func findAvailablePort() (int, error) {
@@ -73,7 +74,12 @@ func findAvailablePort() (int, error) {
 	return listener.Addr().(*net.TCPAddr).Port, nil
 }
 
-func FindAvailablePort(p project.ProjectContext) (int, error) {
+func FindAvailablePort(p project.ProjectContext, tryPort int) (int, error) {
+	if tryPort > 0 {
+		if isPortAvailable(tryPort) {
+			return tryPort, nil
+		}
+	}
 	if v, ok := os.LookupEnv("AGENTUITY_CLOUD_PORT"); ok && v != "" {
 		p, err := strconv.Atoi(v)
 		if err != nil {
