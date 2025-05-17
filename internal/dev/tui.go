@@ -224,7 +224,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				for i, listItem := range m.logList.VisibleItems() {
 					v, _ := listItem.(logItem)
 					if zone.Get(v.id).InBounds(msg) {
-						m.logList.Select(i - 1)
+						index := i - 1
+						if index < 0 {
+							index = 0
+						}
+						m.logList.Select(index)
 						break
 					}
 				}
