@@ -286,12 +286,6 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// if r.Method != "POST" {
-	// 	sendCORSHeaders(w.Header())
-	// 	w.WriteHeader(http.StatusMethodNotAllowed)
-	// 	return
-	// }
-
 	agentId := r.URL.Path[1:]
 	var found bool
 	for _, agent := range s.Project.Project.Agents {
