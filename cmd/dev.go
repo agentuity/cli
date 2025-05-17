@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -82,6 +83,10 @@ Examples:
 		}
 
 		serverAddr, _ := cmd.Flags().GetString("server")
+
+		if strings.Contains(apiUrl, "agentuity.io") && !strings.Contains(serverAddr, "localhost") {
+			serverAddr = "localhost:12001"
+		}
 
 		server, err := dev.New(dev.ServerArgs{
 			Ctx:          ctx,
@@ -163,6 +168,7 @@ Examples:
 					if err == bundler.ErrBuildFailed {
 						return
 					}
+					ui.Close(true)
 					errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to bundle project: %s", err))).ShowErrorAndExit()
 				}
 				ok = true
