@@ -471,7 +471,10 @@ func (d *DevModeUI) SetPublicURL(url string) {
 		d.model.publicUrl = url
 	}
 	if !d.enabled {
-		width, _, _ := term.GetSize(int(os.Stdout.Fd()))
+		width, _, err := term.GetSize(int(os.Stdout.Fd()))
+		if err != nil {
+			width = 80 // Default width if terminal size can't be determined
+		}
 		fmt.Println(generateInfoBox(width, false, false, d.publicUrl, d.appUrl, d.devModeUrl))
 	}
 }
