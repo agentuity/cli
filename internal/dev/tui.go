@@ -206,11 +206,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.logList.CursorUp()
 			} else if msg.Button == tea.MouseButtonWheelDown {
 				m.logList.CursorDown()
-			} else if msg.Button == tea.MouseButtonLeft && m.selectedLog == nil {
+			} else if msg.Button == tea.MouseButtonLeft {
+				// let the list update first so the clicked row becomes selected
+				lm, _ := m.logList.Update(msg)
+				m.logList = lm
 				if sel := m.logList.SelectedItem(); sel != nil {
 					if log, ok := sel.(logItem); ok {
 						m.selectedLog = &log
-						break
 					}
 				}
 			}
