@@ -15,6 +15,8 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/google/uuid"
+	zone "github.com/lrstanley/bubblezone"
 	"golang.org/x/term"
 )
 
@@ -60,14 +62,15 @@ type spinnerStartMsg struct{}
 type spinnerStopMsg struct{}
 
 type logItem struct {
+	id        string
 	timestamp time.Time
 	message   string
 	raw       string
 }
 
-func (i logItem) Title() string       { return strings.ReplaceAll(string(i.message), "\n", " ") }
+func (i logItem) Title() string       { return zone.Mark(i.id, i.message) }
 func (i logItem) Description() string { return "" }
-func (i logItem) FilterValue() string { return string(i.message) }
+func (i logItem) FilterValue() string { return zone.Mark(i.id, i.message) }
 
 type tickMsg time.Time
 type addLogMsg logItem
@@ -207,13 +210,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.logList.CursorUp()
 			} else if msg.Button == tea.MouseButtonWheelDown {
 				m.logList.CursorDown()
-			} else if msg.Button == tea.MouseButtonLeft {
-				// let the list update first so the clicked row becomes selected
-				lm, _ := m.logList.Update(msg)
-				m.logList = lm
-				if sel := m.logList.SelectedItem(); sel != nil {
-					if log, ok := sel.(logItem); ok {
-						m.selectedLog = &log
+			} else if msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionRelease {
+				// try and find the item that was clicked on
+				for i, listItem := range m.logList.VisibleItems() {
+					v, _ := listItem.(logItem)
+					if zone.Get(v.id).InBounds(msg) {
+						m.logList.Select(i - 1)
+						break
 					}
 				}
 			}
@@ -390,7 +393,7 @@ func (m *model) View() string {
 		view = " "
 	}
 
-	return fmt.Sprintf("%s\n%s\n%s", m.infoBox, view+statusMsgStyle.Render(m.statusMessage), m.logList.View())
+	return zone.Scan(fmt.Sprintf("%s\n%s\n%s", m.infoBox, view+statusMsgStyle.Render(m.statusMessage), m.logList.View()))
 }
 
 type Agent struct {
@@ -455,6 +458,7 @@ func (d *DevModeUI) Close(abort bool) {
 
 // Start the program
 func (d *DevModeUI) Start() {
+	zone.NewGlobal()
 	d.program = tea.NewProgram(
 		d.model,
 		tea.WithoutSignalHandler(),
@@ -477,9 +481,10 @@ func (d *DevModeUI) Start() {
 func (d *DevModeUI) AddLog(log string, args ...any) {
 	raw := fmt.Sprintf(log, args...)
 	d.program.Send(addLogMsg{
+		id:        uuid.New().String(),
 		timestamp: time.Now(),
 		raw:       raw,
-		message:   ansiColorStripper.ReplaceAllString(raw, ""),
+		message:   strings.ReplaceAll(ansiColorStripper.ReplaceAllString(raw, ""), "\n", " "),
 	})
 }
 
