@@ -62,6 +62,7 @@ type spinnerStopMsg struct{}
 type logItem struct {
 	timestamp time.Time
 	message   string
+	raw       string
 }
 
 func (i logItem) Title() string       { return strings.ReplaceAll(string(i.message), "\n", " ") }
@@ -445,6 +446,10 @@ func (d *DevModeUI) Close(abort bool) {
 		d.program.Quit()
 		<-d.Done()
 		fmt.Fprint(os.Stdout, "\033c")
+		tui.ClearScreen()
+		for _, item := range d.model.logItems {
+			fmt.Println(item.(logItem).raw)
+		}
 	})
 }
 
@@ -460,11 +465,6 @@ func (d *DevModeUI) Start() {
 		defer func() {
 			d.cancel()
 			d.wg.Done()
-			if d.aborting {
-				for i := len(d.model.logItems) - 1; i >= 0; i-- {
-					fmt.Println(d.model.logItems[i])
-				}
-			}
 		}()
 		_, err := d.program.Run()
 		if err != nil {
@@ -475,9 +475,11 @@ func (d *DevModeUI) Start() {
 
 // Add a log message to the log list
 func (d *DevModeUI) AddLog(log string, args ...any) {
+	raw := fmt.Sprintf(log, args...)
 	d.program.Send(addLogMsg{
 		timestamp: time.Now(),
-		message:   ansiColorStripper.ReplaceAllString(fmt.Sprintf(log, args...), ""),
+		raw:       raw,
+		message:   ansiColorStripper.ReplaceAllString(raw, ""),
 	})
 }
 
