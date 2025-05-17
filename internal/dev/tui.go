@@ -25,6 +25,7 @@ var (
 	agentsKey         = key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "show agents"))
 	logoColor         = lipgloss.AdaptiveColor{Light: "#11c7b9", Dark: "#00FFFF"}
 	labelColor        = lipgloss.AdaptiveColor{Light: "#999999", Dark: "#FFFFFF"}
+	selectedColor     = lipgloss.AdaptiveColor{Light: "#36EEE0", Dark: "#00FFFF"}
 	runningColor      = lipgloss.AdaptiveColor{Light: "#00FF00", Dark: "#009900"}
 	pausedColor       = lipgloss.AdaptiveColor{Light: "#FFA500", Dark: "#FFA500"}
 	statusColor       = lipgloss.AdaptiveColor{Light: "#750075", Dark: "#FF5CFF"}
@@ -58,14 +59,17 @@ type model struct {
 type spinnerStartMsg struct{}
 type spinnerStopMsg struct{}
 
-type logItem string
+type logItem struct {
+	timestamp time.Time
+	message   string
+}
 
-func (i logItem) Title() string       { return strings.ReplaceAll(string(i), "\n", " ") }
+func (i logItem) Title() string       { return strings.ReplaceAll(string(i.message), "\n", " ") }
 func (i logItem) Description() string { return "" }
-func (i logItem) FilterValue() string { return string(i) }
+func (i logItem) FilterValue() string { return string(i.message) }
 
 type tickMsg time.Time
-type addLogMsg string
+type addLogMsg logItem
 type statusMessageMsg string
 
 func tick() tea.Cmd {
@@ -89,7 +93,7 @@ func initialModel(config DevModeConfig) *model {
 	listDelegate.ShowDescription = false
 	listDelegate.SetSpacing(0)
 	listDelegate.Styles.NormalTitle = listDelegate.Styles.NormalTitle.Padding(0, 1)
-	listDelegate.Styles.SelectedTitle = listDelegate.Styles.SelectedTitle.BorderLeft(false).Foreground(labelColor).Bold(true)
+	listDelegate.Styles.SelectedTitle = listDelegate.Styles.SelectedTitle.BorderLeft(false).Foreground(selectedColor).Bold(true)
 
 	l := list.New(items, listDelegate, width-2, 10)
 	l.SetShowTitle(false)
@@ -174,7 +178,7 @@ func (m *model) generateInfoBox() string {
 %s  %s
 %s  %s`,
 		tui.Bold("⨺ Agentuity DevMode")+" "+statusStyle.Render(tui.PadLeft("⏺", m.windowSize.Width-25, " ")),
-		label("Dashboard"), tui.Link("%s", m.appUrl),
+		label("DevMode"), tui.Link("%s", m.appUrl),
 		label("Local"), tui.Link("%s", m.devModeUrl),
 		label("Public"), url,
 	)
@@ -196,10 +200,29 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner = sm
 		cmd = append(cmd, c)
 		break
+	case tea.MouseMsg:
+		if !m.showhelp && !m.showagents && !m.logList.SettingFilter() && m.selectedLog == nil {
+			if msg.Button == tea.MouseButtonWheelUp {
+				m.logList.CursorUp()
+			} else if msg.Button == tea.MouseButtonWheelDown {
+				m.logList.CursorDown()
+			} else if msg.Button == tea.MouseButtonLeft && m.selectedLog == nil {
+				if sel := m.logList.SelectedItem(); sel != nil {
+					if log, ok := sel.(logItem); ok {
+						m.selectedLog = &log
+						break
+					}
+				}
+			}
+		}
+		break
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyCtrlC {
 			cmd = append(cmd, tea.Quit)
 			break
+		}
+		if m.logList.SettingFilter() {
+			break // if in the filter mode, don't do anything as it will be handled by the list
 		}
 		if msg.Type == tea.KeyEscape {
 			if m.showhelp {
@@ -215,6 +238,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selectedLog = nil
 				return m, nil
 			}
+			return m, nil // otherwise escape just is ignored
 		}
 		if msg.Type == tea.KeyEnter && m.selectedLog == nil {
 			if sel := m.logList.SelectedItem(); sel != nil {
@@ -262,11 +286,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmd = append(cmd, tick())
 		break
 	case addLogMsg:
-		m.logItems = append([]list.Item{logItem(msg)}, m.logItems...)
-		if !m.paused {
-			if m.logList.FilterState() == list.Unfiltered {
-				m.logList.SetItems(m.logItems)
-			}
+		m.logItems = append(m.logItems, logItem(msg))
+		cmd = append(cmd, m.logList.SetItems(m.logItems))
+		if m.logList.FilterState() == list.Unfiltered && !m.paused {
+			m.logList.Select(len(m.logItems) - 1)
 		}
 		break
 	case statusMessageMsg:
@@ -324,7 +347,7 @@ func (m *model) View() string {
 		)
 	} else if m.selectedLog != nil {
 		showModal = true
-		modalContent = string(*m.selectedLog)
+		modalContent = fmt.Sprintf("%s\n\n%s", tui.Muted(m.selectedLog.timestamp.Format(time.DateTime)), tui.Highlight(m.selectedLog.message))
 	} else if m.showagents {
 		showModal = true
 		modalContent = "Agents"
@@ -427,8 +450,8 @@ func (d *DevModeUI) Close(abort bool) {
 func (d *DevModeUI) Start() {
 	d.program = tea.NewProgram(
 		d.model,
-		tea.WithAltScreen(),
 		tea.WithoutSignalHandler(),
+		tea.WithMouseAllMotion(),
 	)
 	d.wg.Add(1)
 	go func() {
@@ -450,7 +473,10 @@ func (d *DevModeUI) Start() {
 
 // Add a log message to the log list
 func (d *DevModeUI) AddLog(log string, args ...any) {
-	d.program.Send(addLogMsg(fmt.Sprintf(log, args...)))
+	d.program.Send(addLogMsg{
+		timestamp: time.Now(),
+		message:   ansiColorStripper.ReplaceAllString(fmt.Sprintf(log, args...), ""),
+	})
 }
 
 func (d *DevModeUI) SetStatusMessage(msg string, args ...any) {
