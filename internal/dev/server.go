@@ -214,9 +214,13 @@ func (s *Server) getAgents(ctx context.Context, project *project.Project) (*Agen
 		return nil, err
 	}
 	for _, agent := range project.Agents {
+		var w Welcome
+		if welcome != nil {
+			w = welcome[agent.ID]
+		}
 		resp.Agents = append(resp.Agents, AgentWelcome{
 			AgentConfig: agent,
-			Welcome:     welcome[agent.ID],
+			Welcome:     w,
 		})
 	}
 	return resp, nil
