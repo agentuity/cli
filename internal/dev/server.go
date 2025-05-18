@@ -179,6 +179,7 @@ func (s *Server) connect(initial bool) {
 			s.reconnectMutex.Lock()
 			if s.reconnectFailures == 0 {
 				s.connectionFailed = time.Now()
+				s.logger.Warn("lost connection to the dev server, reconnecting ...")
 			}
 			s.reconnectFailures++
 			started = s.connectionFailed
@@ -220,7 +221,7 @@ func (s *Server) connect(initial bool) {
 	conn, err := tls.Dial("tcp", s.serverAddr, &tlsConfig)
 	if err != nil {
 		gerr = err
-		s.logger.Error("failed to dial tls: %s", err)
+		s.logger.Warn("failed to dial tls: %s, will retry ...", err)
 		return
 	}
 	s.conn = conn
@@ -233,6 +234,7 @@ func (s *Server) connect(initial bool) {
 	s.reconnectMutex.Lock()
 	if s.reconnectFailures > 0 && !s.connectionFailed.IsZero() {
 		s.logger.Debug("reconnection successful after %s (%d attempts)", time.Since(s.connectionFailed), s.reconnectFailures)
+		s.logger.Info("✅ connection to the dev server re-established")
 	}
 	s.reconnectFailures = 0
 	s.connectionStarted = time.Now()
