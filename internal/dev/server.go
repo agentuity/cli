@@ -63,6 +63,7 @@ type Server struct {
 	wg                sync.WaitGroup
 	serverAddr        string
 	cleanup           func()
+	connectionLock    sync.Mutex
 	reconnectFailures int
 	connectionFailed  time.Time
 	connectionStarted time.Time
@@ -155,6 +156,11 @@ func (s *Server) reconnect() {
 
 func (s *Server) connect(initial bool) {
 	var gerr error
+
+	// hold a connection lock to prevent multiple go routines from trying to reconnect
+	// before the previous connect goroutine has finished
+	s.connectionLock.Lock()
+	defer s.connectionLock.Unlock()
 
 	defer func() {
 		if initial && gerr != nil {
