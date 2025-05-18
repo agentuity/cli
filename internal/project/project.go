@@ -8,13 +8,17 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Masterminds/semver"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	cstr "github.com/agentuity/go-common/string"
+	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	yc "github.com/zijiren233/yaml-comment"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -39,12 +43,13 @@ type initProjectResult struct {
 
 type ProjectData struct {
 	APIKey           string            `json:"api_key"`
+	ProjectKey       string            `json:"projectKey"`
 	ProjectId        string            `json:"id"`
 	OrgId            string            `json:"orgId"`
 	Env              map[string]string `json:"env"`
 	Secrets          map[string]string `json:"secrets"`
 	WebhookAuthToken string            `json:"webhookAuthToken,omitempty"`
-	AgentID          string            `json:"agentId"`
+	Agents           []AgentConfig     `json:"agents"`
 }
 
 type InitProjectArgs struct {
@@ -56,23 +61,32 @@ type InitProjectArgs struct {
 	Name              string
 	Description       string
 	EnableWebhookAuth bool
-	AgentName         string
-	AgentDescription  string
-	AgentID           string
+	Agents            []AgentConfig
+	AuthType          string
 }
 
 // InitProject will create a new project in the organization.
 // It will return the API key and project ID if the project is initialized successfully.
 func InitProject(ctx context.Context, logger logger.Logger, args InitProjectArgs) (*ProjectData, error) {
 
+	agents := make([]map[string]any, 0)
+	for _, agent := range args.Agents {
+		agents = append(agents, map[string]any{
+			"name":        agent.Name,
+			"description": agent.Description,
+		})
+	}
 	payload := map[string]any{
-		"organization_id":   args.OrgId,
-		"provider":          args.Provider,
-		"name":              args.Name,
+		"organization_id": args.OrgId,
+		"provider":        args.Provider,
+		"name":            args.Name,
+
 		"description":       args.Description,
 		"enableWebhookAuth": args.EnableWebhookAuth,
-		"agent":             map[string]string{"name": args.AgentName, "description": args.AgentDescription},
+		"agents":            agents,
+		"authType":          args.AuthType,
 	}
+	logger.Trace("sending new project payload: %s", cstr.JSONStringify(payload))
 
 	client := util.NewAPIClient(ctx, logger, args.BaseURL, args.Token)
 
@@ -80,7 +94,6 @@ func InitProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 	if err := client.Do("POST", initPath, payload, &result); err != nil {
 		return nil, err
 	}
-
 	return &result.Data, nil
 }
 
@@ -90,8 +103,7 @@ func getFilename(dir string) string {
 
 func ProjectExists(dir string) bool {
 	fn := getFilename(dir)
-	_, err := os.Stat(fn)
-	return err == nil
+	return util.Exists(fn)
 }
 
 type Resources struct {
@@ -123,9 +135,10 @@ type Development struct {
 }
 
 type AgentConfig struct {
-	ID          string `json:"id" yaml:"id" hc:"The ID of the Agent which is automatically generated"`
-	Name        string `json:"name" yaml:"name" hc:"The name of the Agent which is editable"`
-	Description string `json:"description,omitempty" yaml:"description,omitempty" hc:"The description of the Agent which is editable"`
+	ID          string   `json:"id" yaml:"id" hc:"The ID of the Agent which is automatically generated"`
+	Name        string   `json:"name" yaml:"name" hc:"The name of the Agent which is editable"`
+	Description string   `json:"description,omitempty" yaml:"description,omitempty" hc:"The description of the Agent which is editable"`
+	Types       []string `json:"io_types,omitempty" yaml:"io_types,omitempty" hc:"The IO types of the Agent which is editable"`
 }
 
 type Project struct {
@@ -142,16 +155,16 @@ type Project struct {
 // Load will load the project from a file in the given directory.
 func (p *Project) Load(dir string) error {
 	fn := getFilename(dir)
-	if _, err := os.Stat(fn); os.IsNotExist(err) {
+	if !util.Exists(fn) {
 		return nil
 	}
 	of, err := os.Open(fn)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open project file: %s. %w", fn, err)
 	}
 	defer of.Close()
 	if err := yaml.NewDecoder(of).Decode(p); err != nil {
-		return err
+		return fmt.Errorf("failed to decode YAML project file: %s. %w", fn, err)
 	}
 	if p.ProjectId == "" {
 		return ErrProjectMissingProjectId
@@ -249,11 +262,11 @@ type Response[T any] struct {
 
 type ProjectResponse = Response[ProjectData]
 
-func ProjectWithNameExists(ctx context.Context, logger logger.Logger, baseUrl string, token string, name string) (bool, error) {
+func ProjectWithNameExists(ctx context.Context, logger logger.Logger, baseUrl string, token string, orgId string, name string) (bool, error) {
 	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var resp Response[bool]
-	if err := client.Do("GET", fmt.Sprintf("/cli/project/exists/%s", url.PathEscape(name)), nil, &resp); err != nil {
+	if err := client.Do("GET", fmt.Sprintf("/cli/project/exists/%s?orgId=%s", url.PathEscape(name), url.PathEscape(orgId)), nil, &resp); err != nil {
 		var apiErr *util.APIError
 		if errors.As(err, &apiErr) {
 			if apiErr.Status == http.StatusConflict {
@@ -367,6 +380,7 @@ type ProjectImportResponse struct {
 	ID          string        `json:"id"`
 	Agents      []AgentConfig `json:"agents"`
 	APIKey      string        `json:"apiKey"`
+	ProjectKey  string        `json:"projectKey"`
 	IOAuthToken string        `json:"ioAuthToken"`
 }
 
@@ -478,19 +492,26 @@ func LoadProject(logger logger.Logger, dir string, apiUrl string, appUrl string,
 	}
 }
 
-func EnsureProject(cmd *cobra.Command) ProjectContext {
+func isVersionCheckRequired(ver string) bool {
+	if ver != "" && ver != "dev" && !strings.Contains(ver, "-next") {
+		return true
+	}
+	return false
+}
+
+func EnsureProject(ctx context.Context, cmd *cobra.Command) ProjectContext {
 	logger := env.NewLogger(cmd)
 	dir := ResolveProjectDir(logger, cmd, true)
 	apiUrl, appUrl, transportUrl := util.GetURLs(logger)
 	var token string
 	// if the --api-key flag is used, we only need to verify the api key
 	if cmd.Flags().Changed("api-key") {
-		token = util.EnsureLoggedInWithOnlyAPIKey()
+		token = util.EnsureLoggedInWithOnlyAPIKey(ctx, logger, cmd)
 	} else {
-		token, _ = util.EnsureLoggedIn()
+		token, _ = util.EnsureLoggedIn(ctx, logger, cmd)
 	}
 	p := LoadProject(logger, dir, apiUrl, appUrl, transportUrl, token)
-	if !p.NewProject && Version != "" && Version != "dev" && p.Project.Version != "" {
+	if !p.NewProject && isVersionCheckRequired(Version) && p.Project.Version != "" {
 		v := semver.MustParse(Version)
 		c, err := semver.NewConstraint(p.Project.Version)
 		if err != nil {
@@ -504,14 +525,14 @@ func EnsureProject(cmd *cobra.Command) ProjectContext {
 	return p
 }
 
-func TryProject(cmd *cobra.Command) ProjectContext {
+func TryProject(ctx context.Context, cmd *cobra.Command) ProjectContext {
 	logger := env.NewLogger(cmd)
 	dir := ResolveProjectDir(logger, cmd, false)
 	apiUrl, appUrl, transportUrl := util.GetURLs(logger)
 	var token string
 	// if the --api-key flag is used, we only need to verify the api key
 	if cmd.Flags().Changed("api-key") {
-		token = util.EnsureLoggedInWithOnlyAPIKey()
+		token = util.EnsureLoggedInWithOnlyAPIKey(ctx, logger, cmd)
 	} else {
 		apikey, _, ok := util.TryLoggedIn()
 		if ok {
@@ -530,7 +551,7 @@ func TryProject(cmd *cobra.Command) ProjectContext {
 		}
 	}
 	p := LoadProject(logger, dir, apiUrl, appUrl, transportUrl, token)
-	if !p.NewProject && Version != "" && Version != "dev" && p.Project.Version != "" {
+	if !p.NewProject && isVersionCheckRequired(Version) && p.Project.Version != "" {
 		v := semver.MustParse(Version)
 		c, err := semver.NewConstraint(p.Project.Version)
 		if err != nil {
@@ -548,7 +569,7 @@ func ResolveProjectDir(logger logger.Logger, cmd *cobra.Command, required bool) 
 	cwd, err := os.Getwd()
 	if err != nil {
 		errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
-			errsystem.WithUserMessage(fmt.Sprintf("Failed to get current directory: %s", err))).ShowErrorAndExit()
+			errsystem.WithUserMessage("Failed to get current working directory: %s", err)).ShowErrorAndExit()
 	}
 	dir := cwd
 	dirFlag, _ := cmd.Flags().GetString("dir")
@@ -562,10 +583,21 @@ func ResolveProjectDir(logger logger.Logger, cmd *cobra.Command, required bool) 
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
-			errsystem.WithUserMessage(fmt.Sprintf("Failed to get absolute path: %s", err))).ShowErrorAndExit()
+			errsystem.WithUserMessage("Failed to get absolute path to %s: %s", dir, err)).ShowErrorAndExit()
 	}
 	if !ProjectExists(abs) && required {
-		logger.Fatal("Project file not found: %s", filepath.Join(abs, "agentuity.yaml"))
+		dir = viper.GetString("preferences.project_dir")
+		if ProjectExists(dir) {
+			tui.ShowWarning("Using your last used project directory (%s). You should change into the correct directory or use the --dir flag.", dir)
+			return dir
+		}
+		tui.ShowBanner("Agentuity Project Not Found", "No Agentuity project file not found in the directory "+abs+"\n\nMake sure you are in an Agentuity project directory or use the --dir flag to specify a project directory.", false)
+		os.Exit(1)
+	}
+	if ProjectExists(abs) {
+		// if we are successful, set the project dir in the config
+		viper.Set("preferences.project_dir", abs)
+		viper.WriteConfig()
 	}
 	return abs
 }

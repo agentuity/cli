@@ -23,6 +23,7 @@ package main
 
 import (
 	"github.com/agentuity/cli/cmd"
+	"github.com/agentuity/cli/internal/bundler"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
@@ -42,5 +43,6 @@ func main() {
 	project.Version = version
 	util.Version = version
 	util.Commit = commit
+	bundler.Version = version
 	cmd.Execute()
 }

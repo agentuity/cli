@@ -5,11 +5,11 @@ import "fmt"
 func generateVercelAIProvider(name string, envkey string) string {
 	return generateJSArgsPatch(0, "") + fmt.Sprintf(`const opts = {...(_args[0] ?? {}) };
 if (!opts.baseURL) {
-	const apikey = process.env.AGENTUITY_API_KEY;
-	const url = process.env.AGENTUITY_URL;
+	const apikey = process.env.AGENTUITY_SDK_KEY;
+	const url = process.env.AGENTUITY_TRANSPORT_URL;
 	if (url && apikey) {
 		opts.apiKey = apikey;
-		opts.baseURL = url + '/sdk/gateway/%[1]s';
+		opts.baseURL = url + '/gateway/%[1]s';
 		_args[0] = opts;
 	} else {
 	  %[2]s

@@ -3,11 +3,13 @@ package bundler
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
@@ -21,6 +23,8 @@ import (
 
 var Version = "dev"
 
+var ErrBuildFailed = fmt.Errorf("build failed")
+
 type AgentConfig struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
@@ -33,27 +37,50 @@ type BundleContext struct {
 	ProjectDir string
 	Production bool
 	Install    bool
+	CI         bool
+	DevMode    bool
+	Writer     io.Writer
 }
 
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
 
-	if ctx.Install {
+	if ctx.Install || !util.Exists(filepath.Join(dir, "node_modules")) {
 		var install *exec.Cmd
 		switch theproject.Bundler.Runtime {
 		case "nodejs":
-			install = exec.Command("npm", "install", "--no-save", "--no-audit", "--no-fund", "--include=prod")
+			install = exec.CommandContext(ctx.Context, "npm", "install", "--no-save", "--no-audit", "--no-fund", "--include=prod", "--ignore-scripts")
 		case "bunjs":
-			install = exec.Command("bun", "install", "--production", "--no-save", "--silent", "--no-progress", "--no-summary")
+			args := []string{"install", "--production", "--no-save", "--ignore-scripts"}
+			if ctx.CI {
+				args = append(args, "--verbose", "--no-cache")
+			} else {
+				args = append(args, "--no-progress", "--no-summary", "--silent")
+			}
+			install = exec.CommandContext(ctx.Context, "bun", args...)
 		default:
 			return fmt.Errorf("unsupported runtime: %s", theproject.Bundler.Runtime)
 		}
 		util.ProcessSetup(install)
 		install.Dir = dir
 		out, err := install.CombinedOutput()
+		var ec int
+		if install.ProcessState != nil {
+			ec = install.ProcessState.ExitCode()
+		}
+		ctx.Logger.Trace("install command: %s returned: %s, err: %s, exit code: %d", strings.Join(install.Args, " "), strings.TrimSpace(string(out)), err, ec)
 		if err != nil {
-			return fmt.Errorf("failed to install dependencies: %w. %s", err, string(out))
+			if install.ProcessState == nil || install.ProcessState.ExitCode() != 0 {
+				if install.ProcessState != nil {
+					return fmt.Errorf("failed to install dependencies (exit code %d): %w. %s", install.ProcessState.ExitCode(), err, string(out))
+				}
+				return fmt.Errorf("failed to install dependencies: %w. %s", err, string(out))
+			}
 		}
 		ctx.Logger.Debug("installed dependencies: %s", strings.TrimSpace(string(out)))
+	}
+
+	if err := checkForBreakingChanges(ctx, "javascript", theproject.Bundler.Runtime); err != nil {
+		return err
 	}
 
 	var entryPoints []string
@@ -75,7 +102,10 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 	if err != nil {
 		return fmt.Errorf("failed to load %s: %w", pkgjson, err)
 	}
-	agentuitypkg := filepath.Join(dir, "node_modules", "@agentuity", "sdk", "package.json")
+	agentuitypkg, err := resolveAgentuity(dir)
+	if err != nil {
+		return err
+	}
 	pkg2, err := util.NewOrderedMapFromFile(util.PackageJsonKeysOrder, agentuitypkg)
 	if err != nil {
 		return fmt.Errorf("failed to load %s: %w", agentuitypkg, err)
@@ -98,8 +128,10 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 			defines["process.env.AGENTUITY_ENVIRONMENT"] = fmt.Sprintf("'%s'", "development")
 		}
 	}
-	defines["process.env.AGENTUITY_CLOUD_AGENTS_JSON"] = fmt.Sprintf("'%s'", cstr.JSONStringify(agents))
+	defines["process.env.AGENTUITY_CLOUD_AGENTS_JSON"] = cstr.JSONStringify(cstr.JSONStringify(agents))
 
+	ctx.Logger.Debug("starting build")
+	started := time.Now()
 	result := api.Build(api.BuildOptions{
 		EntryPoints:    entryPoints,
 		Bundle:         true,
@@ -124,12 +156,17 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 			"js": jsheader + jsshim,
 		},
 	})
+	ctx.Logger.Debug("finished build in %v", time.Since(started))
 	if len(result.Errors) > 0 {
-		fmt.Println("\n" + tui.Warning("Build Failed") + "\n")
+		fmt.Fprintln(ctx.Writer, "\n"+tui.Warning("Build Failed")+"\n")
 
 		for _, err := range result.Errors {
 			formattedError := formatESBuildError(dir, err)
-			fmt.Println(formattedError)
+			fmt.Fprintln(ctx.Writer, formattedError)
+		}
+
+		if ctx.DevMode {
+			return ErrBuildFailed
 		}
 
 		os.Exit(2)
@@ -145,13 +182,13 @@ var (
 
 func bundlePython(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
 
-	if ctx.Install {
+	if ctx.Install || !util.Exists(filepath.Join(dir, ".venv", "lib")) {
 		var install *exec.Cmd
 		switch theproject.Bundler.Runtime {
 		case "uv":
-			install = exec.Command("uv", "sync", "--no-dev", "--frozen", "--quiet", "--no-progress")
+			install = exec.CommandContext(ctx.Context, "uv", "sync", "--no-dev", "--frozen", "--quiet", "--no-progress")
 		case "pip":
-			install = exec.Command("uv", "pip", "install", "--quiet", "--no-progress")
+			install = exec.CommandContext(ctx.Context, "uv", "pip", "install", "--quiet", "--no-progress")
 		case "poetry":
 			return fmt.Errorf("poetry is not supported yet")
 		default:
@@ -161,9 +198,18 @@ func bundlePython(ctx BundleContext, dir string, outdir string, theproject *proj
 		install.Dir = dir
 		out, err := install.CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("failed to install dependencies: %w. %s", err, string(out))
+			if install.ProcessState == nil || install.ProcessState.ExitCode() != 0 {
+				if install.ProcessState != nil {
+					return fmt.Errorf("failed to install dependencies (exit code %d): %w. %s", install.ProcessState.ExitCode(), err, string(out))
+				}
+				return fmt.Errorf("failed to install dependencies: %w. %s", err, string(out))
+			}
 		}
 		ctx.Logger.Debug("installed dependencies: %s", strings.TrimSpace(string(out)))
+	}
+
+	if err := checkForBreakingChanges(ctx, "python", theproject.Bundler.Runtime); err != nil {
+		return err
 	}
 
 	config := map[string]any{
@@ -197,10 +243,16 @@ func bundlePython(ctx BundleContext, dir string, outdir string, theproject *proj
 func getAgents(theproject *project.Project, filename string) []AgentConfig {
 	var agents []AgentConfig
 	for _, agent := range theproject.Agents {
+		var agentfilename string
+		if theproject.Bundler.Language == "python" {
+			agentfilename = util.SafePythonFilename(agent.Name)
+		} else {
+			agentfilename = util.SafeFilename(agent.Name)
+		}
 		agents = append(agents, AgentConfig{
 			ID:       agent.ID,
 			Name:     agent.Name,
-			Filename: filepath.Join(theproject.Bundler.AgentConfig.Dir, util.SafeFilename(agent.Name), filename),
+			Filename: filepath.Join(theproject.Bundler.AgentConfig.Dir, agentfilename, filename),
 		})
 	}
 	return agents
@@ -209,11 +261,16 @@ func getAgents(theproject *project.Project, filename string) []AgentConfig {
 func Bundle(ctx BundleContext) error {
 	theproject := project.NewProject()
 	if err := theproject.Load(ctx.ProjectDir); err != nil {
-		return err
+		return fmt.Errorf("failed to load project from %s: %w", ctx.ProjectDir, err)
+	}
+	if theproject.ProjectId == "" {
+		return fmt.Errorf("project in the directory %s is not a valid agentuity project", ctx.ProjectDir)
 	}
 	dir := ctx.ProjectDir
 	outdir := filepath.Join(dir, ".agentuity")
+	ctx.Logger.Debug("bundling project %s to %s", dir, outdir)
 	if sys.Exists(outdir) {
+		ctx.Logger.Debug("removing existing directory: %s", outdir)
 		if err := os.RemoveAll(outdir); err != nil {
 			return fmt.Errorf("failed to remove .agentuity directory: %w", err)
 		}
@@ -229,4 +286,21 @@ func Bundle(ctx BundleContext) error {
 		return bundlePython(ctx, dir, outdir, theproject)
 	}
 	return fmt.Errorf("unsupported runtime: %s", theproject.Bundler.Runtime)
+}
+
+// resolveAgentuity walks up from startDir looking for node_modules/@agentuity/sdk/package.json
+func resolveAgentuity(startDir string) (string, error) {
+	dir := startDir
+	for {
+		candidate := filepath.Join(dir, "node_modules", "@agentuity", "sdk", "package.json")
+		if util.Exists(candidate) {
+			return candidate, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return "", fmt.Errorf("could not find @agentuity/sdk/package.json in any parent directory of %s", startDir)
 }

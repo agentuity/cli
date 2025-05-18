@@ -29,13 +29,13 @@ type MCPClientApplicationConfig struct {
 	Windows []string
 	Linux   []string
 }
+
 func toPathArray(path string) []string {
 	if path == "" {
 		return []string{}
 	}
 	return []string{path}
 }
-
 
 type MCPClientConfig struct {
 	Name           string
@@ -102,7 +102,7 @@ func loadConfig(path string) (*MCPConfig, error) {
 var mcpClientConfigs []MCPClientConfig
 
 // Detect detects the MCP clients that are installed and returns an array of MCP client names found.
-func Detect(all bool) ([]MCPClientConfig, error) {
+func Detect(logger logger.Logger, all bool) ([]MCPClientConfig, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
@@ -130,7 +130,7 @@ func Detect(all bool) ([]MCPClientConfig, error) {
 			case "linux":
 				filepaths = config.Application.Linux
 			}
-			
+
 			for _, filepath := range filepaths {
 				if filepath == "$PATH" {
 					if config.Command != "" {
@@ -158,7 +158,8 @@ func Detect(all bool) ([]MCPClientConfig, error) {
 		if util.Exists(config.ConfigLocation) {
 			mcpconfig, err = loadConfig(config.ConfigLocation)
 			if err != nil {
-				return nil, err
+				logger.Error("failed to load MCP config for %s: %s", config.Name, err)
+				return nil, nil
 			}
 			if _, ok := mcpconfig.MCPServers[agentuityToolName]; ok {
 				config.Detected = true
@@ -173,7 +174,7 @@ func Detect(all bool) ([]MCPClientConfig, error) {
 // Install installs the agentuity tool for the given command and args.
 // It will install the tool for each MCP client config that is detected and not already installed.
 func Install(ctx context.Context, logger logger.Logger) error {
-	detected, err := Detect(false)
+	detected, err := Detect(logger, false)
 	if err != nil {
 		return err
 	}
@@ -236,14 +237,14 @@ func Install(ctx context.Context, logger logger.Logger) error {
 	if installed == 0 {
 		tui.ShowSuccess("All MCP clients are up-to-date")
 	}
-	
+
 	return nil
 }
 
 // Uninstall uninstalls the agentuity tool for the given command and args.
 // It will uninstall the tool for each MCP client config that is detected and not already uninstalled.
 func Uninstall(ctx context.Context, logger logger.Logger) error {
-	detected, err := Detect(false)
+	detected, err := Detect(logger, false)
 	if err != nil {
 		return err
 	}

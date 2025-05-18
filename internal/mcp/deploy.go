@@ -7,7 +7,10 @@ import (
 )
 
 type DeployArguments struct {
-	Directory string `json:"directory" jsonschema:"required,description=The directory where the project is located"`
+	Directory   string   `json:"directory" jsonschema:"required,description=The directory where the project is located"`
+	Tags        []string `json:"tags,omitempty" jsonschema:"description=Tags to associate with this deployment"`
+	Description string   `json:"description,omitempty" jsonschema:"description=Description for the deployment tag(s)"`
+	Message     string   `json:"message,omitempty" jsonschema:"description=Message for the deployment tag(s)"`
 }
 
 func init() {
@@ -22,7 +25,17 @@ func init() {
 			if resp := ensureProject(&c); resp != nil {
 				return resp, nil
 			}
-			result, err := execCommand(ctx, c.ProjectDir, "deploy", "--format", "json", "--dir", c.ProjectDir)
+			argsList := []string{"deploy", "--format", "json", "--dir", c.ProjectDir}
+			for _, tag := range args.Tags {
+				argsList = append(argsList, "--tag", tag)
+			}
+			if args.Description != "" {
+				argsList = append(argsList, "--description", args.Description)
+			}
+			if args.Message != "" {
+				argsList = append(argsList, "--message", args.Message)
+			}
+			result, err := execCommand(ctx, c.ProjectDir, argsList[0], argsList[1:]...)
 			if err != nil {
 				return nil, err
 			}

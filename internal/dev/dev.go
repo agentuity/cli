@@ -1,12 +1,13 @@
 package dev
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
 	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/agentuity/cli/internal/project"
@@ -14,29 +15,54 @@ import (
 	"github.com/agentuity/go-common/logger"
 )
 
-func KillProjectServer(projectServerCmd *exec.Cmd) {
-	projectServerCmd.Process.Signal(syscall.SIGTERM)
-	ch := make(chan struct{})
+func KillProjectServer(logger logger.Logger, projectServerCmd *exec.Cmd, pid int) {
+	if pid > 0 {
+		processes, err := getProcessTree(logger, pid)
+		if err != nil {
+			logger.Error("error getting process tree for parent (pid: %d): %s", pid, err)
+		}
+		for _, childPid := range processes {
+			logger.Debug("killing child process (pid: %d)", childPid)
+			kill(logger, childPid)
+		}
+	}
+	if projectServerCmd == nil || projectServerCmd.ProcessState == nil || projectServerCmd.ProcessState.Exited() {
+		logger.Debug("project server already exited (pid: %d)", pid)
+		kill(logger, pid)
+		return
+	}
+	ch := make(chan struct{}, 1)
 	go func() {
 		projectServerCmd.Wait()
 		ch <- struct{}{}
 	}()
+
+	if projectServerCmd.Process != nil {
+		logger.Debug("killing parent process %d", pid)
+		if err := terminateProcess(logger, projectServerCmd); err != nil {
+			logger.Error("error terminating project server: %s", err)
+		}
+	}
+
+	// Wait a bit longer for SIGTERM to take effect
 	select {
 	case <-ch:
-		break
-	case <-time.After(time.Second * 10):
-		// this will kill the process group not just the parent process
+		return
+	case <-time.After(time.Second * 3):
+		// If neither signal worked, use the platform-specific kill
 		util.ProcessKill(projectServerCmd)
+		close(ch)
 	}
 }
 
 func isPortAvailable(port int) bool {
-	listener, err := net.Listen("tcp4", fmt.Sprintf("0.0.0.0:%d", port))
+	timeout := time.Second
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("0.0.0.0:%d", port), timeout)
 	if err != nil {
-		return false
+		return true
 	}
-	listener.Close()
-	return true
+	defer conn.Close()
+	return false
 }
 
 func findAvailablePort() (int, error) {
@@ -48,7 +74,12 @@ func findAvailablePort() (int, error) {
 	return listener.Addr().(*net.TCPAddr).Port, nil
 }
 
-func FindAvailablePort(p project.ProjectContext) (int, error) {
+func FindAvailablePort(p project.ProjectContext, tryPort int) (int, error) {
+	if tryPort > 0 {
+		if isPortAvailable(tryPort) {
+			return tryPort, nil
+		}
+	}
 	if v, ok := os.LookupEnv("AGENTUITY_CLOUD_PORT"); ok && v != "" {
 		p, err := strconv.Atoi(v)
 		if err != nil {
@@ -73,15 +104,16 @@ func FindAvailablePort(p project.ProjectContext) (int, error) {
 	return findAvailablePort()
 }
 
-func CreateRunProjectCmd(log logger.Logger, theproject project.ProjectContext, liveDevConnection *Websocket, dir string, orgId string, port int) (*exec.Cmd, error) {
+func CreateRunProjectCmd(ctx context.Context, log logger.Logger, theproject project.ProjectContext, server *Server, dir string, orgId string, port int, writer io.Writer) (*exec.Cmd, error) {
 	// set the vars
-	projectServerCmd := exec.Command(theproject.Project.Development.Command, theproject.Project.Development.Args...)
+	projectServerCmd := exec.CommandContext(ctx, theproject.Project.Development.Command, theproject.Project.Development.Args...)
 	projectServerCmd.Env = os.Environ()[:]
-	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_OTLP_BEARER_TOKEN=%s", liveDevConnection.OtelToken))
-	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_OTLP_URL=%s", liveDevConnection.OtelUrl))
+	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_OTLP_BEARER_TOKEN=%s", server.otelToken))
+	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_OTLP_URL=%s", server.otelUrl))
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_URL=%s", theproject.APIURL))
+	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_TRANSPORT_URL=%s", theproject.TransportURL))
 
-	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_DEPLOYMENT_ID=%s", liveDevConnection.WebSocketId))
+	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_DEPLOYMENT_ID=%s", server.ID))
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_PROJECT_ID=%s", theproject.Project.ProjectId))
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_ORG_ID=%s", orgId))
 
@@ -96,9 +128,9 @@ func CreateRunProjectCmd(log logger.Logger, theproject project.ProjectContext, l
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_PORT=%d", port))
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("PORT=%d", port))
 
-	projectServerCmd.Stdout = os.Stdout
-	projectServerCmd.Stderr = os.Stderr
-	projectServerCmd.Stdin = os.Stdin
+	projectServerCmd.Stdout = writer
+	projectServerCmd.Stderr = writer
+	projectServerCmd.Dir = dir
 
 	util.ProcessSetup(projectServerCmd)
 

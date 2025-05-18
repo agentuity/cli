@@ -15,25 +15,32 @@ The command line tools for the Agentuity Agent Cloud Platform.  These tools are 
 
 ## Installation
 
-You can install the CLI using the install script:
+You can install the CLI using the install script (Linux, macOS, or WSL):
 
 ```bash
-curl -fsSL https://agentuity.sh/install.sh | sh
+curl -fsS https://agentuity.sh | sh
 ```
 
-If you are on a Mac, you can install the CLI using Homebrew:
+If you are on a Mac, you can install the CLI using Homebrew (by default, the install script will use Homebrew if it is installed and not disabled):
 
 ```bash
- brew install agentuity/tap/agentuity
+brew install agentuity/tap/agentuity
 ```
 
-For Windows, you can install the CLI using the install script:
+You can force the install script to use the direct binary install (not Homebrew) with:
 
 ```bash
-irm https://agentuity.sh/install.ps1 | iex
+curl -fsS https://agentuity.sh | sh -s -- --no-brew
 ```
+
+**Windows:** Native Windows installation is no longer supported. Please use [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/) and run the install script from your WSL terminal.
 
 For other platforms, please download the binary from the [Releases](https://github.com/agentuity/cli/releases) page.
+
+**Supported platforms:**
+- Linux
+- macOS
+- Windows (via WSL only)
 
 ## Upgrade
 
@@ -42,6 +49,25 @@ If you have already installed the CLI, you can upgrade to the latest version usi
 ```bash
 agentuity upgrade
 ```
+
+You can check the current version with:
+
+```bash
+agentuity version
+```
+
+You can check if there is a newer version:
+
+```bash
+agentuity version check
+```
+
+Use the `--upgrade` flag to automatically upgrade if a newer version is found:
+
+```bash
+agentuity version check --upgrade
+```
+
 
 ## Usage
 
@@ -92,6 +118,9 @@ agentuity agent list
 
 # Delete one or more Agents
 agentuity agent delete
+
+# Test an Agent by sending a payload to its webhook
+agentuity agent test --agent-id <agent_id> --payload '{"key": "value"}'
 ```
 
 ### Development and Deployment
