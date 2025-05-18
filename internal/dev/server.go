@@ -31,38 +31,41 @@ import (
 
 const (
 	maxConnectionFailures = 20
+	maxReconnectBaseDelay = time.Millisecond * 250
+	maxReconnectMaxDelay  = time.Second * 10
 )
 
 var propagator propagation.TraceContext
 
 type Server struct {
-	ID                string
-	otelToken         string
-	otelUrl           string
-	Project           project.ProjectContext
-	orgId             string
-	userId            string
-	apiurl            string
-	transportUrl      string
-	apiKey            string
-	ctx               context.Context
-	cancel            context.CancelFunc
-	logger            logger.Logger
-	tracer            trace.Tracer
-	version           string
-	once              sync.Once
-	apiclient         *util.APIClient
-	publicUrl         string
-	port              int
-	connected         chan string
-	pendingLogger     logger.Logger
-	expiresAt         *time.Time
-	tlsCertificate    *tls.Certificate
-	conn              *tls.Conn
-	srv               *http2.Server
-	wg                sync.WaitGroup
-	serverAddr        string
-	cleanup           func()
+	ID             string
+	otelToken      string
+	otelUrl        string
+	Project        project.ProjectContext
+	orgId          string
+	userId         string
+	apiurl         string
+	transportUrl   string
+	apiKey         string
+	ctx            context.Context
+	cancel         context.CancelFunc
+	logger         logger.Logger
+	tracer         trace.Tracer
+	version        string
+	once           sync.Once
+	apiclient      *util.APIClient
+	publicUrl      string
+	port           int
+	connected      chan string
+	pendingLogger  logger.Logger
+	expiresAt      *time.Time
+	tlsCertificate *tls.Certificate
+	conn           *tls.Conn
+	wg             sync.WaitGroup
+	serverAddr     string
+	cleanup        func()
+
+	// Connection state
 	connectionLock    sync.Mutex
 	reconnectFailures int
 	connectionFailed  time.Time
@@ -185,7 +188,11 @@ func (s *Server) connect(initial bool) {
 				s.logger.Fatal("Too many connection failures, giving up after %d attempts (%s). You may need to re-run `agentuity dev`. If this error persists, please contact support.", count, time.Since(started))
 				return
 			}
-			wait := time.Millisecond * 250 * time.Duration(count)
+			baseDelay := maxReconnectBaseDelay
+			wait := baseDelay * time.Duration(math.Pow(2, float64(count-1)))
+			if wait > maxReconnectMaxDelay {
+				wait = maxReconnectMaxDelay
+			}
 			s.logger.Debug("reconnecting in %s after %d connection failures (%s)", wait, count, time.Since(started))
 			time.Sleep(wait)
 			s.reconnect()
