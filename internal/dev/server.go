@@ -179,7 +179,7 @@ func (s *Server) connect(initial bool) {
 				s.logger.Fatal("Too many connection failures, giving up after %d attempts (%s). You may need to re-run `agentuity dev`. If this error persists, please contact support.", count, time.Since(started))
 				return
 			}
-			wait := time.Millisecond * 250 * time.Duration(s.reconnectFailures)
+			wait := time.Millisecond * 250 * time.Duration(count)
 			s.logger.Debug("reconnecting in %s after %d connection failures (%s)", wait, count, time.Since(started))
 			time.Sleep(wait)
 			s.reconnect()
