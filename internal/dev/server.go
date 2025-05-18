@@ -297,6 +297,7 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		if agent.ID == agentId || strings.TrimLeft(agent.ID, "agent_") == agentId {
 			found = true
 			agentId = agent.ID
+			r.URL.Path = fmt.Sprintf("/%s", agentId) // in case we used the short version of the agent id
 			break
 		}
 	}
