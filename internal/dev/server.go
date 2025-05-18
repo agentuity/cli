@@ -29,36 +29,44 @@ import (
 	"golang.org/x/net/http2"
 )
 
+const (
+	maxConnectionFailures = 20
+)
+
 var propagator propagation.TraceContext
 
 type Server struct {
-	ID             string
-	otelToken      string
-	otelUrl        string
-	Project        project.ProjectContext
-	orgId          string
-	userId         string
-	apiurl         string
-	transportUrl   string
-	apiKey         string
-	ctx            context.Context
-	cancel         context.CancelFunc
-	logger         logger.Logger
-	tracer         trace.Tracer
-	version        string
-	once           sync.Once
-	apiclient      *util.APIClient
-	publicUrl      string
-	port           int
-	connected      chan string
-	pendingLogger  logger.Logger
-	expiresAt      *time.Time
-	tlsCertificate *tls.Certificate
-	conn           *tls.Conn
-	srv            *http2.Server
-	wg             sync.WaitGroup
-	serverAddr     string
-	cleanup        func()
+	ID                string
+	otelToken         string
+	otelUrl           string
+	Project           project.ProjectContext
+	orgId             string
+	userId            string
+	apiurl            string
+	transportUrl      string
+	apiKey            string
+	ctx               context.Context
+	cancel            context.CancelFunc
+	logger            logger.Logger
+	tracer            trace.Tracer
+	version           string
+	once              sync.Once
+	apiclient         *util.APIClient
+	publicUrl         string
+	port              int
+	connected         chan string
+	pendingLogger     logger.Logger
+	expiresAt         *time.Time
+	tlsCertificate    *tls.Certificate
+	conn              *tls.Conn
+	srv               *http2.Server
+	wg                sync.WaitGroup
+	serverAddr        string
+	cleanup           func()
+	reconnectFailures int
+	connectionFailed  time.Time
+	connectionStarted time.Time
+	reconnectMutex    sync.Mutex
 }
 
 type ServerArgs struct {
@@ -147,9 +155,34 @@ func (s *Server) reconnect() {
 
 func (s *Server) connect(initial bool) {
 	var gerr error
+
 	defer func() {
 		if initial && gerr != nil {
 			s.connected <- gerr.Error()
+		}
+		s.logger.Debug("connection closed")
+		select {
+		case <-s.ctx.Done():
+			return
+		default:
+			var count int
+			var started time.Time
+			s.reconnectMutex.Lock()
+			if s.reconnectFailures == 0 {
+				s.connectionFailed = time.Now()
+			}
+			s.reconnectFailures++
+			started = s.connectionFailed
+			count = s.reconnectFailures
+			s.reconnectMutex.Unlock()
+			if count >= maxConnectionFailures {
+				s.logger.Fatal("Too many connection failures, giving up after %d attempts (%s). You may need to re-run `agentuity dev`. If this error persists, please contact support.", count, time.Since(started))
+				return
+			}
+			wait := time.Millisecond * 250 * time.Duration(s.reconnectFailures)
+			s.logger.Debug("reconnecting in %s after %d connection failures (%s)", wait, count, time.Since(started))
+			time.Sleep(wait)
+			s.reconnect()
 		}
 	}()
 
@@ -182,6 +215,18 @@ func (s *Server) connect(initial bool) {
 	if initial {
 		s.connected <- ""
 	}
+
+	// if we successfully connect, reset our connection failures
+	s.reconnectMutex.Lock()
+	if s.reconnectFailures > 0 && !s.connectionFailed.IsZero() {
+		s.logger.Debug("reconnection successful after %s (%d attempts)", time.Since(s.connectionFailed), s.reconnectFailures)
+	}
+	s.reconnectFailures = 0
+	s.connectionStarted = time.Now()
+	s.connectionFailed = time.Time{}
+	s.reconnectMutex.Unlock()
+
+	s.logger.Debug("connection established to %s", s.serverAddr)
 
 	// HTTP/2 server to accept proxied requests over the tunnel connection
 	h2s := &http2.Server{}
