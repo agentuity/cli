@@ -597,6 +597,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.0.88]: https://github.com/agentuity/cli/compare/v0.0.87...v0.0.88
 [v0.0.87]: https://github.com/agentuity/cli/compare/v0.0.86...v0.0.87
 [v0.0.86]: https://github.com/agentuity/cli/compare/v0.0.85...v0.0.86
+[v0.0.127]: https://github.com/agentuity/cli/compare/v0.0.126...v0.0.127
 [v0.0.85]: https://github.com/agentuity/cli/compare/v0.0.84...v0.0.85
 [v0.0.84]: https://github.com/agentuity/cli/compare/v0.0.83...v0.0.84
 [v0.0.83]: https://github.com/agentuity/cli/compare/v0.0.82...v0.0.83
@@ -609,7 +610,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.0.76]: https://github.com/agentuity/cli/compare/v0.0.75...v0.0.76
 [v0.0.75]: https://github.com/agentuity/cli/compare/v0.0.74...v0.0.75
 [v0.0.74]: https://github.com/agentuity/cli/compare/v0.0.73...v0.0.74
-[v0.0.127]: https://github.com/agentuity/cli/compare/v0.0.126...v0.0.127
 [v0.0.73]: https://github.com/agentuity/cli/compare/v0.0.72...v0.0.73
 [v0.0.72]: https://github.com/agentuity/cli/compare/v0.0.71...v0.0.72
 [v0.0.71]: https://github.com/agentuity/cli/compare/v0.0.70...v0.0.71
