@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.128] - 2025-05-18
+
+### Fixed
+- DevMode: automatic reconnect if losing connection to echo server ([#308](https://github.com/agentuity/cli/pull/308))
+
 ## [v0.0.127] - 2025-05-18
 
 ### Fixed
@@ -560,6 +565,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks for new agent creation
 
 
+[v0.0.128]: https://github.com/agentuity/cli/compare/v0.0.127...v0.0.128
 [v0.0.127]: https://github.com/agentuity/cli/compare/v0.0.126...v0.0.127
 [v0.0.126]: https://github.com/agentuity/cli/compare/v0.0.125...v0.0.126
 [v0.0.125]: https://github.com/agentuity/cli/compare/v0.0.124...v0.0.125
