@@ -458,9 +458,9 @@ func (s *Server) getWelcome(ctx context.Context, port int) (map[string]Welcome, 
 func (s *Server) HealthCheck(devModeUrl string) error {
 	started := time.Now()
 	var i int
-	for time.Since(started) < 15*time.Second {
+	for time.Since(started) < 30*time.Second {
 		i++
-		s.logger.Trace("health check request: %s", fmt.Sprintf("%s/_health", devModeUrl))
+		s.logger.Trace("health check request [#%d (%s)]: %s", i, time.Since(started), fmt.Sprintf("%s/_health", devModeUrl))
 		req, err := http.NewRequestWithContext(s.ctx, "GET", fmt.Sprintf("%s/_health", devModeUrl), nil)
 		if err != nil {
 			return fmt.Errorf("failed to create health check request: %w", err)

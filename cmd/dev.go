@@ -207,14 +207,17 @@ Examples:
 		}
 		defer watcher.Close(tuiLogger)
 
+		tuiLogger.Trace("starting project server")
 		if err := projectServerCmd.Start(); err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start project: %s", err))).ShowErrorAndExit()
 		}
 
 		pid = projectServerCmd.Process.Pid
+		tuiLogger.Trace("started project server with pid: %d", pid)
 
 		if err := server.HealthCheck(devModeUrl); err != nil {
 			tuiLogger.Error("failed to health check connection: %s", err)
+			dev.KillProjectServer(tuiLogger, projectServerCmd, pid)
 			ui.Close(true)
 			return
 		}
