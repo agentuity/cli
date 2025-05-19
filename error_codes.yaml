@@ -79,3 +79,12 @@ errors:
 
   - code: CLI-0025
     message: Failed to upgrade CLI
+
+  - code: CLI-0026
+    message: Failed to fetch API keys
+
+  - code: CLI-0027
+    message: Failed to create API key
+
+  - code: CLI-0028
+    message: Failed to delete API key

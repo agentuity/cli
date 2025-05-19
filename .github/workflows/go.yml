@@ -3,8 +3,14 @@ name: Go Build and Test
 on:
   push:
     branches: [ "main" ]
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
   pull_request:
     branches: [ "main" ]
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
 
 permissions:
   contents: read
@@ -12,7 +18,11 @@ permissions:
 
 jobs:
   build:
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    name: Build and Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [blacksmith-4vcpu-ubuntu-2204, blacksmith-4vcpu-ubuntu-2204-arm, windows-latest, macos-latest]
     steps:
     - uses: actions/checkout@v4
 
@@ -41,33 +51,38 @@ jobs:
     timeout-minutes: 10
     strategy:
       matrix:
-        os: [blacksmith-4vcpu-ubuntu-2204]
+        os: [blacksmith-4vcpu-ubuntu-2204, macos-latest]
     steps:
     - uses: actions/checkout@v4
     
     - name: Test Install Script (Linux)
       if: matrix.os == 'blacksmith-4vcpu-ubuntu-2204'
       run: |
+        chmod +x ./install_test/docker-test-install.sh
+        ./install_test/docker-test-install.sh
+      shell: sh
+      
+    - name: Test Install Script (Linux ARM)
+      if: matrix.os == 'blacksmith-4vcpu-ubuntu-2204-arm' 
+      run: |
+        chmod +x ./install_test/docker-test-install.sh
+        ./install_test/docker-test-install.sh
+      shell: sh
+      
+    - name: Test Install Script (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
         chmod +x ./install.sh
-        # Test with default options (latest version)
-        ./install.sh -d /tmp/agentuity-test
+        # Test with default options (latest version) - use --no-brew to skip Homebrew
+        ./install.sh -d /tmp/agentuity-test --no-brew
         # Verify installation
         /tmp/agentuity-test/agentuity --version
         
-        # Test with specific version if available - simplified to avoid potential issues
-        LATEST_VERSION=$(/tmp/agentuity-test/agentuity --version)
-        if [ -n "$LATEST_VERSION" ]; then
-          echo "Testing installation with specific version: $LATEST_VERSION"
-          ./install.sh -d /tmp/agentuity-test-version -v $LATEST_VERSION
-          # Verify installation with specific version
-          INSTALLED_VERSION=$(/tmp/agentuity-test-version/agentuity --version)
-          echo "Installed version: $INSTALLED_VERSION"
-          echo "Expected version: $LATEST_VERSION"
-          if [ "$INSTALLED_VERSION" = "$LATEST_VERSION" ]; then
-            echo "Version verification successful"
-          else
-            echo "Version verification failed"
-            exit 1
-          fi
-        fi
-      shell: bash                                                                                                                                                                                        
+        # Test installing over existing installation to verify segfault fix
+        echo "Testing installation over existing binary to verify segfault fix..."
+        ./install.sh -d /tmp/agentuity-test --no-brew
+        # Verify installation still works after reinstall
+        /tmp/agentuity-test/agentuity --version
+        
+        echo "macOS double installation test passed - segfault fix verified"
+      shell: bash                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        

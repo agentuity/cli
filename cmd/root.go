@@ -12,9 +12,12 @@ import (
 	"time"
 
 	"github.com/agentuity/cli/internal/deployer"
+	"github.com/agentuity/cli/internal/errsystem"
+	"github.com/agentuity/cli/internal/templates"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
 	"github.com/agentuity/go-common/tui"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -27,21 +30,42 @@ var (
 
 var cfgFile string
 
+var logoColor = lipgloss.AdaptiveColor{Light: "#11c7b9", Dark: "#00FFFF"}
+var logoStyle = lipgloss.NewStyle().Foreground(logoColor)
+var logoBox = lipgloss.NewStyle().
+	Width(52).
+	Border(lipgloss.RoundedBorder()).
+	BorderForeground(logoColor).
+	Padding(0, 1).
+	AlignVertical(lipgloss.Top).
+	AlignHorizontal(lipgloss.Left).
+	Foreground(logoColor)
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use: "agentuity",
-	Long: `Agentuity CLI is a command-line tool for building, managing, and deploying AI agents.
+	Use:   "agentuity",
+	Short: "Agentuity CLI is a command-line tool for building, managing, and deploying AI agents.",
+	PreRun: func(cmd *cobra.Command, args []string) {
+		// do this after load so we can get the dynamic version
+		cmd.Long = logoBox.Render(fmt.Sprintf(`%s     %s
 
-Use the various commands to create projects, manage agents, set environment variables,
-and deploy your agents to the Agentuity Cloud Platform.
-
-Run 'agentuity help <command>' for more information about a specific command.`,
+Version:        %s
+Docs:           %s
+Community:      %s
+Dashboard:      %s`,
+			tui.Bold("⨺ Agentuity"),
+			tui.Muted("Build, manage and deploy AI agents"),
+			Version,
+			tui.Link("https://agentuity.dev"),
+			tui.Link("https://discord.gg/vtn3hgUfuc"),
+			tui.Link("https://app.agentuity.com"),
+		))
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		if version, _ := cmd.Flags().GetBool("version"); version {
 			fmt.Println(Version)
 			return
 		}
-		tui.Logo()
 		cmd.Help()
 	},
 }
@@ -53,6 +77,27 @@ func Execute() {
 	if err != nil {
 		os.Exit(1)
 	}
+}
+
+func loadTemplates(ctx context.Context, cmd *cobra.Command) (templates.Templates, string) {
+	tmplDir, custom, err := getConfigTemplateDir(cmd)
+	if err != nil {
+		errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates from directory")).ShowErrorAndExit()
+	}
+
+	var tmpls templates.Templates
+
+	tui.ShowSpinner("Loading templates...", func() {
+		tmpls, err = templates.LoadTemplates(ctx, tmplDir, custom)
+		if err != nil {
+			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("Failed to load templates")).ShowErrorAndExit()
+		}
+
+		if len(tmpls) == 0 {
+			errsystem.New(errsystem.ErrLoadTemplates, err, errsystem.WithContextMessage("No templates returned from load templates")).ShowErrorAndExit()
+		}
+	})
+	return tmpls, tmplDir
 }
 
 func init() {
@@ -157,7 +202,7 @@ func isCancelled(ctx context.Context) bool {
 	}
 }
 
-func checkForUpgrade(ctx context.Context, logger logger.Logger) {
+func checkForUpgrade(ctx context.Context, logger logger.Logger, force bool) {
 	v := viper.GetInt64("preferences.last_update_check")
 	var check bool
 	if v == 0 {
@@ -168,10 +213,17 @@ func checkForUpgrade(ctx context.Context, logger logger.Logger) {
 			check = true
 		}
 	}
-	if check {
+	if check || force {
 		viper.Set("preferences.last_update_check", time.Now().Unix())
 		viper.WriteConfig()
-		util.CheckLatestRelease(ctx, logger)
+		ok, err := util.CheckLatestRelease(ctx, logger, force)
+		if err != nil {
+			logger.Error("Failed to check for latest release: %s", err)
+		}
+		if ok && force {
+			tui.ShowWarning("Agentuity CLI was upgraded. Please re-run the command again to continue.")
+			os.Exit(1) // force an exit after upgrade if executed
+		}
 	}
 }
 

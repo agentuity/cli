@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/agentuity/cli/internal/bundler"
@@ -33,17 +35,22 @@ Examples:
 	Hidden:  true,
 	Run: func(cmd *cobra.Command, args []string) {
 		started := time.Now()
-		projectContext := project.EnsureProject(cmd)
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		projectContext := project.EnsureProject(ctx, cmd)
 		production, _ := cmd.Flags().GetBool("production")
 		install, _ := cmd.Flags().GetBool("install")
 		deploy, _ := cmd.Flags().GetBool("deploy")
+		ci, _ := cmd.Flags().GetBool("ci")
 
 		if err := bundler.Bundle(bundler.BundleContext{
-			Context:    context.Background(),
+			Context:    ctx,
 			Logger:     projectContext.Logger,
 			ProjectDir: projectContext.Dir,
 			Production: production,
 			Install:    install,
+			CI:         ci,
+			Writer:     os.Stderr,
 		}); err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to bundle project")).ShowErrorAndExit()
 		}
@@ -63,20 +70,51 @@ Examples:
 			if deploymentId != "" {
 				args = append(args, "--deploymentId", deploymentId)
 			}
-			flags := []string{"log-level", "api-url", "api-key", "dir", "ci"}
+			flags := []string{
+				"log-level",
+				"api-url",
+				"api-key",
+				"dir",
+				"ci",
+				"ci-remote-url",
+				"ci-branch",
+				"ci-commit",
+				"ci-message",
+				"ci-logs-url",
+				"ci-git-provider",
+				"ci-logs-url",
+			}
+
+			f := cmd.Flags()
 			for _, flag := range flags {
-				if cmd.Flags().Changed(flag) {
-					val, _ := cmd.Flags().GetString(flag)
-					args = append(args, "--"+flag, val)
+				if f.Changed(flag) {
+					switch f.Lookup(flag).Value.Type() {
+					case "string":
+						val, _ := f.GetString(flag)
+						args = append(args, "--"+flag, val)
+					case "bool":
+						args = append(args, "--"+flag)
+					}
 				}
 			}
+
+			if ci {
+				if ciMessage, _ := f.GetString("ci-message"); ciMessage != "" {
+					args = append(args, "--message", ciMessage)
+				}
+				if ciCommit, _ := f.GetString("ci-commit"); ciCommit != "" {
+					args = append(args, "--tag", ciCommit)
+				}
+				args = append(args, "--tag", "latest")
+			}
+
 			started = time.Now()
 			projectContext.Logger.Trace("deploying to cloud with %s and args: %v", bin, args)
 			cwd, err := os.Getwd()
 			if err != nil {
 				projectContext.Logger.Fatal("Failed to get current working directory: %s", err)
 			}
-			c := exec.Command(bin, args...)
+			c := exec.CommandContext(ctx, bin, args...)
 			util.ProcessSetup(c)
 			c.Dir = cwd
 			c.Stdin = nil
@@ -102,4 +140,17 @@ func init() {
 	bundleCmd.Flags().MarkHidden("deploymentId")
 	bundleCmd.Flags().Bool("ci", false, "Used to track a specific CI job")
 	bundleCmd.Flags().MarkHidden("ci")
+	bundleCmd.Flags().String("ci-remote-url", "", "Used to set the remote repository URL for your deployment metadata")
+	bundleCmd.Flags().String("ci-branch", "", "Used to set the branch name for your deployment metadata")
+	bundleCmd.Flags().String("ci-commit", "", "Used to set the commit hash for your deployment metadata")
+	bundleCmd.Flags().String("ci-message", "", "Used to set the commit message for your deployment metadata")
+	bundleCmd.Flags().String("ci-git-provider", "", "Used to set the git provider for your deployment metadata")
+	bundleCmd.Flags().String("ci-logs-url", "", "Used to set the CI logs URL for your deployment metadata")
+
+	bundleCmd.Flags().MarkHidden("ci-remote-url")
+	bundleCmd.Flags().MarkHidden("ci-branch")
+	bundleCmd.Flags().MarkHidden("ci-commit")
+	bundleCmd.Flags().MarkHidden("ci-message")
+	bundleCmd.Flags().MarkHidden("ci-git-provider")
+	bundleCmd.Flags().MarkHidden("ci-logs-url")
 }

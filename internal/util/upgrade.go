@@ -95,18 +95,6 @@ func getBinaryName() string {
 	return binaryName
 }
 
-func isWindowsMsiInstallation() bool {
-	if runtime.GOOS != "windows" {
-		return false
-	}
-	exe, err := os.Executable()
-	if err != nil {
-		return false
-	}
-	return strings.Contains(strings.ToLower(exe), "\\program files\\") ||
-		strings.Contains(strings.ToLower(exe), "\\program files (x86)\\")
-}
-
 func getReleaseAssetName() string {
 	goos := runtime.GOOS
 	arch := runtime.GOARCH
@@ -128,55 +116,23 @@ func getReleaseAssetName() string {
 	return fmt.Sprintf("agentuity_%s_%s.%s", strings.Title(goos), archName, extension)
 }
 
-func getMsiInstallerName() string {
-	arch := runtime.GOARCH
-	var msiArch string
-	if arch == "amd64" {
-		msiArch = "x64"
-	} else if arch == "386" {
-		msiArch = "x86"
-	} else {
-		msiArch = arch
-	}
-
-	return fmt.Sprintf("agentuity-%s.msi", msiArch)
-}
-
-func isAdmin(ctx context.Context) bool {
-	if runtime.GOOS != "windows" {
-		return false
-	}
-
-	cmd := exec.CommandContext(ctx, "powershell", "-Command", "([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)")
-	output, err := cmd.Output()
-	if err != nil {
-		return false
-	}
-
-	return strings.TrimSpace(string(output)) == "True"
-}
-
 func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 	if runtime.GOOS == "darwin" {
 		exe, err := os.Executable()
-		if err == nil && strings.Contains(exe, "/homebrew/Cellar/agentuity/") {
-			logger.Info("Detected Homebrew installation, upgrading via brew")
-			return upgradeWithHomebrew(ctx, logger)
-		}
-	}
+		if err == nil {
+			if strings.Contains(exe, "/usr/local/Cellar/agentuity/") ||
+				strings.Contains(exe, "/opt/homebrew/Cellar/agentuity/") ||
+				strings.Contains(exe, "/homebrew/Cellar/agentuity/") {
+				logger.Debug("Detected Homebrew installation, upgrading via brew")
+				return upgradeWithHomebrew(ctx, logger)
+			}
 
-	if isWindowsMsiInstallation() {
-		release, err := GetLatestRelease(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get latest release: %w", err)
+			if strings.Contains(exe, "/usr/local/bin/agentuity") ||
+				strings.Contains(exe, "/opt/homebrew/bin/agentuity") {
+				logger.Debug("Detected Homebrew symlink, upgrading via brew")
+				return upgradeWithHomebrew(ctx, logger)
+			}
 		}
-
-		if Version == release && !force {
-			tui.ShowSuccess("You are already on the latest version (%s)", release)
-			return nil
-		}
-
-		return upgradeWithWindowsMsi(ctx, release)
 	}
 
 	release, err := GetLatestRelease(ctx) // Using public function from version.go
@@ -198,8 +154,8 @@ func UpgradeCLI(ctx context.Context, logger logger.Logger, force bool) error {
 	}
 	defer os.RemoveAll(tempDir)
 
-	assetURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s/%s", release, assetName)
-	checksumURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s/%s", release, checksumFileName)
+	assetURL := fmt.Sprintf("https://agentuity.sh/release/cli/v%s/%s", release, assetName)
+	checksumURL := fmt.Sprintf("https://agentuity.sh/release/cli/v%s/%s", release, checksumFileName)
 
 	assetPath := filepath.Join(tempDir, assetName)
 	checksumPath := filepath.Join(tempDir, checksumFileName)
@@ -297,15 +253,28 @@ func replaceBinary(ctx context.Context, logger logger.Logger, assetPath, version
 		return fmt.Errorf("failed to extract binary")
 	}
 
-	if err := checkWritePermission(currentExe); err != nil {
-		return fmt.Errorf("insufficient permissions to update binary: %w", err)
-	}
-
 	info, err := os.Stat(currentExe)
 	if err != nil {
 		return fmt.Errorf("failed to get file info: %w", err)
 	}
 	fileMode := info.Mode()
+
+	if err := checkWritePermission(currentExe); err != nil {
+		if strings.Contains(err.Error(), "binary is currently running") || strings.Contains(err.Error(), "is being used by another process") {
+			var updateErr error
+			updateAction := func() {
+				updateErr = updateRunningBinary(currentExe, binaryPath, fileMode)
+			}
+			tui.ShowSpinner("Setting up background update...", updateAction)
+			if updateErr != nil {
+				return fmt.Errorf("failed to set up background update: %w", updateErr)
+			}
+			tui.ShowSuccess("Successfully scheduled update to %s. The update will complete when this process exits.", version)
+			return nil
+		}
+
+		return fmt.Errorf("insufficient permissions to update binary: %w", err)
+	}
 
 	var replaceErr error
 	replaceAction := func() {
@@ -359,11 +328,108 @@ func checkWritePermission(filePath string) error {
 
 	file, err := os.OpenFile(filePath, os.O_WRONLY, info.Mode())
 	if err != nil {
+		if strings.Contains(err.Error(), "text file busy") {
+			return fmt.Errorf("binary is currently running: %w", err)
+		}
 		return err
 	}
 	file.Close()
 
 	return nil
+}
+
+// cleanupUpdateFiles removes any leftover temporary files from previous update attempts
+func cleanupUpdateFiles(dir string) {
+	tmpFiles := []string{
+		filepath.Join(dir, ".agentuity.new"),
+		filepath.Join(dir, ".agentuity.old"),
+		filepath.Join(dir, ".agentuity_updater.sh"),
+		filepath.Join(dir, ".agentuity_updater.ps1"),
+	}
+
+	for _, file := range tmpFiles {
+		_ = os.Remove(file)
+	}
+}
+
+func updateRunningBinary(currentExe, newBinary string, fileMode os.FileMode) error {
+	dir := filepath.Dir(currentExe)
+	tmpBinary := filepath.Join(dir, ".agentuity.new")
+	oldBinary := filepath.Join(dir, ".agentuity.old")
+
+	cleanupUpdateFiles(dir)
+
+	if err := copyFile(newBinary, tmpBinary); err != nil {
+		return fmt.Errorf("failed to copy new binary to temp location: %w", err)
+	}
+
+	if err := os.Chmod(tmpBinary, fileMode); err != nil {
+		return fmt.Errorf("failed to set permissions on new binary: %w", err)
+	}
+
+	if runtime.GOOS == "windows" {
+		script := fmt.Sprintf(`
+$currentExe = "%s"
+$oldBinary = "%s" 
+$tmpBinary = "%s"
+$updateScript = $MyInvocation.MyCommand.Path
+
+# Wait for the process to exit (give it a moment)
+Start-Sleep -Seconds 1
+
+# Perform the update
+try {
+    # Move current binary to old
+    if (Test-Path $currentExe) {
+        Move-Item -Path $currentExe -Destination $oldBinary -Force
+    }
+    
+    # Move new binary to current location
+    Move-Item -Path $tmpBinary -Destination $currentExe -Force
+    
+    # Clean up old binary
+    if (Test-Path $oldBinary) {
+        Remove-Item -Path $oldBinary -Force
+    }
+    
+    # Clean up this script
+    Remove-Item -Path $updateScript -Force
+} catch {
+    # If something goes wrong, try to restore the old binary
+    if (Test-Path $oldBinary) {
+        Move-Item -Path $oldBinary -Destination $currentExe -Force
+    }
+}
+`, currentExe, oldBinary, tmpBinary)
+
+		updateScript := filepath.Join(dir, ".agentuity_updater.ps1")
+		if err := os.WriteFile(updateScript, []byte(script), 0644); err != nil {
+			return fmt.Errorf("failed to create update script: %w", err)
+		}
+
+		cmd := exec.Command("powershell", "-WindowStyle", "Hidden", "-Command",
+			fmt.Sprintf("Start-Process powershell -ArgumentList '-WindowStyle Hidden -ExecutionPolicy Bypass -File \"%s\"' -WindowStyle Hidden", updateScript))
+		return cmd.Start()
+	} else {
+		script := fmt.Sprintf(`#!/bin/sh
+# Wait for the process to exit
+sleep 1
+# Perform the update
+mv "%s" "%s"
+mv "%s" "%s"
+rm "%s"
+# Clean up this script
+rm -- "$0"
+`, currentExe, oldBinary, tmpBinary, currentExe, oldBinary)
+
+		updateScript := filepath.Join(dir, ".agentuity_updater.sh")
+		if err := os.WriteFile(updateScript, []byte(script), 0755); err != nil {
+			return fmt.Errorf("failed to create update script: %w", err)
+		}
+
+		cmd := exec.Command("sh", "-c", fmt.Sprintf("nohup %s > /dev/null 2>&1 &", updateScript))
+		return cmd.Start()
+	}
 }
 
 func extractBinary(ctx context.Context, logger logger.Logger, assetPath, extractDir string) string {
@@ -471,72 +537,52 @@ func extractBinary(ctx context.Context, logger logger.Logger, assetPath, extract
 }
 
 func upgradeWithHomebrew(ctx context.Context, logger logger.Logger) error {
-	logger.Info("Updating Homebrew")
-	updateCmd := exec.CommandContext(ctx, "brew", "update")
-	updateCmd.Stdout = os.Stdout
-	updateCmd.Stderr = os.Stderr
-	if err := updateCmd.Run(); err != nil {
-		return fmt.Errorf("failed to update Homebrew: %w", err)
-	}
-
-	logger.Info("Upgrading agentuity")
-	upgradeCmd := exec.CommandContext(ctx, "brew", "upgrade", "agentuity")
-	upgradeCmd.Stdout = os.Stdout
-	upgradeCmd.Stderr = os.Stderr
-	if err := upgradeCmd.Run(); err != nil {
-		return fmt.Errorf("failed to upgrade via Homebrew: %w", err)
+	release, rerr := GetLatestRelease(ctx)
+	if rerr != nil {
+		return fmt.Errorf("failed to get latest release: %w", rerr)
 	}
 
 	exe, _ := os.Executable()
 	v, _ := exec.CommandContext(ctx, exe, "version").Output()
-	version := strings.TrimSpace(string(v))
+	currentVersion := strings.TrimSpace(string(v))
 
-	tui.ShowSuccess("Successfully upgraded to version %s via Homebrew", version)
-	return nil
-}
-
-func upgradeWithWindowsMsi(ctx context.Context, version string) error {
-	if !isAdmin(ctx) {
-		return fmt.Errorf("administrator privileges required to upgrade MSI installation. Please run the command as administrator")
+	if currentVersion == release {
+		tui.ShowSuccess("You are already on the latest version (%s)", currentVersion)
+		return nil
 	}
 
-	tempDir, err := os.MkdirTemp("", "agentuity-upgrade-msi")
+	var newVersion string
+	var err error
+
+	action := func() {
+		logger.Debug("Updating Homebrew")
+		updateCmd := exec.CommandContext(ctx, "brew", "update")
+		updateCmd.Stdout = os.Stdout
+		updateCmd.Stderr = os.Stderr
+		if lerr := updateCmd.Run(); lerr != nil {
+			err = fmt.Errorf("failed to update Homebrew: %w", lerr)
+			return
+		}
+
+		logger.Debug("Upgrading agentuity")
+		upgradeCmd := exec.CommandContext(ctx, "brew", "upgrade", "agentuity")
+		upgradeCmd.Stdout = os.Stdout
+		upgradeCmd.Stderr = os.Stderr
+		if lerr := upgradeCmd.Run(); lerr != nil {
+			err = fmt.Errorf("failed to upgrade via Homebrew: %w", lerr)
+			return
+		}
+
+		v, _ = exec.CommandContext(ctx, exe, "version").Output()
+		newVersion = strings.TrimSpace(string(v))
+	}
+
+	action()
+
 	if err != nil {
-		return fmt.Errorf("failed to create temp directory: %w", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	installerName := getMsiInstallerName()
-	installerURL := fmt.Sprintf("https://github.com/agentuity/cli/releases/download/%s/%s", version, installerName)
-	installerPath := filepath.Join(tempDir, installerName)
-
-	var downloadErr error
-	downloadAction := func() {
-		if err := downloadFile(installerURL, installerPath); err != nil {
-			downloadErr = fmt.Errorf("failed to download MSI installer: %w", err)
-		}
-	}
-	tui.ShowSpinner("Downloading MSI installer...", downloadAction)
-	if downloadErr != nil {
-		return downloadErr
+		return err
 	}
 
-	var installErr error
-	installAction := func() {
-		updateCmd := exec.CommandContext(ctx, "msiexec", "/update", installerPath, "/qn")
-		if err := updateCmd.Run(); err != nil {
-			tui.ShowWarning("Update approach failed, trying install with reinstall: %v", err)
-			installCmd := exec.CommandContext(ctx, "msiexec", "/i", installerPath, "/qn", "REINSTALLMODE=amus", "REINSTALL=ALL")
-			if err := installCmd.Run(); err != nil {
-				installErr = fmt.Errorf("failed to run MSI installer: %w", err)
-			}
-		}
-	}
-	tui.ShowSpinner("Installing upgrade...", installAction)
-	if installErr != nil {
-		return installErr
-	}
-
-	tui.ShowSuccess("Successfully upgraded to version %s", version)
+	tui.ShowSuccess("Successfully upgraded to version %s via Homebrew", newVersion)
 	return nil
 }
