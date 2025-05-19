@@ -9,7 +9,9 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sort"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/mcp"
@@ -804,6 +806,81 @@ Examples:
 	},
 }
 
+var projectRollbackDeploymentCmd = &cobra.Command{
+	Use:   "rollback-deployment",
+	Short: "Rollback a deployment for a project",
+	Long: `Rollback a specific deployment for a project by selecting a project and deployment.
+
+Examples:
+  agentuity project rollback-deployment
+`,
+	Args: cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		logger := env.NewLogger(cmd)
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
+		apiUrl, _, _ := util.GetURLs(logger)
+
+		selected := selectProject(ctx, logger, apiUrl, apikey, "Select a project to rollback a deployment")
+		if selected == "" {
+			return
+		}
+		selectedDeployment := selectDeployment(ctx, logger, apiUrl, apikey, selected, "Select a deployment to rollback")
+		if selectedDeployment == "" {
+			tui.ShowWarning("no deployment selected")
+			return
+		}
+		err := project.RollbackDeployment(ctx, logger, apiUrl, apikey, selected, selectedDeployment)
+		if err != nil {
+			tui.ShowError(err.Error())
+			return
+		}
+		tui.ShowSuccess("Deployment rolled back successfully")
+	},
+}
+
+var projectDeleteDeploymentCmd = &cobra.Command{
+	Use:   "delete-deployment",
+	Short: "Delete a deployment for a project",
+	Long: `Delete a specific deployment for a project by selecting a project and deployment.
+
+Examples:
+  agentuity project delete-deployment
+`,
+	Args: cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		logger := env.NewLogger(cmd)
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
+		apiUrl, _, _ := util.GetURLs(logger)
+
+		selected := selectProject(ctx, logger, apiUrl, apikey, "Select a project to delete a deployment")
+		if selected == "" {
+			return
+		}
+		selectedDeployment := selectDeployment(ctx, logger, apiUrl, apikey, selected, "Select a deployment to delete")
+		if selectedDeployment == "" {
+			tui.ShowWarning("no deployment selected")
+			return
+		}
+
+		if !tui.Ask(logger, "Are you sure you want to delete the selected deployment?", true) {
+			tui.ShowWarning("cancelled")
+			return
+		}
+
+		err := project.DeleteDeployment(ctx, logger, apiUrl, apikey, selected, selectedDeployment)
+		if err != nil {
+			tui.ShowError(err.Error())
+			return
+		}
+
+		tui.ShowSuccess("Deployment deleted successfully")
+	},
+}
+
 func getConfigTemplateDir(cmd *cobra.Command) (string, bool, error) {
 	if cmd.Flags().Changed("templates-dir") {
 		dir, _ := cmd.Flags().GetString("templates-dir")
@@ -821,6 +898,88 @@ func getConfigTemplateDir(cmd *cobra.Command) (string, bool, error) {
 	return dir, false, nil
 }
 
+// Helper to fetch projects and prompt user to select one. Returns selected project ID or empty string.
+func selectProject(ctx context.Context, logger logger.Logger, apiUrl, apikey string, prompt string) string {
+	var projects []project.ProjectListData
+	action := func() {
+		var err error
+		projects, err = project.ListProjects(ctx, logger, apiUrl, apikey)
+		if err != nil {
+			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list projects")).ShowErrorAndExit()
+		}
+	}
+	tui.ShowSpinner("fetching projects ...", action)
+	if len(projects) == 0 {
+		showNoProjects()
+		return ""
+	}
+	var options []tui.Option
+	for _, p := range projects {
+		desc := p.Description
+		if desc == "" {
+			desc = emptyProjectDescription
+		}
+		options = append(options, tui.Option{
+			ID:   p.ID,
+			Text: tui.Bold(tui.PadRight(p.Name, 20, " ")) + tui.Muted(p.ID),
+		})
+	}
+	selected := tui.Select(logger, prompt, "", options)
+	if selected == "" {
+		tui.ShowWarning("no project selected")
+	}
+	return selected
+}
+
+func selectDeployment(ctx context.Context, logger logger.Logger, apiUrl, apikey, projectId string, prompt string) string {
+	var deployments []project.DeploymentListData
+	fetchDeploymentsAction := func() {
+		var err error
+		deployments, err = project.ListDeployments(ctx, logger, apiUrl, apikey, projectId)
+		if err != nil {
+			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list deployments")).ShowErrorAndExit()
+		}
+	}
+	tui.ShowSpinner("fetching deployments ...", fetchDeploymentsAction)
+	if len(deployments) == 0 {
+		tui.ShowWarning("no deployments found")
+		return ""
+	}
+	var deploymentOptions []tui.Option
+	for _, d := range deployments {
+		date, err := time.Parse(time.RFC3339, d.CreatedAt)
+		if err != nil {
+			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to parse deployment date")).ShowErrorAndExit()
+		}
+		var msg string
+		if len(d.Message) > 60 {
+			msg = d.Message[:57] + "..."
+		} else {
+			msg = d.Message
+		}
+		tags := strings.Join(d.Tags, ", ")
+		if len(d.Tags) > 50 {
+			tags = strings.Join(d.Tags[:50], ", ") + "..."
+		} else {
+			tags = strings.Join(d.Tags, ", ")
+		}
+
+		if d.Active {
+			deploymentOptions = append(deploymentOptions, tui.Option{
+				ID:   d.ID,
+				Text: fmt.Sprintf("%s  %s, tags: [%-50s], msg: [%s]", "✅", tui.Title(date.Format("2006-01-02 15:04:05")), tui.Bold(tags), tui.Bold(msg)),
+			})
+		} else {
+			deploymentOptions = append(deploymentOptions, tui.Option{
+				ID:   d.ID,
+				Text: fmt.Sprintf("    %s, tags: [%-50s], msg: [%s]", tui.Title(date.Format("2006-01-02 15:04:05")), tui.Bold(tags), tui.Bold(msg)),
+			})
+		}
+	}
+	selectedDeployment := tui.Select(logger, "Select a deployment to rollback", "", deploymentOptions)
+	return selectedDeployment
+}
+
 func init() {
 	rootCmd.AddCommand(projectCmd)
 	rootCmd.AddCommand(projectNewCmd)
@@ -828,6 +987,8 @@ func init() {
 	projectCmd.AddCommand(projectListCmd)
 	projectCmd.AddCommand(projectDeleteCmd)
 	projectCmd.AddCommand(projectImportCmd)
+	projectCmd.AddCommand(projectRollbackDeploymentCmd)
+	projectCmd.AddCommand(projectDeleteDeploymentCmd)
 
 	for _, cmd := range []*cobra.Command{projectNewCmd, projectImportCmd} {
 		cmd.Flags().StringP("dir", "d", "", "The directory for the project")
