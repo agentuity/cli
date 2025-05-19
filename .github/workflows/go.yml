@@ -93,11 +93,6 @@ jobs:
         # Windows test - simplified to avoid bash usage
         Write-Host "Testing bash install script on Windows..."
         
-        # Set up environment for testing
-        $env:NONINTERACTIVE = "true"
-        $env:OS = "Windows"
-        $env:ARCH = "x86_64"
-        
         # Make script executable using PowerShell
         if (Test-Path "install.sh") {
           Write-Host "Found install.sh script"
@@ -110,23 +105,18 @@ jobs:
         Write-Host "Testing install script with default options..."
         & sh -c "./install.sh -d '$env:TEMP/agentuity-test-download'"
         
-        # Verify MSI was downloaded
-        if (Test-Path "$env:USERPROFILE/agentuity-x64.msi") {
-          Write-Host "MSI download verification successful"
-          
-          # Test with specific version
-          Write-Host "Testing install script with specific version..."
-          & sh -c "./install.sh -d '$env:TEMP/agentuity-test-version-download' -v 0.0.74"
-          
-          # Verify version-specific MSI was downloaded
-          if (Test-Path "$env:USERPROFILE/agentuity-x64.msi") {
-            Write-Host "Version-specific MSI download verification successful"
+        # Check if the script correctly detected Windows and aborted
+        if ($LASTEXITCODE -eq 1) {
+          $output = & sh -c "./install.sh -d '$env:TEMP/agentuity-test-download'" 2>&1
+          if ($output -match "Windows is not supported") {
+            Write-Host "Windows detection test passed: Script correctly detected Windows environment and aborted"
+            exit 0
           } else {
-            Write-Host "Version-specific MSI download verification failed"
+            Write-Host "Windows detection test failed: Script did not abort with the expected message"
             exit 1
           }
         } else {
-          Write-Host "MSI download verification failed"
+          Write-Host "Windows detection test failed: Script did not abort as expected"
           exit 1
         }
       shell: pwsh
@@ -200,4 +190,4 @@ jobs:
           Write-Host "Installation verification failed"
           exit 1
         }
-      shell: pwsh                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+      shell: pwsh                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
