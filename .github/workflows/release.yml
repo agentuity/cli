@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: windows-latest # required to use wix
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,3 +34,8 @@ jobs:
           MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
           MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
           MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-checksums: ./dist/checksums.txt
+          subject-checksums-type: sha256
