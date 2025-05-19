@@ -116,14 +116,3 @@ brews:
       bin.install "agentuity"
     alternative_names:
       - "agentuity@{{ .Version }}"
-
-msi:
-  - id: agentuity
-    name: "agentuity-{{.MsiArch}}"
-    wxs: ./installer.wsx
-    ids:
-      - agentuity
-    goamd64: v1
-    replace: true
-    mod_timestamp: "{{ .CommitTimestamp }}"
-    version: v3

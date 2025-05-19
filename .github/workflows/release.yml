@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: windows-latest # required to use wix
+    runs-on: blacksmith-4vcpu-ubuntu-2204 # previously used windows for wix
     steps:
       - name: Checkout
         uses: actions/checkout@v4
