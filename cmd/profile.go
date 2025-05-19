@@ -72,9 +72,10 @@ func selectProfile(logger logger.Logger) string {
 }
 
 var profileCmd = &cobra.Command{
-	Use:   "profile",
-	Args:  cobra.NoArgs,
-	Short: "Manage profiles",
+	Use:     "profile",
+	Args:    cobra.NoArgs,
+	Aliases: []string{"profiles", "prf", "ctx"},
+	Short:   "Manage profiles",
 	Long: `Manage CLI configuration profiles.
 
 Use the subcommands to create and switch between different configuration profiles.`,
@@ -85,9 +86,10 @@ Use the subcommands to create and switch between different configuration profile
 }
 
 var profileUseCmd = &cobra.Command{
-	Use:   "use [name]",
-	Args:  cobra.MaximumNArgs(1),
-	Short: "Use a different profile",
+	Use:     "use [name]",
+	Aliases: []string{"select"},
+	Args:    cobra.MaximumNArgs(1),
+	Short:   "Use a different profile",
 	Long: `Switch to a different configuration profile.
 
 Arguments:
@@ -98,7 +100,6 @@ If no name is provided, you will be prompted to select a profile.
 Examples:
   agentuity profile use dev
   agentuity profile use`,
-	Hidden: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		var name string
@@ -125,9 +126,10 @@ Examples:
 }
 
 var profileCreateCmd = &cobra.Command{
-	Use:   "create",
-	Args:  cobra.NoArgs,
-	Short: "Create a new empty profile",
+	Use:     "create",
+	Aliases: []string{"new", "add"},
+	Args:    cobra.NoArgs,
+	Short:   "Create a new empty profile",
 	Long: `Create a new empty configuration profile.
 
 This command creates a new configuration profile with a unique name.
@@ -135,7 +137,6 @@ You will be prompted to enter a name for the profile.
 
 Examples:
   agentuity profile create`,
-	Hidden: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
 		profiles := fetchProfiles()
