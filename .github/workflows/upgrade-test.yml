@@ -23,7 +23,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [blacksmith-4vcpu-ubuntu-2204, blacksmith-4vcpu-ubuntu-2204-arm, macos-latest]
+        os: [blacksmith-4vcpu-ubuntu-2204, blacksmith-4vcpu-ubuntu-2204-arm, macos-latest, windows-latest]
     
     steps:
       - name: Checkout code
@@ -46,7 +46,11 @@ jobs:
       - name: Build current version
         shell: bash
         run: |
-          go build -o agentuity-current
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            go build -o agentuity-current.exe
+          else
+            go build -o agentuity-current
+          fi
       
       # Simulate having an older version installed
       - name: Create simulated previous version
@@ -56,7 +60,13 @@ jobs:
           # we'll create a simulated "previous version" from the current build
           
           # Copy the current build as our "previous" version
-          cp agentuity-current agentuity-previous
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            # On Windows, executables have .exe extension
+            cp agentuity-current.exe agentuity-previous.exe
+          else
+            # On Unix systems (Linux/macOS)
+            cp agentuity-current agentuity-previous
+          fi
           
           echo "Created simulated previous version"
       
@@ -68,8 +78,12 @@ jobs:
           mkdir -p test-upgrade
           
           # Copy the "previous" version to the test directory
-          cp agentuity-previous test-upgrade/agentuity
-          chmod +x test-upgrade/agentuity
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            cp agentuity-previous.exe test-upgrade/agentuity.exe
+          else
+            cp agentuity-previous test-upgrade/agentuity
+            chmod +x test-upgrade/agentuity
+          fi
           
           # Build the current version with a modified version string to simulate a newer version
           VERSION=$(./agentuity-current version)
@@ -85,7 +99,11 @@ jobs:
           
           # Create checksums file
           cd mock-release
-          shasum -a 256 agentuity > checksums.txt
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            certutil -hashfile agentuity SHA256 | grep -v "hash of file" | grep -v "CertUtil" > checksums.txt
+          else
+            shasum -a 256 agentuity > checksums.txt
+          fi
           cd ..
           
           # Test the upgrade command by mocking the GitHub API response
@@ -93,9 +111,15 @@ jobs:
           # and set up a proper test environment
           
           echo "Testing upgrade command..."
-          ./test-upgrade/agentuity version
-          # On Unix systems, we can test more directly
-          # In a real test, you would mock the GitHub API and test the actual upgrade
-          echo "Unix upgrade test completed (simplified)"
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            ./test-upgrade/agentuity.exe version
+            # On Windows, we would need a more complex setup to test the actual upgrade
+            echo "Windows upgrade test completed (simplified)"
+          else
+            ./test-upgrade/agentuity version
+            # On Unix systems, we can test more directly
+            # In a real test, you would mock the GitHub API and test the actual upgrade
+            echo "Unix upgrade test completed (simplified)"
+          fi
           
           echo "Upgrade path test completed"
