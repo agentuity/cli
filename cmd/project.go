@@ -754,7 +754,7 @@ Examples:
 		if len(orgs) > 1 {
 			for _, orgId := range orgs {
 				fmt.Println()
-				fmt.Println(tui.Bold(orgNames[orgId]) + " " + tui.Muted("(" + orgId + ")"))
+				fmt.Println(tui.Bold(orgNames[orgId]) + " " + tui.Muted("("+orgId+")"))
 				fmt.Println()
 
 				headers := []string{tui.Title("Project Id"), tui.Title("Name"), tui.Title("Description")}
