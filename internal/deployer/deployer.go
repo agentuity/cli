@@ -13,7 +13,7 @@ import (
 
 type EnvFile struct {
 	Filepath string
-	Env      []env.EnvLine
+	Env      []env.EnvLineComment
 }
 
 func (e *EnvFile) Lookup(key string) (string, bool) {
@@ -41,7 +41,7 @@ type PromptHelpers struct {
 	// Ask will ask the user for input and return true (confirm) or false (no!)
 	Ask func(logger logger.Logger, title string, defaultValue bool) bool
 	// PromptForEnv is a helper for prompting the user to get a environment (or secret) value. You must do something with the result such as save it.
-	PromptForEnv func(logger logger.Logger, key string, isSecret bool, localenv map[string]string, osenv map[string]string) string
+	PromptForEnv func(logger logger.Logger, key string, isSecret bool, localenv map[string]string, osenv map[string]string, defaultValue string, placeholder string) string
 }
 
 type DeployPreflightCheckData struct {

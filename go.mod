@@ -4,7 +4,7 @@ go 1.24.2
 
 require (
 	github.com/Masterminds/semver v1.5.0
-	github.com/agentuity/go-common v1.0.59
+	github.com/agentuity/go-common v1.0.60
 	github.com/agentuity/mcp-golang/v2 v2.0.2
 	github.com/bep/debounce v1.2.1
 	github.com/bmatcuk/doublestar/v4 v4.8.1
