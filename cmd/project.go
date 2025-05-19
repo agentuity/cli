@@ -833,7 +833,7 @@ Examples:
 		}
 		err := project.RollbackDeployment(ctx, logger, apiUrl, apikey, selected, selectedDeployment)
 		if err != nil {
-			tui.ShowError(err.Error())
+			tui.ShowError("%s", err.Error())
 			return
 		}
 		tui.ShowSuccess("Deployment rolled back successfully")
@@ -873,7 +873,7 @@ Examples:
 
 		err := project.DeleteDeployment(ctx, logger, apiUrl, apikey, selected, selectedDeployment)
 		if err != nil {
-			tui.ShowError(err.Error())
+			tui.ShowError("%s", err.Error())
 			return
 		}
 
