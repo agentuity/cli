@@ -1,13 +1,14 @@
-## [v0.0.129] - 2025-05-20
-
-### Changed
-- [AGENT-169] Expose framework to the UI ([#295](https://github.com/agentuity/cli/pull/295))
 # Changelog
 
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [v0.0.129] - 2025-05-20
+
+### Changed
+- [AGENT-169] Expose framework to the UI ([#295](https://github.com/agentuity/cli/pull/295))
 
 ## [v0.0.128] - 2025-05-18
 
