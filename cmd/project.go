@@ -9,9 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sort"
-	"strings"
 	"syscall"
-	"time"
 
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/mcp"
@@ -854,55 +852,6 @@ func selectProject(ctx context.Context, logger logger.Logger, apiUrl, apikey str
 		tui.ShowWarning("no project selected")
 	}
 	return selected
-}
-
-func selectDeployment(ctx context.Context, logger logger.Logger, apiUrl, apikey, projectId string, prompt string) string {
-	var deployments []project.DeploymentListData
-	fetchDeploymentsAction := func() {
-		var err error
-		deployments, err = project.ListDeployments(ctx, logger, apiUrl, apikey, projectId)
-		if err != nil {
-			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list deployments")).ShowErrorAndExit()
-		}
-	}
-	tui.ShowSpinner("fetching deployments ...", fetchDeploymentsAction)
-	if len(deployments) == 0 {
-		tui.ShowWarning("no deployments found")
-		return ""
-	}
-	var deploymentOptions []tui.Option
-	for _, d := range deployments {
-		date, err := time.Parse(time.RFC3339, d.CreatedAt)
-		if err != nil {
-			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to parse deployment date")).ShowErrorAndExit()
-		}
-		var msg string
-		if len(d.Message) > 60 {
-			msg = d.Message[:57] + "..."
-		} else {
-			msg = d.Message
-		}
-		tags := strings.Join(d.Tags, ", ")
-		if len(d.Tags) > 50 {
-			tags = strings.Join(d.Tags[:50], ", ") + "..."
-		} else {
-			tags = strings.Join(d.Tags, ", ")
-		}
-
-		if d.Active {
-			deploymentOptions = append(deploymentOptions, tui.Option{
-				ID:   d.ID,
-				Text: fmt.Sprintf("%s  %s, tags: [%-50s], msg: [%s]", "✅", tui.Title(date.Format("2006-01-02 15:04:05")), tui.Bold(tags), tui.Bold(msg)),
-			})
-		} else {
-			deploymentOptions = append(deploymentOptions, tui.Option{
-				ID:   d.ID,
-				Text: fmt.Sprintf("    %s, tags: [%-50s], msg: [%s]", tui.Title(date.Format("2006-01-02 15:04:05")), tui.Bold(tags), tui.Bold(msg)),
-			})
-		}
-	}
-	selectedDeployment := tui.Select(logger, "Select a deployment to rollback", "", deploymentOptions)
-	return selectedDeployment
 }
 
 func init() {

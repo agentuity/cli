@@ -861,10 +861,8 @@ func cloudSelectDeployment(ctx context.Context, logger logger.Logger, apiUrl, ap
 			msg = d.Message
 		}
 		tags := strings.Join(d.Tags, ", ")
-		if len(d.Tags) > 50 {
-			tags = strings.Join(d.Tags[:50], ", ") + "..."
-		} else {
-			tags = strings.Join(d.Tags, ", ")
+		if len(tags) > 50 {
+			tags = tags[:50] + "..."
 		}
 
 		if d.Active {
