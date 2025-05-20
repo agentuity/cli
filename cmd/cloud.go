@@ -697,8 +697,7 @@ Examples:
 		if dir != "" {
 			proj := project.EnsureProject(ctx, cmd)
 			if proj.Project == nil {
-				tui.ShowWarning("Project not found")
-				return
+				errsystem.New(errsystem.ErrApiRequest, fmt.Errorf("project not found")).ShowErrorAndExit()
 			}
 			selectedProject = proj.Project.ProjectId
 		} else {
@@ -707,7 +706,7 @@ Examples:
 				// look up the project by id
 				projects, err := project.ListProjects(ctx, logger, apiUrl, apikey)
 				if err != nil {
-					errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list projects")).ShowErrorAndExit()
+					errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 				}
 				for _, p := range projects {
 					if p.ID == projectId {
@@ -716,8 +715,8 @@ Examples:
 					}
 				}
 				if selectedProject == "" {
-					tui.ShowWarning("Project not found")
-					return
+					// this will never happen because we've already checked the project id
+					errsystem.New(errsystem.ErrApiRequest, fmt.Errorf("project not found")).ShowErrorAndExit()
 				}
 			}
 		}
@@ -761,8 +760,7 @@ Examples:
 				}
 			}
 			if selectedDeployment == "" {
-				tui.ShowWarning("No deployment found with tag '%s'", tag)
-				return
+				errsystem.New(errsystem.ErrApiRequest, fmt.Errorf("no deployment found with tag '%s'", tag)).ShowErrorAndExit()
 			}
 		} else {
 			question = "Select a deployment to rollback"
@@ -771,8 +769,8 @@ Examples:
 			}
 			selectedDeployment = cloudSelectDeployment(ctx, logger, apiUrl, apikey, selectedProject, question)
 			if selectedDeployment == "" {
-				tui.ShowWarning("no deployment selected")
-				return
+				// this will never happen because we've already checked the deployment id
+				errsystem.New(errsystem.ErrApiRequest, fmt.Errorf("no deployment selected")).ShowErrorAndExit()
 			}
 		}
 
@@ -785,7 +783,7 @@ Examples:
 			}
 
 			if !tui.Ask(logger, "Are you sure you want to "+tui.Bold(what)+" the selected deployment?", true) {
-				tui.ShowWarning("cancelled")
+				tui.ShowWarning("Canceled")
 				return
 			}
 		}
@@ -793,16 +791,13 @@ Examples:
 		if deleteFlag {
 			err := project.DeleteDeployment(ctx, logger, apiUrl, apikey, selectedProject, selectedDeployment)
 			if err != nil {
-				tui.ShowError("%s", err.Error())
-				return
+				errsystem.New(errsystem.ErrDeleteApiKey, err, errsystem.WithContextMessage("Failed to delete deployment")).ShowErrorAndExit()
 			}
 			tui.ShowSuccess("Deployment deleted successfully")
 		} else {
 			err := project.RollbackDeployment(ctx, logger, apiUrl, apikey, selectedProject, selectedDeployment)
 			if err != nil {
-				tui.ShowError("%s", err.Error())
-				os.Exit(1)
-				return
+				errsystem.New(errsystem.ErrDeployProject, err, errsystem.WithContextMessage("Failed to rollback deployment")).ShowErrorAndExit()
 			}
 			tui.ShowSuccess("Deployment rolled back successfully")
 		}

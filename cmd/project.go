@@ -821,39 +821,6 @@ func getConfigTemplateDir(cmd *cobra.Command) (string, bool, error) {
 	return dir, false, nil
 }
 
-// Helper to fetch projects and prompt user to select one. Returns selected project ID or empty string.
-func selectProject(ctx context.Context, logger logger.Logger, apiUrl, apikey string, prompt string) string {
-	var projects []project.ProjectListData
-	action := func() {
-		var err error
-		projects, err = project.ListProjects(ctx, logger, apiUrl, apikey)
-		if err != nil {
-			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list projects")).ShowErrorAndExit()
-		}
-	}
-	tui.ShowSpinner("fetching projects ...", action)
-	if len(projects) == 0 {
-		showNoProjects()
-		return ""
-	}
-	var options []tui.Option
-	for _, p := range projects {
-		desc := p.Description
-		if desc == "" {
-			desc = emptyProjectDescription
-		}
-		options = append(options, tui.Option{
-			ID:   p.ID,
-			Text: tui.Bold(tui.PadRight(p.Name, 20, " ")) + tui.Muted(p.ID),
-		})
-	}
-	selected := tui.Select(logger, prompt, "", options)
-	if selected == "" {
-		tui.ShowWarning("no project selected")
-	}
-	return selected
-}
-
 func init() {
 	rootCmd.AddCommand(projectCmd)
 	rootCmd.AddCommand(projectNewCmd)
