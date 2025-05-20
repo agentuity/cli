@@ -587,16 +587,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.0.114]: https://github.com/agentuity/cli/compare/v0.0.113...v0.0.114
 [v0.0.113]: https://github.com/agentuity/cli/compare/v0.0.112...v0.0.113
 [v0.0.112]: https://github.com/agentuity/cli/compare/v0.0.111...v0.0.112
-[v0.0.111]: https://github.com/agentuity/cli/compare/v0.0.110...v0.0.111
-[v0.0.110]: https://github.com/agentuity/cli/compare/v0.0.109...v0.0.110
-[v0.0.109]: https://github.com/agentuity/cli/compare/v0.0.108...v0.0.109
-[v0.0.108]: https://github.com/agentuity/cli/compare/v0.0.107...v0.0.108
-[v0.0.107]: https://github.com/agentuity/cli/compare/v0.0.106...v0.0.107
-[v0.0.106]: https://github.com/agentuity/cli/compare/v0.0.105...v0.0.106
-[v0.0.105]: https://github.com/agentuity/cli/compare/v0.0.104...v0.0.105
-[v0.0.104]: https://github.com/agentuity/cli/compare/v0.0.103...v0.0.104
-[v0.0.103]: https://github.com/agentuity/cli/compare/v0.0.102...v0.0.103
-[v0.0.102]: https://github.com/agentuity/cli/compare/v0.0.101...v0.0.102
 [v0.0.129]: https://github.com/agentuity/cli/compare/v0.0.128...v0.0.129
 [v0.0.128]: https://github.com/agentuity/cli/compare/v0.0.127...v0.0.128
 [v0.0.127]: https://github.com/agentuity/cli/compare/v0.0.126...v0.0.127
@@ -617,7 +607,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.0.112]: https://github.com/agentuity/cli/compare/v0.0.111...v0.0.112
 [v0.0.111]: https://github.com/agentuity/cli/compare/v0.0.110...v0.0.111
 [v0.0.110]: https://github.com/agentuity/cli/compare/v0.0.109...v0.0.110
-[v0.0.109]: https://github.com/agentuity/cli/compare/v0.0.107...v0.0.109
+[v0.0.109]: https://github.com/agentuity/cli/compare/v0.0.108...v0.0.109
+[v0.0.108]: https://github.com/agentuity/cli/compare/v0.0.107...v0.0.108
 [v0.0.107]: https://github.com/agentuity/cli/compare/v0.0.106...v0.0.107
 [v0.0.106]: https://github.com/agentuity/cli/compare/v0.0.105...v0.0.106
 [v0.0.105]: https://github.com/agentuity/cli/compare/v0.0.104...v0.0.105
