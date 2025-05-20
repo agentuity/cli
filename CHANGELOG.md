@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - DevMode: remove mouse tracking as it caused the inability to copy/paste in the terminal ([#316](https://github.com/agentuity/cli/pull/316))
 
+## [v0.0.129] - 2025-05-20
+
+### Changed
+- [AGENT-169] Expose framework to the UI ([#295](https://github.com/agentuity/cli/pull/295))
+
 ## [v0.0.128] - 2025-05-18
 
 ### Fixed
