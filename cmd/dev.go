@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -44,12 +43,7 @@ Examples:
 		logLevel := env.LogLevel(cmd)
 		apiUrl, appUrl, transportUrl := util.GetURLs(log)
 
-		signals := []os.Signal{os.Interrupt, syscall.SIGINT}
-		if runtime.GOOS != "windows" {
-			signals = append(signals, syscall.SIGTERM)
-		}
-
-		ctx, cancel := signal.NotifyContext(context.Background(), signals...)
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
 		apiKey, userId := util.EnsureLoggedIn(ctx, log, cmd)
