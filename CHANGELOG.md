@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.131] - 2025-05-20
+
+### Added
+- Added headless import functionality for non-interactive project imports ([#318](https://github.com/agentuity/cli/pull/318))
+
+### Fixed
+- Fixed release workflow by removing invalid subject-checksums-type parameter ([#319](https://github.com/agentuity/cli/pull/319))
+
 ## [v0.0.130] - 2025-05-20
 
 ### Fixed
@@ -575,6 +583,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks for new agent creation
 
 
+[v0.0.130]: https://github.com/agentuity/cli/compare/v0.0.129...v0.0.130
+[v0.0.129]: https://github.com/agentuity/cli/compare/v0.0.128...v0.0.129
+[v0.0.128]: https://github.com/agentuity/cli/compare/v0.0.127...v0.0.128
+[v0.0.127]: https://github.com/agentuity/cli/compare/v0.0.126...v0.0.127
+[v0.0.126]: https://github.com/agentuity/cli/compare/v0.0.125...v0.0.126
+[v0.0.125]: https://github.com/agentuity/cli/compare/v0.0.124...v0.0.125
+[v0.0.124]: https://github.com/agentuity/cli/compare/v0.0.123...v0.0.124
+[v0.0.123]: https://github.com/agentuity/cli/compare/v0.0.122...v0.0.123
+[v0.0.122]: https://github.com/agentuity/cli/compare/v0.0.121...v0.0.122
+[v0.0.121]: https://github.com/agentuity/cli/compare/v0.0.120...v0.0.121
+[v0.0.120]: https://github.com/agentuity/cli/compare/v0.0.119...v0.0.120
+[v0.0.119]: https://github.com/agentuity/cli/compare/v0.0.118...v0.0.119
+[v0.0.118]: https://github.com/agentuity/cli/compare/v0.0.117...v0.0.118
+[v0.0.117]: https://github.com/agentuity/cli/compare/v0.0.116...v0.0.117
+[v0.0.131]: https://github.com/agentuity/cli/compare/v0.0.130...v0.0.131
 [v0.0.130]: https://github.com/agentuity/cli/compare/v0.0.129...v0.0.130
 [v0.0.129]: https://github.com/agentuity/cli/compare/v0.0.128...v0.0.129
 [v0.0.128]: https://github.com/agentuity/cli/compare/v0.0.127...v0.0.128
