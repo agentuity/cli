@@ -568,7 +568,7 @@ func (d *DevModeUI) SetSpinner(spinning bool) {
 				}
 			}
 		}()
-	} else {
+	} else if d.spinnerCtx != nil {
 		d.spinnerCancel()
 		d.spinnerCtx = nil
 		d.program.Send(spinnerStopMsg{})
