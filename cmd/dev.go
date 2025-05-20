@@ -127,7 +127,7 @@ Examples:
 		tuiLogger := dev.NewTUILogger(logLevel, ui, dev.Stdout)
 		tuiLoggerErr := dev.NewTUILogger(logLevel, ui, dev.StdErr)
 
-		if err := server.Connect(ui, tuiLogger); err != nil {
+		if err := server.Connect(ui, tuiLogger, tuiLoggerErr); err != nil {
 			log.Error("failed to start live dev connection: %s", err)
 			ui.Close(true)
 			return
