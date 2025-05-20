@@ -1,3 +1,7 @@
+## [v0.0.129] - 2025-05-20
+
+### Changed
+- [AGENT-169] Expose framework to the UI ([#295](https://github.com/agentuity/cli/pull/295))
 # Changelog
 
 All notable changes to this project will be documented in this file.
