@@ -15,8 +15,6 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/google/uuid"
-	zone "github.com/lrstanley/bubblezone"
 	"golang.org/x/term"
 )
 
@@ -62,15 +60,14 @@ type spinnerStartMsg struct{}
 type spinnerStopMsg struct{}
 
 type logItem struct {
-	id        string
 	timestamp time.Time
 	message   string
 	raw       string
 }
 
-func (i logItem) Title() string       { return zone.Mark(i.id, i.message) }
+func (i logItem) Title() string       { return i.message }
 func (i logItem) Description() string { return "" }
-func (i logItem) FilterValue() string { return zone.Mark(i.id, i.message) }
+func (i logItem) FilterValue() string { return i.message }
 
 type tickMsg time.Time
 type addLogMsg logItem
@@ -212,28 +209,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		sm, c := m.spinner.Update(msg)
 		m.spinner = sm
 		cmd = append(cmd, c)
-		break
-	case tea.MouseMsg:
-		if !m.showhelp && !m.showagents && !m.logList.SettingFilter() && m.selectedLog == nil {
-			if msg.Button == tea.MouseButtonWheelUp {
-				m.logList.CursorUp()
-			} else if msg.Button == tea.MouseButtonWheelDown {
-				m.logList.CursorDown()
-			} else if msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionRelease {
-				// try and find the item that was clicked on
-				for i, listItem := range m.logList.VisibleItems() {
-					v, _ := listItem.(logItem)
-					if zone.Get(v.id).InBounds(msg) {
-						index := i - 1
-						if index < 0 {
-							index = 0
-						}
-						m.logList.Select(index)
-						break
-					}
-				}
-			}
-		}
 		break
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyCtrlC {
@@ -406,7 +381,7 @@ func (m *model) View() string {
 		view = " "
 	}
 
-	return zone.Scan(fmt.Sprintf("%s\n%s\n%s", m.infoBox, view+statusMsgStyle.Render(m.statusMessage), m.logList.View()))
+	return fmt.Sprintf("%s\n%s\n%s", m.infoBox, view+statusMsgStyle.Render(m.statusMessage), m.logList.View())
 }
 
 type Agent struct {
@@ -509,11 +484,9 @@ func (d *DevModeUI) Start() {
 	if !d.enabled {
 		return
 	}
-	zone.NewGlobal()
 	d.program = tea.NewProgram(
 		d.model,
 		tea.WithoutSignalHandler(),
-		tea.WithMouseAllMotion(),
 	)
 	d.wg.Add(1)
 	go func() {
@@ -536,7 +509,6 @@ func (d *DevModeUI) AddLog(log string, args ...any) {
 	}
 	raw := fmt.Sprintf(log, args...)
 	d.program.Send(addLogMsg{
-		id:        uuid.New().String(),
 		timestamp: time.Now(),
 		raw:       raw,
 		message:   strings.ReplaceAll(ansiColorStripper.ReplaceAllString(raw, ""), "\n", " "),
@@ -596,7 +568,7 @@ func (d *DevModeUI) SetSpinner(spinning bool) {
 				}
 			}
 		}()
-	} else {
+	} else if d.spinnerCtx != nil {
 		d.spinnerCancel()
 		d.spinnerCtx = nil
 		d.program.Send(spinnerStopMsg{})
