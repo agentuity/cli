@@ -828,10 +828,6 @@ func cloudSelectProject(ctx context.Context, logger logger.Logger, apiUrl, apike
 	}
 	var options []tui.Option
 	for _, p := range projects {
-		desc := p.Description
-		if desc == "" {
-			desc = "No description provided."
-		}
 		options = append(options, tui.Option{
 			ID:   p.ID,
 			Text: tui.Bold(tui.PadRight(p.Name, 20, " ")) + tui.Muted(p.ID),
