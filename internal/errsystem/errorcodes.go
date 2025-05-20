@@ -102,4 +102,16 @@ var (
 		Code:    "CLI-0025",
 		Message: "Failed to upgrade CLI",
 	}
+	ErrFetchApiKeys = errorType{
+		Code:    "CLI-0026",
+		Message: "Failed to fetch API keys",
+	}
+	ErrCreateApiKey = errorType{
+		Code:    "CLI-0027",
+		Message: "Failed to create API key",
+	}
+	ErrDeleteApiKey = errorType{
+		Code:    "CLI-0028",
+		Message: "Failed to delete API key",
+	}
 )

@@ -41,14 +41,31 @@ var (
 	isAgentuityEnv  = regexp.MustCompile(`(?i)AGENTUITY_`)
 )
 
-func loadEnvFile(le []env.EnvLine, forceSecret bool) (map[string]string, map[string]string) {
+func descriptionLookingLikeASecret(description string) bool {
+	if description == "" {
+		return false
+	}
+	val := strings.ToLower(description)
+	if strings.Contains(val, "secret") {
+		return true
+	}
+	if strings.Contains(val, "password") {
+		return true
+	}
+	if strings.Contains(val, "key") {
+		return true
+	}
+	return false
+}
+
+func loadEnvFile(le []env.EnvLineComment, forceSecret bool) (map[string]string, map[string]string) {
 	envs := make(map[string]string)
 	secrets := make(map[string]string)
 	for _, ev := range le {
 		if isAgentuityEnv.MatchString(ev.Key) {
 			continue
 		}
-		if looksLikeSecret.MatchString(ev.Key) || forceSecret {
+		if looksLikeSecret.MatchString(ev.Key) || forceSecret || descriptionLookingLikeASecret(ev.Comment) {
 			secrets[ev.Key] = ev.Val
 		} else {
 			envs[ev.Key] = ev.Val
@@ -57,25 +74,32 @@ func loadEnvFile(le []env.EnvLine, forceSecret bool) (map[string]string, map[str
 	return envs, secrets
 }
 
-func promptForEnv(logger logger.Logger, key string, isSecret bool, localenv map[string]string, osenv map[string]string) string {
+func promptForEnv(logger logger.Logger, key string, isSecret bool, localenv map[string]string, osenv map[string]string, defaultValue string, placeholder string) string {
 	prompt := "Enter the value for " + key
 	var help string
-	var defaultValue string
 	var value string
 	if isSecret {
 		prompt = "Enter the secret value for " + key
 		if val, ok := localenv[key]; ok {
 			help = "Press enter to set as " + maxString(cstr.Mask(val), 30) + " from your .env file"
-			defaultValue = val
+			if defaultValue == "" {
+				defaultValue = val
+			}
 		} else if val, ok := osenv[key]; ok {
 			help = "Press enter to set as " + maxString(cstr.Mask(val), 30) + " from your environment"
-			defaultValue = val
+			if defaultValue == "" {
+				defaultValue = val
+			}
 		} else {
 			help = "Your input will be masked"
 		}
 		value = tui.Password(logger, prompt, help)
 	} else {
-		value = tui.Input(logger, prompt, help)
+		if placeholder == "" {
+			value = tui.InputWithPlaceholder(logger, prompt, placeholder, defaultValue)
+		} else {
+			value = tui.InputWithPlaceholder(logger, prompt, help, defaultValue)
+		}
 	}
 
 	if value == "" && defaultValue != "" {
@@ -118,8 +142,8 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		context := project.EnsureProject(cmd)
-		logger := context.Logger
+		logger := env.NewLogger(cmd)
+		context := project.EnsureProject(ctx, cmd)
 		dir := context.Dir
 		apiUrl := context.APIURL
 		apiKey := context.Token
@@ -141,7 +165,7 @@ Examples:
 		setFromFile, err := cmd.Flags().GetString("file")
 		if setFromFile != "" {
 			if sys.Exists(setFromFile) {
-				le, _ := env.ParseEnvFile(setFromFile)
+				le, _ := env.ParseEnvFileWithComments(setFromFile)
 				envs, secrets = loadEnvFile(le, forceSecret)
 				if len(envs) > 0 || len(secrets) > 0 {
 					hasSetFromFile = true
@@ -227,7 +251,7 @@ Examples:
 				}
 			}
 			if value == "" {
-				value = promptForEnv(logger, key, isSecret, localenv, osenv)
+				value = promptForEnv(logger, key, isSecret, localenv, osenv, "", "")
 			}
 		}
 		if key != "" && value != "" {
@@ -297,7 +321,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		context := project.EnsureProject(cmd)
+		context := project.EnsureProject(ctx, cmd)
 		logger := context.Logger
 		theproject := context.Project
 		apiUrl := context.APIURL
@@ -371,7 +395,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		context := project.EnsureProject(cmd)
+		context := project.EnsureProject(ctx, cmd)
 		logger := context.Logger
 		theproject := context.Project
 		apiUrl := context.APIURL
@@ -435,7 +459,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		context := project.EnsureProject(cmd)
+		context := project.EnsureProject(ctx, cmd)
 		logger := context.Logger
 		theproject := context.Project
 		apiUrl := context.APIURL

@@ -5,7 +5,7 @@ func init() {
 		Module:   "openai",
 		Filename: "index",
 		Body: &patchAction{
-			Before: generateEnvGuard("OPENAI_API_KEY", generateGatewayEnvGuard("OPENAI_API_KEY", "process.env.AGENTUITY_API_KEY", "OPENAI_BASE_URL", "openai")),
+			Before: generateEnvGuard("OPENAI_API_KEY", generateGatewayEnvGuard("OPENAI_API_KEY", "process.env.AGENTUITY_SDK_KEY", "OPENAI_BASE_URL", "openai")),
 		},
 	}
 }

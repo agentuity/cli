@@ -24,6 +24,7 @@ import (
 var Version string = "dev"
 
 const baseDocURL = "https://agentuity.dev/errors/%s"
+const discordURL = "https://discord.gg/vtn3hgUfuc"
 
 type crashReport struct {
 	ID         string         `json:"id"`
@@ -128,9 +129,11 @@ func (e *errSystem) ShowErrorAndExit() {
 			detail = append(detail, tui.Bold(tui.PadRight("Error:", 10, " "))+style.Render(errmsg+"\n"))
 		}
 	}
-	detail = append(detail, tui.Bold(tui.PadRight("Code:", 10, " "))+e.code.Code)
-	detail = append(detail, tui.Bold(tui.PadRight("ID:", 10, " "))+e.id)
-	detail = append(detail, tui.Bold(tui.PadRight("Help:", 10, " "))+tui.Link(baseDocURL, e.code.Code))
+	detail = append(detail, tui.Bold(tui.PadRight("Code:", 10, " "))+tui.Muted(e.code.Code))
+	detail = append(detail, tui.Bold(tui.PadRight("ID:", 10, " "))+tui.Muted(e.id))
+	detail = append(detail, tui.Bold(tui.PadRight("Doc:", 10, " "))+tui.Link(baseDocURL, e.code.Code))
+	detail = append(detail, tui.Bold(tui.PadRight("Help:", 10, " "))+tui.Link(discordURL))
+	detail = append(detail, tui.Bold(tui.PadRight("", 10, " "))+tui.Link("support@agentuity.com"))
 	crashReportFile := e.writeCrashReportFile(stackTrace)
 	for _, d := range detail {
 		body.WriteString(tui.Muted(d) + "\n")

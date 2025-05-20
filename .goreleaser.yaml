@@ -20,7 +20,6 @@ builds:
     binary: agentuity
     goos:
       - linux
-      - windows
       - darwin
 
 archives:
@@ -34,10 +33,7 @@ archives:
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
-    # use zip for windows archives
-    format_overrides:
-      - goos: windows
-        formats: ['zip']
+
 checksum:
   name_template: "checksums.txt"
 
@@ -120,14 +116,3 @@ brews:
       bin.install "agentuity"
     alternative_names:
       - "agentuity@{{ .Version }}"
-
-msi:
-  - id: agentuity
-    name: "agentuity-{{.MsiArch}}"
-    wxs: ./installer.wsx
-    ids:
-      - agentuity
-    goamd64: v1
-    replace: true
-    mod_timestamp: "{{ .CommitTimestamp }}"
-    version: v3

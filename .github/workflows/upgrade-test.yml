@@ -3,8 +3,14 @@ name: Upgrade Path Test
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
   pull_request:
     branches: [ main ]
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
   workflow_dispatch:
 
 permissions:
@@ -17,7 +23,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [blacksmith-4vcpu-ubuntu-2204, macos-latest, windows-latest]
+        os: [blacksmith-4vcpu-ubuntu-2204, blacksmith-4vcpu-ubuntu-2204-arm, macos-latest, windows-latest]
     
     steps:
       - name: Checkout code

@@ -23,7 +23,9 @@ import (
 	"github.com/agentuity/go-common/crypto"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/tui"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -68,9 +70,12 @@ type startAgent struct {
 }
 
 type startRequest struct {
-	Agents    []startAgent       `json:"agents"`
-	Resources *Resources         `json:"resources,omitempty"`
-	Metadata  *deployer.Metadata `json:"metadata,omitempty"`
+	Agents         []startAgent       `json:"agents"`
+	Resources      *Resources         `json:"resources,omitempty"`
+	Metadata       *deployer.Metadata `json:"metadata,omitempty"`
+	Tags           []string           `json:"tags,omitempty"`
+	TagDescription string             `json:"description,omitempty"`
+	TagMessage     string             `json:"message,omitempty"`
 }
 
 func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.Command, apiUrl, apikey, projectId string, project *project.Project, dir string, isImport bool) {
@@ -90,7 +95,7 @@ func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.
 	tui.WaitForAnyKey()
 	tui.ClearScreen()
 	orgId := promptForOrganization(ctx, logger, cmd, apiUrl, apikey)
-	name, description := promptForProjectDetail(ctx, logger, apiUrl, apikey, project.Name, project.Description)
+	name, description := promptForProjectDetail(ctx, logger, apiUrl, apikey, project.Name, project.Description, orgId)
 	project.Name = name
 	project.Description = description
 	var createWebhookAuth bool
@@ -112,10 +117,67 @@ func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.
 			errsystem.New(errsystem.ErrSaveProject, err,
 				errsystem.WithContextMessage("Error saving project after import")).ShowErrorAndExit()
 		}
-		saveEnv(dir, result.APIKey)
+		saveEnv(dir, result.APIKey, result.ProjectKey)
 	})
 	tui.ShowSuccess("Project imported successfully")
 }
+
+var envTemplateFileNames = []string{".env.example", ".env.template"}
+
+func readPossibleEnvTemplateFiles(baseDir string) map[string][]env.EnvLineComment {
+	var results map[string][]env.EnvLineComment
+	keys := make(map[string]bool)
+	for _, file := range envTemplateFileNames {
+		filename := filepath.Join(baseDir, file)
+		if !util.Exists(filename) {
+			continue
+		}
+		efc, err := env.ParseEnvFileWithComments(filename)
+		if err == nil {
+			if results == nil {
+				results = make(map[string][]env.EnvLineComment)
+			}
+			for _, ev := range efc {
+				if _, ok := keys[ev.Key]; !ok {
+					if isAgentuityEnv.MatchString(ev.Key) {
+						continue
+					}
+					keys[ev.Key] = true
+					results[file] = append(results[file], ev)
+				}
+			}
+		}
+	}
+	return results
+}
+
+func appendToEnvFile(envfile string, envs []env.EnvLineComment) ([]env.EnvLineComment, error) {
+	le, err := env.ParseEnvFileWithComments(envfile)
+	if err != nil {
+		return nil, err
+	}
+	var buf strings.Builder
+	for _, ev := range le {
+		if ev.Comment != "" {
+			buf.WriteString(fmt.Sprintf("# %s\n", ev.Comment))
+		}
+		buf.WriteString(fmt.Sprintf("%s=%s\n", ev.Key, ev.Raw))
+	}
+	for _, ev := range envs {
+		if ev.Comment != "" {
+			buf.WriteString(fmt.Sprintf("# %s\n", ev.Comment))
+		}
+		buf.WriteString(fmt.Sprintf("%s=%s\n", ev.Key, ev.Raw))
+		le = append(le, ev)
+	}
+	if err := os.WriteFile(envfile, []byte(buf.String()), 0644); err != nil {
+		return nil, err
+	}
+	return le, nil
+}
+
+var border = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).Padding(1).BorderForeground(lipgloss.AdaptiveColor{Light: "#999999", Dark: "#999999"})
+var redDiff = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#990000", Dark: "#EE0000"})
 
 var cloudDeployCmd = &cobra.Command{
 	Use:   "deploy",
@@ -135,8 +197,10 @@ Examples:
   agentuity cloud deploy --dir /path/to/project`,
 	Run: func(cmd *cobra.Command, args []string) {
 		parentCtx := context.Background()
-		context := project.EnsureProject(cmd)
-		logger := context.Logger
+		ctx, cancel := signal.NotifyContext(parentCtx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		logger := env.NewLogger(cmd)
+		context := project.EnsureProject(ctx, cmd)
 		theproject := context.Project
 		dir := context.Dir
 		apiUrl := context.APIURL
@@ -144,8 +208,24 @@ Examples:
 		transportUrl := context.TransportURL
 		token := context.Token
 		ci, _ := cmd.Flags().GetBool("ci")
-		ctx, cancel := signal.NotifyContext(parentCtx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-		defer cancel()
+		ciRemoteUrl, _ := cmd.Flags().GetString("ci-remote-url")
+		ciBranch, _ := cmd.Flags().GetString("ci-branch")
+		ciCommit, _ := cmd.Flags().GetString("ci-commit")
+		ciMessage, _ := cmd.Flags().GetString("ci-message")
+		ciGitProvider, _ := cmd.Flags().GetString("ci-git-provider")
+		ciLogsUrl, _ := cmd.Flags().GetString("ci-logs-url")
+		tags, _ := cmd.Flags().GetStringArray("tag")
+		description, _ := cmd.Flags().GetString("description")
+		message, _ := cmd.Flags().GetString("message")
+
+		// remove duplicates and empty strings
+		tags = util.RemoveDuplicates(tags)
+		tags = util.RemoveEmpty(tags)
+
+		// If no tags are provided, default to ["latest"]
+		if len(tags) == 0 {
+			tags = []string{"latest"}
+		}
 
 		deploymentConfig := project.NewDeploymentConfig()
 		client := util.NewAPIClient(ctx, logger, apiUrl, token)
@@ -154,7 +234,9 @@ Examples:
 		var state map[string]agentListState
 
 		if !ci {
-			checkForUpgrade(ctx, logger)
+			checkForUpgrade(ctx, logger, true)
+
+			loadTemplates(ctx, cmd)
 
 			var keys []string
 
@@ -169,7 +251,7 @@ Examples:
 			}
 
 			var err error
-			var le []env.EnvLine
+			var le []env.EnvLineComment
 			var projectExists bool
 			var action func()
 
@@ -204,12 +286,79 @@ Examples:
 			envfilename := filepath.Join(dir, ".env")
 			if tui.HasTTY && util.Exists(envfilename) {
 
-				le, err = env.ParseEnvFile(envfilename)
+				// attempt to see if we have any template files
+				templateEnvs := readPossibleEnvTemplateFiles(dir)
+
+				le, err = env.ParseEnvFileWithComments(envfilename)
 				if err != nil {
 					errsystem.New(errsystem.ErrParseEnvironmentFile, err,
 						errsystem.WithContextMessage("Error parsing .env file")).ShowErrorAndExit()
 				}
 				envFile = &deployer.EnvFile{Filepath: envfilename, Env: le}
+
+				if len(templateEnvs) > 0 {
+					kvmap := make(map[string]env.EnvLineComment)
+					for _, ev := range le {
+						if isAgentuityEnv.MatchString(ev.Key) {
+							continue
+						}
+						kvmap[ev.Key] = ev
+					}
+					var osenv map[string]string
+					var addtoenvfile []env.EnvLineComment
+					// look to see if we have any template environment variables that are not in the .env file
+					for filename, evs := range templateEnvs {
+						for _, ev := range evs {
+							if _, ok := kvmap[ev.Key]; !ok {
+								isSecret := looksLikeSecret.MatchString(ev.Key)
+								if !isSecret && descriptionLookingLikeASecret(ev.Comment) {
+									isSecret = true
+								}
+								_ = filename
+								var content string
+								var para []string
+								para = append(para, tui.Warning("Missing Environment Variable\n"))
+								para = append(para, fmt.Sprintf("The variable %s was found in %s but not in your %s file:\n", tui.Bold(ev.Key), tui.Bold(filename), tui.Bold(".env")))
+								if ev.Comment != "" {
+									para = append(para, tui.Muted(fmt.Sprintf("# %s", ev.Comment)))
+								}
+								if isSecret {
+									para = append(para, redDiff.Render(fmt.Sprintf("+ %s=%s\n", ev.Key, cstr.Mask(ev.Val))))
+								} else {
+									para = append(para, redDiff.Render(fmt.Sprintf("+ %s=%s\n", ev.Key, ev.Val)))
+								}
+								content = lipgloss.JoinVertical(lipgloss.Left, para...)
+								fmt.Println(border.Render(content))
+								if !tui.Ask(logger, "Would you like to add it to your .env file?", true) {
+									fmt.Println()
+									tui.ShowWarning("cancelled")
+									continue
+								}
+								if osenv == nil {
+									osenv = loadOSEnv()
+								}
+								val := promptForEnv(logger, ev.Key, isSecret, nil, osenv, ev.Val, ev.Comment)
+								addtoenvfile = append(addtoenvfile, env.EnvLineComment{
+									EnvLine: env.EnvLine{
+										Key: ev.Key,
+										Val: val,
+										Raw: val,
+									},
+									Comment: ev.Comment,
+								})
+							}
+						}
+					}
+					if len(addtoenvfile) > 0 {
+						le, err = appendToEnvFile(envfilename, addtoenvfile)
+						if err != nil {
+							errsystem.New(errsystem.ErrParseEnvironmentFile, err,
+								errsystem.WithContextMessage("Error parsing .env file")).ShowErrorAndExit()
+						}
+						tui.ShowSuccess("added %s to your .env file", util.Pluralize(len(addtoenvfile), "environment variable", "environment variables"))
+						fmt.Println()
+					}
+				}
 
 				var foundkeys []string
 				for _, ev := range le {
@@ -219,22 +368,32 @@ Examples:
 					if projectData != nil && projectData.Env != nil && projectData.Env[ev.Key] == ev.Val {
 						continue
 					}
-					if projectData != nil && projectData.Secrets != nil && projectData.Secrets[ev.Key] == ev.Val {
+					if projectData != nil && projectData.Secrets != nil && projectData.Secrets[ev.Key] == cstr.Mask(ev.Val) {
 						continue
 					}
 					foundkeys = append(foundkeys, ev.Key)
 				}
 				if len(foundkeys) > 0 {
 					var title string
+					var suffix string
 					switch {
 					case len(foundkeys) < 3 && len(foundkeys) > 1:
-						title = fmt.Sprintf("The environment variables %s from .env are not been set in the project. Would you like to add it?", strings.Join(foundkeys, ", "))
+						suffix = "it"
+						var colorized []string
+						for _, key := range foundkeys {
+							colorized = append(colorized, tui.Bold(key))
+						}
+						title = fmt.Sprintf("The environment variables %s from %s are not been set in the project.", strings.Join(colorized, ", "), tui.Bold(".env"))
 					case len(foundkeys) == 1:
-						title = fmt.Sprintf("The environment variable %s from .env has not been set in the project. Would you like to add it?", foundkeys[0])
+						suffix = "it"
+						title = fmt.Sprintf("The environment variable %s from %s has not been set in the project.", tui.Bold(foundkeys[0]), tui.Bold(".env"))
 					default:
-						title = fmt.Sprintf("There are %d environment variables from .env that are not set in the project. Would you like to add them?", len(foundkeys))
+						suffix = "them"
+						title = fmt.Sprintf("There are %d environment variables from %s that are not set in the project.", len(foundkeys), tui.Bold(".env"))
 					}
-					if !tui.Ask(logger, title, true) {
+					fmt.Println(title)
+					if !tui.Ask(logger, "Would you like to set "+suffix+"?", true) {
+						fmt.Println()
 						tui.ShowWarning("cancelled")
 						return
 					}
@@ -247,6 +406,8 @@ Examples:
 						errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
 							errsystem.WithContextMessage("Failed to set project environment variables")).ShowErrorAndExit()
 					}
+					fmt.Println()
+					fmt.Println()
 					projectData = pd // overwrite with the new version
 					switch {
 					case len(envs) > 0 && len(secrets) > 0:
@@ -260,6 +421,7 @@ Examples:
 					case len(secrets) > 1:
 						tui.ShowSuccess("Secrets added")
 					}
+					fmt.Println()
 				}
 			}
 
@@ -351,26 +513,49 @@ Examples:
 			deploymentId = "/" + deploymentId
 		}
 
-		gitInfo, err := deployer.GetGitInfo(dir)
-		if err != nil {
-			logger.Error("error getting git info: %s", err)
-		}
+		var gitInfo deployer.GitInfo
 		var originType string
-		if ci {
+		var ciInfo deployer.CIInfo
+		isOverwritingGitInfo := ciRemoteUrl != "" || ciBranch != "" || ciCommit != "" || ciMessage != "" || ciGitProvider != "" || ciLogsUrl != ""
+		if ci && isOverwritingGitInfo {
 			originType = "ci"
+			ciInfo = deployer.CIInfo{
+				LogsURL: ciLogsUrl,
+			}
+			gitInfo = deployer.GitInfo{
+				RemoteURL:     &ciRemoteUrl,
+				Branch:        &ciBranch,
+				Commit:        &ciCommit,
+				CommitMessage: &ciMessage,
+				GitProvider:   &ciGitProvider,
+				IsRepo:        true,
+			}
 		} else {
+			info, err := deployer.GetGitInfoRecursive(logger, dir)
+			if err != nil {
+				logger.Debug("Failed to get git info: %v", err)
+			}
+			gitInfo = *info
 			originType = "cli"
 		}
 
+		data := map[string]interface{}{
+			"machine": deployer.GetMachineInfo(),
+			"git":     gitInfo,
+		}
+		if originType == "ci" && ciLogsUrl != "" {
+			data["ci"] = ciInfo
+		}
 		startRequest.Metadata = &deployer.Metadata{
 			Origin: deployer.MetadataOrigin{
 				Type: originType,
-				Data: map[string]interface{}{
-					"machine": deployer.GetMachineInfo(),
-					"git":     gitInfo,
-				},
+				Data: data,
 			},
 		}
+
+		startRequest.Tags = tags
+		startRequest.TagDescription = description
+		startRequest.TagMessage = message
 
 		// Start deployment
 		if err := client.Do("PUT", fmt.Sprintf("/cli/deploy/start/%s%s", theproject.ProjectId, deploymentId), startRequest, &startResponse); err != nil {
@@ -570,10 +755,12 @@ Examples:
 					errsystem.WithContextMessage("Error updating deployment status to completed")).ShowErrorAndExit()
 			}
 			if len(theproject.Agents) == 1 {
-				webhookToken, err = agent.GetApiKey(ctx, logger, apiUrl, token, theproject.Agents[0].ID)
-				if err != nil {
-					errsystem.New(errsystem.ErrApiRequest, err,
-						errsystem.WithContextMessage("Error getting Agent API key")).ShowErrorAndExit()
+				if len(theproject.Agents[0].Types) > 0 {
+					webhookToken, err = agent.GetApiKey(ctx, logger, apiUrl, token, theproject.Agents[0].ID, theproject.Agents[0].Types[0])
+					if err != nil {
+						errsystem.New(errsystem.ErrApiRequest, err,
+							errsystem.WithContextMessage("Error getting Agent API key")).ShowErrorAndExit()
+					}
 				}
 			}
 		}
@@ -601,7 +788,7 @@ Examples:
 							body2 += tui.Body("· Run ") + tui.Command("agent apikey "+theproject.Agents[0].ID) + tui.Body("\n  to fetch the Webhook API key for this webhook")
 							body2 += "\n\n"
 						}
-						body2 += tui.Body(fmt.Sprintf("· Send %s webhook request to\n  ", theproject.Agents[0].Name) + tui.Link("%s/webhook/%s", transportUrl, strings.Replace(theproject.Agents[0].ID, "agent_", "", 1)))
+						body2 += tui.Body(fmt.Sprintf("· Send %s webhook POST request to\n  ", theproject.Agents[0].Name) + tui.Link("%s/webhook/%s", transportUrl, strings.Replace(theproject.Agents[0].ID, "agent_", "", 1)))
 					}
 
 					tui.ShowBanner("Your project was deployed successfully!", body+body2, true)
@@ -630,8 +817,25 @@ func init() {
 	cloudDeployCmd.Flags().StringP("dir", "d", ".", "The directory to the project to deploy")
 	cloudDeployCmd.Flags().String("deploymentId", "", "Used to track a specific deployment")
 	cloudDeployCmd.Flags().Bool("ci", false, "Used to track a specific CI job")
+	cloudDeployCmd.Flags().String("ci-remote-url", "", "Used to set the remote repository URL for your deployment metadata")
+	cloudDeployCmd.Flags().String("ci-branch", "", "Used to set the branch name for your deployment metadata")
+	cloudDeployCmd.Flags().String("ci-commit", "", "Used to set the commit hash for your deployment metadata")
+	cloudDeployCmd.Flags().String("ci-message", "", "Used to set the commit message for your deployment metadata")
+	cloudDeployCmd.Flags().String("ci-git-provider", "", "Used to set the git provider for your deployment metadata")
+	cloudDeployCmd.Flags().String("ci-logs-url", "", "Used to set the CI logs URL for your deployment metadata")
+	cloudDeployCmd.Flags().StringArray("tag", nil, "Tag(s) to associate with this deployment (can be specified multiple times)")
+	cloudDeployCmd.Flags().String("description", "", "Description for the deployment")
+	cloudDeployCmd.Flags().String("message", "", "A shorter description for the deployment")
+
 	cloudDeployCmd.Flags().MarkHidden("deploymentId")
 	cloudDeployCmd.Flags().MarkHidden("ci")
+	cloudDeployCmd.Flags().MarkHidden("ci-remote-url")
+	cloudDeployCmd.Flags().MarkHidden("ci-branch")
+	cloudDeployCmd.Flags().MarkHidden("ci-commit")
+	cloudDeployCmd.Flags().MarkHidden("ci-message")
+	cloudDeployCmd.Flags().MarkHidden("ci-git-provider")
+	cloudDeployCmd.Flags().MarkHidden("ci-logs-url")
+
 	cloudDeployCmd.Flags().String("format", "text", "The output format to use for results which can be either 'text' or 'json'")
 	cloudDeployCmd.Flags().String("org-id", "", "The organization to create the project in")
 	cloudDeployCmd.Flags().String("templates-dir", "", "The directory to load the templates. Defaults to loading them from the github.com/agentuity/templates repository")
