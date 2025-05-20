@@ -104,7 +104,7 @@ func FindAvailablePort(p project.ProjectContext, tryPort int) (int, error) {
 	return findAvailablePort()
 }
 
-func CreateRunProjectCmd(ctx context.Context, log logger.Logger, theproject project.ProjectContext, server *Server, dir string, orgId string, port int, writer io.Writer) (*exec.Cmd, error) {
+func CreateRunProjectCmd(ctx context.Context, log logger.Logger, theproject project.ProjectContext, server *Server, dir string, orgId string, port int, stdout io.Writer, stderr io.Writer) (*exec.Cmd, error) {
 	// set the vars
 	projectServerCmd := exec.CommandContext(ctx, theproject.Project.Development.Command, theproject.Project.Development.Args...)
 	projectServerCmd.Env = os.Environ()[:]
@@ -128,8 +128,8 @@ func CreateRunProjectCmd(ctx context.Context, log logger.Logger, theproject proj
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_PORT=%d", port))
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("PORT=%d", port))
 
-	projectServerCmd.Stdout = writer
-	projectServerCmd.Stderr = writer
+	projectServerCmd.Stdout = stdout
+	projectServerCmd.Stderr = stderr
 	projectServerCmd.Dir = dir
 
 	util.ProcessSetup(projectServerCmd)

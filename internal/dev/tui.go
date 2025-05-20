@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/agentuity/go-common/logger"
 	"github.com/agentuity/go-common/tui"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -29,6 +30,10 @@ var (
 	runningColor      = lipgloss.AdaptiveColor{Light: "#00FF00", Dark: "#009900"}
 	pausedColor       = lipgloss.AdaptiveColor{Light: "#FFA500", Dark: "#FFA500"}
 	statusColor       = lipgloss.AdaptiveColor{Light: "#750075", Dark: "#FF5CFF"}
+	errorColor        = lipgloss.AdaptiveColor{Light: "#FF0000", Dark: "#EE0000"}
+	warningColor      = lipgloss.AdaptiveColor{Light: "#FFFF00", Dark: "#FFFF00"}
+	errorStyle        = lipgloss.NewStyle().Foreground(errorColor)
+	warningStyle      = lipgloss.NewStyle().Foreground(warningColor)
 	runningStyle      = lipgloss.NewStyle().Foreground(runningColor)
 	pausedStyle       = lipgloss.NewStyle().Foreground(pausedColor).AlignHorizontal(lipgloss.Center)
 	labelStyle        = lipgloss.NewStyle().Foreground(labelColor).Bold(true)
@@ -61,11 +66,25 @@ type spinnerStopMsg struct{}
 
 type logItem struct {
 	timestamp time.Time
+	severity  logger.LogLevel
 	message   string
 	raw       string
 }
 
-func (i logItem) Title() string       { return i.message }
+func (i logItem) Title() string {
+	switch i.severity {
+	case logger.LevelError:
+		return errorStyle.Render(i.message)
+	case logger.LevelDebug, logger.LevelTrace:
+		return tui.Muted(i.message)
+	case logger.LevelInfo:
+		return i.message
+	case logger.LevelWarn:
+		return warningStyle.Render(i.message)
+	default:
+		return i.message
+	}
+}
 func (i logItem) Description() string { return "" }
 func (i logItem) FilterValue() string { return i.message }
 
@@ -502,7 +521,7 @@ func (d *DevModeUI) Start() {
 }
 
 // Add a log message to the log list
-func (d *DevModeUI) AddLog(log string, args ...any) {
+func (d *DevModeUI) AddLog(severity logger.LogLevel, log string, args ...any) {
 	if !d.enabled {
 		fmt.Println(fmt.Sprintf(log, args...))
 		return
@@ -510,8 +529,24 @@ func (d *DevModeUI) AddLog(log string, args ...any) {
 	raw := fmt.Sprintf(log, args...)
 	d.program.Send(addLogMsg{
 		timestamp: time.Now(),
+		severity:  severity,
 		raw:       raw,
 		message:   strings.ReplaceAll(ansiColorStripper.ReplaceAllString(raw, ""), "\n", " "),
+	})
+}
+
+// Add an error log message to the log list
+func (d *DevModeUI) AddErrorLog(log string, args ...any) {
+	if !d.enabled {
+		fmt.Println(errorStyle.Render(fmt.Sprintf(log, args...)))
+		return
+	}
+	raw := fmt.Sprintf(log, args...)
+	d.program.Send(addLogMsg{
+		timestamp: time.Now(),
+		severity:  logger.LevelError,
+		raw:       raw,
+		message:   errorStyle.Render(strings.ReplaceAll(ansiColorStripper.ReplaceAllString(raw, ""), "\n", " ")),
 	})
 }
 
