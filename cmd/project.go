@@ -800,13 +800,14 @@ Examples:
 		description, _ := cmd.Flags().GetString("description")
 		orgId, _ := cmd.Flags().GetString("org-id")
 		apikey, _ := cmd.Flags().GetString("apikey")
-		headless, _ := cmd.Flags().GetBool("headless")
+
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		context := project.EnsureProject(ctx, cmd)
 		logger := env.NewLogger(cmd)
 
-		if headless && apikey != "" && orgId != "" && name != "" && description != "" {
+		// headless mode for nova
+		if apikey != "" && orgId != "" && name != "" && description != "" {
 			context.Project.Name = name
 			context.Project.Description = description
 			_, err := context.Project.Import(ctx, logger, context.APIURL, apikey, orgId, true)
@@ -863,12 +864,11 @@ func init() {
 	projectNewCmd.Flags().String("action", "github-app", "The action to take for the project (github-action, github-app, none)")
 
 	projectImportCmd.Flags().String("apikey", "", "The API key to use for the project")
-	projectImportCmd.Flags().Bool("headless", false, "Run the import in headless mode (true, false)")
 	projectImportCmd.Flags().String("name", "", "The name of the project to import")
 	projectImportCmd.Flags().String("description", "", "The description of the project to import")
 
 	projectImportCmd.Flags().MarkHidden("apikey")
-	projectImportCmd.Flags().MarkHidden("headless")
 	projectImportCmd.Flags().MarkHidden("name")
 	projectImportCmd.Flags().MarkHidden("description")
+	projectImportCmd.Flags().MarkHidden("org-id")
 }
