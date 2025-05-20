@@ -776,11 +776,21 @@ Examples:
 			}
 		}
 
-		if deleteFlag {
-			if !tui.Ask(logger, "Are you sure you want to "+tui.Bold("delete")+" the selected deployment?", true) {
+		forceFlag, _ := cmd.Flags().GetBool("force")
+
+		if !forceFlag {
+			what := "rollback"
+			if deleteFlag {
+				what = "delete"
+			}
+
+			if !tui.Ask(logger, "Are you sure you want to "+tui.Bold(what)+" the selected deployment?", true) {
 				tui.ShowWarning("cancelled")
 				return
 			}
+		}
+
+		if deleteFlag {
 			err := project.DeleteDeployment(ctx, logger, apiUrl, apikey, selectedProject, selectedDeployment)
 			if err != nil {
 				tui.ShowError("%s", err.Error())
@@ -916,5 +926,6 @@ func init() {
 	cloudRollbackCmd.Flags().String("tag", "", "Tag of the deployment to rollback")
 	cloudRollbackCmd.Flags().String("project", "", "Project to rollback a deployment")
 	cloudRollbackCmd.Flags().String("dir", "", "The directory to the project to rollback if project is not specified")
+	cloudRollbackCmd.Flags().Bool("force", false, "Force the rollback or delete")
 	cloudRollbackCmd.Flags().Bool("delete", false, "Delete the deployment instead of rolling back")
 }
