@@ -104,7 +104,7 @@ var breakingChanges = []breakingChange{
 		Runtime: "uv",
 		Version: "<0.0.84",
 		Title:   "🚫 Python SDK Breaking Changes 🚫",
-		Message: "The environment variable and code reference for your Agentuity API key has changed from AGENTUITY_API_KEY to AGENTUITY_SDK_KEY. Update all occurrences in your .env files and codebase. See the v0.0.84 Changelog for details.\n\n" + tui.Link("https://agentuity.dev/Changelog/python-js#v0084") + "\n\nAfter migrated, please run `uv add agentuity -U` --latest and then re-run this command again.",
+		Message: "The environment variable and code reference for your Agentuity API key has changed from AGENTUITY_API_KEY to AGENTUITY_SDK_KEY. Update all occurrences in your .env files and codebase. See the v0.0.84 Changelog for details.\n\n" + tui.Link("https://agentuity.dev/Changelog/sdk-py#v0084") + "\n\nAfter migrated, please run `uv add agentuity -U` --latest and then re-run this command again.",
 		Callback: func(ctx BundleContext) error {
 			files := []string{
 				filepath.Join(ctx.ProjectDir, "server.py"),
@@ -216,11 +216,10 @@ func checkForBreakingChanges(ctx BundleContext, language string, runtime string)
 		if c.Check(currentVersion) {
 			if change.Callback != nil {
 				var proceed bool
-				if tui.HasTTY {
+				if tui.HasTTY && !ctx.DevMode {
 					tui.ShowBanner(change.Title, change.Message, true)
 				} else {
-					tui.Text(change.Title + " - " + change.Message)
-					return fmt.Errorf("migration required")
+					return fmt.Errorf("migration required: %s. %s", change.Title, change.Message)
 				}
 				proceed = tui.AskForConfirm("Would you like to migrate your project now?", 'y') == 'y'
 				if proceed {
@@ -232,7 +231,7 @@ func checkForBreakingChanges(ctx BundleContext, language string, runtime string)
 					return fmt.Errorf("migration required")
 				}
 			} else {
-				if tui.HasTTY {
+				if tui.HasTTY && !ctx.DevMode {
 					tui.ShowBanner(change.Title, change.Message, true)
 					os.Exit(1)
 				} else {

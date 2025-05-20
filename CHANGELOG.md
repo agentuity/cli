@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.128] - 2025-05-18
+
+### Fixed
+- DevMode: automatic reconnect if losing connection to echo server ([#308](https://github.com/agentuity/cli/pull/308))
+
+## [v0.0.127] - 2025-05-18
+
+### Fixed
+- Added better logging on startup, make sure we kill server if healthcheck fails, wait longer ([#306](https://github.com/agentuity/cli/pull/306))
+
+
+## [v0.0.126] - 2025-05-18
+
+### Fixed
+- DevMode: Fixed issue when using short agent ID wasn't going upstream ([#304](https://github.com/agentuity/cli/pull/304))
+
+## [v0.0.125] - 2025-05-18
+
+### Fixed
+- Fixed regression with transport having no IO (public) ([#302](https://github.com/agentuity/cli/pull/302))
+
+## [v0.0.124] - 2025-05-17
+
+### Added
+- Mouse support for developer UI (scrolling and log selection) ([#300](https://github.com/agentuity/cli/pull/300))
+- Agent welcome messages and optional prompts for richer metadata ([#300](https://github.com/agentuity/cli/pull/300))
+- Support for non-TUI mode in VS Code terminals and pipe environments ([#300](https://github.com/agentuity/cli/pull/300))
+
+### Changed
+- Renamed interface label from "Dashboard" to "DevMode" for clarity ([#300](https://github.com/agentuity/cli/pull/300))
+- Enhanced log display with timestamps and improved formatting ([#300](https://github.com/agentuity/cli/pull/300))
+- Don't use alt screen so content is preserved on exit ([#300](https://github.com/agentuity/cli/pull/300))
+- Modified CI workflows to ignore documentation-only PRs ([#300](https://github.com/agentuity/cli/pull/300))
+- Updated port selection logic for dev server and agent testing ([#300](https://github.com/agentuity/cli/pull/300))
+
+### Fixed
+- Fixed port binding conflicts when running multiple agents ([#300](https://github.com/agentuity/cli/pull/300))
+- Fixed escape key behavior in main screen ([#300](https://github.com/agentuity/cli/pull/300))
+- Fixed log filtering issue ([#300](https://github.com/agentuity/cli/pull/300))
+- Fixed regression in welcome prompt not showing up ([#300](https://github.com/agentuity/cli/pull/300))
+
+## [v0.0.123] - 2025-05-17
+
+### Fixed
+- Auto switch to local echo if using localhost, fix terminal reset issues ([#298](https://github.com/agentuity/cli/pull/298))
+
+## [v0.0.122] - 2025-05-16
+
+### Changed
+- Initial Refactor for DevMode to use new Bridge API and new TUI ([#270](https://github.com/agentuity/cli/pull/270))
+
+## [v0.0.121] - 2025-05-16
+
+### Added
+- [AGENT-133] Added "test" command ([#290](https://github.com/agentuity/cli/pull/290))
+- [AGENT-129] Multiple tags for a deployment ([#291](https://github.com/agentuity/cli/pull/291))
+
+### Changed
+- Add tag and message to deployments in CI ([#293](https://github.com/agentuity/cli/pull/293))
+
+### Fixed
+- [AGENT-179] Call the agent from the correct endpoint ([#294](https://github.com/agentuity/cli/pull/294))
+
 ## [v0.0.120] - 2025-05-14
 
 ### Added
@@ -501,6 +564,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+
+[v0.0.128]: https://github.com/agentuity/cli/compare/v0.0.127...v0.0.128
+[v0.0.127]: https://github.com/agentuity/cli/compare/v0.0.126...v0.0.127
+[v0.0.126]: https://github.com/agentuity/cli/compare/v0.0.125...v0.0.126
+[v0.0.125]: https://github.com/agentuity/cli/compare/v0.0.124...v0.0.125
+[v0.0.124]: https://github.com/agentuity/cli/compare/v0.0.123...v0.0.124
+[v0.0.123]: https://github.com/agentuity/cli/compare/v0.0.122...v0.0.123
+[v0.0.122]: https://github.com/agentuity/cli/compare/v0.0.121...v0.0.122
+[v0.0.121]: https://github.com/agentuity/cli/compare/v0.0.120...v0.0.121
 [v0.0.120]: https://github.com/agentuity/cli/compare/v0.0.119...v0.0.120
 [v0.0.119]: https://github.com/agentuity/cli/compare/v0.0.118...v0.0.119
 [v0.0.118]: https://github.com/agentuity/cli/compare/v0.0.117...v0.0.118

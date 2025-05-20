@@ -96,6 +96,7 @@ type InitProjectArgs struct {
 	AuthType          string
 	Provider          *templates.TemplateRules
 	Agents            []project.AgentConfig
+	Framework         string
 }
 
 func initProject(ctx context.Context, logger logger.Logger, args InitProjectArgs) *project.ProjectData {
@@ -111,6 +112,7 @@ func initProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 		Dir:               args.Dir,
 		Provider:          args.Provider.Identifier,
 		Agents:            args.Agents,
+		Framework:         args.Framework,
 	})
 	if err != nil {
 		errsystem.New(errsystem.ErrCreateProject, err, errsystem.WithContextMessage("Failed to init project")).ShowErrorAndExit()
@@ -478,7 +480,6 @@ Examples:
 				provider = resp.Provider
 			}
 		}
-
 		projectDir := filepath.Join(cwd, util.SafeFilename(name))
 		dir, _ := cmd.Flags().GetString("dir")
 		if dir != "" {
@@ -572,6 +573,7 @@ Examples:
 				Agents:            agents,
 				EnableWebhookAuth: authType == "project" || authType == "webhook",
 				AuthType:          authType,
+				Framework:         templateName,
 			})
 
 			// remember our choices

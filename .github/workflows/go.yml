@@ -3,8 +3,14 @@ name: Go Build and Test
 on:
   push:
     branches: [ "main" ]
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
   pull_request:
     branches: [ "main" ]
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
 
 permissions:
   contents: read
@@ -80,4 +86,55 @@ jobs:
         
         echo "macOS double installation test passed - segfault fix verified"
       shell: bash
+
+    - name: Test Bash Install Script (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        # Windows test - simplified to avoid bash usage
+        Write-Host "Testing bash install script on Windows..."
+        
+        # Make script executable using PowerShell
+        if (Test-Path "install.sh") {
+          Write-Host "Found install.sh script"
+        } else {
+          Write-Host "install.sh not found"
+          exit 1
+        }
+        
+        # Test with default options (latest version)
+        Write-Host "Testing install script with default options..."
+        & sh -c "./install.sh -d '$env:TEMP/agentuity-test-download'"
+        
+        # Check if the script correctly detected Windows and aborted
+        if ($LASTEXITCODE -eq 1) {
+          $output = & sh -c "./install.sh -d '$env:TEMP/agentuity-test-download'" 2>&1
+          if ($output -match "Windows is not supported") {
+            Write-Host "Windows detection test passed: Script correctly detected Windows environment and aborted"
+            exit 0
+          } else {
+            Write-Host "Windows detection test failed: Script did not abort with the expected message"
+            exit 1
+          }
+        } else {
+          Write-Host "Windows detection test failed: Script did not abort as expected"
+          exit 1
+        }
+      shell: pwsh
       
+    - name: Test PowerShell Install Script (Windows)
+      if: matrix.os == 'windows-latest'
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        CI: true
+        AGENTUITY_TEST_VERSION: "0.0.74"
+      run: |
+        Write-Host "Testing PowerShell install script on Windows..."
+        
+        # Since we're removing Windows native support and only supporting Windows via WSL,
+        # we don't need a PowerShell install script anymore.
+        # This test is now skipped intentionally.
+        
+        Write-Host "Windows native installation is not supported - users should use WSL instead"
+        Write-Host "PowerShell install script test skipped intentionally"
+        exit 0
+      shell: pwsh                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        

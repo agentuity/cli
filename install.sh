@@ -119,8 +119,8 @@ is_linux() {
 }
 
 abort_if_windows() {
-  if [ "$OS" = "Windows" ]; then
-    abort "Windows is not supported. Please use WSL or a native Windows installation."
+  if [ "$OS" = "Windows" ] || echo "$OS" | grep -q "MINGW\|MSYS"; then
+    abort "Windows is not supported by this shell script. Please use the Windows installer or WSL."
   fi
 }
 
