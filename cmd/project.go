@@ -806,81 +806,6 @@ Examples:
 	},
 }
 
-var projectRollbackDeploymentCmd = &cobra.Command{
-	Use:   "rollback-deployment",
-	Short: "Rollback a deployment for a project",
-	Long: `Rollback a specific deployment for a project by selecting a project and deployment.
-
-Examples:
-  agentuity project rollback-deployment
-`,
-	Args: cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		logger := env.NewLogger(cmd)
-		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-		defer cancel()
-		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
-
-		selected := selectProject(ctx, logger, apiUrl, apikey, "Select a project to rollback a deployment")
-		if selected == "" {
-			return
-		}
-		selectedDeployment := selectDeployment(ctx, logger, apiUrl, apikey, selected, "Select a deployment to rollback")
-		if selectedDeployment == "" {
-			tui.ShowWarning("no deployment selected")
-			return
-		}
-		err := project.RollbackDeployment(ctx, logger, apiUrl, apikey, selected, selectedDeployment)
-		if err != nil {
-			tui.ShowError("%s", err.Error())
-			return
-		}
-		tui.ShowSuccess("Deployment rolled back successfully")
-	},
-}
-
-var projectDeleteDeploymentCmd = &cobra.Command{
-	Use:   "delete-deployment",
-	Short: "Delete a deployment for a project",
-	Long: `Delete a specific deployment for a project by selecting a project and deployment.
-
-Examples:
-  agentuity project delete-deployment
-`,
-	Args: cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		logger := env.NewLogger(cmd)
-		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-		defer cancel()
-		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
-
-		selected := selectProject(ctx, logger, apiUrl, apikey, "Select a project to delete a deployment")
-		if selected == "" {
-			return
-		}
-		selectedDeployment := selectDeployment(ctx, logger, apiUrl, apikey, selected, "Select a deployment to delete")
-		if selectedDeployment == "" {
-			tui.ShowWarning("no deployment selected")
-			return
-		}
-
-		if !tui.Ask(logger, "Are you sure you want to delete the selected deployment?", true) {
-			tui.ShowWarning("cancelled")
-			return
-		}
-
-		err := project.DeleteDeployment(ctx, logger, apiUrl, apikey, selected, selectedDeployment)
-		if err != nil {
-			tui.ShowError("%s", err.Error())
-			return
-		}
-
-		tui.ShowSuccess("Deployment deleted successfully")
-	},
-}
-
 func getConfigTemplateDir(cmd *cobra.Command) (string, bool, error) {
 	if cmd.Flags().Changed("templates-dir") {
 		dir, _ := cmd.Flags().GetString("templates-dir")
@@ -987,8 +912,6 @@ func init() {
 	projectCmd.AddCommand(projectListCmd)
 	projectCmd.AddCommand(projectDeleteCmd)
 	projectCmd.AddCommand(projectImportCmd)
-	projectCmd.AddCommand(projectRollbackDeploymentCmd)
-	projectCmd.AddCommand(projectDeleteDeploymentCmd)
 
 	for _, cmd := range []*cobra.Command{projectNewCmd, projectImportCmd} {
 		cmd.Flags().StringP("dir", "d", "", "The directory for the project")
