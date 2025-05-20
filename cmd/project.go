@@ -796,10 +796,28 @@ Examples:
   agentuity project import --dir /path/to/project`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		dir, _ := cmd.Flags().GetString("dir")
+		name, _ := cmd.Flags().GetString("name")
+		description, _ := cmd.Flags().GetString("description")
+		orgId, _ := cmd.Flags().GetString("org-id")
+		apikey, _ := cmd.Flags().GetString("apikey")
+		headless, _ := cmd.Flags().GetBool("headless")
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
-		logger := env.NewLogger(cmd)
 		context := project.EnsureProject(ctx, cmd)
+		logger := env.NewLogger(cmd)
+
+		if headless && apikey != "" && orgId != "" && name != "" && description != "" {
+			context.Project.Name = name
+			context.Project.Description = description
+			result, err := context.Project.Import(ctx, logger, context.APIURL, apikey, orgId, true)
+			if err != nil {
+				errsystem.New(errsystem.ErrImportingProject, err, errsystem.WithContextMessage("Error importing project")).ShowErrorAndExit()
+			}
+			saveEnv(dir, result.APIKey, result.ProjectKey)
+			return
+		}
+
 		ShowNewProjectImport(ctx, logger, cmd, context.APIURL, context.Token, "", context.Project, context.Dir, true)
 	},
 }
@@ -844,4 +862,9 @@ func init() {
 	projectNewCmd.Flags().String("templates-dir", "", "The directory to load the templates. Defaults to loading them from the github.com/agentuity/templates repository")
 	projectNewCmd.Flags().String("auth", "project", "The authentication type for the agent (project, webhook, or none)")
 	projectNewCmd.Flags().String("action", "github-app", "The action to take for the project (github-action, github-app, none)")
+
+	projectImportCmd.Flags().String("apikey", "", "The API key to use for the project")
+	projectImportCmd.Flags().Bool("headless", false, "Run the import in headless mode (true, false)")
+	projectImportCmd.Flags().String("name", "", "The name of the project to import")
+	projectImportCmd.Flags().String("description", "", "The description of the project to import")
 }

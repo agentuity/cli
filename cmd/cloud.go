@@ -77,7 +77,7 @@ type startRequest struct {
 	TagMessage     string             `json:"message,omitempty"`
 }
 
-func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.Command, apiUrl, apikey, projectId string, project *project.Project, dir string, isImport bool) {
+func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.Command, apiUrl string, apikey string, projectId string, project *project.Project, dir string, isImport bool) {
 	title := "Import Project"
 	var message string
 	if isImport {
@@ -674,6 +674,7 @@ func init() {
 	rootCmd.AddCommand(cloudCmd)
 	rootCmd.AddCommand(cloudDeployCmd)
 	cloudCmd.AddCommand(cloudDeployCmd)
+
 	cloudDeployCmd.Flags().StringP("dir", "d", ".", "The directory to the project to deploy")
 	cloudDeployCmd.Flags().String("deploymentId", "", "Used to track a specific deployment")
 	cloudDeployCmd.Flags().Bool("ci", false, "Used to track a specific CI job")
