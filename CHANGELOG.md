@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.130] - 2025-05-20
+
+### Fixed
+- DevMode: remove mouse tracking as it caused the inability to copy/paste in the terminal ([#316](https://github.com/agentuity/cli/pull/316))
+
 ## [v0.0.129] - 2025-05-20
 
 ### Changed
@@ -570,6 +575,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks for new agent creation
 
 
+[v0.0.130]: https://github.com/agentuity/cli/compare/v0.0.129...v0.0.130
 [v0.0.129]: https://github.com/agentuity/cli/compare/v0.0.128...v0.0.129
 [v0.0.128]: https://github.com/agentuity/cli/compare/v0.0.127...v0.0.128
 [v0.0.127]: https://github.com/agentuity/cli/compare/v0.0.126...v0.0.127
