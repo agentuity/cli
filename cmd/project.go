@@ -796,7 +796,6 @@ Examples:
   agentuity project import --dir /path/to/project`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		dir, _ := cmd.Flags().GetString("dir")
 		name, _ := cmd.Flags().GetString("name")
 		description, _ := cmd.Flags().GetString("description")
 		orgId, _ := cmd.Flags().GetString("org-id")
@@ -810,15 +809,15 @@ Examples:
 		if headless && apikey != "" && orgId != "" && name != "" && description != "" {
 			context.Project.Name = name
 			context.Project.Description = description
-			result, err := context.Project.Import(ctx, logger, context.APIURL, apikey, orgId, true)
+			_, err := context.Project.Import(ctx, logger, context.APIURL, apikey, orgId, true)
 			if err != nil {
 				errsystem.New(errsystem.ErrImportingProject, err, errsystem.WithContextMessage("Error importing project")).ShowErrorAndExit()
 			}
-			saveEnv(dir, result.APIKey, result.ProjectKey)
 			return
 		}
 
 		ShowNewProjectImport(ctx, logger, cmd, context.APIURL, context.Token, "", context.Project, context.Dir, true)
+
 	},
 }
 
@@ -867,4 +866,9 @@ func init() {
 	projectImportCmd.Flags().Bool("headless", false, "Run the import in headless mode (true, false)")
 	projectImportCmd.Flags().String("name", "", "The name of the project to import")
 	projectImportCmd.Flags().String("description", "", "The description of the project to import")
+
+	projectImportCmd.Flags().MarkHidden("apikey")
+	projectImportCmd.Flags().MarkHidden("headless")
+	projectImportCmd.Flags().MarkHidden("name")
+	projectImportCmd.Flags().MarkHidden("description")
 }
