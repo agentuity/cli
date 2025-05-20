@@ -104,7 +104,7 @@ var breakingChanges = []breakingChange{
 		Runtime: "uv",
 		Version: "<0.0.84",
 		Title:   "🚫 Python SDK Breaking Changes 🚫",
-		Message: "The environment variable and code reference for your Agentuity API key has changed from AGENTUITY_API_KEY to AGENTUITY_SDK_KEY. Update all occurrences in your .env files and codebase. See the v0.0.84 Changelog for details.\n\n" + tui.Link("https://agentuity.dev/Changelog/python-js#v0084") + "\n\nAfter migrated, please run `uv add agentuity -U` --latest and then re-run this command again.",
+		Message: "The environment variable and code reference for your Agentuity API key has changed from AGENTUITY_API_KEY to AGENTUITY_SDK_KEY. Update all occurrences in your .env files and codebase. See the v0.0.84 Changelog for details.\n\n" + tui.Link("https://agentuity.dev/Changelog/sdk-py#v0084") + "\n\nAfter migrated, please run `uv add agentuity -U` --latest and then re-run this command again.",
 		Callback: func(ctx BundleContext) error {
 			files := []string{
 				filepath.Join(ctx.ProjectDir, "server.py"),
