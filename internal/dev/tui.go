@@ -546,7 +546,7 @@ func (d *DevModeUI) AddErrorLog(log string, args ...any) {
 		timestamp: time.Now(),
 		severity:  logger.LevelError,
 		raw:       raw,
-		message:   errorStyle.Render(strings.ReplaceAll(ansiColorStripper.ReplaceAllString(raw, ""), "\n", " ")),
+		message:   strings.ReplaceAll(ansiColorStripper.ReplaceAllString(raw, ""), "\n", " "),
 	})
 }
 

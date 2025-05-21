@@ -46,7 +46,7 @@ func installSourceMapSupportIfNeeded(ctx BundleContext, dir string) error {
 	// only bun needs to install this library to aide in parsing the source maps
 	path := filepath.Join(dir, "node_modules", "source-map-js", "package.json")
 	if !util.Exists(path) {
-		cmd := exec.CommandContext(ctx.Context, "bun", "install", "source-map-js", "--no-save", "--silent", "--no-progress", "--no-summary", "--ignore-scripts")
+		cmd := exec.CommandContext(ctx.Context, "bun", "add", "source-map-js", "--no-save", "--silent", "--no-progress", "--no-summary", "--ignore-scripts")
 		cmd.Dir = dir
 		out, err := cmd.CombinedOutput()
 		if err != nil {
@@ -180,7 +180,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		Define:        defines,
 		LegalComments: api.LegalCommentsNone,
 		Banner: map[string]string{
-			"js": jsheader + jsshim + postShim,
+			"js": strings.Join([]string{jsheader, jsshim, postShim}, "\n"),
 		},
 	})
 	ctx.Logger.Debug("finished build in %v", time.Since(started))

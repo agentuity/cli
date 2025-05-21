@@ -38,4 +38,3 @@ jobs:
       - uses: actions/attest-build-provenance@v2
         with:
           subject-checksums: ./dist/checksums.txt
-          subject-checksums-type: sha256

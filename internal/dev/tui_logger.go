@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/agentuity/go-common/logger"
 	"github.com/agentuity/go-common/tui"
@@ -25,6 +26,7 @@ type TuiLogger struct {
 	ui       *DevModeUI
 	ioType   ioType
 	pending  bytes.Buffer
+	mu       sync.Mutex
 }
 
 func NewTUILogger(logLevel logger.LogLevel, ui *DevModeUI, ioType ioType) *TuiLogger {
@@ -105,6 +107,8 @@ var eol = []byte("\n")
 var ansiColorStripper = regexp.MustCompile("\x1b\\[[0-9;]*[mK]")
 
 func (l *TuiLogger) Write(p []byte) (n int, err error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.pending.Write(p)
 
 	if !bytes.HasSuffix(l.pending.Bytes(), eol) {
@@ -123,7 +127,13 @@ func (l *TuiLogger) Write(p []byte) (n int, err error) {
 		var prefix string
 		if len(log) > 9 {
 			bracket := strings.Index(log, "] ")
-			prefix = strings.TrimSpace(log[:bracket+2])
+			if bracket == -1 {
+				// No prefix – treat the entire line as the message
+				prefix = ""
+			} else {
+				prefix = strings.TrimSpace(log[:bracket+2])
+				log = strings.TrimPrefix(log[bracket+2:], " ")
+			}
 			if strings.HasPrefix(prefix, "[TRACE]") {
 				severity = logger.LevelTrace
 				if logger.LevelTrace < l.logLevel {
@@ -139,20 +149,17 @@ func (l *TuiLogger) Write(p []byte) (n int, err error) {
 				if logger.LevelInfo < l.logLevel {
 					continue
 				}
-				prefix += " "
 			} else if strings.HasPrefix(prefix, "[WARN]") {
 				severity = logger.LevelWarn
 				if logger.LevelWarn < l.logLevel {
 					continue
 				}
-				prefix += " "
 			} else if strings.HasPrefix(prefix, "[ERROR]") {
 				severity = logger.LevelError
 				if logger.LevelError < l.logLevel {
 					continue
 				}
 			}
-			log = strings.TrimPrefix(log[bracket+2:], " ")
 		}
 		if l.ioType == Stdout {
 			l.ui.AddLog(severity, "%s %s", prefix, log)
