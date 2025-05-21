@@ -10,8 +10,13 @@ import (
 	"github.com/agentuity/go-common/tui"
 )
 
+type pendingLog struct {
+	level logger.LogLevel
+	msg   string
+}
+
 type PendingLogger struct {
-	pending  []string
+	pending  []pendingLog
 	logLevel logger.LogLevel
 	logger   logger.Logger
 	mutex    sync.RWMutex
@@ -21,7 +26,7 @@ var _ logger.Logger = (*PendingLogger)(nil)
 
 func NewPendingLogger(logLevel logger.LogLevel) *PendingLogger {
 	return &PendingLogger{
-		pending:  make([]string, 0),
+		pending:  make([]pendingLog, 0),
 		logLevel: logLevel,
 	}
 }
@@ -30,7 +35,7 @@ func (l *PendingLogger) drain(ui *DevModeUI, logger logger.Logger) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	for _, val := range l.pending {
-		ui.AddLog("%s", val)
+		ui.AddLog(val.level, "%s", val.msg)
 	}
 	l.logger = logger
 	l.pending = nil
@@ -62,7 +67,10 @@ func (l *PendingLogger) Trace(msg string, args ...interface{}) {
 		l.logger.Trace(msg, args...)
 		return
 	}
-	val := tui.Muted("[TRACE] " + fmt.Sprintf(msg, args...))
+	val := pendingLog{
+		level: logger.LevelTrace,
+		msg:   fmt.Sprintf(msg, args...),
+	}
 	l.pending = append(l.pending, val)
 }
 
@@ -77,7 +85,10 @@ func (l *PendingLogger) Debug(msg string, args ...interface{}) {
 		l.logger.Debug(msg, args...)
 		return
 	}
-	val := tui.Muted("[TRACE] " + fmt.Sprintf(msg, args...))
+	val := pendingLog{
+		level: logger.LevelDebug,
+		msg:   fmt.Sprintf(msg, args...),
+	}
 	l.pending = append(l.pending, val)
 }
 
@@ -92,7 +103,10 @@ func (l *PendingLogger) Info(msg string, args ...interface{}) {
 		l.logger.Info(msg, args...)
 		return
 	}
-	val := tui.Text("[INFO] " + fmt.Sprintf(msg, args...))
+	val := pendingLog{
+		level: logger.LevelInfo,
+		msg:   fmt.Sprintf(msg, args...),
+	}
 	l.pending = append(l.pending, val)
 }
 
@@ -107,7 +121,10 @@ func (l *PendingLogger) Warn(msg string, args ...interface{}) {
 		l.logger.Warn(msg, args...)
 		return
 	}
-	val := tui.Title("[WARN] " + fmt.Sprintf(msg, args...))
+	val := pendingLog{
+		level: logger.LevelWarn,
+		msg:   fmt.Sprintf(msg, args...),
+	}
 	l.pending = append(l.pending, val)
 }
 
@@ -122,7 +139,10 @@ func (l *PendingLogger) Error(msg string, args ...interface{}) {
 		l.logger.Error(msg, args...)
 		return
 	}
-	val := tui.Bold("[ERROR] " + fmt.Sprintf(msg, args...))
+	val := pendingLog{
+		level: logger.LevelError,
+		msg:   fmt.Sprintf(msg, args...),
+	}
 	l.pending = append(l.pending, val)
 }
 

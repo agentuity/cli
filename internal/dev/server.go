@@ -553,8 +553,11 @@ func (s *Server) HealthCheck(devModeUrl string) error {
 	return fmt.Errorf("health check failed after %s", time.Since(started))
 }
 
-func (s *Server) Connect(ui *DevModeUI, tuiLogger logger.Logger) error {
+func (s *Server) Connect(ui *DevModeUI, tuiLogger logger.Logger, tuiLoggerErr logger.Logger) error {
 	s.logger = tuiLogger
+	if pl, ok := tuiLoggerErr.(*PendingLogger); ok {
+		pl.drain(ui, tuiLoggerErr)
+	}
 	if pl, ok := s.logger.(*PendingLogger); ok {
 		pl.drain(ui, s.logger)
 	}

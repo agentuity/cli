@@ -8,18 +8,29 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/agentuity/go-common/logger"
 	"github.com/agentuity/go-common/tui"
 )
 
+type ioType int
+
+const (
+	StdErr ioType = iota
+	Stdout
+)
+
 type TuiLogger struct {
 	logLevel logger.LogLevel
 	ui       *DevModeUI
+	ioType   ioType
+	pending  bytes.Buffer
+	mu       sync.Mutex
 }
 
-func NewTUILogger(logLevel logger.LogLevel, ui *DevModeUI) *TuiLogger {
-	return &TuiLogger{logLevel: logLevel, ui: ui}
+func NewTUILogger(logLevel logger.LogLevel, ui *DevModeUI, ioType ioType) *TuiLogger {
+	return &TuiLogger{logLevel: logLevel, ui: ui, ioType: ioType}
 }
 
 var _ logger.Logger = (*TuiLogger)(nil)
@@ -45,8 +56,7 @@ func (l *TuiLogger) Trace(msg string, args ...interface{}) {
 	if logger.LevelTrace < l.logLevel {
 		return
 	}
-	val := tui.Muted("[TRACE] " + fmt.Sprintf(msg, args...))
-	l.ui.AddLog("%s", val)
+	l.ui.AddLog(logger.LevelTrace, "[TRACE] %s", fmt.Sprintf(msg, args...))
 }
 
 // Debug level logging
@@ -54,8 +64,7 @@ func (l *TuiLogger) Debug(msg string, args ...interface{}) {
 	if logger.LevelDebug < l.logLevel {
 		return
 	}
-	val := tui.Muted("[TRACE] " + fmt.Sprintf(msg, args...))
-	l.ui.AddLog("%s", val)
+	l.ui.AddLog(logger.LevelDebug, "[DEBUG] %s", fmt.Sprintf(msg, args...))
 }
 
 // Info level loggi	ng
@@ -63,8 +72,7 @@ func (l *TuiLogger) Info(msg string, args ...interface{}) {
 	if logger.LevelInfo < l.logLevel {
 		return
 	}
-	val := tui.Text("[INFO] " + fmt.Sprintf(msg, args...))
-	l.ui.AddLog("%s", val)
+	l.ui.AddLog(logger.LevelInfo, "[INFO] %s", fmt.Sprintf(msg, args...))
 }
 
 // Warning level logging
@@ -72,8 +80,7 @@ func (l *TuiLogger) Warn(msg string, args ...interface{}) {
 	if logger.LevelWarn < l.logLevel {
 		return
 	}
-	val := tui.Title("[WARN] " + fmt.Sprintf(msg, args...))
-	l.ui.AddLog("%s", val)
+	l.ui.AddLog(logger.LevelWarn, "[WARN] %s", fmt.Sprintf(msg, args...))
 }
 
 // Error level logging
@@ -81,14 +88,13 @@ func (l *TuiLogger) Error(msg string, args ...interface{}) {
 	if logger.LevelError < l.logLevel {
 		return
 	}
-	val := tui.Bold("[ERROR] " + fmt.Sprintf(msg, args...))
-	l.ui.AddLog("%s", val)
+	l.ui.AddLog(logger.LevelError, "[ERROR] %s", fmt.Sprintf(msg, args...))
 }
 
 // Fatal level logging and exit with code 1
 func (l *TuiLogger) Fatal(msg string, args ...interface{}) {
 	val := tui.Bold("[FATAL] " + fmt.Sprintf(msg, args...))
-	l.ui.AddLog("%s", val)
+	l.ui.AddLog(logger.LevelError, "%s", val)
 	os.Exit(1)
 }
 
@@ -100,32 +106,60 @@ func (l *TuiLogger) Stack(next logger.Logger) logger.Logger {
 var eol = []byte("\n")
 var ansiColorStripper = regexp.MustCompile("\x1b\\[[0-9;]*[mK]")
 
+// Map prefix to severity level
+var prefixToLevel = map[string]logger.LogLevel{
+	"[TRACE]": logger.LevelTrace,
+	"[DEBUG]": logger.LevelDebug,
+	"[INFO]":  logger.LevelInfo,
+	"[WARN]":  logger.LevelWarn,
+	"[ERROR]": logger.LevelError,
+	"[FATAL]": logger.LevelError,
+}
+
 func (l *TuiLogger) Write(p []byte) (n int, err error) {
-	trimmed := bytes.Split(p, eol)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.pending.Write(p)
+
+	if !bytes.HasSuffix(l.pending.Bytes(), eol) {
+		return len(p), nil
+	}
+
+	trimmed := bytes.Split(l.pending.Bytes(), eol)
+	l.pending.Reset()
+
 	for _, line := range trimmed {
 		if len(line) == 0 {
 			continue
 		}
-		log := string(line)
-		if len(log) > 20 {
-			prefix := ansiColorStripper.ReplaceAllString(log[:20], "")
-			if logger.LevelTrace < l.logLevel && strings.HasPrefix(prefix, "[TRACE]") {
-				continue
+		log := ansiColorStripper.ReplaceAllString(string(line), "")
+		severity := logger.LevelTrace
+		var prefix string
+		if len(log) > 9 {
+			bracket := strings.Index(log, "] ")
+			if bracket == -1 {
+				// No prefix – treat the entire line as the message
+				prefix = ""
+			} else {
+				prefix = strings.TrimSpace(log[:bracket+2])
+				log = strings.TrimPrefix(log[bracket+2:], " ")
 			}
-			if logger.LevelDebug < l.logLevel && strings.HasPrefix(prefix, "[DEBUG]") {
-				continue
-			}
-			if logger.LevelInfo < l.logLevel && strings.HasPrefix(prefix, "[INFO]") {
-				continue
-			}
-			if logger.LevelWarn < l.logLevel && strings.HasPrefix(prefix, "[WARN]") {
-				continue
-			}
-			if logger.LevelError < l.logLevel && strings.HasPrefix(prefix, "[ERROR]") {
-				continue
+			// Find matching prefix
+			for p, level := range prefixToLevel {
+				if strings.HasPrefix(prefix, p) {
+					severity = level
+					if level < l.logLevel {
+						continue
+					}
+					break
+				}
 			}
 		}
-		l.ui.AddLog("%s", log)
+		if l.ioType == Stdout {
+			l.ui.AddLog(severity, "%s %s", prefix, log)
+		} else {
+			l.ui.AddErrorLog("%s", log)
+		}
 	}
 	return len(p), nil
 }

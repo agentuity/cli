@@ -124,9 +124,10 @@ Examples:
 
 		defer ui.Close(false)
 
-		tuiLogger := dev.NewTUILogger(logLevel, ui)
+		tuiLogger := dev.NewTUILogger(logLevel, ui, dev.Stdout)
+		tuiLoggerErr := dev.NewTUILogger(logLevel, ui, dev.StdErr)
 
-		if err := server.Connect(ui, tuiLogger); err != nil {
+		if err := server.Connect(ui, tuiLogger, tuiLoggerErr); err != nil {
 			log.Error("failed to start live dev connection: %s", err)
 			ui.Close(true)
 			return
@@ -139,7 +140,7 @@ Examples:
 			agent.PublicURL = fmt.Sprintf("%s/%s", publicUrl, agent.ID)
 		}
 
-		projectServerCmd, err := dev.CreateRunProjectCmd(processCtx, tuiLogger, theproject, server, dir, orgId, port, tuiLogger)
+		projectServerCmd, err := dev.CreateRunProjectCmd(processCtx, tuiLogger, theproject, server, dir, orgId, port, tuiLogger, tuiLoggerErr)
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 		}
@@ -241,7 +242,7 @@ Examples:
 				if isDeliberateRestart {
 					isDeliberateRestart = false
 					tuiLogger.Trace("restarting project server")
-					projectServerCmd, err = dev.CreateRunProjectCmd(processCtx, tuiLogger, theproject, server, dir, orgId, port, tuiLogger)
+					projectServerCmd, err = dev.CreateRunProjectCmd(processCtx, tuiLogger, theproject, server, dir, orgId, port, tuiLogger, tuiLoggerErr)
 					if err != nil {
 						errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 					}
