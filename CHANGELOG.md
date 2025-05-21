@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.132] - 2025-05-21
+
+### Fixed
+- [AGENT-166] Add dev mode flag and improved error handling during server streaming operations ([#322](https://github.com/agentuity/cli/pull/322))
+
 ## [v0.0.131] - 2025-05-20
 
 ### Added
@@ -583,6 +588,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks for new agent creation
 
 
+[v0.0.132]: https://github.com/agentuity/cli/compare/v0.0.131...v0.0.132
 [v0.0.131]: https://github.com/agentuity/cli/compare/v0.0.130...v0.0.131
 [v0.0.130]: https://github.com/agentuity/cli/compare/v0.0.129...v0.0.130
 [v0.0.129]: https://github.com/agentuity/cli/compare/v0.0.128...v0.0.129
