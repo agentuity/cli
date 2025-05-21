@@ -106,6 +106,16 @@ func (l *TuiLogger) Stack(next logger.Logger) logger.Logger {
 var eol = []byte("\n")
 var ansiColorStripper = regexp.MustCompile("\x1b\\[[0-9;]*[mK]")
 
+// Map prefix to severity level
+var prefixToLevel = map[string]logger.LogLevel{
+	"[TRACE]": logger.LevelTrace,
+	"[DEBUG]": logger.LevelDebug,
+	"[INFO]":  logger.LevelInfo,
+	"[WARN]":  logger.LevelWarn,
+	"[ERROR]": logger.LevelError,
+	"[FATAL]": logger.LevelError,
+}
+
 func (l *TuiLogger) Write(p []byte) (n int, err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -134,30 +144,14 @@ func (l *TuiLogger) Write(p []byte) (n int, err error) {
 				prefix = strings.TrimSpace(log[:bracket+2])
 				log = strings.TrimPrefix(log[bracket+2:], " ")
 			}
-			if strings.HasPrefix(prefix, "[TRACE]") {
-				severity = logger.LevelTrace
-				if logger.LevelTrace < l.logLevel {
-					continue
-				}
-			} else if strings.HasPrefix(prefix, "[DEBUG]") {
-				severity = logger.LevelDebug
-				if logger.LevelDebug < l.logLevel {
-					continue
-				}
-			} else if strings.HasPrefix(prefix, "[INFO]") {
-				severity = logger.LevelInfo
-				if logger.LevelInfo < l.logLevel {
-					continue
-				}
-			} else if strings.HasPrefix(prefix, "[WARN]") {
-				severity = logger.LevelWarn
-				if logger.LevelWarn < l.logLevel {
-					continue
-				}
-			} else if strings.HasPrefix(prefix, "[ERROR]") {
-				severity = logger.LevelError
-				if logger.LevelError < l.logLevel {
-					continue
+			// Find matching prefix
+			for p, level := range prefixToLevel {
+				if strings.HasPrefix(prefix, p) {
+					severity = level
+					if level < l.logLevel {
+						continue
+					}
+					break
 				}
 			}
 		}
