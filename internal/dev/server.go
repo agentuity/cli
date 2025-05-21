@@ -71,6 +71,7 @@ type Server struct {
 	connectionFailed  time.Time
 	connectionStarted time.Time
 	reconnectMutex    sync.Mutex
+	hostname          string
 }
 
 type ServerArgs struct {
@@ -98,6 +99,7 @@ type ConnectionResponse struct {
 		ExpiresAt       string `json:"expires_at"`
 		OtelUrl         string `json:"otlp_url"`
 		OtelBearerToken string `json:"otlp_token"`
+		Hostname        string `json:"hostname,omitempty"`
 	} `json:"data"`
 }
 
@@ -145,6 +147,7 @@ func (s *Server) refreshConnection() error {
 		s.logger = logger
 		s.cleanup = cleanup
 	}
+	s.hostname = resp.Data.Hostname
 
 	return nil
 }
@@ -210,18 +213,23 @@ func (s *Server) connect(initial bool) {
 	tlsConfig.Certificates = []tls.Certificate{*s.tlsCertificate}
 	tlsConfig.NextProtos = []string{"h2"}
 
-	if strings.Contains(s.serverAddr, "localhost") || strings.Contains(s.serverAddr, "127.0.0.1") {
+	hostname := s.hostname
+	if hostname == "" {
+		hostname = s.serverAddr
+	}
+
+	if strings.Contains(hostname, "localhost") || strings.Contains(hostname, "127.0.0.1") {
 		tlsConfig.InsecureSkipVerify = true
 	}
 
-	if !strings.Contains(s.serverAddr, ":") {
-		s.serverAddr = fmt.Sprintf("%s:443", s.serverAddr)
+	if !strings.Contains(hostname, ":") {
+		hostname = fmt.Sprintf("%s:443", hostname)
 	}
 
-	conn, err := tls.Dial("tcp", s.serverAddr, &tlsConfig)
+	conn, err := tls.Dial("tcp", hostname, &tlsConfig)
 	if err != nil {
 		gerr = err
-		s.logger.Warn("failed to dial tls: %s, will retry ...", err)
+		s.logger.Warn("failed to dial devmode server: %s (%s), will retry ...", hostname, err)
 		return
 	}
 	s.conn = conn
@@ -428,7 +436,7 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		err = fmt.Errorf("failed to insert project id into trace state: %w", err)
 		return
 	}
-	traceState, err = traceState.Insert("d", "1");
+	traceState, err = traceState.Insert("d", "1")
 	if err != nil {
 		logger.Error("failed to insert devmode status into trace state: %s", err)
 		err = fmt.Errorf("failed to insert devmode status into trace state: %w", err)
