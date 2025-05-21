@@ -249,7 +249,7 @@ func (s *Server) connect(initial bool) {
 	s.connectionFailed = time.Time{}
 	s.reconnectMutex.Unlock()
 
-	s.logger.Debug("connection established to %s", s.serverAddr)
+	s.logger.Debug("connection established to %s", hostname)
 
 	// HTTP/2 server to accept proxied requests over the tunnel connection
 	h2s := &http2.Server{}
