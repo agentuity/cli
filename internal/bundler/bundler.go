@@ -165,7 +165,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		Outdir:         outdir,
 		Write:          true,
 		Splitting:      false,
-		Sourcemap:      api.SourceMapExternal,
+		Sourcemap:      api.SourceMapLinked,
 		SourcesContent: api.SourcesContentInclude,
 		Format:         api.FormatESModule,
 		Platform:       api.PlatformNode,
