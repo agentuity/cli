@@ -155,6 +155,7 @@ func (c *APIClient) Do(method, pathParam string, payload interface{}, response i
 	if err != nil {
 		return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error creating request: %w", err), traceID)
 	}
+
 	req.Header.Set("User-Agent", UserAgent())
 	req.Header.Set("Content-Type", "application/json")
 	if c.token != "" {

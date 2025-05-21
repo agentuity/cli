@@ -12,10 +12,11 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/agentuity/cli/internal/envutil"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
+	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
-	"github.com/agentuity/go-common/logger"
 	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/sys"
 	"github.com/agentuity/go-common/tui"
@@ -72,40 +73,6 @@ func loadEnvFile(le []env.EnvLineComment, forceSecret bool) (map[string]string, 
 		}
 	}
 	return envs, secrets
-}
-
-func promptForEnv(logger logger.Logger, key string, isSecret bool, localenv map[string]string, osenv map[string]string, defaultValue string, placeholder string) string {
-	prompt := "Enter the value for " + key
-	var help string
-	var value string
-	if isSecret {
-		prompt = "Enter the secret value for " + key
-		if val, ok := localenv[key]; ok {
-			help = "Press enter to set as " + maxString(cstr.Mask(val), 30) + " from your .env file"
-			if defaultValue == "" {
-				defaultValue = val
-			}
-		} else if val, ok := osenv[key]; ok {
-			help = "Press enter to set as " + maxString(cstr.Mask(val), 30) + " from your environment"
-			if defaultValue == "" {
-				defaultValue = val
-			}
-		} else {
-			help = "Your input will be masked"
-		}
-		value = tui.Password(logger, prompt, help)
-	} else {
-		if placeholder == "" {
-			value = tui.InputWithPlaceholder(logger, prompt, placeholder, defaultValue)
-		} else {
-			value = tui.InputWithPlaceholder(logger, prompt, help, defaultValue)
-		}
-	}
-
-	if value == "" && defaultValue != "" {
-		value = defaultValue
-	}
-	return value
 }
 
 func loadOSEnv() map[string]string {
@@ -251,16 +218,16 @@ Examples:
 				}
 			}
 			if value == "" {
-				value = promptForEnv(logger, key, isSecret, localenv, osenv, "", "")
+				value = envutil.PromptForEnv(logger, key, isSecret, localenv, osenv, "", "")
 			}
 		}
 		if key != "" && value != "" {
 			if isSecret {
 				secrets[key] = value
-				tui.ShowSuccess("%s=%s", key, maxString(cstr.Mask(value), 40))
+				tui.ShowSuccess("%s=%s", key, util.MaxString(cstr.Mask(value), 40))
 			} else {
 				envs[key] = value
-				tui.ShowSuccess("%s=%s", key, maxString(value, 40))
+				tui.ShowSuccess("%s=%s", key, util.MaxString(value, 40))
 			}
 		}
 		if askMore {
@@ -426,7 +393,7 @@ Examples:
 			if !hasTTY {
 				fmt.Printf("%s=%s\n", key, value)
 			} else {
-				fmt.Printf("%s=%s\n", tui.Title(key), tui.Muted(maxString(value, 40)))
+				fmt.Printf("%s=%s\n", tui.Title(key), tui.Muted(util.MaxString(value, 40)))
 			}
 		}
 		if len(projectData.Env) == 0 && len(projectData.Secrets) == 0 {

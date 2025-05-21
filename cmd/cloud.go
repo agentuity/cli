@@ -16,6 +16,7 @@ import (
 
 	"github.com/agentuity/cli/internal/agent"
 	"github.com/agentuity/cli/internal/deployer"
+	"github.com/agentuity/cli/internal/envutil"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/ignore"
 	"github.com/agentuity/cli/internal/project"
@@ -23,7 +24,6 @@ import (
 	"github.com/agentuity/go-common/crypto"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
-	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/tui"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -124,58 +124,6 @@ func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.
 
 var envTemplateFileNames = []string{".env.example", ".env.template"}
 
-func readPossibleEnvTemplateFiles(baseDir string) map[string][]env.EnvLineComment {
-	var results map[string][]env.EnvLineComment
-	keys := make(map[string]bool)
-	for _, file := range envTemplateFileNames {
-		filename := filepath.Join(baseDir, file)
-		if !util.Exists(filename) {
-			continue
-		}
-		efc, err := env.ParseEnvFileWithComments(filename)
-		if err == nil {
-			if results == nil {
-				results = make(map[string][]env.EnvLineComment)
-			}
-			for _, ev := range efc {
-				if _, ok := keys[ev.Key]; !ok {
-					if isAgentuityEnv.MatchString(ev.Key) {
-						continue
-					}
-					keys[ev.Key] = true
-					results[file] = append(results[file], ev)
-				}
-			}
-		}
-	}
-	return results
-}
-
-func appendToEnvFile(envfile string, envs []env.EnvLineComment) ([]env.EnvLineComment, error) {
-	le, err := env.ParseEnvFileWithComments(envfile)
-	if err != nil {
-		return nil, err
-	}
-	var buf strings.Builder
-	for _, ev := range le {
-		if ev.Comment != "" {
-			buf.WriteString(fmt.Sprintf("# %s\n", ev.Comment))
-		}
-		buf.WriteString(fmt.Sprintf("%s=%s\n", ev.Key, ev.Raw))
-	}
-	for _, ev := range envs {
-		if ev.Comment != "" {
-			buf.WriteString(fmt.Sprintf("# %s\n", ev.Comment))
-		}
-		buf.WriteString(fmt.Sprintf("%s=%s\n", ev.Key, ev.Raw))
-		le = append(le, ev)
-	}
-	if err := os.WriteFile(envfile, []byte(buf.String()), 0644); err != nil {
-		return nil, err
-	}
-	return le, nil
-}
-
 var border = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).Padding(1).BorderForeground(lipgloss.AdaptiveColor{Light: "#999999", Dark: "#999999"})
 var redDiff = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#990000", Dark: "#EE0000"})
 
@@ -251,13 +199,11 @@ Examples:
 			}
 
 			var err error
-			var le []env.EnvLineComment
 			var projectExists bool
 			var action func()
 
 			if !context.NewProject {
 				action = func() {
-					var err error
 					projectData, err = theproject.GetProject(ctx, logger, apiUrl, token)
 					if err != nil {
 						if err == project.ErrProjectNotFound {
@@ -282,148 +228,12 @@ Examples:
 				ShowNewProjectImport(ctx, logger, cmd, apiUrl, token, projectId, theproject, dir, false)
 			}
 
-			// check to see if we have any env vars that are not in the project
-			envfilename := filepath.Join(dir, ".env")
-			if tui.HasTTY && util.Exists(envfilename) {
-
-				// attempt to see if we have any template files
-				templateEnvs := readPossibleEnvTemplateFiles(dir)
-
-				le, err = env.ParseEnvFileWithComments(envfilename)
-				if err != nil {
-					errsystem.New(errsystem.ErrParseEnvironmentFile, err,
-						errsystem.WithContextMessage("Error parsing .env file")).ShowErrorAndExit()
-				}
-				envFile = &deployer.EnvFile{Filepath: envfilename, Env: le}
-
-				if len(templateEnvs) > 0 {
-					kvmap := make(map[string]env.EnvLineComment)
-					for _, ev := range le {
-						if isAgentuityEnv.MatchString(ev.Key) {
-							continue
-						}
-						kvmap[ev.Key] = ev
-					}
-					var osenv map[string]string
-					var addtoenvfile []env.EnvLineComment
-					// look to see if we have any template environment variables that are not in the .env file
-					for filename, evs := range templateEnvs {
-						for _, ev := range evs {
-							if _, ok := kvmap[ev.Key]; !ok {
-								isSecret := looksLikeSecret.MatchString(ev.Key)
-								if !isSecret && descriptionLookingLikeASecret(ev.Comment) {
-									isSecret = true
-								}
-								_ = filename
-								var content string
-								var para []string
-								para = append(para, tui.Warning("Missing Environment Variable\n"))
-								para = append(para, fmt.Sprintf("The variable %s was found in %s but not in your %s file:\n", tui.Bold(ev.Key), tui.Bold(filename), tui.Bold(".env")))
-								if ev.Comment != "" {
-									para = append(para, tui.Muted(fmt.Sprintf("# %s", ev.Comment)))
-								}
-								if isSecret {
-									para = append(para, redDiff.Render(fmt.Sprintf("+ %s=%s\n", ev.Key, cstr.Mask(ev.Val))))
-								} else {
-									para = append(para, redDiff.Render(fmt.Sprintf("+ %s=%s\n", ev.Key, ev.Val)))
-								}
-								content = lipgloss.JoinVertical(lipgloss.Left, para...)
-								fmt.Println(border.Render(content))
-								if !tui.Ask(logger, "Would you like to add it to your .env file?", true) {
-									fmt.Println()
-									tui.ShowWarning("cancelled")
-									continue
-								}
-								if osenv == nil {
-									osenv = loadOSEnv()
-								}
-								val := promptForEnv(logger, ev.Key, isSecret, nil, osenv, ev.Val, ev.Comment)
-								addtoenvfile = append(addtoenvfile, env.EnvLineComment{
-									EnvLine: env.EnvLine{
-										Key: ev.Key,
-										Val: val,
-										Raw: val,
-									},
-									Comment: ev.Comment,
-								})
-							}
-						}
-					}
-					if len(addtoenvfile) > 0 {
-						le, err = appendToEnvFile(envfilename, addtoenvfile)
-						if err != nil {
-							errsystem.New(errsystem.ErrParseEnvironmentFile, err,
-								errsystem.WithContextMessage("Error parsing .env file")).ShowErrorAndExit()
-						}
-						tui.ShowSuccess("added %s to your .env file", util.Pluralize(len(addtoenvfile), "environment variable", "environment variables"))
-						fmt.Println()
-					}
-				}
-
-				var foundkeys []string
-				for _, ev := range le {
-					if isAgentuityEnv.MatchString(ev.Key) {
-						continue
-					}
-					if projectData != nil && projectData.Env != nil && projectData.Env[ev.Key] == ev.Val {
-						continue
-					}
-					if projectData != nil && projectData.Secrets != nil && projectData.Secrets[ev.Key] == cstr.Mask(ev.Val) {
-						continue
-					}
-					foundkeys = append(foundkeys, ev.Key)
-				}
-				if len(foundkeys) > 0 {
-					var title string
-					var suffix string
-					switch {
-					case len(foundkeys) < 3 && len(foundkeys) > 1:
-						suffix = "it"
-						var colorized []string
-						for _, key := range foundkeys {
-							colorized = append(colorized, tui.Bold(key))
-						}
-						title = fmt.Sprintf("The environment variables %s from %s are not been set in the project.", strings.Join(colorized, ", "), tui.Bold(".env"))
-					case len(foundkeys) == 1:
-						suffix = "it"
-						title = fmt.Sprintf("The environment variable %s from %s has not been set in the project.", tui.Bold(foundkeys[0]), tui.Bold(".env"))
-					default:
-						suffix = "them"
-						title = fmt.Sprintf("There are %d environment variables from %s that are not set in the project.", len(foundkeys), tui.Bold(".env"))
-					}
-					fmt.Println(title)
-					if !tui.Ask(logger, "Would you like to set "+suffix+"?", true) {
-						fmt.Println()
-						tui.ShowWarning("cancelled")
-						return
-					}
-					envs, secrets := loadEnvFile(le, false)
-					pd, err := theproject.SetProjectEnv(ctx, logger, apiUrl, token, envs, secrets)
-					if err != nil {
-						if isCancelled(ctx) {
-							os.Exit(1)
-						}
-						errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
-							errsystem.WithContextMessage("Failed to set project environment variables")).ShowErrorAndExit()
-					}
-					fmt.Println()
-					fmt.Println()
-					projectData = pd // overwrite with the new version
-					switch {
-					case len(envs) > 0 && len(secrets) > 0:
-						tui.ShowSuccess("Environment variables and secrets added")
-					case len(envs) == 1:
-						tui.ShowSuccess("Environment variable added")
-					case len(envs) > 1:
-						tui.ShowSuccess("Environment variables added")
-					case len(secrets) == 1:
-						tui.ShowSuccess("Secret added")
-					case len(secrets) > 1:
-						tui.ShowSuccess("Secrets added")
-					}
-					fmt.Println()
-				}
+			force, _ := cmd.Flags().GetBool("force")
+			if !tui.HasTTY {
+				force = true
 			}
+			// check to see if we have any env vars that are not in the project
+			envFile, projectData = envutil.ProcessEnvFiles(ctx, logger, dir, theproject, projectData, apiUrl, token, force)
 
 			if tui.HasTTY {
 				_, localIssues, remoteIssues, err := buildAgentTree(keys, state, context)
@@ -827,6 +637,7 @@ func init() {
 	cloudDeployCmd.Flags().StringArray("tag", nil, "Tag(s) to associate with this deployment (can be specified multiple times)")
 	cloudDeployCmd.Flags().String("description", "", "Description for the deployment")
 	cloudDeployCmd.Flags().String("message", "", "A shorter description for the deployment")
+	cloudDeployCmd.Flags().Bool("force", false, "Force the processing of environment files")
 
 	cloudDeployCmd.Flags().MarkHidden("deploymentId")
 	cloudDeployCmd.Flags().MarkHidden("ci")

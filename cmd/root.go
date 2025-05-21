@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/agentuity/cli/internal/deployer"
+	"github.com/agentuity/cli/internal/envutil"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/templates"
 	"github.com/agentuity/cli/internal/util"
@@ -168,13 +169,6 @@ func initConfig() {
 	}
 }
 
-func maxString(val string, max int) string {
-	if len(val) > max {
-		return val[:max] + "..."
-	}
-	return val
-}
-
 func initScreenWithLogo() {
 	tui.ClearScreen()
 	tui.Logo()
@@ -189,7 +183,7 @@ func createPromptHelper() deployer.PromptHelpers {
 		PrintLock:     tui.ShowLock,
 		PrintWarning:  tui.ShowWarning,
 		Ask:           tui.Ask,
-		PromptForEnv:  promptForEnv,
+		PromptForEnv:  envutil.PromptForEnv,
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"sort"
 	"syscall"
 
+	"github.com/agentuity/cli/internal/envutil"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/mcp"
 	"github.com/agentuity/cli/internal/organization"
@@ -820,6 +821,11 @@ Examples:
 		}
 
 		ShowNewProjectImport(ctx, logger, cmd, context.APIURL, context.Token, "", context.Project, context.Dir, true)
+		force, _ := cmd.Flags().GetBool("force")
+		if !tui.HasTTY {
+			force = true
+		}
+		_, _ = envutil.ProcessEnvFiles(ctx, logger, context.Dir, context.Project, nil, context.APIURL, context.Token, force)
 
 	},
 }
@@ -868,6 +874,7 @@ func init() {
 	projectImportCmd.Flags().String("apikey", "", "The API key to use for the project")
 	projectImportCmd.Flags().String("name", "", "The name of the project to import")
 	projectImportCmd.Flags().String("description", "", "The description of the project to import")
+	projectImportCmd.Flags().Bool("force", false, "Force the processing of environment files")
 
 	projectImportCmd.Flags().MarkHidden("apikey")
 	projectImportCmd.Flags().MarkHidden("name")
