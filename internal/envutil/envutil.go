@@ -166,8 +166,9 @@ func HandleMissingProjectEnvs(ctx context.Context, logger logger.Logger, le []en
 				title = fmt.Sprintf("The environment variables %s from %s are not been set in the project.", strings.Join(colorized, ", "), tui.Bold(".env"))
 			case len(keyvalue) == 1:
 				var key string
-				for _key, _ := range keyvalue {
+				for _key := range keyvalue {
 					key = _key
+					break
 				}
 				suffix = "it"
 				title = fmt.Sprintf("The environment variable %s from %s has not been set in the project.", tui.Bold(key), tui.Bold(".env"))
@@ -289,13 +290,6 @@ func LoadOSEnv() map[string]string {
 	return osenv
 }
 
-func maxString(val string, max int) string {
-	if len(val) > max {
-		return val[:max] + "..."
-	}
-	return val
-}
-
 func PromptForEnv(logger logger.Logger, key string, isSecret bool, localenv map[string]string, osenv map[string]string, defaultValue string, placeholder string) string {
 	prompt := "Enter the value for " + key
 	var help string
@@ -303,12 +297,12 @@ func PromptForEnv(logger logger.Logger, key string, isSecret bool, localenv map[
 	if isSecret {
 		prompt = "Enter the secret value for " + key
 		if val, ok := localenv[key]; ok {
-			help = "Press enter to set as " + maxString(cstr.Mask(val), 30) + " from your .env file"
+			help = "Press enter to set as " + cstr.Mask(util.MaxString(val, 30)) + " from your .env file"
 			if defaultValue == "" {
 				defaultValue = val
 			}
 		} else if val, ok := osenv[key]; ok {
-			help = "Press enter to set as " + maxString(cstr.Mask(val), 30) + " from your environment"
+			help = "Press enter to set as " + cstr.Mask(util.MaxString(val, 30)) + " from your environment"
 			if defaultValue == "" {
 				defaultValue = val
 			}
