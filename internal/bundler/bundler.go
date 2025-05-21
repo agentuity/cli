@@ -42,6 +42,21 @@ type BundleContext struct {
 	Writer     io.Writer
 }
 
+func installSourceMapSupportIfNeeded(ctx BundleContext, dir string) error {
+	// only bun needs to install this library to aide in parsing the source maps
+	path := filepath.Join(dir, "node_modules", "source-map-js", "package.json")
+	if !util.Exists(path) {
+		cmd := exec.CommandContext(ctx.Context, "bun", "install", "source-map-js", "--no-save", "--silent", "--no-progress", "--no-summary", "--ignore-scripts")
+		cmd.Dir = dir
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to install source-map-js: %w. %s", err, string(out))
+		}
+		return nil
+	}
+	return nil
+}
+
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
 
 	if ctx.Install || !util.Exists(filepath.Join(dir, "node_modules")) {
@@ -77,6 +92,12 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 			}
 		}
 		ctx.Logger.Debug("installed dependencies: %s", strings.TrimSpace(string(out)))
+	}
+
+	if theproject.Bundler.Runtime == "bunjs" {
+		if err := installSourceMapSupportIfNeeded(ctx, dir); err != nil {
+			return fmt.Errorf("failed to install bun source-map-support: %w", err)
+		}
 	}
 
 	if err := checkForBreakingChanges(ctx, "javascript", theproject.Bundler.Runtime); err != nil {
@@ -130,6 +151,12 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 	}
 	defines["process.env.AGENTUITY_CLOUD_AGENTS_JSON"] = cstr.JSONStringify(cstr.JSONStringify(agents))
 
+	var postShim string
+	// only bun needs this shim
+	if theproject.Bundler.Runtime == "bunjs" {
+		postShim = sourceMapShim
+	}
+
 	ctx.Logger.Debug("starting build")
 	started := time.Now()
 	result := api.Build(api.BuildOptions{
@@ -153,7 +180,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		Define:        defines,
 		LegalComments: api.LegalCommentsNone,
 		Banner: map[string]string{
-			"js": jsheader + jsshim,
+			"js": jsheader + jsshim + postShim,
 		},
 	})
 	ctx.Logger.Debug("finished build in %v", time.Since(started))

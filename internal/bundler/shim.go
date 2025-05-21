@@ -7,6 +7,7 @@ import { createRequire as __agentuity_createRequire } from 'module';
 const require = __agentuity_createRequire(import.meta.url);
 import { fileURLToPath as __agentuity_fileURLToPath } from 'url';
 import { dirname as __agentuity_dirname } from 'path';
+import { readFileSync as __agentuity_readFileSync, existsSync as __agentuity_existsSync } from 'fs';
 
 const __filename = __agentuity_fileURLToPath(import.meta.url);
 const __dirname = __agentuity_dirname(__filename);
@@ -45,4 +46,62 @@ globalThis.__require = (id) => {
 		}
 	}
 	throw new Error('Dynamic require of ' + id + ' is not supported');
-};`
+};
+`
+
+// NOTE: this shim is only used in bun since node has built-in source map support
+var sourceMapShim = `
+(function () {
+const { SourceMapConsumer: __agentuity_SourceMapConsumer } = require('source-map-js');
+const { join: __agentuity_join } = require('path');
+const __prepareStackTrace = Error.prepareStackTrace;
+const __cachedSourceMap = {};
+function getSourceMap(filename) {
+	if (filename in __cachedSourceMap) {
+		return __cachedSourceMap[filename];
+	}
+	if (!__agentuity_existsSync(filename)) {
+		return null;
+	}
+	const sm = new __agentuity_SourceMapConsumer(__agentuity_readFileSync(filename).toString());
+	__cachedSourceMap[filename] = sm;
+	return sm;
+}
+const frameRegex = /(.+)\((.+):(\d+):(\d+)\)$/;
+Error.prepareStackTrace = function (err, stack) {
+	const _stack = __prepareStackTrace(err, stack);
+	const tok = _stack.split('\n');
+	const lines = [];
+	for (const t of tok) {
+		if (t.includes('.agentuity/') && frameRegex.test(t)) {
+			const parts = frameRegex.exec(t);
+			if (parts.length === 5) {
+				const filename = parts[2];
+				const sm = getSourceMap(filename+'.map');
+				if (sm) {
+					const lineno = parts[3];
+					const colno = parts[4];
+					const pos = sm.originalPositionFor({
+						line: +lineno,
+						column: +colno,
+					})
+					if (pos && pos.source) {
+						const startIndex = filename.indexOf('.agentuity/');
+						const offset = filename.includes('../node_modules/') ? 11 : 0;
+						const basedir = filename.substring(0, startIndex + offset);
+						const sourceOffset = pos.source.indexOf('src/');
+						const source = pos.source.substring(sourceOffset);
+						const newfile = __agentuity_join(basedir, source);
+						const newline = parts[1] + '(' + newfile + ':' + pos.line + ':' + pos.column + ')';
+						lines.push(newline);
+						continue;
+					}
+				}
+			}
+		}
+		lines.push(t);
+	}
+	return lines.join('\n');
+};
+})();
+`

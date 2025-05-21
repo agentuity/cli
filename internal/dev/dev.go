@@ -125,6 +125,18 @@ func CreateRunProjectCmd(ctx context.Context, log logger.Logger, theproject proj
 		projectServerCmd.Env = append(projectServerCmd.Env, "NODE_ENV=development")
 	}
 
+	// for nodejs, we need to enable source maps directly in the environment.
+	// for bun, we need to inject a shim helper to parse the source maps
+	if theproject.Project.Bundler.Runtime == "nodejs" {
+		nodeOptions := os.Getenv("NODE_OPTIONS")
+		if nodeOptions == "" {
+			nodeOptions = "--enable-source-maps"
+		} else {
+			nodeOptions = fmt.Sprintf("%s --enable-source-maps", nodeOptions)
+		}
+		projectServerCmd.Env = append(projectServerCmd.Env, nodeOptions)
+	}
+
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_PORT=%d", port))
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("PORT=%d", port))
 

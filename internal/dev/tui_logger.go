@@ -139,11 +139,13 @@ func (l *TuiLogger) Write(p []byte) (n int, err error) {
 				if logger.LevelInfo < l.logLevel {
 					continue
 				}
+				prefix += " "
 			} else if strings.HasPrefix(prefix, "[WARN]") {
 				severity = logger.LevelWarn
 				if logger.LevelWarn < l.logLevel {
 					continue
 				}
+				prefix += " "
 			} else if strings.HasPrefix(prefix, "[ERROR]") {
 				severity = logger.LevelError
 				if logger.LevelError < l.logLevel {
