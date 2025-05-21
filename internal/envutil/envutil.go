@@ -106,9 +106,7 @@ func HandleMissingTemplateEnvs(logger logger.Logger, dir, envfilename string, le
 					if ev.Val == "" {
 						ev.Val = PromptForEnv(logger, ev.Key, isSecret, nil, osenv, ev.Val, ev.Comment)
 					}
-				}
-				if ev.Val != "" {
-					continue
+					ev.Raw = ev.Val
 				}
 				addtoenvfile = append(addtoenvfile, env.EnvLineComment{
 					EnvLine: env.EnvLine{
@@ -238,7 +236,11 @@ func AppendToEnvFile(envfile string, envs []env.EnvLineComment) ([]env.EnvLineCo
 		if ev.Comment != "" {
 			buf.WriteString(fmt.Sprintf("# %s\n", ev.Comment))
 		}
-		buf.WriteString(fmt.Sprintf("%s=%s\n", ev.Key, ev.Raw))
+		raw := ev.Raw
+		if raw == "" {
+			raw = ev.Val
+		}
+		buf.WriteString(fmt.Sprintf("%s=%s\n", ev.Key, raw))
 		le = append(le, ev)
 	}
 	if err := os.WriteFile(envfile, []byte(buf.String()), 0600); err != nil {
