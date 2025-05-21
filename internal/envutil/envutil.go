@@ -52,6 +52,7 @@ func ProcessEnvFiles(ctx context.Context, logger logger.Logger, dir string, thep
 		}
 
 		projectData = HandleMissingProjectEnvs(ctx, logger, le, projectData, theproject, apiUrl, token, force)
+		envFile.Env = le
 		return envFile, projectData
 	}
 	return envFile, projectData
@@ -240,7 +241,7 @@ func AppendToEnvFile(envfile string, envs []env.EnvLineComment) ([]env.EnvLineCo
 		buf.WriteString(fmt.Sprintf("%s=%s\n", ev.Key, ev.Raw))
 		le = append(le, ev)
 	}
-	if err := os.WriteFile(envfile, []byte(buf.String()), 0644); err != nil {
+	if err := os.WriteFile(envfile, []byte(buf.String()), 0600); err != nil {
 		return nil, err
 	}
 	return le, nil
