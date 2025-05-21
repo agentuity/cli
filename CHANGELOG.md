@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.133] - 2025-05-21
+
+### Changed
+- Removed Windows from the build matrix in CI workflow ([73fe98b](https://github.com/agentuity/cli/commit/73fe98bca31f3864a1028c379b29aac6cf36350f))
+
+### Added
+- DevMode: Allow the API to return a preferred server ([#325](https://github.com/agentuity/cli/pull/325))
+
+### Fixed
+- DevMode: Improved logging output and sourcemap support ([#321](https://github.com/agentuity/cli/pull/321))
+- [AGENT-209] Refactor adding env vars from file ([#324](https://github.com/agentuity/cli/pull/324))
+
 ## [v0.0.132] - 2025-05-21
 
 ### Fixed
@@ -588,6 +600,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks for new agent creation
 
 
+[v0.0.133]: https://github.com/agentuity/cli/compare/v0.0.132...v0.0.133
 [v0.0.132]: https://github.com/agentuity/cli/compare/v0.0.131...v0.0.132
 [v0.0.131]: https://github.com/agentuity/cli/compare/v0.0.130...v0.0.131
 [v0.0.130]: https://github.com/agentuity/cli/compare/v0.0.129...v0.0.130
