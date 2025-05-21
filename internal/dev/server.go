@@ -428,7 +428,7 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		err = fmt.Errorf("failed to insert project id into trace state: %w", err)
 		return
 	}
-	traceState.Insert("d", "1");
+	traceState, err = traceState.Insert("d", "1");
 	if err != nil {
 		logger.Error("failed to insert devmode status into trace state: %s", err)
 		err = fmt.Errorf("failed to insert devmode status into trace state: %w", err)
