@@ -67,7 +67,7 @@ Examples:
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithUserMessage("Failed to validate project (%s) using the provided API key from the .env file in %s. This is most likely due to the API key being invalid or the project has been deleted.\n\nYou can import this project using the following command:\n\n"+tui.Command("project import"), theproject.Project.ProjectId, dir), errsystem.WithContextMessage(fmt.Sprintf("Failed to get project: %s", err))).ShowErrorAndExit()
 		}
 
-		force, _ := cmd.Flags().GetBool("force-env")
+		force, _ := cmd.Flags().GetBool("force")
 		if !tui.HasTTY {
 			force = true
 		}
@@ -282,6 +282,5 @@ func init() {
 	devCmd.Flags().Int("port", 0, "The port to run the development server on (uses project default if not provided)")
 	devCmd.Flags().String("server", "echo.agentuity.cloud", "the echo server to connect to")
 	devCmd.Flags().MarkHidden("server")
-	devCmd.Flags().Bool("force-env", false, "Force the processing of environment files")
-	devCmd.Flags().MarkHidden("force-env")
+	devCmd.Flags().Bool("force", false, "Force the processing of environment files")
 }

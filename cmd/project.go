@@ -821,7 +821,7 @@ Examples:
 		}
 
 		ShowNewProjectImport(ctx, logger, cmd, context.APIURL, context.Token, "", context.Project, context.Dir, true)
-		force, _ := cmd.Flags().GetBool("force-env")
+		force, _ := cmd.Flags().GetBool("force")
 		if !tui.HasTTY {
 			force = true
 		}
@@ -874,8 +874,7 @@ func init() {
 	projectImportCmd.Flags().String("apikey", "", "The API key to use for the project")
 	projectImportCmd.Flags().String("name", "", "The name of the project to import")
 	projectImportCmd.Flags().String("description", "", "The description of the project to import")
-	projectImportCmd.Flags().Bool("force-env", false, "Force the processing of environment files")
-	projectImportCmd.Flags().MarkHidden("force-env")
+	projectImportCmd.Flags().Bool("force", false, "Force the processing of environment files")
 
 	projectImportCmd.Flags().MarkHidden("apikey")
 	projectImportCmd.Flags().MarkHidden("name")

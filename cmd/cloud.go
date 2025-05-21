@@ -228,7 +228,7 @@ Examples:
 				ShowNewProjectImport(ctx, logger, cmd, apiUrl, token, projectId, theproject, dir, false)
 			}
 
-			force, _ := cmd.Flags().GetBool("force-env")
+			force, _ := cmd.Flags().GetBool("force")
 			if !tui.HasTTY {
 				force = true
 			}
@@ -637,7 +637,7 @@ func init() {
 	cloudDeployCmd.Flags().StringArray("tag", nil, "Tag(s) to associate with this deployment (can be specified multiple times)")
 	cloudDeployCmd.Flags().String("description", "", "Description for the deployment")
 	cloudDeployCmd.Flags().String("message", "", "A shorter description for the deployment")
-	cloudDeployCmd.Flags().Bool("force-env", false, "Force the processing of environment files")
+	cloudDeployCmd.Flags().Bool("force", false, "Force the processing of environment files")
 
 	cloudDeployCmd.Flags().MarkHidden("deploymentId")
 	cloudDeployCmd.Flags().MarkHidden("ci")
@@ -647,7 +647,7 @@ func init() {
 	cloudDeployCmd.Flags().MarkHidden("ci-message")
 	cloudDeployCmd.Flags().MarkHidden("ci-git-provider")
 	cloudDeployCmd.Flags().MarkHidden("ci-logs-url")
-	cloudDeployCmd.Flags().MarkHidden("force-env")
+
 	cloudDeployCmd.Flags().String("format", "text", "The output format to use for results which can be either 'text' or 'json'")
 	cloudDeployCmd.Flags().String("org-id", "", "The organization to create the project in")
 	cloudDeployCmd.Flags().String("templates-dir", "", "The directory to load the templates. Defaults to loading them from the github.com/agentuity/templates repository")
