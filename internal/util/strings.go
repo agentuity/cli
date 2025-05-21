@@ -38,3 +38,10 @@ func Pluralize(count int, singular string, plural string) string {
 	}
 	return fmt.Sprintf("%d %s", count, plural)
 }
+
+func MaxString(val string, max int) string {
+	if len(val) > max {
+		return val[:max] + "..."
+	}
+	return val
+}

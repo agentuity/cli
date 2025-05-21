@@ -11,6 +11,7 @@ import (
 	"sort"
 	"syscall"
 
+	"github.com/agentuity/cli/internal/envutil"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/mcp"
 	"github.com/agentuity/cli/internal/organization"
@@ -820,6 +821,8 @@ Examples:
 		}
 
 		ShowNewProjectImport(ctx, logger, cmd, context.APIURL, context.Token, "", context.Project, context.Dir, true)
+
+		_, _ = envutil.ProcessEnvFiles(ctx, logger, context.Dir, context.Project, nil, context.APIURL, context.Token)
 
 	},
 }
