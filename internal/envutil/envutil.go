@@ -31,10 +31,10 @@ var looksLikeSecret = regexp.MustCompile(`(?i)KEY|SECRET|TOKEN|PASSWORD|sk_`)
 var isAgentuityEnv = regexp.MustCompile(`(?i)AGENTUITY_`)
 
 // ProcessEnvFiles handles .env and template env processing
-func ProcessEnvFiles(ctx context.Context, logger logger.Logger, dir string, theproject *project.Project, projectData *project.ProjectData, apiUrl, token string) (*deployer.EnvFile, *project.ProjectData) {
+func ProcessEnvFiles(ctx context.Context, logger logger.Logger, dir string, theproject *project.Project, projectData *project.ProjectData, apiUrl, token string, force bool) (*deployer.EnvFile, *project.ProjectData) {
 	envfilename := filepath.Join(dir, ".env")
 	var envFile *deployer.EnvFile
-	if tui.HasTTY && util.Exists(envfilename) {
+	if (tui.HasTTY || force) && util.Exists(envfilename) {
 		// attempt to see if we have any template files
 		templateEnvs := ReadPossibleEnvTemplateFiles(dir)
 
@@ -45,20 +45,20 @@ func ProcessEnvFiles(ctx context.Context, logger logger.Logger, dir string, thep
 		}
 		envFile = &deployer.EnvFile{Filepath: envfilename, Env: le}
 
-		le, err = HandleMissingTemplateEnvs(logger, dir, envfilename, le, templateEnvs)
+		le, err = HandleMissingTemplateEnvs(logger, dir, envfilename, le, templateEnvs, force)
 		if err != nil {
 			errsystem.New(errsystem.ErrParseEnvironmentFile, err,
 				errsystem.WithContextMessage("Error parsing .env file")).ShowErrorAndExit()
 		}
 
-		projectData = HandleMissingProjectEnvs(ctx, logger, le, projectData, theproject, apiUrl, token)
+		projectData = HandleMissingProjectEnvs(ctx, logger, le, projectData, theproject, apiUrl, token, force)
 		return envFile, projectData
 	}
 	return envFile, projectData
 }
 
 // HandleMissingTemplateEnvs handles missing envs from template files
-func HandleMissingTemplateEnvs(logger logger.Logger, dir, envfilename string, le []env.EnvLineComment, templateEnvs map[string][]env.EnvLineComment) ([]env.EnvLineComment, error) {
+func HandleMissingTemplateEnvs(logger logger.Logger, dir, envfilename string, le []env.EnvLineComment, templateEnvs map[string][]env.EnvLineComment, force bool) ([]env.EnvLineComment, error) {
 	if len(templateEnvs) == 0 {
 		return le, nil
 	}
@@ -79,35 +79,41 @@ func HandleMissingTemplateEnvs(logger logger.Logger, dir, envfilename string, le
 				if !isSecret && DescriptionLookingLikeASecret(ev.Comment) {
 					isSecret = true
 				}
-				_ = filename
-				var content string
-				var para []string
-				para = append(para, tui.Warning("Missing Environment Variable\n"))
-				para = append(para, fmt.Sprintf("The variable %s was found in %s but not in your %s file:\n", tui.Bold(ev.Key), tui.Bold(filename), tui.Bold(".env")))
-				if ev.Comment != "" {
-					para = append(para, tui.Muted(fmt.Sprintf("# %s", ev.Comment)))
+				if !force {
+					var content string
+					var para []string
+					para = append(para, tui.Warning("Missing Environment Variable\n"))
+					para = append(para, fmt.Sprintf("The variable %s was found in %s but not in your %s file:\n", tui.Bold(ev.Key), tui.Bold(filename), tui.Bold(".env")))
+					if ev.Comment != "" {
+						para = append(para, tui.Muted(fmt.Sprintf("# %s", ev.Comment)))
+					}
+					if isSecret {
+						para = append(para, redDiff.Render(fmt.Sprintf("+ %s=%s\n", ev.Key, cstr.Mask(ev.Val))))
+					} else {
+						para = append(para, redDiff.Render(fmt.Sprintf("+ %s=%s\n", ev.Key, ev.Val)))
+					}
+					content = lipgloss.JoinVertical(lipgloss.Left, para...)
+					fmt.Println(border.Render(content))
+					if !tui.Ask(logger, "Would you like to add it to your .env file?", true) {
+						fmt.Println()
+						tui.ShowWarning("cancelled")
+						continue
+					}
+					if osenv == nil {
+						osenv = LoadOSEnv()
+					}
+					if ev.Val == "" {
+						ev.Val = PromptForEnv(logger, ev.Key, isSecret, nil, osenv, ev.Val, ev.Comment)
+					}
 				}
-				if isSecret {
-					para = append(para, redDiff.Render(fmt.Sprintf("+ %s=%s\n", ev.Key, cstr.Mask(ev.Val))))
-				} else {
-					para = append(para, redDiff.Render(fmt.Sprintf("+ %s=%s\n", ev.Key, ev.Val)))
-				}
-				content = lipgloss.JoinVertical(lipgloss.Left, para...)
-				fmt.Println(border.Render(content))
-				if !tui.Ask(logger, "Would you like to add it to your .env file?", true) {
-					fmt.Println()
-					tui.ShowWarning("cancelled")
+				if ev.Val != "" {
 					continue
 				}
-				if osenv == nil {
-					osenv = LoadOSEnv()
-				}
-				val := PromptForEnv(logger, ev.Key, isSecret, nil, osenv, ev.Val, ev.Comment)
 				addtoenvfile = append(addtoenvfile, env.EnvLineComment{
 					EnvLine: env.EnvLine{
 						Key: ev.Key,
-						Val: val,
-						Raw: val,
+						Val: ev.Val,
+						Raw: ev.Raw,
 					},
 					Comment: ev.Comment,
 				})
@@ -120,14 +126,16 @@ func HandleMissingTemplateEnvs(logger logger.Logger, dir, envfilename string, le
 		if err != nil {
 			return le, err
 		}
-		tui.ShowSuccess("added %s to your .env file", util.Pluralize(len(addtoenvfile), "environment variable", "environment variables"))
-		fmt.Println()
+		if tui.HasTTY {
+			tui.ShowSuccess("added %s to your .env file", util.Pluralize(len(addtoenvfile), "environment variable", "environment variables"))
+			fmt.Println()
+		}
 	}
 	return le, nil
 }
 
 // HandleMissingProjectEnvs handles missing envs in project
-func HandleMissingProjectEnvs(ctx context.Context, logger logger.Logger, le []env.EnvLineComment, projectData *project.ProjectData, theproject *project.Project, apiUrl, token string) *project.ProjectData {
+func HandleMissingProjectEnvs(ctx context.Context, logger logger.Logger, le []env.EnvLineComment, projectData *project.ProjectData, theproject *project.Project, apiUrl, token string, force bool) *project.ProjectData {
 	keyvalue := map[string]string{}
 	for _, ev := range le {
 		if isAgentuityEnv.MatchString(ev.Key) {
@@ -142,28 +150,31 @@ func HandleMissingProjectEnvs(ctx context.Context, logger logger.Logger, le []en
 		keyvalue[ev.Key] = ev.Val
 	}
 	if len(keyvalue) > 0 {
-		var title string
-		var suffix string
-		switch {
-		case len(keyvalue) < 3 && len(keyvalue) > 1:
-			suffix = "it"
-			var colorized []string
-			for _, key := range keyvalue {
-				colorized = append(colorized, tui.Bold(key))
+		if !force {
+			var title string
+			var suffix string
+			switch {
+			case len(keyvalue) < 3 && len(keyvalue) > 1:
+				suffix = "it"
+				var colorized []string
+				for _, key := range keyvalue {
+					colorized = append(colorized, tui.Bold(key))
+				}
+				title = fmt.Sprintf("The environment variables %s from %s are not been set in the project.", strings.Join(colorized, ", "), tui.Bold(".env"))
+			case len(keyvalue) == 1:
+				var key string
+				for _key, _ := range keyvalue {
+					key = _key
+				}
+				suffix = "it"
+				title = fmt.Sprintf("The environment variable %s from %s has not been set in the project.", tui.Bold(key), tui.Bold(".env"))
+			default:
+				suffix = "them"
+				title = fmt.Sprintf("There are %d environment variables from %s that are not set in the project.", len(keyvalue), tui.Bold(".env"))
 			}
-			title = fmt.Sprintf("The environment variables %s from %s are not been set in the project.", strings.Join(colorized, ", "), tui.Bold(".env"))
-		case len(keyvalue) == 1:
-			var key string
-			for _key, _ := range keyvalue {
-				key = _key
-			}
-			suffix = "it"
-			title = fmt.Sprintf("The environment variable %s from %s has not been set in the project.", tui.Bold(key), tui.Bold(".env"))
-		default:
-			suffix = "them"
-			title = fmt.Sprintf("There are %d environment variables from %s that are not set in the project.", len(keyvalue), tui.Bold(".env"))
+			force = tui.Ask(logger, title+"\nWould you like to set "+suffix+" now?", true)
 		}
-		if tui.Ask(logger, title+"\nWould you like to set "+suffix+" now?", true) {
+		if force {
 			for key, val := range keyvalue {
 				if projectData.Env == nil {
 					projectData.Env = make(map[string]string)
