@@ -135,15 +135,19 @@ func HandleMissingTemplateEnvs(logger logger.Logger, dir, envfilename string, le
 
 // HandleMissingProjectEnvs handles missing envs in project
 func HandleMissingProjectEnvs(ctx context.Context, logger logger.Logger, le []env.EnvLineComment, projectData *project.ProjectData, theproject *project.Project, apiUrl, token string, force bool) *project.ProjectData {
+
+	if projectData == nil {
+		projectData = &project.ProjectData{}
+	}
 	keyvalue := map[string]string{}
 	for _, ev := range le {
 		if isAgentuityEnv.MatchString(ev.Key) {
 			continue
 		}
-		if projectData != nil && projectData.Env != nil && projectData.Env[ev.Key] == ev.Val {
+		if projectData.Env != nil && projectData.Env[ev.Key] == ev.Val {
 			continue
 		}
-		if projectData != nil && projectData.Secrets != nil && projectData.Secrets[ev.Key] == cstr.Mask(ev.Val) {
+		if projectData.Secrets != nil && projectData.Secrets[ev.Key] == cstr.Mask(ev.Val) {
 			continue
 		}
 		keyvalue[ev.Key] = ev.Val
@@ -230,7 +234,11 @@ func AppendToEnvFile(envfile string, envs []env.EnvLineComment) ([]env.EnvLineCo
 		if ev.Comment != "" {
 			buf.WriteString(fmt.Sprintf("# %s\n", ev.Comment))
 		}
-		buf.WriteString(fmt.Sprintf("%s=%s\n", ev.Key, ev.Raw))
+		raw := ev.Raw
+		if raw == "" {
+			raw = ev.Val
+		}
+		buf.WriteString(fmt.Sprintf("%s=%s\n", ev.Key, raw))
 	}
 	for _, ev := range envs {
 		if ev.Comment != "" {
