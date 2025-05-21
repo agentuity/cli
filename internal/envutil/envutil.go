@@ -158,7 +158,7 @@ func HandleMissingProjectEnvs(ctx context.Context, logger logger.Logger, le []en
 			case len(keyvalue) < 3 && len(keyvalue) > 1:
 				suffix = "it"
 				var colorized []string
-				for _, key := range keyvalue {
+				for key := range keyvalue {
 					colorized = append(colorized, tui.Bold(key))
 				}
 				title = fmt.Sprintf("The environment variables %s from %s are not been set in the project.", strings.Join(colorized, ", "), tui.Bold(".env"))
