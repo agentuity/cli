@@ -46,6 +46,7 @@ Examples:
 		if err := bundler.Bundle(bundler.BundleContext{
 			Context:    ctx,
 			Logger:     projectContext.Logger,
+			Project:    projectContext.Project,
 			ProjectDir: projectContext.Dir,
 			Production: production,
 			Install:    install,
