@@ -620,6 +620,218 @@ func updateDeploymentStatusCompleted(logger logger.Logger, apiUrl, token, deploy
 	return client.Do("PUT", fmt.Sprintf("/cli/deploy/upload/%s", deploymentId), payload, nil)
 }
 
+var cloudRollbackCmd = &cobra.Command{
+	Use:   "rollback",
+	Short: "Rollback (undeploy) or delete a deployment from the cloud",
+	Long: `Rollback (undeploy) or delete a specific deployment for a project by selecting a project and deployment.
+
+Examples:
+  agentuity rollback
+  agentuity cloud rollback
+  agentuity rollback --tag name
+  agentuity rollback --delete
+`,
+	Args: cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		logger := env.NewLogger(cmd)
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
+		apiUrl, _, _ := util.GetURLs(logger)
+		deleteFlag, _ := cmd.Flags().GetBool("delete")
+		dir, _ := cmd.Flags().GetString("dir")
+
+		var selectedProject string
+		if dir != "" {
+			proj := project.EnsureProject(ctx, cmd)
+			if proj.Project == nil {
+				errsystem.New(errsystem.ErrApiRequest, fmt.Errorf("project not found")).ShowErrorAndExit()
+			}
+			selectedProject = proj.Project.ProjectId
+		} else {
+			projectId, _ := cmd.Flags().GetString("project")
+			if projectId != "" {
+				// look up the project by id
+				projects, err := project.ListProjects(ctx, logger, apiUrl, apikey)
+				if err != nil {
+					errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
+				}
+				for _, p := range projects {
+					if p.ID == projectId {
+						selectedProject = p.ID
+						break
+					}
+				}
+				if selectedProject == "" {
+					// this will never happen because we've already checked the project id
+					errsystem.New(errsystem.ErrApiRequest, fmt.Errorf("project not found")).ShowErrorAndExit()
+				}
+			}
+		}
+
+		question := "Select a project to rollback a deployment"
+		if deleteFlag {
+			question = "Select a project to delete a deployment"
+		}
+
+		if selectedProject == "" {
+			selectedProject = cloudSelectProject(ctx, logger, apiUrl, apikey, question)
+		}
+
+		if selectedProject == "" {
+			return
+		}
+
+		// Try to get tag flag
+		tag, _ := cmd.Flags().GetString("tag")
+		var selectedDeployment string
+		if tag != "" {
+			// List deployments and match by tag
+			var deployments []project.DeploymentListData
+			action := func() {
+				var err error
+				deployments, err = project.ListDeployments(ctx, logger, apiUrl, apikey, selectedProject)
+				if err != nil {
+					errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list deployments")).ShowErrorAndExit()
+				}
+			}
+			tui.ShowSpinner("fetching deployments ...", action)
+			for _, d := range deployments {
+				for _, t := range d.Tags {
+					if t == tag {
+						selectedDeployment = d.ID
+						break
+					}
+				}
+				if selectedDeployment != "" {
+					break
+				}
+			}
+			if selectedDeployment == "" {
+				errsystem.New(errsystem.ErrApiRequest, fmt.Errorf("no deployment found with tag '%s'", tag)).ShowErrorAndExit()
+			}
+		} else {
+			question = "Select a deployment to rollback"
+			if deleteFlag {
+				question = "Select a deployment to delete"
+			}
+			selectedDeployment = cloudSelectDeployment(ctx, logger, apiUrl, apikey, selectedProject, question)
+			if selectedDeployment == "" {
+				// this will never happen because we've already checked the deployment id
+				errsystem.New(errsystem.ErrApiRequest, fmt.Errorf("no deployment selected")).ShowErrorAndExit()
+			}
+		}
+
+		forceFlag, _ := cmd.Flags().GetBool("force")
+
+		if !forceFlag {
+			what := "rollback"
+			if deleteFlag {
+				what = "delete"
+			}
+
+			if !tui.Ask(logger, "Are you sure you want to "+tui.Bold(what)+" the selected deployment?", true) {
+				fmt.Println()
+				tui.ShowWarning("Canceled")
+				return
+			}
+			fmt.Println()
+		}
+
+		if deleteFlag {
+			err := project.DeleteDeployment(ctx, logger, apiUrl, apikey, selectedProject, selectedDeployment)
+			if err != nil {
+				errsystem.New(errsystem.ErrDeleteApiKey, err, errsystem.WithContextMessage("Failed to delete deployment")).ShowErrorAndExit()
+			}
+			tui.ShowSuccess("Deployment deleted successfully")
+		} else {
+			err := project.RollbackDeployment(ctx, logger, apiUrl, apikey, selectedProject, selectedDeployment)
+			if err != nil {
+				errsystem.New(errsystem.ErrDeployProject, err, errsystem.WithContextMessage("Failed to rollback deployment")).ShowErrorAndExit()
+			}
+			tui.ShowSuccess("Deployment rolled back successfully")
+		}
+	},
+}
+
+// Helper to fetch projects and prompt user to select one. Returns selected project ID or empty string.
+func cloudSelectProject(ctx context.Context, logger logger.Logger, apiUrl, apikey string, prompt string) string {
+	var projects []project.ProjectListData
+	action := func() {
+		var err error
+		projects, err = project.ListProjects(ctx, logger, apiUrl, apikey)
+		if err != nil {
+			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list projects")).ShowErrorAndExit()
+		}
+	}
+	tui.ShowSpinner("fetching projects ...", action)
+	if len(projects) == 0 {
+		fmt.Println()
+		tui.ShowWarning("no projects found")
+		tui.ShowBanner("Create a new project", tui.Text("Use the ")+tui.Command("new")+tui.Text(" command to create a new project"), false)
+		return ""
+	}
+	var options []tui.Option
+	for _, p := range projects {
+		options = append(options, tui.Option{
+			ID:   p.ID,
+			Text: tui.Bold(tui.PadRight(p.Name, 20, " ")) + tui.Muted(p.ID),
+		})
+	}
+	selected := tui.Select(logger, prompt, "", options)
+	if selected == "" {
+		tui.ShowWarning("no project selected")
+	}
+	return selected
+}
+
+func cloudSelectDeployment(ctx context.Context, logger logger.Logger, apiUrl, apikey, projectId string, prompt string) string {
+	var deployments []project.DeploymentListData
+	fetchDeploymentsAction := func() {
+		var err error
+		deployments, err = project.ListDeployments(ctx, logger, apiUrl, apikey, projectId)
+		if err != nil {
+			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list deployments")).ShowErrorAndExit()
+		}
+	}
+	tui.ShowSpinner("fetching deployments ...", fetchDeploymentsAction)
+	if len(deployments) == 0 {
+		tui.ShowWarning("no deployments found for this project")
+		os.Exit(1)
+	}
+	var deploymentOptions []tui.Option
+	for _, d := range deployments {
+		date, err := time.Parse(time.RFC3339, d.CreatedAt)
+		if err != nil {
+			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to parse deployment date")).ShowErrorAndExit()
+		}
+		var msg string
+		if len(d.Message) > 60 {
+			msg = d.Message[:57] + "..."
+		} else {
+			msg = d.Message
+		}
+		tags := strings.Join(d.Tags, ", ")
+		if len(tags) > 50 {
+			tags = tags[:50] + "..."
+		}
+
+		if d.Active {
+			deploymentOptions = append(deploymentOptions, tui.Option{
+				ID:   d.ID,
+				Text: fmt.Sprintf("%s  %s %-50s %s", "✅", tui.Title(date.Format(time.Stamp)), tui.Bold(tags), tui.Muted(msg)),
+			})
+		} else {
+			deploymentOptions = append(deploymentOptions, tui.Option{
+				ID:   d.ID,
+				Text: fmt.Sprintf("    %s %-50s %s", tui.Title(date.Format(time.Stamp)), tui.Bold(tags), tui.Muted(msg)),
+			})
+		}
+	}
+	selectedDeployment := tui.Select(logger, prompt, "", deploymentOptions)
+	return selectedDeployment
+}
+
 func init() {
 	rootCmd.AddCommand(cloudCmd)
 	rootCmd.AddCommand(cloudDeployCmd)
@@ -651,4 +863,12 @@ func init() {
 	cloudDeployCmd.Flags().String("format", "text", "The output format to use for results which can be either 'text' or 'json'")
 	cloudDeployCmd.Flags().String("org-id", "", "The organization to create the project in")
 	cloudDeployCmd.Flags().String("templates-dir", "", "The directory to load the templates. Defaults to loading them from the github.com/agentuity/templates repository")
+
+	rootCmd.AddCommand(cloudRollbackCmd)
+	cloudCmd.AddCommand(cloudRollbackCmd)
+	cloudRollbackCmd.Flags().String("tag", "", "Tag of the deployment to rollback")
+	cloudRollbackCmd.Flags().String("project", "", "Project to rollback a deployment")
+	cloudRollbackCmd.Flags().String("dir", "", "The directory to the project to rollback if project is not specified")
+	cloudRollbackCmd.Flags().Bool("force", false, "Force the rollback or delete")
+	cloudRollbackCmd.Flags().Bool("delete", false, "Delete the deployment instead of rolling back")
 }

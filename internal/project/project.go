@@ -300,6 +300,50 @@ func ListProjects(ctx context.Context, logger logger.Logger, baseUrl string, tok
 	return resp.Data, nil
 }
 
+type DeploymentListData struct {
+	ID        string   `json:"id"`
+	Message   string   `json:"message"`
+	Tags      []string `json:"tags"`
+	Active    bool     `json:"active"`
+	CreatedAt string   `json:"createdAt"`
+}
+
+func ListDeployments(ctx context.Context, logger logger.Logger, baseUrl string, token string, projectId string) ([]DeploymentListData, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
+
+	var resp Response[[]DeploymentListData]
+	if err := client.Do("GET", fmt.Sprintf("/cli/project/%s/deployments", projectId), nil, &resp); err != nil {
+		return nil, fmt.Errorf("error listing deployments: %w", err)
+	}
+	return resp.Data, nil
+}
+
+func DeleteDeployment(ctx context.Context, logger logger.Logger, baseUrl string, token string, projectId string, deploymentId string) error {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
+
+	var resp Response[string]
+	if err := client.Do("DELETE", fmt.Sprintf("/cli/project/%s/deployments/%s", projectId, deploymentId), nil, &resp); err != nil {
+		return fmt.Errorf("error deleting deployment: %w", err)
+	}
+	if !resp.Success {
+		return errors.New(resp.Message)
+	}
+	return nil
+}
+
+func RollbackDeployment(ctx context.Context, logger logger.Logger, baseUrl string, token string, projectId string, deploymentId string) error {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
+
+	var resp Response[string]
+	if err := client.Do("POST", fmt.Sprintf("/cli/project/%s/deployments/%s/rollback", projectId, deploymentId), nil, &resp); err != nil {
+		return fmt.Errorf("error rolling back deployment: %w", err)
+	}
+	if !resp.Success {
+		return errors.New(resp.Message)
+	}
+	return nil
+}
+
 func DeleteProjects(ctx context.Context, logger logger.Logger, baseUrl string, token string, ids []string) ([]string, error) {
 	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
