@@ -783,9 +783,11 @@ Examples:
 			}
 
 			if !tui.Ask(logger, "Are you sure you want to "+tui.Bold(what)+" the selected deployment?", true) {
+				fmt.Println()
 				tui.ShowWarning("Canceled")
 				return
 			}
+			fmt.Println()
 		}
 
 		if deleteFlag {
@@ -846,8 +848,8 @@ func cloudSelectDeployment(ctx context.Context, logger logger.Logger, apiUrl, ap
 	}
 	tui.ShowSpinner("fetching deployments ...", fetchDeploymentsAction)
 	if len(deployments) == 0 {
-		tui.ShowWarning("no deployments found")
-		return ""
+		tui.ShowWarning("no deployments found for this project")
+		os.Exit(1)
 	}
 	var deploymentOptions []tui.Option
 	for _, d := range deployments {
@@ -869,12 +871,12 @@ func cloudSelectDeployment(ctx context.Context, logger logger.Logger, apiUrl, ap
 		if d.Active {
 			deploymentOptions = append(deploymentOptions, tui.Option{
 				ID:   d.ID,
-				Text: fmt.Sprintf("%s  %s, tags: [%-50s], msg: [%s]", "✅", tui.Title(date.Format("2006-01-02 15:04:05")), tui.Bold(tags), tui.Bold(msg)),
+				Text: fmt.Sprintf("%s  %s %-50s %s", "✅", tui.Title(date.Format(time.Stamp)), tui.Bold(tags), tui.Muted(msg)),
 			})
 		} else {
 			deploymentOptions = append(deploymentOptions, tui.Option{
 				ID:   d.ID,
-				Text: fmt.Sprintf("    %s, tags: [%-50s], msg: [%s]", tui.Title(date.Format("2006-01-02 15:04:05")), tui.Bold(tags), tui.Bold(msg)),
+				Text: fmt.Sprintf("    %s %-50s %s", tui.Title(date.Format(time.Stamp)), tui.Bold(tags), tui.Muted(msg)),
 			})
 		}
 	}
