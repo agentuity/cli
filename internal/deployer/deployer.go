@@ -68,17 +68,16 @@ type DeployPreflightCheckData struct {
 }
 
 func PreflightCheck(ctx context.Context, logger logger.Logger, data DeployPreflightCheckData) error {
-	if data.Project.Bundler.Enabled {
-		started := time.Now()
-		if err := bundler.Bundle(bundler.BundleContext{
-			Context:    context.Background(),
-			Logger:     logger,
-			ProjectDir: data.Dir,
-			Production: true,
-		}); err != nil {
-			return err
-		}
-		logger.Debug("bundled in %s", time.Since(started))
+	started := time.Now()
+	if err := bundler.Bundle(bundler.BundleContext{
+		Context:    context.Background(),
+		Logger:     logger,
+		ProjectDir: data.Dir,
+		Production: true,
+		Project:    data.Project,
+	}); err != nil {
+		return err
 	}
+	logger.Debug("bundled in %s", time.Since(started))
 	return nil
 }

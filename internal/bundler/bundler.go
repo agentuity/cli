@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,6 +20,7 @@ import (
 	"github.com/agentuity/go-common/sys"
 	"github.com/agentuity/go-common/tui"
 	"github.com/evanw/esbuild/pkg/api"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 var Version = "dev"
@@ -34,12 +36,69 @@ type AgentConfig struct {
 type BundleContext struct {
 	Context    context.Context
 	Logger     logger.Logger
+	Project    *project.Project
 	ProjectDir string
 	Production bool
 	Install    bool
 	CI         bool
 	DevMode    bool
 	Writer     io.Writer
+}
+
+func dirSize(path string) (int64, error) {
+	var size int64
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return nil
+	})
+	return size, err
+}
+
+func validateDiskRequest(ctx BundleContext, dir string) error {
+	if !ctx.DevMode {
+		if !util.Exists(dir) {
+			return fmt.Errorf("%s not found", dir)
+		}
+		size, err := dirSize(dir)
+		if err != nil {
+			return fmt.Errorf("error calculating size of %s: %w", dir, err)
+		}
+		diskSize := resource.NewQuantity(size, resource.DecimalSI)
+		val, ok := diskSize.AsInt64()
+		if ok {
+			millisValue := fmt.Sprintf("%.0fMi", math.Round(float64(val)/1000/1000))
+			askSize, err := resource.ParseQuantity(ctx.Project.Deployment.Resources.Disk)
+			if err != nil {
+				return fmt.Errorf("error parsing disk requirement: %w", err)
+			}
+			askVal, ok := askSize.AsInt64()
+			if ok {
+				if askVal < val {
+					if tui.HasTTY {
+						fmt.Println(tui.Warning(fmt.Sprintf("Warning: The deployment is larger (%s) than the requested disk size for the deployment (%s).", millisValue, ctx.Project.Deployment.Resources.Disk)))
+						if tui.AskForConfirm("Would you like to adjust the disk requirement?", 'y') != 'y' {
+							fmt.Println()
+							return fmt.Errorf("Disk request is too small. %s required but %s requested", millisValue, ctx.Project.Deployment.Resources.Disk)
+						}
+						fmt.Println()
+						ctx.Project.Deployment.Resources.Disk = millisValue
+						if err := ctx.Project.Save(ctx.ProjectDir); err != nil {
+							return fmt.Errorf("error saving project: %w", err)
+						}
+						tui.ShowSuccess("Disk requirement adjusted to %s", millisValue)
+					} else {
+						return fmt.Errorf("The deployment is larger (%s) than the requested disk size for the deployment (%s)", millisValue, ctx.Project.Deployment.Resources.Disk)
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func installSourceMapSupportIfNeeded(ctx BundleContext, dir string) error {
@@ -199,6 +258,11 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		os.Exit(2)
 		return nil // This line will never be reached due to os.Exit
 	}
+
+	if err := validateDiskRequest(ctx, outdir); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -246,6 +310,10 @@ func bundlePython(ctx BundleContext, dir string, outdir string, theproject *proj
 	}
 	if ctx.Production {
 		config["environment"] = "production"
+	}
+
+	if err := validateDiskRequest(ctx, filepath.Join(dir, ".venv")); err != nil {
+		return err
 	}
 
 	pyproject := filepath.Join(dir, "pyproject.toml")
