@@ -59,6 +59,48 @@ func dirSize(path string) (int64, error) {
 	return size, err
 }
 
+func validateDiskRequest(ctx BundleContext, dir string) error {
+	if !ctx.DevMode {
+		if !util.Exists(dir) {
+			return fmt.Errorf("%s not found", dir)
+		}
+		size, err := dirSize(dir)
+		if err != nil {
+			return fmt.Errorf("error calculating size of %s: %w", dir, err)
+		}
+		diskSize := resource.NewQuantity(size, resource.DecimalSI)
+		val, ok := diskSize.AsInt64()
+		if ok {
+			millisValue := fmt.Sprintf("%.0fMi", math.Round(float64(val)/1000/1000))
+			askSize, err := resource.ParseQuantity(ctx.Project.Deployment.Resources.Disk)
+			if err != nil {
+				return fmt.Errorf("error parsing disk requirement: %w", err)
+			}
+			askVal, ok := askSize.AsInt64()
+			if ok {
+				if askVal < val {
+					if tui.HasTTY {
+						fmt.Println(tui.Warning(fmt.Sprintf("Warning: The deployment is larger (%s) than the requested disk size for the deployment (%s).", millisValue, ctx.Project.Deployment.Resources.Disk)))
+						if tui.AskForConfirm("Would you like to adjust the disk requirement?", 'y') != 'y' {
+							fmt.Println()
+							return fmt.Errorf("Disk request is too small. %s required but %s requested", millisValue, ctx.Project.Deployment.Resources.Disk)
+						}
+						fmt.Println()
+						ctx.Project.Deployment.Resources.Disk = millisValue
+						if err := ctx.Project.Save(ctx.ProjectDir); err != nil {
+							return fmt.Errorf("error saving project: %w", err)
+						}
+						tui.ShowSuccess("Disk requirement adjusted to %s", millisValue)
+					} else {
+						return fmt.Errorf("The deployment is larger (%s) than the requested disk size for the deployment (%s)", millisValue, ctx.Project.Deployment.Resources.Disk)
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func installSourceMapSupportIfNeeded(ctx BundleContext, dir string) error {
 	// only bun needs to install this library to aide in parsing the source maps
 	path := filepath.Join(dir, "node_modules", "source-map-js", "package.json")
@@ -216,6 +258,11 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		os.Exit(2)
 		return nil // This line will never be reached due to os.Exit
 	}
+
+	if err := validateDiskRequest(ctx, outdir); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -265,45 +312,8 @@ func bundlePython(ctx BundleContext, dir string, outdir string, theproject *proj
 		config["environment"] = "production"
 	}
 
-	if !ctx.DevMode {
-		venv := filepath.Join(dir, ".venv")
-		if !util.Exists(venv) {
-			return fmt.Errorf("python venv not found in %s", dir)
-		}
-		size, err := dirSize(venv)
-		if err != nil {
-			return fmt.Errorf("error calculating size of .venv: %w", err)
-		}
-		diskSize := resource.NewQuantity(size, resource.DecimalSI)
-		val, ok := diskSize.AsInt64()
-		if ok {
-			millisValue := fmt.Sprintf("%.0fMi", math.Round(float64(val)/1000/1000))
-			askSize, err := resource.ParseQuantity(ctx.Project.Deployment.Resources.Disk)
-			if err != nil {
-				return fmt.Errorf("error parsing disk requirement: %w", err)
-			}
-			askVal, ok := askSize.AsInt64()
-			if ok {
-				if askVal < val {
-					if tui.HasTTY {
-						fmt.Println(tui.Warning(fmt.Sprintf("Warning: The deployment is larger (%s) than the requested disk size for the deployment (%s).", millisValue, ctx.Project.Deployment.Resources.Disk)))
-						if tui.AskForConfirm("Would you like to adjust the disk requirement?", 'y') != 'y' {
-							fmt.Println()
-							return fmt.Errorf("Disk request is too small. %s required but %s requested", millisValue, ctx.Project.Deployment.Resources.Disk)
-						}
-						fmt.Println()
-						ctx.Project.Deployment.Resources.Disk = millisValue
-						if err := ctx.Project.Save(dir); err != nil {
-							return fmt.Errorf("error saving project: %w", err)
-						}
-						tui.ShowSuccess("Disk requirement adjusted to %s", millisValue)
-					} else {
-						fmt.Printf("The deployment is larger (%s) than the requested disk size for the deployment (%s)\n", millisValue, ctx.Project.Deployment.Resources.Disk)
-						os.Exit(1)
-					}
-				}
-			}
-		}
+	if err := validateDiskRequest(ctx, filepath.Join(dir, ".venv")); err != nil {
+		return err
 	}
 
 	pyproject := filepath.Join(dir, "pyproject.toml")
