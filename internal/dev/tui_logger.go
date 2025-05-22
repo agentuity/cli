@@ -111,6 +111,8 @@ var prefixToLevel = map[string]logger.LogLevel{
 	"[TRACE]": logger.LevelTrace,
 	"[DEBUG]": logger.LevelDebug,
 	"[INFO]":  logger.LevelInfo,
+	"[INFO ]": logger.LevelInfo, // python
+	"[WARNI]": logger.LevelWarn, // python
 	"[WARN]":  logger.LevelWarn,
 	"[ERROR]": logger.LevelError,
 	"[FATAL]": logger.LevelError,
