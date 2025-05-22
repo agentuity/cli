@@ -177,7 +177,14 @@ func getSDKVersionPython(ctx BundleContext) (*semver.Version, error) {
 		return nil, err
 	}
 	for _, pkg := range lockfile.Packages {
-		if pkg.Name == "agentuity" && !strings.Contains(pkg.Version, "+") {
+		if pkg.Name == "agentuity" {
+			if strings.Contains(pkg.Version, "+") {
+				// the default python local build version isn't semver compliant,
+				// so we need to convert it to a semver compliant version
+				tok := strings.Split(pkg.Version, "+")
+				tok = strings.Split(tok[0], ".")
+				pkg.Version = fmt.Sprintf("%s.%s.%s-prerelease", tok[0], tok[1], tok[2])
+			}
 			currentVersion := semver.MustParse(pkg.Version)
 			return currentVersion, nil
 		}
