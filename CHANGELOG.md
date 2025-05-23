@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.137] - 2025-05-23
+
+### Changed
+- Updated Discord community invite links across the CLI, TUI, README, and error system ([#339](https://github.com/agentuity/cli/pull/339))
+- Modified prompt in environment handling to separate informational messages from interactive questions ([#339](https://github.com/agentuity/cli/pull/339))
+- Updated dependency `github.com/agentuity/go-common` from v1.0.60 to v1.0.64 ([#339](https://github.com/agentuity/cli/pull/339))
+
+### Fixed
+- Fixed DevMode: Removed "server" and "force" flags and all related logic, including environment file processing ([#339](https://github.com/agentuity/cli/pull/339))
+
 ## [v0.0.136] - 2025-05-22
 
 ### Added
@@ -620,6 +630,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks for new agent creation
 
 
+[v0.0.137]: https://github.com/agentuity/cli/compare/v0.0.136...v0.0.137
 [v0.0.136]: https://github.com/agentuity/cli/compare/v0.0.135...v0.0.136
 [v0.0.135]: https://github.com/agentuity/cli/compare/v0.0.134...v0.0.135
 [v0.0.134]: https://github.com/agentuity/cli/compare/v0.0.133...v0.0.134
