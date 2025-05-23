@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -123,6 +124,10 @@ Examples:
 		tuiLoggerErr := dev.NewTUILogger(logLevel, ui, dev.StdErr)
 
 		if err := server.Connect(ui, tuiLogger, tuiLoggerErr); err != nil {
+			if errors.Is(err, context.Canceled) {
+				ui.Close(true)
+				return
+			}
 			log.Error("failed to start live dev connection: %s", err)
 			ui.Close(true)
 			return

@@ -175,6 +175,9 @@ func (c *APIClient) Do(method, pathParam string, payload interface{}, response i
 			continue
 		}
 		if err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return err
+			}
 			return NewAPIError(u.String(), method, 0, "", fmt.Errorf("error sending request: %w", err), traceID)
 		}
 		break

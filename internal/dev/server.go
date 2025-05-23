@@ -56,7 +56,7 @@ type Server struct {
 	apiclient      *util.APIClient
 	publicUrl      string
 	port           int
-	connected      chan string
+	connected      chan error
 	pendingLogger  logger.Logger
 	expiresAt      *time.Time
 	tlsCertificate *tls.Certificate
@@ -170,7 +170,7 @@ func (s *Server) connect(initial bool) {
 
 	defer func() {
 		if initial && gerr != nil {
-			s.connected <- gerr.Error()
+			s.connected <- gerr
 		}
 		s.logger.Debug("connection closed")
 		select {
@@ -206,7 +206,10 @@ func (s *Server) connect(initial bool) {
 	s.logger.Trace("refreshing connection metadata")
 	refreshStart := time.Now()
 	if err := s.refreshConnection(); err != nil {
-		s.logger.Error("failed to refresh connection: %s", err)
+		if !initial {
+			s.logger.Error("failed to refresh connection: %s", err)
+		}
+		// initial will bubble this up
 		gerr = err
 		return
 	}
@@ -239,7 +242,7 @@ func (s *Server) connect(initial bool) {
 	s.logger.Trace("dialed devmode server in %v", time.Since(dialStart))
 
 	if initial {
-		s.connected <- ""
+		s.connected <- nil
 	}
 
 	// if we successfully connect, reset our connection failures
@@ -571,10 +574,10 @@ func (s *Server) Connect(ui *DevModeUI, tuiLogger logger.Logger, tuiLoggerErr lo
 	}
 	s.logger = tuiLogger
 	s.pendingLogger = s.logger
-	msg := <-s.connected
+	err := <-s.connected
 	close(s.connected)
-	if msg != "" {
-		return fmt.Errorf("%s", msg)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -627,7 +630,7 @@ func New(args ServerArgs) (*Server, error) {
 		port:          args.Port,
 		apiclient:     util.NewAPIClient(ctx, pendingLogger, args.APIURL, args.APIKey),
 		pendingLogger: pendingLogger,
-		connected:     make(chan string, 1),
+		connected:     make(chan error, 1),
 	}
 
 	go server.connect(true)
