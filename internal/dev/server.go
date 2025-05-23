@@ -161,6 +161,8 @@ func (s *Server) reconnect() {
 func (s *Server) connect(initial bool) {
 	var gerr error
 
+	s.logger.Trace("connecting to devmode server")
+
 	// hold a connection lock to prevent multiple go routines from trying to reconnect
 	// before the previous connect goroutine has finished
 	s.connectionLock.Lock()
@@ -201,11 +203,15 @@ func (s *Server) connect(initial bool) {
 		}
 	}()
 
+	s.logger.Trace("refreshing connection metadata")
+	refreshStart := time.Now()
 	if err := s.refreshConnection(); err != nil {
 		s.logger.Error("failed to refresh connection: %s", err)
 		gerr = err
 		return
 	}
+
+	s.logger.Trace("refreshed connection metadata in %v", time.Since(refreshStart))
 
 	var tlsConfig tls.Config
 	tlsConfig.Certificates = []tls.Certificate{*s.tlsCertificate}
@@ -221,6 +227,8 @@ func (s *Server) connect(initial bool) {
 		hostname = fmt.Sprintf("%s:443", hostname)
 	}
 
+	s.logger.Trace("dialing devmode server: %s", hostname)
+	dialStart := time.Now()
 	conn, err := tls.Dial("tcp", hostname, &tlsConfig)
 	if err != nil {
 		gerr = err
@@ -228,6 +236,7 @@ func (s *Server) connect(initial bool) {
 		return
 	}
 	s.conn = conn
+	s.logger.Trace("dialed devmode server in %v", time.Since(dialStart))
 
 	if initial {
 		s.connected <- ""
@@ -557,13 +566,10 @@ func (s *Server) HealthCheck(devModeUrl string) error {
 }
 
 func (s *Server) Connect(ui *DevModeUI, tuiLogger logger.Logger, tuiLoggerErr logger.Logger) error {
-	s.logger = tuiLogger
-	if pl, ok := tuiLoggerErr.(*PendingLogger); ok {
-		pl.drain(ui, tuiLoggerErr)
-	}
 	if pl, ok := s.logger.(*PendingLogger); ok {
-		pl.drain(ui, s.logger)
+		pl.drain(ui, tuiLogger)
 	}
+	s.logger = tuiLogger
 	s.pendingLogger = s.logger
 	msg := <-s.connected
 	close(s.connected)
@@ -590,11 +596,12 @@ func (s *Server) monitor() {
 }
 
 func New(args ServerArgs) (*Server, error) {
-	id := cstr.NewHash(args.OrgId, args.UserId)
+	id := cstr.NewHash(args.Project.Project.ProjectId, args.UserId)
 	tracer := otel.Tracer("@agentuity/cli", trace.WithInstrumentationAttributes(
 		attribute.String("id", id),
 		attribute.String("@agentuity/orgId", args.OrgId),
 		attribute.String("@agentuity/userId", args.UserId),
+		attribute.String("@agentuity/projectId", args.Project.Project.ProjectId),
 		attribute.Bool("@agentuity/devmode", true),
 		attribute.String("name", "@agentuity/cli"),
 		attribute.String("version", args.Version),
@@ -618,7 +625,7 @@ func New(args ServerArgs) (*Server, error) {
 		tracer:        tracer,
 		version:       args.Version,
 		port:          args.Port,
-		apiclient:     util.NewAPIClient(context.Background(), pendingLogger, args.APIURL, args.APIKey),
+		apiclient:     util.NewAPIClient(ctx, pendingLogger, args.APIURL, args.APIKey),
 		pendingLogger: pendingLogger,
 		connected:     make(chan string, 1),
 	}
