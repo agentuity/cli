@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.137] - 2025-05-23
+
+### Changed
+- Updated Discord community invite links across the CLI, TUI, README, and error system ([#339](https://github.com/agentuity/cli/pull/339))
+- Modified prompt in environment handling to separate informational messages from interactive questions ([#339](https://github.com/agentuity/cli/pull/339))
+- Updated dependency `github.com/agentuity/go-common` from v1.0.60 to v1.0.64 ([#339](https://github.com/agentuity/cli/pull/339))
+
+### Fixed
+- Fixed DevMode: Removed "server" and "force" flags and all related logic, including environment file processing ([#339](https://github.com/agentuity/cli/pull/339))
+
 ## [v0.0.136] - 2025-05-22
 
 ### Added
@@ -679,11 +689,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.0.80]: https://github.com/agentuity/cli/compare/v0.0.79...v0.0.80
 [v0.0.79]: https://github.com/agentuity/cli/compare/v0.0.78...v0.0.79
 [v0.0.78]: https://github.com/agentuity/cli/compare/v0.0.77...v0.0.78
+[v0.0.137]: https://github.com/agentuity/cli/compare/v0.0.136...v0.0.137
+[v0.0.136]: https://github.com/agentuity/cli/compare/v0.0.135...v0.0.136
+[v0.0.135]: https://github.com/agentuity/cli/compare/v0.0.134...v0.0.135
+[v0.0.134]: https://github.com/agentuity/cli/compare/v0.0.133...v0.0.134
+[v0.0.133]: https://github.com/agentuity/cli/compare/v0.0.132...v0.0.133
+[v0.0.132]: https://github.com/agentuity/cli/compare/v0.0.131...v0.0.132
+[v0.0.131]: https://github.com/agentuity/cli/compare/v0.0.130...v0.0.131
+[v0.0.130]: https://github.com/agentuity/cli/compare/v0.0.129...v0.0.130
+[v0.0.129]: https://github.com/agentuity/cli/compare/v0.0.128...v0.0.129
+[v0.0.128]: https://github.com/agentuity/cli/compare/v0.0.127...v0.0.128
+[v0.0.127]: https://github.com/agentuity/cli/compare/v0.0.126...v0.0.127
+[v0.0.126]: https://github.com/agentuity/cli/compare/v0.0.125...v0.0.126
+[v0.0.125]: https://github.com/agentuity/cli/compare/v0.0.124...v0.0.125
+[v0.0.124]: https://github.com/agentuity/cli/compare/v0.0.123...v0.0.124
+[v0.0.123]: https://github.com/agentuity/cli/compare/v0.0.122...v0.0.123
+[v0.0.122]: https://github.com/agentuity/cli/compare/v0.0.121...v0.0.122
+[v0.0.121]: https://github.com/agentuity/cli/compare/v0.0.120...v0.0.121
+[v0.0.120]: https://github.com/agentuity/cli/compare/v0.0.119...v0.0.120
+[v0.0.119]: https://github.com/agentuity/cli/compare/v0.0.118...v0.0.119
+[v0.0.118]: https://github.com/agentuity/cli/compare/v0.0.117...v0.0.118
+[v0.0.117]: https://github.com/agentuity/cli/compare/v0.0.116...v0.0.117
+[v0.0.116]: https://github.com/agentuity/cli/compare/v0.0.115...v0.0.116
+[v0.0.115]: https://github.com/agentuity/cli/compare/v0.0.114...v0.0.115
+[v0.0.114]: https://github.com/agentuity/cli/compare/v0.0.113...v0.0.114
+[v0.0.113]: https://github.com/agentuity/cli/compare/v0.0.112...v0.0.113
+[v0.0.112]: https://github.com/agentuity/cli/compare/v0.0.111...v0.0.112
+[v0.0.111]: https://github.com/agentuity/cli/compare/v0.0.110...v0.0.111
+[v0.0.110]: https://github.com/agentuity/cli/compare/v0.0.109...v0.0.110
+[v0.0.109]: https://github.com/agentuity/cli/compare/v0.0.108...v0.0.109
+[v0.0.108]: https://github.com/agentuity/cli/compare/v0.0.107...v0.0.108
+[v0.0.107]: https://github.com/agentuity/cli/compare/v0.0.106...v0.0.107
+[v0.0.106]: https://github.com/agentuity/cli/compare/v0.0.105...v0.0.106
+[v0.0.105]: https://github.com/agentuity/cli/compare/v0.0.104...v0.0.105
+[v0.0.104]: https://github.com/agentuity/cli/compare/v0.0.103...v0.0.104
+[v0.0.103]: https://github.com/agentuity/cli/compare/v0.0.102...v0.0.103
+[v0.0.102]: https://github.com/agentuity/cli/compare/v0.0.101...v0.0.102
+[v0.0.101]: https://github.com/agentuity/cli/compare/v0.0.100...v0.0.101
+[v0.0.100]: https://github.com/agentuity/cli/compare/v0.0.99...v0.0.100
+[v0.0.99]: https://github.com/agentuity/cli/compare/v0.0.98...v0.0.99
+[v0.0.98]: https://github.com/agentuity/cli/compare/v0.0.97...v0.0.98
+[v0.0.97]: https://github.com/agentuity/cli/compare/v0.0.96...v0.0.97
+[v0.0.96]: https://github.com/agentuity/cli/compare/v0.0.95...v0.0.96
+[v0.0.95]: https://github.com/agentuity/cli/compare/v0.0.94...v0.0.95
+[v0.0.94]: https://github.com/agentuity/cli/compare/v0.0.93...v0.0.94
+[v0.0.93]: https://github.com/agentuity/cli/compare/v0.0.92...v0.0.93
+[v0.0.92]: https://github.com/agentuity/cli/compare/v0.0.91...v0.0.92
+[v0.0.91]: https://github.com/agentuity/cli/compare/v0.0.90...v0.0.91
+[v0.0.90]: https://github.com/agentuity/cli/compare/v0.0.89...v0.0.90
+[v0.0.89]: https://github.com/agentuity/cli/compare/v0.0.88...v0.0.89
+[v0.0.88]: https://github.com/agentuity/cli/compare/v0.0.87...v0.0.88
+[v0.0.87]: https://github.com/agentuity/cli/compare/v0.0.86...v0.0.87
+[v0.0.86]: https://github.com/agentuity/cli/compare/v0.0.85...v0.0.86
+[v0.0.85]: https://github.com/agentuity/cli/compare/v0.0.84...v0.0.85
+[v0.0.84]: https://github.com/agentuity/cli/compare/v0.0.83...v0.0.84
+[v0.0.83]: https://github.com/agentuity/cli/compare/v0.0.82...v0.0.83
+[v0.0.82]: https://github.com/agentuity/cli/compare/v0.0.81...v0.0.82
+[v0.0.81]: https://github.com/agentuity/cli/compare/v0.0.80...v0.0.81
+[v0.0.80]: https://github.com/agentuity/cli/compare/v0.0.79...v0.0.80
+[v0.0.79]: https://github.com/agentuity/cli/compare/v0.0.78...v0.0.79
+[v0.0.78]: https://github.com/agentuity/cli/compare/v0.0.77...v0.0.78
 [v0.0.77]: https://github.com/agentuity/cli/compare/v0.0.76...v0.0.77
 [v0.0.76]: https://github.com/agentuity/cli/compare/v0.0.75...v0.0.76
 [v0.0.75]: https://github.com/agentuity/cli/compare/v0.0.74...v0.0.75
 [v0.0.74]: https://github.com/agentuity/cli/compare/v0.0.73...v0.0.74
-[v0.0.73]: https://github.com/agentuity/cli/compare/v0.0.72...v0.0.73
 [v0.0.72]: https://github.com/agentuity/cli/compare/v0.0.71...v0.0.72
 [v0.0.71]: https://github.com/agentuity/cli/compare/v0.0.70...v0.0.71
 [v0.0.70]: https://github.com/agentuity/cli/compare/v0.0.69...v0.0.70
