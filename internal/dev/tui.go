@@ -355,7 +355,7 @@ func (m *model) View() string {
 			"", "",
 			tui.Warning("To get help or share your feedback, join our Discord community:"),
 			"",
-			tui.Link("https://discord.gg/vtn3hgUfuc"),
+			tui.Link("https://discord.gg/agentuity"),
 			"",
 		)
 	} else if m.selectedLog != nil {

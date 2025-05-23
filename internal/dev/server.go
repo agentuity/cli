@@ -62,7 +62,6 @@ type Server struct {
 	tlsCertificate *tls.Certificate
 	conn           *tls.Conn
 	wg             sync.WaitGroup
-	serverAddr     string
 	cleanup        func()
 
 	// Connection state
@@ -86,7 +85,6 @@ type ServerArgs struct {
 	UserId       string
 	Version      string
 	Port         int
-	ServerAddr   string
 }
 
 type ConnectionResponse struct {
@@ -214,9 +212,6 @@ func (s *Server) connect(initial bool) {
 	tlsConfig.NextProtos = []string{"h2"}
 
 	hostname := s.hostname
-	if hostname == "" {
-		hostname = s.serverAddr
-	}
 
 	if strings.Contains(hostname, "localhost") || strings.Contains(hostname, "127.0.0.1") {
 		tlsConfig.InsecureSkipVerify = true
@@ -626,7 +621,6 @@ func New(args ServerArgs) (*Server, error) {
 		apiclient:     util.NewAPIClient(context.Background(), pendingLogger, args.APIURL, args.APIKey),
 		pendingLogger: pendingLogger,
 		connected:     make(chan string, 1),
-		serverAddr:    args.ServerAddr,
 	}
 
 	go server.connect(true)

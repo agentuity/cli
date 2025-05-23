@@ -176,7 +176,8 @@ func HandleMissingProjectEnvs(ctx context.Context, logger logger.Logger, le []en
 				suffix = "them"
 				title = fmt.Sprintf("There are %d environment variables from %s that are not set in the project.", len(keyvalue), tui.Bold(".env"))
 			}
-			force = tui.Ask(logger, title+"\nWould you like to set "+suffix+" now?", true)
+			fmt.Println(title)
+			force = tui.Ask(logger, "Would you like to set "+suffix+" now?", true)
 		}
 		if force {
 			for key, val := range keyvalue {
