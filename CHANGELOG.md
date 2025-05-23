@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [AGENT-130] Delete and Roll Back deployments ([#313](https://github.com/agentuity/cli/pull/313))
 
 
+## [v0.0.135] - 2025-05-22
+
+### Added
+- [AGENT-130] Added deployment management features with rollback and delete commands ([#313](https://github.com/agentuity/cli/pull/313))
+- Added disk size validation during bundling for JavaScript and Python projects with auto-adjustment option ([#330](https://github.com/agentuity/cli/pull/330))
+
 ## [v0.0.134] - 2025-05-22
 
 ### Fixed
