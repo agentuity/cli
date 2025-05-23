@@ -4,7 +4,7 @@
 <br />
 <a href="https://github.com/agentuity/cli/releases"><img alt="Release version" src="https://img.shields.io/github/v/release/agentuity/cli"></a>
 <a href="https://github.com/agentuity/sdk-js/blob/main/README.md"><img alt="License" src="https://badgen.now.sh/badge/license/Apache-2.0"></a>
-<a href="https://discord.gg/vtn3hgUfuc"><img alt="Join the community on Discord" src="https://img.shields.io/discord/1332974865371758646.svg?style=flat"></a>
+<a href="https://discord.gg/agentuity"><img alt="Join the community on Discord" src="https://img.shields.io/discord/1332974865371758646.svg?style=flat"></a>
 </div>
 </div>
 

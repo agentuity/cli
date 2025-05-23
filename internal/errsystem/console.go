@@ -24,7 +24,7 @@ import (
 var Version string = "dev"
 
 const baseDocURL = "https://agentuity.dev/errors/%s"
-const discordURL = "https://discord.gg/vtn3hgUfuc"
+const discordURL = "https://discord.gg/agentuity"
 
 type crashReport struct {
 	ID         string         `json:"id"`
