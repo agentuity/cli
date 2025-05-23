@@ -69,39 +69,43 @@ function getSourceMap(filename) {
 }
 const frameRegex = /(.+)\((.+):(\d+):(\d+)\)$/;
 Error.prepareStackTrace = function (err, stack) {
-	const _stack = __prepareStackTrace(err, stack);
-	const tok = _stack.split('\n');
-	const lines = [];
-	for (const t of tok) {
-		if (t.includes('.agentuity/') && frameRegex.test(t)) {
-			const parts = frameRegex.exec(t);
-			if (parts.length === 5) {
-				const filename = parts[2];
-				const sm = getSourceMap(filename+'.map');
-				if (sm) {
-					const lineno = parts[3];
-					const colno = parts[4];
-					const pos = sm.originalPositionFor({
-						line: +lineno,
-						column: +colno,
-					})
-					if (pos && pos.source) {
-						const startIndex = filename.indexOf('.agentuity/');
-						const offset = filename.includes('../node_modules/') ? 11 : 0;
-						const basedir = filename.substring(0, startIndex + offset);
-						const sourceOffset = pos.source.indexOf('src/');
-						const source = pos.source.substring(sourceOffset);
-						const newfile = __agentuity_join(basedir, source);
-						const newline = parts[1] + '(' + newfile + ':' + pos.line + ':' + pos.column + ')';
-						lines.push(newline);
-						continue;
+	try {
+		const _stack = __prepareStackTrace(err, stack);
+		const tok = _stack.split('\n');
+		const lines = [];
+		for (const t of tok) {
+			if (t.includes('.agentuity/') && frameRegex.test(t)) {
+				const parts = frameRegex.exec(t);
+				if (parts.length === 5) {
+					const filename = parts[2];
+					const sm = getSourceMap(filename+'.map');
+					if (sm) {
+						const lineno = parts[3];
+						const colno = parts[4];
+						const pos = sm.originalPositionFor({
+							line: +lineno,
+							column: +colno,
+						})
+						if (pos && pos.source) {
+							const startIndex = filename.indexOf('.agentuity/');
+							const offset = filename.includes('../node_modules/') ? 11 : 0;
+							const basedir = filename.substring(0, startIndex + offset);
+							const sourceOffset = pos.source.indexOf('src/');
+							const source = pos.source.substring(sourceOffset);
+							const newfile = __agentuity_join(basedir, source);
+							const newline = parts[1] + '(' + newfile + ':' + pos.line + ':' + pos.column + ')';
+							lines.push(newline);
+							continue;
+						}
 					}
 				}
 			}
+			lines.push(t);
 		}
-		lines.push(t);
+		return lines.join('\n');
+	} catch (e) {
+		return stack;
 	}
-	return lines.join('\n');
 };
 })();
 `
