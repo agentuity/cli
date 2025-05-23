@@ -413,12 +413,13 @@ func (p *Project) DeleteProjectEnv(ctx context.Context, logger logger.Logger, ba
 }
 
 type ProjectImportRequest struct {
-	Name              string        `json:"name"`
-	Description       string        `json:"description"`
-	Provider          string        `json:"provider"`
-	OrgId             string        `json:"orgId"`
-	Agents            []AgentConfig `json:"agents"`
-	EnableWebhookAuth bool          `json:"enableWebhookAuth"`
+	Name                string        `json:"name"`
+	Description         string        `json:"description"`
+	Provider            string        `json:"provider"`
+	OrgId               string        `json:"orgId"`
+	Agents              []AgentConfig `json:"agents"`
+	EnableWebhookAuth   bool          `json:"enableWebhookAuth"`
+	CopiedFromProjectId string        `json:"copiedFromProjectId"`
 }
 
 type ProjectImportResponse struct {
@@ -440,6 +441,7 @@ func (p *Project) Import(ctx context.Context, logger logger.Logger, baseUrl stri
 	req.Agents = p.Agents
 	req.Provider = p.Bundler.Identifier
 	req.EnableWebhookAuth = enableWebhookAuth
+	req.CopiedFromProjectId = p.ProjectId
 
 	if err := client.Do("POST", "/cli/project/import", req, &resp); err != nil {
 		return nil, fmt.Errorf("error importing project: %w", err)
