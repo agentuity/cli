@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-[v0.0.138]: https://github.com/agentuity/cli/compare/v0.0.137...v0.0.138
+
 ## [v0.0.138] - 2025-05-23
 
 ### Changed
@@ -722,3 +722,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.0.58]: https://github.com/agentuity/cli/compare/v0.0.57...v0.0.58
 [v0.0.57]: https://github.com/agentuity/cli/compare/v0.0.56...v0.0.57
 [v0.0.56]: https://github.com/agentuity/cli/compare/v0.0.55...v0.0.56
+[v0.0.138]: https://github.com/agentuity/cli/compare/v0.0.137...v0.0.138
