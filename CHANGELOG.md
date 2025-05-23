@@ -11,7 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Quality of life improvement: if disk requested is smaller than needed, will tell you and potentially adjust ([#330](https://github.com/agentuity/cli/pull/330))
 - [AGENT-130] Delete and Roll Back deployments ([#313](https://github.com/agentuity/cli/pull/313))
 
-
 ## [v0.0.135] - 2025-05-22
 
 ### Added
