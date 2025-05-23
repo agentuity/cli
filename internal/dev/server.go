@@ -21,6 +21,8 @@ import (
 	"github.com/agentuity/go-common/message"
 	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/telemetry"
+	"github.com/agentuity/go-common/tui"
+	"github.com/charmbracelet/lipgloss"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -57,7 +59,6 @@ type Server struct {
 	publicUrl      string
 	port           int
 	connected      chan error
-	pendingLogger  logger.Logger
 	expiresAt      *time.Time
 	tlsCertificate *tls.Certificate
 	conn           *tls.Conn
@@ -568,12 +569,7 @@ func (s *Server) HealthCheck(devModeUrl string) error {
 	return fmt.Errorf("health check failed after %s", time.Since(started))
 }
 
-func (s *Server) Connect(ui *DevModeUI, tuiLogger logger.Logger, tuiLoggerErr logger.Logger) error {
-	if pl, ok := s.logger.(*PendingLogger); ok {
-		pl.drain(ui, tuiLogger)
-	}
-	s.logger = tuiLogger
-	s.pendingLogger = s.logger
+func (s *Server) Connect() error {
 	err := <-s.connected
 	close(s.connected)
 	if err != nil {
@@ -598,6 +594,45 @@ func (s *Server) monitor() {
 	}
 }
 
+var (
+	logoColor    = lipgloss.AdaptiveColor{Light: "#11c7b9", Dark: "#00FFFF"}
+	labelColor   = lipgloss.AdaptiveColor{Light: "#999999", Dark: "#FFFFFF"}
+	runningColor = lipgloss.AdaptiveColor{Light: "#00FF00", Dark: "#009900"}
+	labelStyle   = lipgloss.NewStyle().Foreground(labelColor).Bold(true)
+)
+
+func label(s string) string {
+	return labelStyle.Render(tui.PadRight(s, 10, " "))
+}
+
+func (s *Server) GenerateInfoBox(publicUrl string, appUrl string, devModeUrl string) string {
+	var devmodeBox = lipgloss.NewStyle().
+		Width(100).
+		Border(lipgloss.NormalBorder()).
+		BorderForeground(logoColor).
+		Padding(1, 2).
+		AlignVertical(lipgloss.Top).
+		AlignHorizontal(lipgloss.Left).
+		Foreground(labelColor)
+
+	url := "loading..."
+	if publicUrl != "" {
+		url = tui.Link("%s", publicUrl) + "  " + tui.Muted("(only accessible while running)")
+	}
+
+	content := fmt.Sprintf(`%s
+
+%s  %s
+%s  %s
+%s  %s`,
+		tui.Bold("⨺ Agentuity DevMode"),
+		label("DevMode"), tui.Link("%s", appUrl),
+		label("Local"), tui.Link("%s", devModeUrl),
+		label("Public"), url,
+	)
+	return devmodeBox.Render(content)
+}
+
 func New(args ServerArgs) (*Server, error) {
 	id := cstr.NewHash(args.Project.Project.ProjectId, args.UserId)
 	tracer := otel.Tracer("@agentuity/cli", trace.WithInstrumentationAttributes(
@@ -610,27 +645,24 @@ func New(args ServerArgs) (*Server, error) {
 		attribute.String("version", args.Version),
 	), trace.WithInstrumentationVersion(args.Version))
 
-	pendingLogger := NewPendingLogger(args.LogLevel)
-
 	ctx, cancel := context.WithCancel(args.Ctx)
 
 	server := &Server{
-		ID:            id,
-		logger:        pendingLogger,
-		ctx:           ctx,
-		cancel:        cancel,
-		apiurl:        args.APIURL,
-		transportUrl:  args.TransportURL,
-		apiKey:        args.APIKey,
-		Project:       args.Project,
-		orgId:         args.OrgId,
-		userId:        args.UserId,
-		tracer:        tracer,
-		version:       args.Version,
-		port:          args.Port,
-		apiclient:     util.NewAPIClient(ctx, pendingLogger, args.APIURL, args.APIKey),
-		pendingLogger: pendingLogger,
-		connected:     make(chan error, 1),
+		ID:           id,
+		logger:       args.Logger,
+		ctx:          ctx,
+		cancel:       cancel,
+		apiurl:       args.APIURL,
+		transportUrl: args.TransportURL,
+		apiKey:       args.APIKey,
+		Project:      args.Project,
+		orgId:        args.OrgId,
+		userId:       args.UserId,
+		tracer:       tracer,
+		version:      args.Version,
+		port:         args.Port,
+		apiclient:    util.NewAPIClient(ctx, args.Logger, args.APIURL, args.APIKey),
+		connected:    make(chan error, 1),
 	}
 
 	go server.connect(true)
