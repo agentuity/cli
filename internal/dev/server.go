@@ -597,10 +597,8 @@ func (s *Server) monitor() {
 var (
 	logoColor    = lipgloss.AdaptiveColor{Light: "#11c7b9", Dark: "#00FFFF"}
 	labelColor   = lipgloss.AdaptiveColor{Light: "#999999", Dark: "#FFFFFF"}
-	runningColor = lipgloss.AdaptiveColor{Light: "#00FF00", Dark: "#009900"}
 	labelStyle   = lipgloss.NewStyle().Foreground(labelColor).Bold(true)
 )
-
 func label(s string) string {
 	return labelStyle.Render(tui.PadRight(s, 10, " "))
 }
