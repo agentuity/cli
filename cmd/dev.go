@@ -6,13 +6,11 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/agentuity/cli/internal/bundler"
 	"github.com/agentuity/cli/internal/dev"
-	"github.com/agentuity/cli/internal/envutil"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
@@ -67,24 +65,12 @@ Examples:
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithUserMessage("Failed to validate project (%s) using the provided API key from the .env file in %s. This is most likely due to the API key being invalid or the project has been deleted.\n\nYou can import this project using the following command:\n\n"+tui.Command("project import"), theproject.Project.ProjectId, dir), errsystem.WithContextMessage(fmt.Sprintf("Failed to get project: %s", err))).ShowErrorAndExit()
 		}
 
-		force, _ := cmd.Flags().GetBool("force")
-		if !tui.HasTTY {
-			force = true
-		}
-		_, project = envutil.ProcessEnvFiles(ctx, log, dir, theproject.Project, project, theproject.APIURL, apiKey, force)
-
 		orgId := project.OrgId
 
 		port, _ := cmd.Flags().GetInt("port")
 		port, err = dev.FindAvailablePort(theproject, port)
 		if err != nil {
 			log.Fatal("failed to find available port: %s", err)
-		}
-
-		serverAddr, _ := cmd.Flags().GetString("server")
-
-		if strings.Contains(apiUrl, "agentuity.io") && !strings.Contains(serverAddr, "localhost") {
-			serverAddr = "localhost:12001"
 		}
 
 		server, err := dev.New(dev.ServerArgs{
@@ -99,7 +85,6 @@ Examples:
 			Version:      Version,
 			UserId:       userId,
 			Port:         port,
-			ServerAddr:   serverAddr,
 		})
 		if err != nil {
 			log.Fatal("failed to create live dev connection: %s", err)
@@ -281,7 +266,4 @@ func init() {
 	rootCmd.AddCommand(devCmd)
 	devCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
 	devCmd.Flags().Int("port", 0, "The port to run the development server on (uses project default if not provided)")
-	devCmd.Flags().String("server", "echo.agentuity.cloud", "the echo server to connect to")
-	devCmd.Flags().MarkHidden("server")
-	devCmd.Flags().Bool("force", false, "Force the processing of environment files")
 }
