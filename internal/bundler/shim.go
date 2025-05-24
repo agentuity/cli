@@ -89,9 +89,9 @@ Error.prepareStackTrace = function (err, stack) {
 						if (pos && pos.source) {
 							const startIndex = filename.indexOf('.agentuity/');
 							const offset = filename.includes('../node_modules/') ? 11 : 0;
-							const basedir = filename.substring(0, startIndex + offset);
 							const sourceOffset = pos.source.indexOf('src/');
 							const source = pos.source.substring(sourceOffset);
+							const basedir = filename.substring(0, startIndex + offset) + (source.startsWith('../') ? '.agentuity' : '');
 							const newfile = __agentuity_join(basedir, source);
 							const newline = parts[1] + '(' + newfile + ':' + pos.line + ':' + pos.column + ')';
 							lines.push(newline);
