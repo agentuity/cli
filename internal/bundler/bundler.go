@@ -153,10 +153,13 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		ctx.Logger.Debug("installed dependencies: %s", strings.TrimSpace(string(out)))
 	}
 
+	var shimSourceMap bool
+
 	if theproject.Bundler.Runtime == "bunjs" {
 		if err := installSourceMapSupportIfNeeded(ctx, dir); err != nil {
 			return fmt.Errorf("failed to install bun source-map-support: %w", err)
 		}
+		shimSourceMap = true
 	}
 
 	if err := checkForBreakingChanges(ctx, "javascript", theproject.Bundler.Runtime); err != nil {
@@ -210,12 +213,6 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 	}
 	defines["process.env.AGENTUITY_CLOUD_AGENTS_JSON"] = cstr.JSONStringify(cstr.JSONStringify(agents))
 
-	var postShim string
-	// only bun needs this shim
-	if theproject.Bundler.Runtime == "bunjs" {
-		postShim = sourceMapShim
-	}
-
 	ctx.Logger.Debug("starting build")
 	started := time.Now()
 	result := api.Build(api.BuildOptions{
@@ -235,11 +232,11 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		AbsWorkingDir: dir,
 		TreeShaking:   api.TreeShakingTrue,
 		Drop:          api.DropDebugger,
-		Plugins:       []api.Plugin{createPlugin(ctx.Logger)},
+		Plugins:       []api.Plugin{createPlugin(ctx.Logger, dir, shimSourceMap)},
 		Define:        defines,
 		LegalComments: api.LegalCommentsNone,
 		Banner: map[string]string{
-			"js": strings.Join([]string{jsheader, jsshim, postShim}, "\n"),
+			"js": strings.Join([]string{jsheader, jsshim}, "\n"),
 		},
 	})
 	ctx.Logger.Debug("finished build in %v", time.Since(started))
