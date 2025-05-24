@@ -3,6 +3,7 @@ package bundler
 import (
 	"fmt"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/agentuity/go-common/logger"
@@ -68,10 +69,25 @@ func searchBackwards(contents string, offset int, val byte) int {
 	return -1
 }
 
-func createPlugin(logger logger.Logger) api.Plugin {
+func createPlugin(logger logger.Logger, dir string, shimSourceMap bool) api.Plugin {
 	return api.Plugin{
 		Name: "inject-agentuity",
 		Setup: func(build api.PluginBuild) {
+			if shimSourceMap {
+				build.OnLoad(api.OnLoadOptions{Filter: path.Join(dir, "index.ts"), Namespace: "file"}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
+					logger.Debug("adding source map import to %s", args.Path)
+					buf, err := os.ReadFile(args.Path)
+					if err != nil {
+						return api.OnLoadResult{}, err
+					}
+					contents := string(buf)
+					contents = sourceMapShim + "\n" + contents
+					return api.OnLoadResult{
+						Contents: &contents,
+						Loader:   api.LoaderTS,
+					}, nil
+				})
+			}
 			for name, mod := range patches {
 				path := "node_modules/" + mod.Module + "/.*"
 				if mod.Filename != "" {
