@@ -200,16 +200,16 @@ var logsCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(logsCmd)
 
-	logsCmd.Flags().String("agent", "", "Filter logs by agent ID or name")
-	logsCmd.Flags().String("deployment", "", "Filter logs by deployment ID")
-	logsCmd.Flags().String("env", "local", "Filter logs by environment")
-	logsCmd.Flags().String("project", "", "Filter logs by project ID or name")
-	logsCmd.Flags().String("organization", "", "Filter logs by organization ID or name")
-	logsCmd.Flags().String("session", "", "Filter logs by session ID")
-	logsCmd.Flags().String("severity", "info", "Filter logs by severity (info, warn, error, etc.)")
-	logsCmd.Flags().String("since", "1h", "Show logs since a specific time (e.g., 1h, 30m, 1d)")
+	logsCmd.Flags().StringP("agent", "a", "", "Filter logs by agent ID or name")
+	logsCmd.Flags().StringP("deployment", "d", "", "Filter logs by deployment ID")
+	logsCmd.Flags().StringP("env", "e", "local", "Filter logs by environment")
+	logsCmd.Flags().StringP("project", "p", "", "Filter logs by project ID or name")
+	logsCmd.Flags().StringP("organization", "o", "", "Filter logs by organization ID or name")
+	logsCmd.Flags().StringP("session", "S", "", "Filter logs by session ID")
+	logsCmd.Flags().StringP("severity", "v", "", "Filter logs by severity (info, warn, error, etc.)")
+	logsCmd.Flags().StringP("since", "s", "1h", "Show logs since a specific time (e.g., 1h, 30m, 1d)")
 
-	logsCmd.Flags().Bool("hideDate", false, "Hide the date from the logs")
-	logsCmd.Flags().Bool("hideTime", false, "Hide the time from the logs")
-	logsCmd.Flags().Bool("tail", false, "Number of lines from the end of the logs to show")
+	logsCmd.Flags().BoolP("hideDate", "D", false, "Hide the date from the logs")
+	logsCmd.Flags().BoolP("hideTime", "T", false, "Hide the time from the logs")
+	logsCmd.Flags().BoolP("tail", "t", false, "Continuously stream new logs (similar to tail -f)")
 }
