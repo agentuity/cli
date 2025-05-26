@@ -627,10 +627,14 @@ func listProjects(ctx context.Context, logger logger.Logger, apiUrl string, apik
 	return projects
 }
 
-func showNoProjects() {
+func showNoProjects(orgId string) {
 	fmt.Println()
-	tui.ShowWarning("no projects found")
-	tui.ShowBanner("Create a new project", tui.Text("Use the ")+tui.Command("new")+tui.Text(" command to create a new project"), false)
+	if orgId != "" {
+		tui.ShowWarning("no projects found in organization %s", orgId)
+	} else {
+		tui.ShowWarning("no projects found")
+		tui.ShowBanner("Create a new project", tui.Text("Use the ")+tui.Command("new")+tui.Text(" command to create a new project"), false)
+	}
 }
 
 var projectListCmd = &cobra.Command{
@@ -664,7 +668,7 @@ Examples:
 			return
 		}
 		if len(projects) == 0 {
-			showNoProjects()
+			showNoProjects(orgId)
 			return
 		}
 
@@ -764,7 +768,7 @@ Examples:
 		}
 
 		if len(options) == 0 {
-			showNoProjects()
+			showNoProjects(orgId)
 			return
 		}
 
