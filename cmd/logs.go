@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
+	"os/signal"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/agentuity/cli/internal/util"
@@ -193,7 +196,10 @@ var logsCmd = &cobra.Command{
 		tail, _ := cmd.Flags().GetBool("tail")
 		hideDate, _ := cmd.Flags().GetBool("hideDate")
 		hideTime, _ := cmd.Flags().GetBool("hideTime")
-		printLogs(cmd.Context(), logger, cmd, query, tail, hideDate, hideTime)
+
+		ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		printLogs(ctx, logger, cmd, query, tail, hideDate, hideTime)
 	},
 }
 
