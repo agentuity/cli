@@ -885,7 +885,7 @@ func init() {
 		cmd.Flags().String("format", "text", "The format to use for the output. Can be either 'text' or 'json'")
 	}
 
-	projectListCmd.Flags().String("org-id", "", "filter the projects by organization")
+	projectListCmd.Flags().String("org-id", "", "Filter the projects by organization")
 
 	projectNewCmd.Flags().StringP("runtime", "r", "", "The runtime to use for the project")
 	projectNewCmd.Flags().StringP("template", "t", "", "The template to use for the project")
