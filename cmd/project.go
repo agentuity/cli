@@ -730,12 +730,22 @@ Examples:
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
+		orgId, _ := cmd.Flags().GetString("org-id")
 		var projects []project.ProjectListData
 		action := func() {
 			var err error
-			projects, err = project.ListProjects(ctx, logger, apiUrl, apikey)
+			unfilteredProjects, err := project.ListProjects(ctx, logger, apiUrl, apikey)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list projects")).ShowErrorAndExit()
+			}
+			if orgId != "" {
+				for _, project := range unfilteredProjects {
+					if project.OrgId == orgId {
+						projects = append(projects, project)
+					}
+				}
+			} else {
+				projects = unfilteredProjects
 			}
 		}
 		tui.ShowSpinner("fetching projects ...", action)
@@ -883,6 +893,8 @@ func init() {
 	projectImportCmd.Flags().String("name", "", "The name of the project to import")
 	projectImportCmd.Flags().String("description", "", "The description of the project to import")
 	projectImportCmd.Flags().Bool("force", false, "Force the processing of environment files")
+
+	projectDeleteCmd.Flags().String("org-id", "", "Only delete the projects in the specified organization")
 
 	projectImportCmd.Flags().MarkHidden("name")
 	projectImportCmd.Flags().MarkHidden("description")
