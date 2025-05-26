@@ -42,6 +42,8 @@ Examples:
 		install, _ := cmd.Flags().GetBool("install")
 		deploy, _ := cmd.Flags().GetBool("deploy")
 		ci, _ := cmd.Flags().GetBool("ci")
+		tag, _ := cmd.Flags().GetString("tag")
+		description, _ := cmd.Flags().GetString("description")
 
 		if err := bundler.Bundle(bundler.BundleContext{
 			Context:    ctx,
@@ -70,6 +72,12 @@ Examples:
 			args := []string{"cloud", "deploy"}
 			if deploymentId != "" {
 				args = append(args, "--deploymentId", deploymentId)
+			}
+			if tag != "" {
+				args = append(args, "--tag", tag)
+			}
+			if description != "" {
+				args = append(args, "--description", description)
 			}
 			flags := []string{
 				"log-level",
@@ -138,6 +146,8 @@ func init() {
 	bundleCmd.Flags().BoolP("install", "i", false, "Whether to install dependencies before bundling")
 	bundleCmd.Flags().Bool("deploy", false, "Whether to deploy after bundling")
 	bundleCmd.Flags().String("deploymentId", "", "Used to track a specific deployment")
+	bundleCmd.Flags().String("tag", "", "Used to set the tag of the deployment")
+	bundleCmd.Flags().String("description", "", "Used to set the description of the deployment")
 	bundleCmd.Flags().MarkHidden("deploymentId")
 	bundleCmd.Flags().Bool("ci", false, "Used to track a specific CI job")
 	bundleCmd.Flags().MarkHidden("ci")
