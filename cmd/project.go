@@ -610,10 +610,31 @@ Examples:
 	},
 }
 
-func showNoProjects() {
+func listProjects(ctx context.Context, logger logger.Logger, apiUrl string, apikey string, orgId string) []project.ProjectListData {
+	unfilteredProjects, err := project.ListProjects(ctx, logger, apiUrl, apikey)
+	if err != nil {
+		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list projects")).ShowErrorAndExit()
+	}
+	if orgId == "" {
+		return unfilteredProjects
+	}
+	var projects []project.ProjectListData
+	for _, project := range unfilteredProjects {
+		if project.OrgId == orgId {
+			projects = append(projects, project)
+		}
+	}
+	return projects
+}
+
+func showNoProjects(orgId string) {
 	fmt.Println()
-	tui.ShowWarning("no projects found")
-	tui.ShowBanner("Create a new project", tui.Text("Use the ")+tui.Command("new")+tui.Text(" command to create a new project"), false)
+	if orgId != "" {
+		tui.ShowWarning("no projects found in organization %s", orgId)
+	} else {
+		tui.ShowWarning("no projects found")
+		tui.ShowBanner("Create a new project", tui.Text("Use the ")+tui.Command("new")+tui.Text(" command to create a new project"), false)
+	}
 }
 
 var projectListCmd = &cobra.Command{
@@ -634,14 +655,11 @@ Examples:
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
+		orgId, _ := cmd.Flags().GetString("org-id")
 
 		var projects []project.ProjectListData
 		action := func() {
-			var err error
-			projects, err = project.ListProjects(ctx, logger, apiUrl, apikey)
-			if err != nil {
-				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list projects")).ShowErrorAndExit()
-			}
+			projects = listProjects(ctx, logger, apiUrl, apikey, orgId)
 		}
 		tui.ShowSpinner("fetching projects ...", action)
 		format, _ := cmd.Flags().GetString("format")
@@ -650,7 +668,7 @@ Examples:
 			return
 		}
 		if len(projects) == 0 {
-			showNoProjects()
+			showNoProjects(orgId)
 			return
 		}
 
@@ -730,13 +748,11 @@ Examples:
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
+		orgId, _ := cmd.Flags().GetString("org-id")
+
 		var projects []project.ProjectListData
 		action := func() {
-			var err error
-			projects, err = project.ListProjects(ctx, logger, apiUrl, apikey)
-			if err != nil {
-				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list projects")).ShowErrorAndExit()
-			}
+			projects = listProjects(ctx, logger, apiUrl, apikey, orgId)
 		}
 		tui.ShowSpinner("fetching projects ...", action)
 		var options []tui.Option
@@ -752,7 +768,7 @@ Examples:
 		}
 
 		if len(options) == 0 {
-			showNoProjects()
+			showNoProjects(orgId)
 			return
 		}
 
@@ -873,6 +889,8 @@ func init() {
 		cmd.Flags().String("format", "text", "The format to use for the output. Can be either 'text' or 'json'")
 	}
 
+	projectListCmd.Flags().String("org-id", "", "Filter the projects by organization")
+
 	projectNewCmd.Flags().StringP("runtime", "r", "", "The runtime to use for the project")
 	projectNewCmd.Flags().StringP("template", "t", "", "The template to use for the project")
 	projectNewCmd.Flags().Bool("force", false, "Force the project to be created even if the directory already exists")
@@ -884,7 +902,11 @@ func init() {
 	projectImportCmd.Flags().String("description", "", "The description of the project to import")
 	projectImportCmd.Flags().Bool("force", false, "Force the processing of environment files")
 
+	// hidden because they must be all passed together and we havent documented that
 	projectImportCmd.Flags().MarkHidden("name")
 	projectImportCmd.Flags().MarkHidden("description")
 	projectImportCmd.Flags().MarkHidden("org-id")
+
+	projectDeleteCmd.Flags().String("org-id", "", "Only delete the projects in the specified organization")
+
 }
