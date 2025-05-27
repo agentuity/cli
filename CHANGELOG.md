@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.140] - 2025-05-27
+
+### Added
+- [AGENT-122] Added logs command with filtering and streaming capabilities including tail option, flexible duration parsing, and customizable output formatting ([#342](https://github.com/agentuity/cli/pull/342))
+- Added tag and description options to the bundle command for deployment metadata ([#351](https://github.com/agentuity/cli/pull/351))
+- Added --org-id filter to project list and delete commands for organization-specific operations ([#350](https://github.com/agentuity/cli/pull/350))
+
+### Fixed
+- Fixed mono repository support by improving SDK resolution process with better logging for directory traversal ([#352](https://github.com/agentuity/cli/pull/352))
+- DevMode: Fixed sourcemap resolution when node_modules is outside the project directory ([#348](https://github.com/agentuity/cli/pull/348))
+
 ## [v0.0.139] - 2025-05-24
 
 ### Fixed
@@ -645,6 +656,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks for new agent creation
 
 
+[v0.0.140]: https://github.com/agentuity/cli/compare/v0.0.139...v0.0.140
 [v0.0.139]: https://github.com/agentuity/cli/compare/v0.0.138...v0.0.139
 [v0.0.138]: https://github.com/agentuity/cli/compare/v0.0.137...v0.0.138
 [v0.0.137]: https://github.com/agentuity/cli/compare/v0.0.136...v0.0.137
