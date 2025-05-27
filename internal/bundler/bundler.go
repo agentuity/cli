@@ -185,7 +185,8 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 	if err != nil {
 		return fmt.Errorf("failed to load %s: %w", pkgjson, err)
 	}
-	agentuitypkg, err := resolveAgentuity(dir)
+	ctx.Logger.Debug("resolving agentuity sdk")
+	agentuitypkg, err := resolveAgentuity(ctx.Logger, dir)
 	if err != nil {
 		return err
 	}
@@ -381,15 +382,19 @@ func Bundle(ctx BundleContext) error {
 }
 
 // resolveAgentuity walks up from startDir looking for node_modules/@agentuity/sdk/package.json
-func resolveAgentuity(startDir string) (string, error) {
+func resolveAgentuity(logger logger.Logger, startDir string) (string, error) {
 	dir := startDir
 	for {
 		candidate := filepath.Join(dir, "node_modules", "@agentuity", "sdk", "package.json")
 		if util.Exists(candidate) {
+			logger.Debug("found @agentuity/sdk/package.json in %s", candidate)
 			return candidate, nil
 		}
+		logger.Debug("did not find @agentuity/sdk/package.json in %s", dir)
 		parent := filepath.Dir(dir)
+		logger.Debug("checking parent directory: %s", parent)
 		if parent == dir {
+			logger.Debug("reached root directory, stopping search")
 			break
 		}
 		dir = parent

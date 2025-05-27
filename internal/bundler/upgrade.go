@@ -147,7 +147,11 @@ type UVLockfile struct {
 
 func getSDKVersionJavascript(ctx BundleContext) (*semver.Version, error) {
 	var pkg packageJSON
-	pkgjson := filepath.Join(ctx.ProjectDir, "node_modules", "@agentuity", "sdk", "package.json")
+	pkgjson, err := resolveAgentuity(ctx.Logger, ctx.ProjectDir)
+	if err != nil {
+		return nil, err
+	}
+	ctx.Logger.Debug("found @agentuity/sdk/package.json in %s", pkgjson)
 	if !util.Exists(pkgjson) {
 		return nil, fmt.Errorf("package.json not found: %s", pkgjson)
 	}
