@@ -123,6 +123,10 @@ func CreateRunProjectCmd(ctx context.Context, log logger.Logger, theproject proj
 
 	if theproject.Project.Bundler.Language == "javascript" {
 		projectServerCmd.Env = append(projectServerCmd.Env, "NODE_ENV=development")
+	} else if theproject.Project.Bundler.Language == "python" {
+		// disable these automatic instrumentation for python that conflicts with ours
+		projectServerCmd.Env = append(projectServerCmd.Env, "TRACELOOP_TRACE_CONTENT=false")
+		projectServerCmd.Env = append(projectServerCmd.Env, "OTEL_PYTHON_DISABLED_INSTRUMENTATIONS=langchain,openai")
 	}
 
 	// for nodejs, we need to enable source maps directly in the environment.
