@@ -82,6 +82,7 @@ Examples:
   agentuity apikey ls --project-id <projectId>
   agentuity apikey ls --mask`,
 	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("HEY! I'M NEW")
 		logger := env.NewLogger(cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
