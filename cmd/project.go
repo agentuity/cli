@@ -151,6 +151,7 @@ func initProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 	proj.Deployment.Args = args.Provider.Deployment.Args
 	proj.Deployment.Resources.CPU = args.Provider.Deployment.Resources.CPU
 	proj.Deployment.Resources.Memory = args.Provider.Deployment.Resources.Memory
+	proj.Deployment.Resources.Disk = args.Provider.Deployment.Resources.Disk
 
 	// set the agents from the result
 	proj.Agents = result.Agents
