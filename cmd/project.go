@@ -11,6 +11,7 @@ import (
 	"sort"
 	"syscall"
 
+	"github.com/agentuity/cli/internal/deployer"
 	"github.com/agentuity/cli/internal/envutil"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/mcp"
@@ -586,8 +587,17 @@ Examples:
 
 		})
 
-		// run the git flow
-		projectGitFlow(ctx, provider, tmplContext, githubAction)
+		gitInfo, err := deployer.GetGitInfoRecursive(logger, projectDir)
+
+		logger.Debug("git info: %+v", gitInfo)
+
+		if err != nil {
+			logger.Info("failed to get git info: %s", err)
+		}
+
+		if !gitInfo.IsRepo {
+			projectGitFlow(ctx, provider, tmplContext, githubAction)
+		}
 
 		if format == "json" {
 			json.NewEncoder(os.Stdout).Encode(projectData)
