@@ -641,6 +641,7 @@ func ResolveProjectDir(logger logger.Logger, cmd *cobra.Command, required bool) 
 		dir = viper.GetString("preferences.project_dir")
 		if ProjectExists(dir) {
 			tui.ShowWarning("Using your last used project directory (%s). You should change into the correct directory or use the --dir flag.", dir)
+			os.Chdir(dir)
 			return dir
 		}
 		tui.ShowBanner("Agentuity Project Not Found", "No Agentuity project file not found in the directory "+abs+"\n\nMake sure you are in an Agentuity project directory or use the --dir flag to specify a project directory.", false)
