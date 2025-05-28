@@ -126,20 +126,14 @@ func ZipDir(dir string, outfilename string, opts ...ZipDirCallbackMatcher) error
 		if !Exists(file) {
 			continue
 		}
-		rf, err := os.Open(file)
-		if err != nil {
-			return fmt.Errorf("error opening file: %s. %w", file, err)
-		}
-		defer rf.Close()
 		if len(opts) > 0 {
-			fi, err := rf.Stat()
+			fi, err := os.Stat(file)
 			if err != nil {
 				return fmt.Errorf("error getting file info: %s. %w", file, err)
 			}
 			var notok bool
 			for _, opt := range opts {
 				if !opt(fn, fi) {
-					rf.Close()
 					notok = true
 					break
 				}
@@ -148,6 +142,11 @@ func ZipDir(dir string, outfilename string, opts ...ZipDirCallbackMatcher) error
 				continue
 			}
 		}
+		rf, err := os.Open(file)
+		if err != nil {
+			return fmt.Errorf("error opening file: %s. %w", file, err)
+		}
+		defer rf.Close()
 		w, err := zw.Create(fn)
 		if err != nil {
 			return fmt.Errorf("error creating file: %s. %w", fn, err)
