@@ -123,6 +123,9 @@ func ZipDir(dir string, outfilename string, opts ...ZipDirCallbackMatcher) error
 		if err != nil {
 			return fmt.Errorf("error getting relative path: %s. %w", file, err)
 		}
+		if !Exists(file) {
+			continue
+		}
 		rf, err := os.Open(file)
 		if err != nil {
 			return fmt.Errorf("error opening file: %s. %w", file, err)
