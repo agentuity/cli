@@ -203,6 +203,11 @@ func (p *Project) Load(dir string) error {
 				return fmt.Errorf("error validating deploy memory value '%s'. %w", p.Deployment.Resources.Memory, err)
 			}
 			p.Deployment.Resources.MemoryQuantity = val
+			val, err = resource.ParseQuantity(p.Deployment.Resources.Disk)
+			if err != nil {
+				return fmt.Errorf("error validating deploy disk value '%s'. %w", p.Deployment.Resources.Disk, err)
+			}
+			p.Deployment.Resources.DiskQuantity = val
 		}
 	}
 	return nil

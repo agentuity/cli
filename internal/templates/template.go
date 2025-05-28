@@ -82,6 +82,7 @@ type Bundle struct {
 type Resources struct {
 	Memory string `yaml:"memory"`
 	CPU    string `yaml:"cpu"`
+	Disk   string `yaml:"disk"`
 }
 
 type Watch struct {
