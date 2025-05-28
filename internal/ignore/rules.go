@@ -69,8 +69,10 @@ func (r *Rules) AddDefaults() {
 	r.parseRule("Makefile")
 	r.parseRule(".editorconfig")
 	r.parseRule(".agentuity/config.json")
-	r.parseRule(".cursor/rules/**")
+	r.parseRule(".cursor/**")
 	r.parseRule(".env*")
+	r.parseRule(".github/**")
+	r.parseRule(".vscode/**")
 }
 
 // Add a rule to the ignore set.
