@@ -158,7 +158,7 @@ func (p *Project) SafeFilename() string {
 }
 
 func (p *Project) IsPython() bool {
-	return p.Bundler.Language == "python"
+	return p.Bundler.Language == "python" || p.Bundler.Language == "py"
 }
 
 // Load will load the project from a file in the given directory.
