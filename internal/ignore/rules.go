@@ -67,7 +67,10 @@ func (r *Rules) AddDefaults() {
 	r.parseRule("LICENSE.md")
 	r.parseRule("LICENSE")
 	r.parseRule("Makefile")
+	r.parseRule(".editorconfig")
+	r.parseRule(".agentuity/config.json")
 	r.parseRule(".cursor/rules/**")
+	r.parseRule(".env*")
 }
 
 // Add a rule to the ignore set.
