@@ -3,7 +3,6 @@ package util
 import (
 	"fmt"
 	"regexp"
-	"strings"
 )
 
 var safeNameTransformer = regexp.MustCompile(`[^a-zA-Z0-9_-]`)
@@ -13,7 +12,6 @@ var removeStartingDashes = regexp.MustCompile(`^[-]+`)
 var removeEndingDashes = regexp.MustCompile(`[-]+$`)
 
 func SafeProjectFilename(name string, python bool) string {
-	name = strings.ToLower(name)
 	if python {
 		if beginsWithNumber.MatchString(name) {
 			name = beginsWithNumber.ReplaceAllString(name, "")
