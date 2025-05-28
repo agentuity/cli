@@ -153,6 +153,14 @@ type Project struct {
 	Agents      []AgentConfig `json:"agents" yaml:"agents" hc:"The agents that are part of this project"`
 }
 
+func (p *Project) SafeFilename() string {
+	return util.SafeProjectFilename(p.Name, p.IsPython())
+}
+
+func (p *Project) IsPython() bool {
+	return p.Bundler.Language == "python"
+}
+
 // Load will load the project from a file in the given directory.
 func (p *Project) Load(dir string) error {
 	fn := getFilename(dir)

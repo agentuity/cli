@@ -7,30 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSafeFilename(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{"empty string", "", ""},
-		{"no special characters", "filename", "filename"},
-		{"with spaces", "file name", "file-name"},
-		{"with special characters", "file@#$%^&*()name", "file---------name"},
-		{"mixed case", "FileName", "FileName"},
-		{"with numbers", "file123name", "file123name"},
-		{"with underscores", "file_name", "file_name"},
-		{"with hyphens", "file-name", "file-name"},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			result := SafeFilename(test.input)
-			assert.Equal(t, test.expected, result)
-		})
-	}
-}
-
 func TestPluralize(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -99,7 +75,31 @@ func TestSafePythonFilename(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result := SafePythonFilename(test.input)
+			result := SafeProjectFilename(test.input, true)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+func TestSafeFilename(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"empty string", "", ""},
+		{"no special characters", "filename", "filename"},
+		{"with spaces", "file name", "file-name"},
+		{"with special characters", "file@#$%^&*()name", "file---------name"},
+		{"mixed case", "FileName", "FileName"},
+		{"with numbers", "file123name", "file123name"},
+		{"with underscores", "file_name", "file_name"},
+		{"with hyphens", "file-name", "file-name"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := SafeProjectFilename(test.input, false)
 			assert.Equal(t, test.expected, result)
 		})
 	}
