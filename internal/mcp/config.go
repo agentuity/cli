@@ -21,20 +21,13 @@ const (
 	agentuityToolCommand = "agentuity"
 )
 
-var agentuityToolArgs = []string{"mcp", "run"}
-var agentuityToolEnv = map[string]string{}
+var agentuityToolArgs = []any{"mcp", "run"}
+var agentuityToolEnv = map[string]any{}
 
 type MCPClientApplicationConfig struct {
 	MacOS   []string
 	Windows []string
 	Linux   []string
-}
-
-func toPathArray(path string) []string {
-	if path == "" {
-		return []string{}
-	}
-	return []string{path}
 }
 
 type MCPClientConfig struct {
@@ -49,9 +42,9 @@ type MCPClientConfig struct {
 }
 
 type MCPServerConfig struct {
-	Command string            `json:"command"`
-	Args    []string          `json:"args,omitempty"`
-	Env     map[string]string `json:"env,omitempty"`
+	Command string         `json:"command"`
+	Args    []any          `json:"args,omitempty"`
+	Env     map[string]any `json:"env,omitempty"`
 }
 
 type MCPConfig struct {
@@ -59,7 +52,7 @@ type MCPConfig struct {
 	filename   string
 }
 
-func (c *MCPConfig) AddIfNotExists(name string, command string, args []string, env map[string]string) bool {
+func (c *MCPConfig) AddIfNotExists(name string, command string, args []any, env map[string]any) bool {
 	if _, ok := c.MCPServers[name]; ok {
 		return false
 	}
