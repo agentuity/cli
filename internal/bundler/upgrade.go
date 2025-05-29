@@ -167,6 +167,9 @@ func getSDKVersionJavascript(ctx BundleContext) (*semver.Version, error) {
 }
 
 func getSDKVersionPython(ctx BundleContext) (*semver.Version, error) {
+	if util.Exists(filepath.Join(ctx.ProjectDir, "agentuity")) {
+		return semver.NewVersion("0.0.0-prerelease")
+	}
 	uvlock := filepath.Join(ctx.ProjectDir, "uv.lock")
 	if !util.Exists(uvlock) {
 		return nil, fmt.Errorf("uv.lock not found: %s", uvlock)
