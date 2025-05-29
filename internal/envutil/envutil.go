@@ -27,7 +27,7 @@ var redDiff = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#990
 var LooksLikeSecret = looksLikeSecret
 var IsAgentuityEnv = isAgentuityEnv
 
-var looksLikeSecret = regexp.MustCompile(`(?i)KEY|SECRET|TOKEN|CREDENTIAL|PASSWORD|sk_`)
+var looksLikeSecret = regexp.MustCompile(`(?i)(^|_|-)(APIKEY|API_KEY|PRIVATE_KEY|KEY|SECRET|TOKEN|CREDENTIAL|CREDENTIALS|PASSWORD|sk_[a-zA-Z0-9_-]*|BEARER|AUTH|JWT|WEBHOOK)($|_|-)`)
 var isAgentuityEnv = regexp.MustCompile(`(?i)AGENTUITY_`)
 
 // ProcessEnvFiles handles .env and template env processing

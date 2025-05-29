@@ -20,6 +20,11 @@ func TestLooksLikeSecret(t *testing.T) {
 		{"EMAIL", false},
 		{"AGENTUITY_SECRET", true}, // should match because of SECRET
 		{"SOME_RANDOM_VAR", false},
+		{"PRIVATE_KEY", true},
+		{"MY_APIKEY", true},
+		{"MY_API_KEY", true},
+		{"MY_API-KEY", true},
+		{"MONKEY", false},
 
 		{"api_key", true},
 		{"secret_token", true},
