@@ -29,10 +29,7 @@ type TemplateContext struct {
 func funcTemplates(t *template.Template, isPython bool) *template.Template {
 	return t.Funcs(template.FuncMap{
 		"safe_filename": func(s string) string {
-			if isPython {
-				return util.SafePythonFilename(s)
-			}
-			return util.SafeFilename(s)
+			return util.SafeProjectFilename(s, isPython)
 		},
 	})
 }

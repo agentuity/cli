@@ -546,7 +546,7 @@ func resolveStep(ctx TemplateContext, step any) (Step, bool) {
 				}
 				var name string
 				if val, ok := kv["name"].(string); ok {
-					name = util.SafeFilename(ctx.Interpolate(val).(string))
+					name = util.SafeProjectFilename(ctx.Interpolate(val).(string), ctx.Template.Language == "python")
 				}
 				var version string
 				if val, ok := kv["version"].(string); ok {

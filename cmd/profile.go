@@ -154,7 +154,7 @@ Examples:
 			}
 			return nil
 		})
-		fp := filepath.Join(filepath.Dir(cfgFile), util.SafeFilename(name)+".yaml")
+		fp := filepath.Join(filepath.Dir(cfgFile), util.SafeProjectFilename(name, false)+".yaml")
 		os.WriteFile(fp, []byte(fmt.Sprintf(`name: "%s"`, name)+"\n"), 0644)
 	},
 }

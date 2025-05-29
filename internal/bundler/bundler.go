@@ -337,11 +337,7 @@ func getAgents(theproject *project.Project, filename string) []AgentConfig {
 	var agents []AgentConfig
 	for _, agent := range theproject.Agents {
 		var agentfilename string
-		if theproject.Bundler.Language == "python" {
-			agentfilename = util.SafePythonFilename(agent.Name)
-		} else {
-			agentfilename = util.SafeFilename(agent.Name)
-		}
+		agentfilename = util.SafeProjectFilename(agent.Name, theproject.IsPython())
 		agents = append(agents, AgentConfig{
 			ID:       agent.ID,
 			Name:     agent.Name,
