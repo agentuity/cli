@@ -483,7 +483,7 @@ Examples:
 				provider = resp.Provider
 			}
 		}
-		projectDir := filepath.Join(cwd, util.SafeFilename(name))
+		projectDir := filepath.Join(cwd, util.SafeProjectFilename(name, provider.Language == "python"))
 		dir, _ := cmd.Flags().GetString("dir")
 		if dir != "" {
 			absDir, err := filepath.Abs(dir)
