@@ -27,7 +27,7 @@ var redDiff = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#990
 var LooksLikeSecret = looksLikeSecret
 var IsAgentuityEnv = isAgentuityEnv
 
-var looksLikeSecret = regexp.MustCompile(`(?i)KEY|SECRET|TOKEN|PASSWORD|sk_`)
+var looksLikeSecret = regexp.MustCompile(`(?i)(^|_|-)(APIKEY|API_KEY|PRIVATE_KEY|KEY|SECRET|TOKEN|CREDENTIAL|CREDENTIALS|PASSWORD|sk_[a-zA-Z0-9_-]*|BEARER|AUTH|JWT|WEBHOOK)($|_|-)`)
 var isAgentuityEnv = regexp.MustCompile(`(?i)AGENTUITY_`)
 
 // ProcessEnvFiles handles .env and template env processing
@@ -181,10 +181,17 @@ func HandleMissingProjectEnvs(ctx context.Context, logger logger.Logger, le []en
 		}
 		if force {
 			for key, val := range keyvalue {
-				if projectData.Env == nil {
-					projectData.Env = make(map[string]string)
+				if looksLikeSecret.MatchString(key) {
+					if projectData.Secrets == nil {
+						projectData.Secrets = make(map[string]string)
+					}
+					projectData.Secrets[key] = cstr.Mask(val)
+				} else {
+					if projectData.Env == nil {
+						projectData.Env = make(map[string]string)
+					}
+					projectData.Env[key] = val
 				}
-				projectData.Env[key] = val
 			}
 			_, err := theproject.SetProjectEnv(ctx, logger, apiUrl, token, projectData.Env, projectData.Secrets)
 			if err != nil {
@@ -266,17 +273,7 @@ func DescriptionLookingLikeASecret(description string) bool {
 	if description == "" {
 		return false
 	}
-	val := strings.ToLower(description)
-	if strings.Contains(val, "secret") {
-		return true
-	}
-	if strings.Contains(val, "password") {
-		return true
-	}
-	if strings.Contains(val, "key") {
-		return true
-	}
-	return false
+	return looksLikeSecret.MatchString(description)
 }
 
 // LoadOSEnv loads the OS environment variables
