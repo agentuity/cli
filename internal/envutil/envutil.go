@@ -181,10 +181,17 @@ func HandleMissingProjectEnvs(ctx context.Context, logger logger.Logger, le []en
 		}
 		if force {
 			for key, val := range keyvalue {
-				if projectData.Env == nil {
-					projectData.Env = make(map[string]string)
+				if looksLikeSecret.MatchString(key) {
+					if projectData.Secrets == nil {
+						projectData.Secrets = make(map[string]string)
+					}
+					projectData.Secrets[key] = cstr.Mask(val)
+				} else {
+					if projectData.Env == nil {
+						projectData.Env = make(map[string]string)
+					}
+					projectData.Env[key] = val
 				}
-				projectData.Env[key] = val
 			}
 			_, err := theproject.SetProjectEnv(ctx, logger, apiUrl, token, projectData.Env, projectData.Secrets)
 			if err != nil {
