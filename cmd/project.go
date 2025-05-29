@@ -588,12 +588,10 @@ Examples:
 		})
 
 		gitInfo, err := deployer.GetGitInfoRecursive(logger, projectDir)
-
-		logger.Debug("git info: %+v", gitInfo)
-
 		if err != nil {
 			logger.Info("failed to get git info: %s", err)
 		}
+		logger.Debug("git info: %+v", gitInfo)
 
 		if !gitInfo.IsRepo {
 			projectGitFlow(ctx, provider, tmplContext, githubAction)
