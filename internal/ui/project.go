@@ -435,24 +435,8 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update styles that depend on window width
 		titleStyle = titleStyle.Width(m.width)
 		helpStyle = helpStyle.Width(m.width)
-
-		if !m.ready {
-			m.initViewport()
-		} else {
-			// Fixed elements heights (always including both scroll indicators)
-			titleBarHeight := 3   // Title + description + spacing
-			headerHeight := 4     // Step title + description + spacing
-			footerHeight := 4     // Help text + spacing
-			verticalMargins := 2  // Top and bottom margins
-			scrollIndicators := 4 // Space for both scroll indicators (↑ and ↓)
-
-			// Calculate total fixed height
-			totalFixedHeight := titleBarHeight + headerHeight + footerHeight + verticalMargins + scrollIndicators
-
-			// Update viewport dimensions
-			m.viewport.Width = m.width - 4 // Account for left/right borders/padding
-			m.viewport.Height = m.height - totalFixedHeight
-		}
+		// Always reinitialize the viewport on resize to avoid invalid state
+		m.initViewport()
 
 		return m, nil
 
