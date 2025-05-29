@@ -27,7 +27,7 @@ var redDiff = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#990
 var LooksLikeSecret = looksLikeSecret
 var IsAgentuityEnv = isAgentuityEnv
 
-var looksLikeSecret = regexp.MustCompile(`(?i)KEY|SECRET|TOKEN|PASSWORD|sk_`)
+var looksLikeSecret = regexp.MustCompile(`(?i)KEY|SECRET|TOKEN|CREDENTIAL|PASSWORD|sk_`)
 var isAgentuityEnv = regexp.MustCompile(`(?i)AGENTUITY_`)
 
 // ProcessEnvFiles handles .env and template env processing
@@ -266,17 +266,7 @@ func DescriptionLookingLikeASecret(description string) bool {
 	if description == "" {
 		return false
 	}
-	val := strings.ToLower(description)
-	if strings.Contains(val, "secret") {
-		return true
-	}
-	if strings.Contains(val, "password") {
-		return true
-	}
-	if strings.Contains(val, "key") {
-		return true
-	}
-	return false
+	return looksLikeSecret.MatchString(description)
 }
 
 // LoadOSEnv loads the OS environment variables

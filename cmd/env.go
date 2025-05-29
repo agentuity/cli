@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"syscall"
 
@@ -37,36 +36,17 @@ Use the subcommands to set, get, list, and delete environment variables and secr
 }
 
 var (
-	hasTTY          = tui.HasTTY
-	looksLikeSecret = regexp.MustCompile(`(?i)KEY|SECRET|TOKEN|PASSWORD|sk_`)
-	isAgentuityEnv  = regexp.MustCompile(`(?i)AGENTUITY_`)
+	hasTTY = tui.HasTTY
 )
-
-func descriptionLookingLikeASecret(description string) bool {
-	if description == "" {
-		return false
-	}
-	val := strings.ToLower(description)
-	if strings.Contains(val, "secret") {
-		return true
-	}
-	if strings.Contains(val, "password") {
-		return true
-	}
-	if strings.Contains(val, "key") {
-		return true
-	}
-	return false
-}
 
 func loadEnvFile(le []env.EnvLineComment, forceSecret bool) (map[string]string, map[string]string) {
 	envs := make(map[string]string)
 	secrets := make(map[string]string)
 	for _, ev := range le {
-		if isAgentuityEnv.MatchString(ev.Key) {
+		if envutil.IsAgentuityEnv.MatchString(ev.Key) {
 			continue
 		}
-		if looksLikeSecret.MatchString(ev.Key) || forceSecret || descriptionLookingLikeASecret(ev.Comment) {
+		if envutil.LooksLikeSecret.MatchString(ev.Key) || forceSecret || envutil.DescriptionLookingLikeASecret(ev.Comment) {
 			secrets[ev.Key] = ev.Val
 		} else {
 			envs[ev.Key] = ev.Val
@@ -79,7 +59,7 @@ func loadOSEnv() map[string]string {
 	osenv := make(map[string]string)
 	for _, line := range os.Environ() {
 		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 && !isAgentuityEnv.MatchString(parts[0]) {
+		if len(parts) == 2 && !envutil.IsAgentuityEnv.MatchString(parts[0]) {
 			osenv[parts[0]] = parts[1]
 		}
 	}
@@ -152,7 +132,7 @@ Examples:
 				le, _ := env.ParseEnvFile(envfile)
 				var added bool
 				for _, ev := range le {
-					if !isAgentuityEnv.MatchString(ev.Key) {
+					if !envutil.IsAgentuityEnv.MatchString(ev.Key) {
 						localenv[ev.Key] = ev.Val
 						added = true
 					}
@@ -164,14 +144,14 @@ Examples:
 		if len(args) == 0 && hasEnvFile && len(localenv) > 0 && !hasSetFromFile && !noConfirm {
 			var options []tui.Option
 			for k := range localenv {
-				if !isAgentuityEnv.MatchString(k) {
+				if !envutil.IsAgentuityEnv.MatchString(k) {
 					options = append(options, tui.Option{ID: k, Text: k, Selected: true})
 				}
 			}
 			results := tui.MultiSelect(logger, "Set environment variables from .env", "", options)
 			for _, result := range results {
 				val := localenv[result]
-				if looksLikeSecret.MatchString(result) || forceSecret {
+				if envutil.LooksLikeSecret.MatchString(result) || forceSecret {
 					secrets[result] = val
 				} else {
 					envs[result] = val
@@ -206,7 +186,7 @@ Examples:
 				askMore = false
 			}
 		}
-		isSecret = looksLikeSecret.MatchString(key) || forceSecret
+		isSecret = envutil.LooksLikeSecret.MatchString(key) || forceSecret
 		if key != "" && value == "" && !noConfirm {
 			if len(envs) == 0 && len(secrets) == 0 {
 				fi, _ := os.Stdin.Stat()
