@@ -222,7 +222,7 @@ func getAgentInfoFlow(logger logger.Logger, remoteAgents []agent.Agent, name str
 
 var agentCreateCmd = &cobra.Command{
 	Use:     "create [name] [description] [auth_type]",
-	Short:   "Create a new Agent",
+	Short:   "Create a new Agentssss",
 	Aliases: []string{"new"},
 	Args:    cobra.MaximumNArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
