@@ -398,9 +398,21 @@ func (p *Project) GetProject(ctx context.Context, logger logger.Logger, baseUrl 
 func (p *Project) SetProjectEnv(ctx context.Context, logger logger.Logger, baseUrl string, token string, env map[string]string, secrets map[string]string) (*ProjectData, error) {
 	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 	var projectResponse ProjectResponse
+	_env := make(map[string]string)
+	for k, v := range env {
+		if !strings.HasPrefix(k, "AGENTUITY_") {
+			_env[k] = v
+		}
+	}
+	_secrets := make(map[string]string)
+	for k, v := range secrets {
+		if !strings.HasPrefix(k, "AGENTUITY_") {
+			_secrets[k] = v
+		}
+	}
 	if err := client.Do("PUT", fmt.Sprintf("/cli/project/%s/env", p.ProjectId), map[string]any{
-		"env":     env,
-		"secrets": secrets,
+		"env":     _env,
+		"secrets": _secrets,
 	}, &projectResponse); err != nil {
 		return nil, fmt.Errorf("error setting project env: %w", err)
 	}
