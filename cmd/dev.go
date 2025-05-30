@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/agentuity/cli/internal/bundler"
+	"github.com/agentuity/cli/internal/deployer"
 	"github.com/agentuity/cli/internal/dev"
 	"github.com/agentuity/cli/internal/envutil"
 	"github.com/agentuity/cli/internal/errsystem"
@@ -61,12 +63,32 @@ Examples:
 			ShowNewProjectImport(ctx, log, cmd, theproject.APIURL, apiKey, projectId, theproject.Project, dir, false)
 		}
 
-		project, err := theproject.Project.GetProject(ctx, log, theproject.APIURL, apiKey)
+		project, err := theproject.Project.GetProject(ctx, log, theproject.APIURL, apiKey, false, true)
 		if err != nil {
-			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithUserMessage("Failed to validate project (%s) using the provided API key from the .env file in %s. This is most likely due to the API key being invalid or the project has been deleted.\n\nYou can import this project using the following command:\n\n"+tui.Command("project import"), theproject.Project.ProjectId, dir), errsystem.WithContextMessage(fmt.Sprintf("Failed to get project: %s", err))).ShowErrorAndExit()
+			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithUserMessage("Failed to validate project (%s). This is most likely due to the API key being invalid or the project has been deleted.\n\nYou can import this project using the following command:\n\n"+tui.Command("project import"), theproject.Project.ProjectId), errsystem.WithContextMessage(fmt.Sprintf("Failed to get project: %s", err))).ShowErrorAndExit()
 		}
 
-		_, project = envutil.ProcessEnvFiles(ctx, log, dir, theproject.Project, project, theproject.APIURL, apiKey, false)
+		var envfile *deployer.EnvFile
+
+		envfile, project = envutil.ProcessEnvFiles(ctx, log, dir, theproject.Project, project, theproject.APIURL, apiKey, false)
+
+		if envfile == nil {
+			// we don't have an env file so we need to create one since this likely means you have cloned a new project
+			filename := filepath.Join(dir, ".env")
+			of, err := os.Create(filename)
+			if err != nil {
+				errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to create .env file")).ShowErrorAndExit()
+			}
+			defer of.Close()
+			for k, v := range project.Env {
+				fmt.Fprintf(of, "%s=%s\n", k, v)
+			}
+			for k, v := range project.Secrets {
+				fmt.Fprintf(of, "%s=%s\n", k, v)
+			}
+			of.Close()
+			tui.ShowSuccess("Synchronized project to .env file: %s", tui.Muted(filename))
+		}
 
 		orgId := project.OrgId
 
