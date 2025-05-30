@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.142] - 2025-05-29
+
+### Changed
+- [AGENT-272] Always reinitialize the viewport on resize to avoid invalid state ([#363](https://github.com/agentuity/cli/pull/363))
+- MCP: Relaxed types for MCP parsing configs ([#365](https://github.com/agentuity/cli/pull/365))
+- Allow SDK to be copied into a project for development purposes ([#366](https://github.com/agentuity/cli/pull/366))
+
+### Fixed
+- [AGENT-232] Fixed issue with Python project name by ensuring agent names are lowercase ([#359](https://github.com/agentuity/cli/pull/359))
+- Don't run git init when you are already in a git repository ([#362](https://github.com/agentuity/cli/pull/362))
+
+## [v0.0.141] - 2025-05-28
+
+### Added
+- Added additional ignore rule defaults for better project management ([#357](https://github.com/agentuity/cli/pull/357))
+- Added missing disk units for better user feedback ([#355](https://github.com/agentuity/cli/pull/355))
+
+### Fixed
+- Deploy: Fixed error with missing files during zip creation ([#354](https://github.com/agentuity/cli/pull/354))
+- Fixed directory handling when using last known project ([#358](https://github.com/agentuity/cli/pull/358))
+
 ## [v0.0.143] - 2025-05-30
 
 ### Changed
@@ -644,6 +665,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [v0.0.58] - 2025-03-12
 
 ### Fixed
+[v0.0.142]: https://github.com/agentuity/cli/compare/v0.0.141...v0.0.142
+[v0.0.141]: https://github.com/agentuity/cli/compare/v0.0.140...v0.0.141
 - Fix filepath issues by converting to localized path separators for Windows compatibility ([#80](https://github.com/agentuity/cli/pull/80)) (@jhaynie)
 
 ## [v0.0.57] - 2025-03-12
