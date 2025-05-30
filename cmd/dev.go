@@ -87,7 +87,7 @@ Examples:
 				fmt.Fprintf(of, "%s=%s\n", k, v)
 			}
 			of.Close()
-			tui.ShowSuccess("Synchronized .env file from project at %s", filename)
+			tui.ShowSuccess("Synchronized project to .env file: %s", tui.Muted(filename))
 		}
 
 		orgId := project.OrgId
