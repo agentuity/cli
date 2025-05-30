@@ -665,8 +665,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [v0.0.58] - 2025-03-12
 
 ### Fixed
-[v0.0.142]: https://github.com/agentuity/cli/compare/v0.0.141...v0.0.142
-[v0.0.141]: https://github.com/agentuity/cli/compare/v0.0.140...v0.0.141
 - Fix filepath issues by converting to localized path separators for Windows compatibility ([#80](https://github.com/agentuity/cli/pull/80)) (@jhaynie)
 
 ## [v0.0.57] - 2025-03-12
@@ -689,6 +687,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 [v0.0.143]: https://github.com/agentuity/cli/compare/v0.0.142...v0.0.143
+[v0.0.142]: https://github.com/agentuity/cli/compare/v0.0.141...v0.0.142
+[v0.0.141]: https://github.com/agentuity/cli/compare/v0.0.140...v0.0.141
 [v0.0.140]: https://github.com/agentuity/cli/compare/v0.0.139...v0.0.140
 [v0.0.139]: https://github.com/agentuity/cli/compare/v0.0.138...v0.0.139
 [v0.0.138]: https://github.com/agentuity/cli/compare/v0.0.137...v0.0.138
