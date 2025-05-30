@@ -251,25 +251,34 @@ Examples:
 		deploymentConfig.Runtime = theproject.Bundler.Runtime
 		deploymentConfig.Command = append([]string{theproject.Deployment.Command}, theproject.Deployment.Args...)
 
-		if err := deployer.PreflightCheck(ctx, logger, deployer.DeployPreflightCheckData{
-			Dir:           dir,
-			APIClient:     client,
-			APIURL:        apiUrl,
-			APIKey:        token,
-			Envfile:       envFile,
-			Project:       theproject,
-			ProjectData:   projectData,
-			Config:        deploymentConfig,
-			OSEnvironment: loadOSEnv(),
-			PromptHelpers: createPromptHelper(),
-		}); err != nil {
-			errsystem.New(errsystem.ErrDeployProject, err).ShowErrorAndExit()
+		var zipMutator util.ZipDirCallbackMutator
+
+		preflightAction := func() {
+			zm, err := deployer.PreflightCheck(ctx, logger, deployer.DeployPreflightCheckData{
+				Dir:           dir,
+				APIClient:     client,
+				APIURL:        apiUrl,
+				APIKey:        token,
+				Envfile:       envFile,
+				Project:       theproject,
+				ProjectData:   projectData,
+				Config:        deploymentConfig,
+				OSEnvironment: loadOSEnv(),
+				PromptHelpers: createPromptHelper(),
+			})
+			if err != nil {
+				errsystem.New(errsystem.ErrDeployProject, err).ShowErrorAndExit()
+			}
+
+			if err := deploymentConfig.Write(logger, dir); err != nil {
+				errsystem.New(errsystem.ErrWriteConfigurationFile, err,
+					errsystem.WithContextMessage("Error writing deployment config to disk")).ShowErrorAndExit()
+			}
+
+			zipMutator = zm
 		}
 
-		if err := deploymentConfig.Write(logger, dir); err != nil {
-			errsystem.New(errsystem.ErrWriteConfigurationFile, err,
-				errsystem.WithContextMessage("Error writing deployment config to disk")).ShowErrorAndExit()
-		}
+		tui.ShowSpinner("Bundling ...", preflightAction)
 
 		var startResponse startResponse
 		var startRequest startRequest
@@ -469,7 +478,7 @@ Examples:
 			// zip up our directory
 			started := time.Now()
 			logger.Debug("creating a zip file of %s into %s", dir, tmpfile.Name())
-			if err := util.ZipDir(dir, tmpfile.Name(), func(fn string, fi os.FileInfo) bool {
+			if err := util.ZipDir(dir, tmpfile.Name(), util.WithMutator(zipMutator), util.WithMatcher(func(fn string, fi os.FileInfo) bool {
 				notok := rules.Ignore(fn, fi)
 				if notok {
 					logger.Trace("❌ %s", fn)
@@ -477,7 +486,7 @@ Examples:
 					logger.Trace("❎ %s", fn)
 				}
 				return !notok
-			}); err != nil {
+			})); err != nil {
 				errsystem.New(errsystem.ErrCreateZipFile, err,
 					errsystem.WithContextMessage("Error zipping project")).ShowErrorAndExit()
 			}
@@ -575,7 +584,7 @@ Examples:
 			}
 		}
 
-		tui.ShowSpinner("Deploying ...", action)
+		tui.ShowSpinner("Uploading ...", action)
 
 		format, _ := cmd.Flags().GetString("format")
 		if format == "json" {

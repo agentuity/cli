@@ -67,17 +67,18 @@ type DeployPreflightCheckData struct {
 	OSEnvironment map[string]string
 }
 
-func PreflightCheck(ctx context.Context, logger logger.Logger, data DeployPreflightCheckData) error {
+func PreflightCheck(ctx context.Context, logger logger.Logger, data DeployPreflightCheckData) (util.ZipDirCallbackMutator, error) {
 	started := time.Now()
-	if err := bundler.Bundle(bundler.BundleContext{
+	bundleCtx := bundler.BundleContext{
 		Context:    context.Background(),
 		Logger:     logger,
 		ProjectDir: data.Dir,
 		Production: true,
 		Project:    data.Project,
-	}); err != nil {
-		return err
+	}
+	if err := bundler.Bundle(bundleCtx); err != nil {
+		return nil, err
 	}
 	logger.Debug("bundled in %s", time.Since(started))
-	return nil
+	return bundler.CreateDeploymentMutator(bundleCtx), nil
 }

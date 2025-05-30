@@ -1,6 +1,7 @@
 package bundler
 
 import (
+	"archive/zip"
 	"context"
 	"fmt"
 	"io"
@@ -269,6 +270,26 @@ var (
 	pyProjectVersionRegex = regexp.MustCompile(`version\s+=\s+"(.*?)"`)
 )
 
+/* NOTE: leaving this here for now but we don't need it for now but this will allow you to run uv python commands with virtual env
+func runUVPython(ctx BundleContext, dir string, args ...string) ([]byte, error) {
+	venvPath := ".venv"
+	// python3 -m pip install --upgrade pip
+	pythonPath := filepath.Join(dir, venvPath, "bin", "python3")
+	fmt.Println(pythonPath, strings.Join(args, " "))
+	cmd := exec.CommandContext(ctx.Context, pythonPath, args...)
+	env := os.Environ()
+	env = append(env, "VIRTUAL_ENV="+venvPath)
+	env = append(env, "PATH="+filepath.Join(venvPath, "bin")+":"+os.Getenv("PATH"))
+	cmd.Env = env
+	cmd.Dir = dir
+	cmd.Stdin = os.Stdin
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to run uv: %w. %s", err, string(out))
+	}
+	return out, nil
+}*/
+
 func bundlePython(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
 
 	if ctx.Install || !util.Exists(filepath.Join(dir, ".venv", "lib")) {
@@ -347,6 +368,15 @@ func getAgents(theproject *project.Project, filename string) []AgentConfig {
 	return agents
 }
 
+func CreateDeploymentMutator(ctx BundleContext) util.ZipDirCallbackMutator {
+	return func(writer *zip.Writer) error {
+		// NOTE: for now we don't need to do anything here
+		// but this is a hook for future use where we can add files to the zip
+		// before it is uploaded to the cloud
+		return nil
+	}
+}
+
 func Bundle(ctx BundleContext) error {
 	theproject := project.NewProject()
 	if err := theproject.Load(ctx.ProjectDir); err != nil {
@@ -367,7 +397,6 @@ func Bundle(ctx BundleContext) error {
 	if err := os.MkdirAll(outdir, 0755); err != nil {
 		return fmt.Errorf("failed to create .agentuity directory: %w", err)
 	}
-	ctx.Logger.Debug("bundling project %s to %s", dir, outdir)
 	switch theproject.Bundler.Language {
 	case "javascript":
 		return bundleJavascript(ctx, dir, outdir, theproject)

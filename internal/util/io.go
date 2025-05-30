@@ -105,8 +105,31 @@ func ListDir(dir string) ([]string, error) {
 // ZipDirCallbackMatcher is a function that returns true if the file should be included in the zip
 type ZipDirCallbackMatcher func(fn string, fi os.FileInfo) bool
 
+type ZipDirCallbackMutator func(writer *zip.Writer) error
+
+type options struct {
+	matcher ZipDirCallbackMatcher
+	mutator ZipDirCallbackMutator
+}
+
+type Option func(*options)
+
+// WithMatcher will filter the files that are added to the zip
+func WithMatcher(matcher ZipDirCallbackMatcher) Option {
+	return func(o *options) {
+		o.matcher = matcher
+	}
+}
+
+// WithMutator will mutate the zip file after it has been created allowing you to add files to the zip
+func WithMutator(mutator ZipDirCallbackMutator) Option {
+	return func(o *options) {
+		o.mutator = mutator
+	}
+}
+
 // ZipDir will zip up a directory into the outfilename and return an error if it fails
-func ZipDir(dir string, outfilename string, opts ...ZipDirCallbackMatcher) error {
+func ZipDir(dir string, outfilename string, opts ...Option) error {
 	zf, err := os.Create(outfilename)
 	if err != nil {
 		return fmt.Errorf("error opening: %s. %w", outfilename, err)
@@ -117,6 +140,12 @@ func ZipDir(dir string, outfilename string, opts ...ZipDirCallbackMatcher) error
 	files, err := ListDir(dir)
 	if err != nil {
 		return fmt.Errorf("error listing files: %w", err)
+	}
+	var options options
+	if len(opts) > 0 {
+		for _, opt := range opts {
+			opt(&options)
+		}
 	}
 	for _, file := range files {
 		fn, err := filepath.Rel(dir, file)
@@ -131,15 +160,10 @@ func ZipDir(dir string, outfilename string, opts ...ZipDirCallbackMatcher) error
 			if err != nil {
 				return fmt.Errorf("error getting file info: %s. %w", file, err)
 			}
-			var notok bool
-			for _, opt := range opts {
-				if !opt(fn, fi) {
-					notok = true
-					break
+			if options.matcher != nil {
+				if !options.matcher(fn, fi) {
+					continue
 				}
-			}
-			if notok {
-				continue
 			}
 		}
 		rf, err := os.Open(file)
@@ -156,6 +180,11 @@ func ZipDir(dir string, outfilename string, opts ...ZipDirCallbackMatcher) error
 			return fmt.Errorf("error copying file: %s. %w", file, err)
 		}
 		rf.Close()
+	}
+	if options.mutator != nil {
+		if err := options.mutator(zw); err != nil {
+			return fmt.Errorf("error mutating zip: %w", err)
+		}
 	}
 	zw.Flush()
 	zw.Close()
