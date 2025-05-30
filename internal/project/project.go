@@ -373,14 +373,14 @@ func DeleteProjects(ctx context.Context, logger logger.Logger, baseUrl string, t
 	return resp.Data, nil
 }
 
-func (p *Project) GetProject(ctx context.Context, logger logger.Logger, baseUrl string, token string) (*ProjectData, error) {
+func (p *Project) GetProject(ctx context.Context, logger logger.Logger, baseUrl string, token string, shouldMask bool, includeProjectKeys bool) (*ProjectData, error) {
 	if p.ProjectId == "" {
 		return nil, ErrProjectNotFound
 	}
 	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var projectResponse ProjectResponse
-	if err := client.Do("GET", fmt.Sprintf("/cli/project/%s", p.ProjectId), nil, &projectResponse); err != nil {
+	if err := client.Do("GET", fmt.Sprintf("/cli/project/%s?mask=%t&includeProjectKeys=%t", p.ProjectId, shouldMask, includeProjectKeys), nil, &projectResponse); err != nil {
 		var apiErr *util.APIError
 		if errors.As(err, &apiErr) {
 			if apiErr.Status == 404 {

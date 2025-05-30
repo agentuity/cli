@@ -204,7 +204,7 @@ Examples:
 
 			if !context.NewProject {
 				action = func() {
-					projectData, err = theproject.GetProject(ctx, logger, apiUrl, token)
+					projectData, err = theproject.GetProject(ctx, logger, apiUrl, token, true, false)
 					if err != nil {
 						if err == project.ErrProjectNotFound {
 							return

@@ -274,7 +274,9 @@ Examples:
 		apiUrl := context.APIURL
 		apiKey := context.Token
 
-		projectData, err := theproject.GetProject(ctx, logger, apiUrl, apiKey)
+		mask, _ := cmd.Flags().GetBool("mask")
+
+		projectData, err := theproject.GetProject(ctx, logger, apiUrl, apiKey, mask, false)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}
@@ -348,7 +350,10 @@ Examples:
 		apiUrl := context.APIURL
 		apiKey := context.Token
 
-		projectData, err := theproject.GetProject(ctx, logger, apiUrl, apiKey)
+		mask, _ := cmd.Flags().GetBool("mask")
+		includeProjectKeys, _ := cmd.Flags().GetBool("include-project-keys")
+
+		projectData, err := theproject.GetProject(ctx, logger, apiUrl, apiKey, mask, includeProjectKeys)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}
@@ -412,7 +417,7 @@ Examples:
 		apiUrl := context.APIURL
 		apiKey := context.Token
 
-		projectData, err := theproject.GetProject(ctx, logger, apiUrl, apiKey)
+		projectData, err := theproject.GetProject(ctx, logger, apiUrl, apiKey, true, false)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}
@@ -537,5 +542,8 @@ func init() {
 
 	for _, cmd := range []*cobra.Command{envListCmd, envGetCmd} {
 		cmd.Flags().String("format", "text", "The format to use for the output. Can be either 'text' or 'json'")
+		cmd.Flags().Bool("mask", true, "Mask secrets in the output")
 	}
+
+	envListCmd.Flags().Bool("include-project-keys", false, "Include project keys in the output")
 }
