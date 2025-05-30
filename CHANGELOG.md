@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.143] - 2025-05-30
+
+### Changed
+- Improvements around packaging ([#368](https://github.com/agentuity/cli/pull/368))
+
+### Fixed
+- [AGENT-258] Use utility function from envutil for better environment variable handling ([#364](https://github.com/agentuity/cli/pull/364))
+- Cloned projects now automatically include an .env file ([#369](https://github.com/agentuity/cli/pull/369))
+
 ## [v0.0.142] - 2025-05-29
 
 ### Changed
@@ -25,15 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Deploy: Fixed error with missing files during zip creation ([#354](https://github.com/agentuity/cli/pull/354))
 - Fixed directory handling when using last known project ([#358](https://github.com/agentuity/cli/pull/358))
-
-## [v0.0.143] - 2025-05-30
-
-### Changed
-- Improvements around packaging ([#368](https://github.com/agentuity/cli/pull/368))
-
-### Fixed
-- [AGENT-258] Use utility function from envutil for better environment variable handling ([#364](https://github.com/agentuity/cli/pull/364))
-- Cloned projects now automatically include an .env file ([#369](https://github.com/agentuity/cli/pull/369))
 
 ## [v0.0.140] - 2025-05-27
 
