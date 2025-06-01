@@ -408,11 +408,22 @@ func reconcileAgentList(logger logger.Logger, cmd *cobra.Command, apiUrl string,
 	for _, agent := range remoteAgents {
 		normalizedName := normalAgentName(agent.Name, theproject.Project.IsPython())
 		key := normalizedName + agent.Name
-		state[key] = agentListState{
-			Agent:       &agent,
-			Filename:    filepath.Join(agentSrcDir, normalizedName, agentFilename),
-			FoundLocal:  util.Exists(filepath.Join(agentSrcDir, normalizedName, agentFilename)),
-			FoundRemote: true,
+		filename1 := filepath.Join(agentSrcDir, normalizedName, agentFilename)
+		filename2 := filepath.Join(agentSrcDir, agent.Name, agentFilename)
+		if util.Exists(filename1) {
+			state[key] = agentListState{
+				Agent:       &agent,
+				Filename:    filename1,
+				FoundLocal:  true,
+				FoundRemote: true,
+			}
+		} else if util.Exists(filename2) {
+			state[key] = agentListState{
+				Agent:       &agent,
+				Filename:    filename2,
+				FoundLocal:  true,
+				FoundRemote: true,
+			}
 		}
 	}
 	localAgents, err := util.ListDir(agentSrcDir)
@@ -421,7 +432,8 @@ func reconcileAgentList(logger logger.Logger, cmd *cobra.Command, apiUrl string,
 	}
 	for _, filename := range localAgents {
 		agentName := filepath.Base(filepath.Dir(filename))
-		key := normalAgentName(agentName, theproject.Project.IsPython()) + agentName
+		normalizedName := normalAgentName(agentName, theproject.Project.IsPython())
+		key := normalizedName + agentName
 		// var found bool
 		// for _, agent := range remoteAgents {
 		// 	if localAgent, ok := fileAgentsByID[agent.ID]; ok {
@@ -445,7 +457,7 @@ func reconcileAgentList(logger logger.Logger, cmd *cobra.Command, apiUrl string,
 		// if found {
 		// 	continue
 		// }
-		if filepath.Base(filename) == agentFilename {
+		if filepath.Base(filename) == agentFilename || filepath.Base(filename) == normalizedName {
 			if found, ok := state[key]; ok {
 				state[key] = agentListState{
 					Agent:       found.Agent,
