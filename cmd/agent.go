@@ -457,7 +457,7 @@ func reconcileAgentList(logger logger.Logger, cmd *cobra.Command, apiUrl string,
 		// if found {
 		// 	continue
 		// }
-		if filepath.Base(filename) == agentFilename || filepath.Base(filename) == normalizedName {
+		if filepath.Base(filename) == agentFilename {
 			if found, ok := state[key]; ok {
 				state[key] = agentListState{
 					Agent:       found.Agent,
