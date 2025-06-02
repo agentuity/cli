@@ -240,16 +240,16 @@ func checkForBreakingChanges(ctx BundleContext, language string, runtime string)
 					if err := change.Callback(ctx); err != nil {
 						return err
 					}
-					os.Exit(1)
+					return fmt.Errorf("migration performed, please re-run the command")
 				} else {
 					return fmt.Errorf("migration required")
 				}
 			} else {
 				if tui.HasTTY && !ctx.DevMode {
 					tui.ShowBanner(change.Title, change.Message, true)
-					os.Exit(1)
+					return fmt.Errorf("breaking change migration required")
 				} else {
-					ctx.Logger.Fatal(change.Message)
+					return fmt.Errorf("%s", change.Message)
 				}
 			}
 		}
