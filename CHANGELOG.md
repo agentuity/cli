@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.144] - 2025-06-03
+
+### Fixed
+- Fixed terminal cursor disappearing after breaking change error by returning error instead of os.Exit(1) ([#373](https://github.com/agentuity/cli/pull/373))
+- Fixed issue with agent casing not being considered ([#372](https://github.com/agentuity/cli/pull/372))
+- Fixed filtering of environment variables and secrets that are internal ([#371](https://github.com/agentuity/cli/pull/371))
+
 ## [v0.0.143] - 2025-05-30
 
 ### Changed
@@ -747,6 +754,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.0.85]: https://github.com/agentuity/cli/compare/v0.0.84...v0.0.85
 [v0.0.84]: https://github.com/agentuity/cli/compare/v0.0.83...v0.0.84
 [v0.0.83]: https://github.com/agentuity/cli/compare/v0.0.82...v0.0.83
+[v0.0.144]: https://github.com/agentuity/cli/compare/v0.0.143...v0.0.144
 [v0.0.82]: https://github.com/agentuity/cli/compare/v0.0.81...v0.0.82
 [v0.0.81]: https://github.com/agentuity/cli/compare/v0.0.80...v0.0.81
 [v0.0.80]: https://github.com/agentuity/cli/compare/v0.0.79...v0.0.80
