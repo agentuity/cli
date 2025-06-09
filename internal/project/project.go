@@ -664,7 +664,12 @@ func ResolveProjectDir(logger logger.Logger, cmd *cobra.Command, required bool) 
 			os.Chdir(dir)
 			return dir
 		}
-		tui.ShowBanner("Agentuity Project Not Found", "No Agentuity project file not found in the directory "+abs+"\n\nMake sure you are in an Agentuity project directory or use the --dir flag to specify a project directory.", false)
+		explanation := "No Agentuity project file found in the directory " + abs + "\n\nMake sure you are in an Agentuity project directory or use the --dir flag to specify a project directory."
+		if tui.HasTTY {
+			tui.ShowBanner("Agentuity Project Not Found", explanation, false)
+		} else {
+			logger.Error(explanation)
+		}
 		os.Exit(1)
 	}
 	if ProjectExists(abs) {
