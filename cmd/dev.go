@@ -51,7 +51,6 @@ Examples:
 		apiKey, userId := util.EnsureLoggedIn(ctx, log, cmd)
 		theproject := project.EnsureProject(ctx, cmd)
 		dir := theproject.Dir
-		// var isDeliberateRestart bool
 
 		checkForUpgrade(ctx, log, false)
 
