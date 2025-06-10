@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -116,7 +117,7 @@ Examples:
 		defer server.Close()
 
 		processCtx := context.Background()
-		var pid int
+		var pid int32
 
 		waitForConnection := func() {
 			if err := server.Connect(); err != nil {
@@ -174,17 +175,17 @@ Examples:
 			if err := projectServerCmd.Start(); err != nil {
 				errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start project: %s", err))).ShowErrorAndExit()
 			}
-			pid = projectServerCmd.Process.Pid
+			atomic.StoreInt32(&pid, int32(projectServerCmd.Process.Pid))
 			// running = true
-			log.Trace("restarted project server (pid: %d)", pid)
-			log.Trace("waiting for project server to exit (pid: %d)", pid)
+			log.Trace("restarted project server (pid: %d)", projectServerCmd.Process.Pid)
+			log.Trace("waiting for project server to exit (pid: %d)", projectServerCmd.Process.Pid)
 			if err := projectServerCmd.Wait(); err != nil {
-				log.Error("project server (pid: %d) exited with error: %s", pid, err)
+				log.Error("project server (pid: %d) exited with error: %s", projectServerCmd.Process.Pid, err)
 			}
 			if projectServerCmd.ProcessState != nil {
-				log.Debug("project server (pid: %d) exited with code %d", pid, projectServerCmd.ProcessState.ExitCode())
+				log.Debug("project server (pid: %d) exited with code %d", projectServerCmd.Process.Pid, projectServerCmd.ProcessState.ExitCode())
 			} else {
-				log.Debug("project server (pid: %d) exited", pid)
+				log.Debug("project server (pid: %d) exited", projectServerCmd.Process.Pid)
 			}
 		}
 
@@ -199,7 +200,7 @@ Examples:
 			// prevent multiple restarts from happening at once
 			restartingLock.Lock()
 			defer restartingLock.Unlock()
-			dev.KillProjectServer(log, projectServerCmd, pid)
+			dev.KillProjectServer(log, projectServerCmd, int(atomic.LoadInt32(&pid)))
 			if build(false) {
 				log.Trace("build ready")
 				go runServer()
@@ -224,12 +225,12 @@ Examples:
 				errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start project: %s", err))).ShowErrorAndExit()
 			}
 
-			pid = projectServerCmd.Process.Pid
-			log.Trace("started project server with pid: %d", pid)
+			atomic.StoreInt32(&pid, int32(projectServerCmd.Process.Pid))
+			log.Trace("started project server with pid: %d", projectServerCmd.Process.Pid)
 
 			if err := server.HealthCheck(devModeUrl); err != nil {
 				log.Error("failed to health check connection: %s", err)
-				dev.KillProjectServer(log, projectServerCmd, pid)
+				dev.KillProjectServer(log, projectServerCmd, projectServerCmd.Process.Pid)
 				return
 			}
 		}
@@ -242,7 +243,7 @@ Examples:
 			watcher.Close(log)
 			server.Close()
 			if projectServerCmd != nil {
-				dev.KillProjectServer(log, projectServerCmd, pid)
+				dev.KillProjectServer(log, projectServerCmd, int(atomic.LoadInt32(&pid)))
 				projectServerCmd.Wait()
 			}
 		}
