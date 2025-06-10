@@ -117,6 +117,27 @@ func installSourceMapSupportIfNeeded(ctx BundleContext, dir string) error {
 	return nil
 }
 
+func runTypecheck(ctx BundleContext, dir string) error {
+	tsc := filepath.Join(dir, "node_modules", ".bin", "tsc")
+	if !util.Exists(tsc) {
+		ctx.Logger.Warn("no tsc found at %s, skipping typecheck", tsc)
+		return nil
+	}
+	cmd := exec.CommandContext(ctx.Context, tsc, "--noEmit")
+	cmd.Dir = dir
+	cmd.Stdout = ctx.Writer
+	cmd.Stderr = ctx.Writer
+	if err := cmd.Run(); err != nil {
+		if ctx.DevMode {
+			ctx.Logger.Error("🚫 TypeScript check failed")
+			return ErrBuildFailed // output goes to the console so we don't need to show it
+		}
+		os.Exit(2)
+	}
+	ctx.Logger.Debug("✅ TypeScript passed")
+	return nil
+}
+
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
 
 	if ctx.Install || !util.Exists(filepath.Join(dir, "node_modules")) {
@@ -164,6 +185,10 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 	}
 
 	if err := checkForBreakingChanges(ctx, "javascript", theproject.Bundler.Runtime); err != nil {
+		return err
+	}
+
+	if err := runTypecheck(ctx, dir); err != nil {
 		return err
 	}
 
