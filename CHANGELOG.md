@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.145] - 2025-06-10
+
+### Added
+- TypeScript type checking is now performed automatically during the build process if a TypeScript compiler is present ([#376](https://github.com/agentuity/cli/pull/376))
+
+### Changed
+- Enhanced file watcher to use ignore rules for filtering, improving reliability and performance ([#376](https://github.com/agentuity/cli/pull/376))
+- Streamlined development server restart logic for smoother and more predictable restarts ([#376](https://github.com/agentuity/cli/pull/376))
+- Centralized ignore rules creation for project deployments to simplify configuration management ([#376](https://github.com/agentuity/cli/pull/376))
+
+### Fixed
+- Improved error message handling when a required project file is missing, ensuring messages are displayed appropriately based on terminal capabilities ([#375](https://github.com/agentuity/cli/pull/375))
+- Improved file and directory ignore handling, ensuring that common development files and directories (e.g., swap files, backup files, node_modules, virtual environments) are consistently excluded across all relevant features ([#376](https://github.com/agentuity/cli/pull/376))
+
 ## [v0.0.144] - 2025-06-03
 
 ### Fixed
