@@ -240,6 +240,8 @@ Examples:
 		log.Info("🚀 DevMode ready")
 
 		teardown := func() {
+			restartingLock.Lock()
+			defer restartingLock.Unlock()
 			watcher.Close(log)
 			server.Close()
 			if projectServerCmd != nil {
