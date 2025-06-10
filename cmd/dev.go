@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -19,7 +21,6 @@ import (
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/tui"
-	"github.com/bep/debounce"
 	"github.com/spf13/cobra"
 )
 
@@ -51,7 +52,6 @@ Examples:
 		apiKey, userId := util.EnsureLoggedIn(ctx, log, cmd)
 		theproject := project.EnsureProject(ctx, cmd)
 		dir := theproject.Dir
-		isDeliberateRestart := false
 
 		checkForUpgrade(ctx, log, false)
 
@@ -117,7 +117,7 @@ Examples:
 		defer server.Close()
 
 		processCtx := context.Background()
-		var pid int
+		var pid int32
 
 		waitForConnection := func() {
 			if err := server.Connect(); err != nil {
@@ -167,26 +167,52 @@ Examples:
 			return ok
 		}
 
+		runServer := func() {
+			projectServerCmd, err = dev.CreateRunProjectCmd(processCtx, log, theproject, server, dir, orgId, port, os.Stdout, os.Stderr)
+			if err != nil {
+				errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
+			}
+			if err := projectServerCmd.Start(); err != nil {
+				errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start project: %s", err))).ShowErrorAndExit()
+			}
+			atomic.StoreInt32(&pid, int32(projectServerCmd.Process.Pid))
+			// running = true
+			log.Trace("restarted project server (pid: %d)", projectServerCmd.Process.Pid)
+			log.Trace("waiting for project server to exit (pid: %d)", projectServerCmd.Process.Pid)
+			if err := projectServerCmd.Wait(); err != nil {
+				log.Error("project server (pid: %d) exited with error: %s", projectServerCmd.Process.Pid, err)
+			}
+			if projectServerCmd.ProcessState != nil {
+				log.Debug("project server (pid: %d) exited with code %d", projectServerCmd.Process.Pid, projectServerCmd.ProcessState.ExitCode())
+			} else {
+				log.Debug("project server (pid: %d) exited", projectServerCmd.Process.Pid)
+			}
+		}
+
 		// Initial build must exit if it fails
 		if !build(true) {
 			return
 		}
 
+		var restartingLock sync.Mutex
+
 		restart := func() {
-			isDeliberateRestart = true
-			build(false)
-			log.Debug("killing project server")
-			dev.KillProjectServer(log, projectServerCmd, pid)
-			log.Debug("killing project server done")
+			// prevent multiple restarts from happening at once
+			restartingLock.Lock()
+			defer restartingLock.Unlock()
+			dev.KillProjectServer(log, projectServerCmd, int(atomic.LoadInt32(&pid)))
+			if build(false) {
+				log.Trace("build ready")
+				go runServer()
+			}
 		}
 
-		// debounce a lot of changes at once to avoid multiple restarts in succession
-		debounced := debounce.New(250 * time.Millisecond)
+		rules := createProjectIgnoreRules(dir, theproject.Project)
 
 		// Watch for changes
-		watcher, err := dev.NewWatcher(log, dir, theproject.Project.Development.Watch.Files, func(path string) {
+		watcher, err := dev.NewWatcher(log, dir, rules, func(path string) {
 			log.Trace("%s has changed", path)
-			debounced(restart)
+			restart()
 		})
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start watcher: %s", err))).ShowErrorAndExit()
@@ -199,12 +225,12 @@ Examples:
 				errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start project: %s", err))).ShowErrorAndExit()
 			}
 
-			pid = projectServerCmd.Process.Pid
-			log.Trace("started project server with pid: %d", pid)
+			atomic.StoreInt32(&pid, int32(projectServerCmd.Process.Pid))
+			log.Trace("started project server with pid: %d", projectServerCmd.Process.Pid)
 
 			if err := server.HealthCheck(devModeUrl); err != nil {
 				log.Error("failed to health check connection: %s", err)
-				dev.KillProjectServer(log, projectServerCmd, pid)
+				dev.KillProjectServer(log, projectServerCmd, projectServerCmd.Process.Pid)
 				return
 			}
 		}
@@ -213,50 +239,24 @@ Examples:
 
 		log.Info("🚀 DevMode ready")
 
-		go func() {
-			for {
-				log.Trace("waiting for project server to exit (pid: %d)", pid)
-				if err := projectServerCmd.Wait(); err != nil {
-					if !isDeliberateRestart {
-						log.Error("project server (pid: %d) exited with error: %s", pid, err)
-					}
-				}
-				if projectServerCmd.ProcessState != nil {
-					log.Debug("project server (pid: %d) exited with code %d", pid, projectServerCmd.ProcessState.ExitCode())
-				} else {
-					log.Debug("project server (pid: %d) exited", pid)
-				}
-				log.Debug("isDeliberateRestart: %t, pid: %d", isDeliberateRestart, pid)
-				if !isDeliberateRestart {
-					return
-				}
-
-				// If it was a deliberate restart, start the new process here
-				if isDeliberateRestart {
-					isDeliberateRestart = false
-					log.Trace("restarting project server")
-					projectServerCmd, err = dev.CreateRunProjectCmd(processCtx, log, theproject, server, dir, orgId, port, os.Stdout, os.Stderr)
-					if err != nil {
-						errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
-					}
-					if err := projectServerCmd.Start(); err != nil {
-						errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to start project: %s", err))).ShowErrorAndExit()
-					}
-					pid = projectServerCmd.Process.Pid
-					log.Trace("restarted project server (pid: %d)", pid)
-				}
-			}
-		}()
-
 		teardown := func() {
+			restartingLock.Lock()
+			defer restartingLock.Unlock()
 			watcher.Close(log)
 			server.Close()
-			dev.KillProjectServer(log, projectServerCmd, pid)
+			if projectServerCmd != nil {
+				dev.KillProjectServer(log, projectServerCmd, int(atomic.LoadInt32(&pid)))
+				projectServerCmd.Wait()
+			}
 		}
 
 		<-ctx.Done()
+
+		fmt.Printf("\b\b\033[K") // remove the ^C
+
 		teardown()
 
+		log.Info("👋 See you next time!")
 	},
 }
 
