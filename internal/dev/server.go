@@ -107,6 +107,7 @@ func (s *Server) Close() error {
 	s.logger.Debug("closing connection")
 	s.once.Do(func() {
 		s.cancel()
+		s.closeConnection()
 		s.wg.Wait()
 		if s.conn != nil {
 			s.conn.Close()
@@ -117,6 +118,12 @@ func (s *Server) Close() error {
 		}
 	})
 	return nil
+}
+
+func (s *Server) closeConnection() {
+	if err := s.apiclient.Do("DELETE", "/cli/devmode/"+s.Project.Project.ProjectId+"/"+s.ID, nil, nil); err != nil {
+		s.logger.Error("failed to send close connection: %s", err)
+	}
 }
 
 func (s *Server) refreshConnection() error {
@@ -660,7 +667,7 @@ func New(args ServerArgs) (*Server, error) {
 		tracer:       tracer,
 		version:      args.Version,
 		port:         args.Port,
-		apiclient:    util.NewAPIClient(ctx, args.Logger, args.APIURL, args.APIKey),
+		apiclient:    util.NewAPIClient(context.WithoutCancel(ctx), args.Logger, args.APIURL, args.APIKey),
 		connected:    make(chan error, 1),
 	}
 
