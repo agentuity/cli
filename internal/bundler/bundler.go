@@ -118,6 +118,9 @@ func installSourceMapSupportIfNeeded(ctx BundleContext, dir string) error {
 }
 
 func runTypecheck(ctx BundleContext, dir string) error {
+	if ctx.Production {
+		return nil
+	}
 	tsc := filepath.Join(dir, "node_modules", ".bin", "tsc")
 	if !util.Exists(tsc) {
 		ctx.Logger.Warn("no tsc found at %s, skipping typecheck", tsc)
