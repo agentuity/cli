@@ -1,6 +1,6 @@
 module github.com/agentuity/cli
 
-go 1.24.2
+go 1.24.4
 
 require (
 	github.com/Masterminds/semver v1.5.0
