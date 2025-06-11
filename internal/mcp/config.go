@@ -239,6 +239,7 @@ func Install(ctx context.Context, logger logger.Logger) error {
 			tui.ShowSuccess("Agentuity MCP server already installed for %s", config.Name)
 		}
 		installed++
+		config.Config.client = nil
 	}
 	if installed == 0 {
 		tui.ShowSuccess("All MCP clients are up-to-date")
@@ -274,9 +275,11 @@ func Uninstall(ctx context.Context, logger logger.Logger) error {
 				continue
 			}
 			delete(mcpconfig.MCPServers, agentuityToolName)
+			mcpconfig.client = &config
 			if err := mcpconfig.Save(); err != nil {
 				return fmt.Errorf("failed to save config for %s: %w", config.Name, err)
 			}
+			mcpconfig.client = nil
 			logger.Debug("removed %s config for %s at %s", agentuityToolName, config.Name, config.ConfigLocation)
 			tui.ShowSuccess("Uninstalled Agentuity MCP server for %s", config.Name)
 			uninstalled++
