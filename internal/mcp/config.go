@@ -39,6 +39,8 @@ type MCPClientConfig struct {
 	Config         *MCPConfig `json:"-"`
 	Detected       bool       `json:"-"` // if the agentuity mcp server is detected in the config file
 	Installed      bool       `json:"-"` // if this client is installed on this machine
+
+	BeforeSaveHook func(content []byte) ([]byte, error) `json:"-"`
 }
 
 type MCPServerConfig struct {
@@ -50,6 +52,8 @@ type MCPServerConfig struct {
 type MCPConfig struct {
 	MCPServers map[string]MCPServerConfig `json:"mcpServers"`
 	filename   string
+
+	client *MCPClientConfig `json:"-"`
 }
 
 func (c *MCPConfig) AddIfNotExists(name string, command string, args []any, env map[string]any) bool {
@@ -75,6 +79,14 @@ func (c *MCPConfig) Save() error {
 	content, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		return err
+	}
+	if c.client != nil {
+		if c.client.BeforeSaveHook != nil {
+			content, err = c.client.BeforeSaveHook(content)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return os.WriteFile(c.filename, content, 0644)
 }
@@ -215,6 +227,7 @@ func Install(ctx context.Context, logger logger.Logger) error {
 		if config.Transport == "" {
 			config.Transport = "stdio"
 		}
+		config.Config.client = &config
 		if config.Config.AddIfNotExists(agentuityToolName, executable, append(agentuityToolArgs, "--"+config.Transport), agentuityToolEnv) {
 			if err := config.Config.Save(); err != nil {
 				return fmt.Errorf("failed to save config for %s: %w", config.Name, err)
@@ -371,6 +384,21 @@ func init() {
 			MacOS:   []string{"/usr/local/bin/anthropic", "/opt/homebrew/bin/anthropic", "$PATH"},
 			Windows: []string{filepath.Join(util.GetAppSupportDir(filepath.Join("Programs", "Anthropic")), "anthropic.exe"), "$PATH"},
 			Linux:   []string{"/usr/bin/anthropic", "/usr/local/bin/anthropic", "$PATH"},
+		},
+	})
+	mcpClientConfigs = append(mcpClientConfigs, MCPClientConfig{
+		Name:           "Amp",
+		ConfigLocation: "$HOME/.config/amp/settings.json",
+		Command:        "amp",
+		Transport:      "stdio",
+		Application: &MCPClientApplicationConfig{
+			MacOS: []string{"/usr/local/bin/amp", "/opt/homebrew/bin/amp", "$PATH"},
+			Linux: []string{"/usr/bin/amp", "/usr/local/bin/amp", "$PATH"},
+		},
+		BeforeSaveHook: func(content []byte) ([]byte, error) {
+			buf := string(content)
+			buf = strings.Replace(buf, "mcpServers", "amp.mcpServers", 1)
+			return []byte(buf), nil
 		},
 	})
 }
