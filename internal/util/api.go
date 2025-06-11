@@ -266,16 +266,16 @@ func GetURLs(logger logger.Logger) (string, string, string) {
 	if apiUrl == "https://api.agentuity.com" && appUrl != "https://app.agentuity.com" {
 		logger.Debug("switching app url to production since the api url is production")
 		appUrl = "https://app.agentuity.com"
-	} else if apiUrl == "https://api.agentuity.dev" && appUrl == "https://app.agentuity.com" {
+	} else if apiUrl == "https://api.agentuity.io" && appUrl == "https://app.agentuity.com" {
 		logger.Debug("switching app url to dev since the api url is dev")
-		appUrl = "http://127.0.0.1:3000"
+		appUrl = "https://app.agentuity.io"
 	}
-	if apiUrl == "https://api.agentuity.com" && transportUrl != "https://agentuity.api" {
+	if apiUrl == "https://api.agentuity.com" && transportUrl != "https://agentuity.ai" {
 		logger.Debug("switching transport url to production since the api url is production")
 		transportUrl = "https://agentuity.ai"
-	} else if apiUrl == "https://api.agentuity.dev" && transportUrl == "https://agentuity.ai" {
+	} else if apiUrl == "https://api.agentuity.io" && transportUrl == "https://agentuity.ai" {
 		logger.Debug("switching transport url to dev since the api url is dev")
-		transportUrl = "http://127.0.0.1:3939"
+		transportUrl = "https://ai.agentuity.io"
 	}
 	return TransformUrl(apiUrl), TransformUrl(appUrl), TransformUrl(transportUrl)
 }
