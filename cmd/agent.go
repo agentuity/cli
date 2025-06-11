@@ -395,10 +395,16 @@ func reconcileAgentList(logger logger.Logger, cmd *cobra.Command, apiUrl string,
 	fileAgents := make(map[string]project.AgentConfig)
 	fileAgentsByID := make(map[string]project.AgentConfig)
 	for _, agent := range theproject.Project.Agents {
-		key := normalAgentName(agent.Name, theproject.Project.IsPython()) + agent.Name
-		fileAgents[key] = agent
-		fileAgentsByID[agent.ID] = agent
-	}
+        key := normalAgentName(agent.Name, theproject.Project.IsPython())
+        if existing, ok := fileAgents[key]; ok {
+            logger.Warn(
+                "agent name collision: %q and %q normalize to %q; keeping first entry",
+                existing.Name, agent.Name, key,
+            )
+            continue
+        }
+        fileAgents[key] = agent
+        fileAgentsByID[agent.ID] = agent
 
 	agentFilename := rules.Filename
 	agentSrcDir := filepath.Join(theproject.Dir, theproject.Project.Bundler.AgentConfig.Dir)
@@ -407,18 +413,17 @@ func reconcileAgentList(logger logger.Logger, cmd *cobra.Command, apiUrl string,
 	state := make(map[string]agentListState)
 	for _, agent := range remoteAgents {
 		normalizedName := normalAgentName(agent.Name, theproject.Project.IsPython())
-		key := normalizedName + agent.Name
 		filename1 := filepath.Join(agentSrcDir, normalizedName, agentFilename)
 		filename2 := filepath.Join(agentSrcDir, agent.Name, agentFilename)
 		if util.Exists(filename1) {
-			state[key] = agentListState{
+			state[normalizedName] = agentListState{
 				Agent:       &agent,
 				Filename:    filename1,
 				FoundLocal:  true,
 				FoundRemote: true,
 			}
 		} else if util.Exists(filename2) {
-			state[key] = agentListState{
+			state[normalizedName] = agentListState{
 				Agent:       &agent,
 				Filename:    filename2,
 				FoundLocal:  true,
@@ -433,7 +438,7 @@ func reconcileAgentList(logger logger.Logger, cmd *cobra.Command, apiUrl string,
 	for _, filename := range localAgents {
 		agentName := filepath.Base(filepath.Dir(filename))
 		normalizedName := normalAgentName(agentName, theproject.Project.IsPython())
-		key := normalizedName + agentName
+		key := normalizedName
 		// var found bool
 		// for _, agent := range remoteAgents {
 		// 	if localAgent, ok := fileAgentsByID[agent.ID]; ok {
