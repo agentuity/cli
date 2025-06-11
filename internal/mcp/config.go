@@ -39,8 +39,7 @@ type MCPClientConfig struct {
 	Config         *MCPConfig `json:"-"`
 	Detected       bool       `json:"-"` // if the agentuity mcp server is detected in the config file
 	Installed      bool       `json:"-"` // if this client is installed on this machine
-
-	BeforeSaveHook func(content []byte) ([]byte, error) `json:"-"`
+	IsAMP          bool       `json:"-"`
 }
 
 type MCPServerConfig struct {
@@ -50,20 +49,32 @@ type MCPServerConfig struct {
 }
 
 type MCPConfig struct {
-	MCPServers map[string]MCPServerConfig `json:"mcpServers"`
-	filename   string
+	MCPServers    map[string]MCPServerConfig `json:"mcpServers,omitempty"`
+	AMPMCPServers map[string]MCPServerConfig `json:"amp.mcpServers,omitempty"`
+	filename      string
 
 	client *MCPClientConfig `json:"-"`
 }
 
-func (c *MCPConfig) AddIfNotExists(name string, command string, args []any, env map[string]any) bool {
-	if _, ok := c.MCPServers[name]; ok {
-		return false
-	}
-	c.MCPServers[name] = MCPServerConfig{
-		Command: command,
-		Args:    args,
-		Env:     env,
+func (c *MCPConfig) AddIfNotExists(name string, command string, args []any, env map[string]any, isAMP bool) bool {
+	if isAMP {
+		if _, ok := c.AMPMCPServers[name]; ok {
+			return false
+		}
+		c.AMPMCPServers[name] = MCPServerConfig{
+			Command: command,
+			Args:    args,
+			Env:     env,
+		}
+	} else {
+		if _, ok := c.MCPServers[name]; ok {
+			return false
+		}
+		c.MCPServers[name] = MCPServerConfig{
+			Command: command,
+			Args:    args,
+			Env:     env,
+		}
 	}
 	return true
 }
@@ -72,21 +83,13 @@ func (c *MCPConfig) Save() error {
 	if c.filename == "" {
 		return errors.New("filename is not set")
 	}
-	if len(c.MCPServers) == 0 {
+	if len(c.MCPServers) == 0 && len(c.AMPMCPServers) == 0 {
 		os.Remove(c.filename) // if no more MCP servers, remove the config file
 		return nil
 	}
 	content, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		return err
-	}
-	if c.client != nil {
-		if c.client.BeforeSaveHook != nil {
-			content, err = c.client.BeforeSaveHook(content)
-			if err != nil {
-				return err
-			}
-		}
 	}
 	return os.WriteFile(c.filename, content, 0644)
 }
@@ -169,6 +172,9 @@ func Detect(logger logger.Logger, all bool) ([]MCPClientConfig, error) {
 			if _, ok := mcpconfig.MCPServers[agentuityToolName]; ok {
 				config.Detected = true
 			}
+			if _, ok := mcpconfig.AMPMCPServers[agentuityToolName]; ok {
+				config.Detected = true
+			}
 			config.Config = mcpconfig
 		}
 		found = append(found, config)
@@ -213,8 +219,9 @@ func Install(ctx context.Context, logger logger.Logger) error {
 		}
 		if config.Config == nil {
 			config.Config = &MCPConfig{
-				MCPServers: make(map[string]MCPServerConfig),
-				filename:   config.ConfigLocation,
+				MCPServers:    make(map[string]MCPServerConfig),
+				AMPMCPServers: make(map[string]MCPServerConfig),
+				filename:      config.ConfigLocation,
 			}
 			dir := filepath.Dir(config.ConfigLocation)
 			if !util.Exists(dir) {
@@ -228,7 +235,7 @@ func Install(ctx context.Context, logger logger.Logger) error {
 			config.Transport = "stdio"
 		}
 		config.Config.client = &config
-		if config.Config.AddIfNotExists(agentuityToolName, executable, append(agentuityToolArgs, "--"+config.Transport), agentuityToolEnv) {
+		if config.Config.AddIfNotExists(agentuityToolName, executable, append(agentuityToolArgs, "--"+config.Transport), agentuityToolEnv, config.IsAMP) {
 			if err := config.Config.Save(); err != nil {
 				return fmt.Errorf("failed to save config for %s: %w", config.Name, err)
 			}
@@ -239,7 +246,6 @@ func Install(ctx context.Context, logger logger.Logger) error {
 			tui.ShowSuccess("Agentuity MCP server already installed for %s", config.Name)
 		}
 		installed++
-		config.Config.client = nil
 	}
 	if installed == 0 {
 		tui.ShowSuccess("All MCP clients are up-to-date")
@@ -274,12 +280,15 @@ func Uninstall(ctx context.Context, logger logger.Logger) error {
 				logger.Debug("config for %s not found in %s, skipping", config.Name, config.ConfigLocation)
 				continue
 			}
+			if _, ok := mcpconfig.AMPMCPServers[agentuityToolName]; !ok {
+				logger.Debug("config for %s not found in %s, skipping", config.Name, config.ConfigLocation)
+				continue
+			}
 			delete(mcpconfig.MCPServers, agentuityToolName)
-			mcpconfig.client = &config
+			delete(mcpconfig.AMPMCPServers, agentuityToolName)
 			if err := mcpconfig.Save(); err != nil {
 				return fmt.Errorf("failed to save config for %s: %w", config.Name, err)
 			}
-			mcpconfig.client = nil
 			logger.Debug("removed %s config for %s at %s", agentuityToolName, config.Name, config.ConfigLocation)
 			tui.ShowSuccess("Uninstalled Agentuity MCP server for %s", config.Name)
 			uninstalled++
@@ -398,10 +407,6 @@ func init() {
 			MacOS: []string{"/usr/local/bin/amp", "/opt/homebrew/bin/amp", "$PATH"},
 			Linux: []string{"/usr/bin/amp", "/usr/local/bin/amp", "$PATH"},
 		},
-		BeforeSaveHook: func(content []byte) ([]byte, error) {
-			buf := string(content)
-			buf = strings.Replace(buf, "mcpServers", "amp.mcpServers", 1)
-			return []byte(buf), nil
-		},
+		IsAMP: true,
 	})
 }
