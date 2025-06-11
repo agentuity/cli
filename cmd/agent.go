@@ -395,16 +395,17 @@ func reconcileAgentList(logger logger.Logger, cmd *cobra.Command, apiUrl string,
 	fileAgents := make(map[string]project.AgentConfig)
 	fileAgentsByID := make(map[string]project.AgentConfig)
 	for _, agent := range theproject.Project.Agents {
-        key := normalAgentName(agent.Name, theproject.Project.IsPython())
-        if existing, ok := fileAgents[key]; ok {
-            logger.Warn(
-                "agent name collision: %q and %q normalize to %q; keeping first entry",
-                existing.Name, agent.Name, key,
-            )
-            continue
-        }
-        fileAgents[key] = agent
-        fileAgentsByID[agent.ID] = agent
+		key := normalAgentName(agent.Name, theproject.Project.IsPython())
+		if existing, ok := fileAgents[key]; ok {
+			logger.Warn(
+				"agent name collision: %q and %q normalize to %q; keeping first entry",
+				existing.Name, agent.Name, key,
+			)
+			continue
+		}
+		fileAgents[key] = agent
+		fileAgentsByID[agent.ID] = agent
+	}
 
 	agentFilename := rules.Filename
 	agentSrcDir := filepath.Join(theproject.Dir, theproject.Project.Bundler.AgentConfig.Dir)
