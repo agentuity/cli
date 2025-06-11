@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.147] - 2025-06-11
+
+### Changed
+- Skip TypeScript type checking in production builds to improve build performance ([#380](https://github.com/agentuity/cli/pull/380))
+
+## [v0.0.146] - 2025-06-11
+
+### Changed
+- Need to use the changed directory when using last known project ([#358](https://github.com/agentuity/cli/pull/358))
+
 ## [v0.0.145] - 2025-06-10
 
 ### Added
@@ -707,6 +717,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks for new agent creation
 
 
+[v0.0.147]: https://github.com/agentuity/cli/compare/v0.0.146...v0.0.147
+[v0.0.146]: https://github.com/agentuity/cli/compare/v0.0.145...v0.0.146
+[v0.0.145]: https://github.com/agentuity/cli/compare/v0.0.144...v0.0.145
 [v0.0.144]: https://github.com/agentuity/cli/compare/v0.0.143...v0.0.144
 [v0.0.143]: https://github.com/agentuity/cli/compare/v0.0.142...v0.0.143
 [v0.0.142]: https://github.com/agentuity/cli/compare/v0.0.141...v0.0.142
