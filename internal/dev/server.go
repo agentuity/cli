@@ -106,8 +106,8 @@ type ConnectionResponse struct {
 func (s *Server) Close() error {
 	s.logger.Debug("closing connection")
 	s.once.Do(func() {
-		s.cancel()
 		s.closeConnection()
+		s.cancel()
 		s.wg.Wait()
 		if s.conn != nil {
 			s.conn.Close()
