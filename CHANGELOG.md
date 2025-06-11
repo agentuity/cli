@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.148] - 2025-06-11
+
+### Changed
+- More normalized Python project naming ([#383](https://github.com/agentuity/cli/pull/383))
+- Add AMP MCP support ([#382](https://github.com/agentuity/cli/pull/382))
+
 ## [v0.0.147] - 2025-06-11
 
 ### Changed
@@ -717,6 +723,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks for new agent creation
 
 
+[v0.0.148]: https://github.com/agentuity/cli/compare/v0.0.147...v0.0.148
 [v0.0.147]: https://github.com/agentuity/cli/compare/v0.0.146...v0.0.147
 [v0.0.146]: https://github.com/agentuity/cli/compare/v0.0.145...v0.0.146
 [v0.0.145]: https://github.com/agentuity/cli/compare/v0.0.144...v0.0.145
