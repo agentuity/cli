@@ -52,6 +52,14 @@ func Empty() *Rules {
 	return &Rules{patterns: []*pattern{}}
 }
 
+func (r *Rules) String() string {
+	buf := bytes.NewBufferString("")
+	for _, p := range r.patterns {
+		buf.WriteString(p.raw + "\n")
+	}
+	return buf.String()
+}
+
 // AddDefaults adds default ignore patterns.
 func (r *Rules) AddDefaults() {
 	r.parseRule("**/.venv/**/*")
@@ -140,20 +148,42 @@ func (r *Rules) Ignore(path string, fi os.FileInfo) bool {
 	if path == "." || path == "./" {
 		return false
 	}
-	for _, p := range r.patterns {
+
+	var fullWildcard bool
+
+	for n, p := range r.patterns {
 		if p.match == nil {
 			log.Printf("ignore: no matcher supplied for %q", p.raw)
 			return false
 		}
 
+		// this is a special case for the first rule, which is a full wildcard
+		// and this means the following rules are all negated and should only
+		// only return files that match
+		if n == 0 && p.fullWildcard {
+			fullWildcard = true
+			continue
+		}
+
 		// For negative rules, we need to capture and return non-matches,
 		// and continue for matches.
 		if p.negate {
-			if p.mustDir && !fi.IsDir() {
-				return true
-			}
-			if !p.match(path, fi) {
-				return true
+			// if full wildcard, we inverse the negation to only match files that match the following rules
+			if fullWildcard {
+				if p.mustDir && fi.IsDir() {
+					return false
+				}
+				if p.match(path, fi) {
+					return false
+				}
+			} else {
+				// otherwise, we only match files that don't match the rule
+				if p.mustDir && !fi.IsDir() {
+					return true
+				}
+				if !p.match(path, fi) {
+					return true
+				}
 			}
 			continue
 		}
@@ -167,7 +197,7 @@ func (r *Rules) Ignore(path string, fi os.FileInfo) bool {
 			return true
 		}
 	}
-	return false
+	return fullWildcard
 }
 
 // parseRule parses a rule string and creates a pattern, which is then stored in the Rules object.
@@ -183,8 +213,22 @@ func (r *Rules) parseRule(rule string) error {
 		return nil
 	}
 
-	// Special case for agentuity build folder
-	if rule == ".agentuity" || rule == ".agentuity/**" {
+	// this is a special case rule where we're saying we want to ignore everything
+	// and then use negate rules to only include files that match the rule
+	if rule == "**/*" {
+		p := &pattern{raw: rule, fullWildcard: true}
+		p.match = func(n string, fi os.FileInfo) bool {
+			return true
+		}
+		newpatterns := make([]*pattern, 0)
+		// filter out any rules that aren't negated in case they come before
+		// the full wildcard rule
+		for _, pattern := range r.patterns {
+			if !pattern.fullWildcard && pattern.negate {
+				newpatterns = append(newpatterns, pattern)
+			}
+		}
+		r.patterns = append([]*pattern{p}, newpatterns...)
 		return nil
 	}
 
@@ -250,6 +294,10 @@ func (r *Rules) parseRule(rule string) error {
 		}
 	}
 
+	if len(r.patterns) > 0 && r.patterns[0].fullWildcard && !p.negate {
+		return nil // skip adding the rule if it's a full wildcard and not a negation
+	}
+
 	r.patterns = append(r.patterns, p)
 	return nil
 }
@@ -268,5 +316,6 @@ type pattern struct {
 	// negate indicates that the rule's outcome should be negated.
 	negate bool
 	// mustDir indicates that the matched file must be a directory.
-	mustDir bool
+	mustDir      bool
+	fullWildcard bool
 }

@@ -148,6 +148,7 @@ func createProjectIgnoreRules(dir string, theproject *project.Project) *ignore.R
 				errsystem.WithContextMessage(fmt.Sprintf("Error adding project ignore rule: %s. %s", rule, err))).ShowErrorAndExit()
 		}
 	}
+
 	return rules
 }
 

@@ -37,3 +37,57 @@ func TestRules(t *testing.T) {
 	assert.True(t, rules.Ignore("/Users/foobar/example/src/__test__/test_bar.py", nil))
 	assert.True(t, rules.Ignore("/Users/foobar/example/.agentuity-12345", nil))
 }
+
+func TestNegateRules(t *testing.T) {
+	rules := Empty()
+	rules.AddDefaults()
+	rules.Add("!**/foo.py")
+	assert.False(t, rules.Ignore("/Users/foobar/example/src/foo.py", nil))
+	assert.False(t, rules.Ignore("foo.py", nil))
+	assert.True(t, rules.Ignore("bar.py", nil))
+}
+
+func TestFullWildcardRules(t *testing.T) {
+	rules := Empty()
+	rules.AddDefaults()
+	rules.Add("**/*")
+	rules.Add("!.agentuity/**")
+	rules.Add("!agentuity.yaml")
+	assert.False(t, rules.Ignore(".agentuity/foo.py", nil))
+	assert.False(t, rules.Ignore("agentuity.yaml", nil))
+	assert.True(t, rules.Ignore("bar.py", nil))
+}
+
+func TestFullWildcardRulesAfter(t *testing.T) {
+	rules := Empty()
+	rules.AddDefaults()
+	rules.Add("!.agentuity/**")
+	rules.Add("!agentuity.yaml")
+	rules.Add("**/*")
+	assert.False(t, rules.Ignore(".agentuity/foo.py", nil))
+	assert.False(t, rules.Ignore("agentuity.yaml", nil))
+	assert.True(t, rules.Ignore("bar.py", nil))
+}
+
+func TestFullWildcardRulesBetween(t *testing.T) {
+	rules := Empty()
+	rules.AddDefaults()
+	rules.Add("!.agentuity/**")
+	rules.Add("**/*")
+	rules.Add("!agentuity.yaml")
+	assert.False(t, rules.Ignore(".agentuity/foo.py", nil))
+	assert.False(t, rules.Ignore("agentuity.yaml", nil))
+	assert.True(t, rules.Ignore("bar.py", nil))
+}
+
+func TestFullWildcardRulesFilteredOut(t *testing.T) {
+	rules := Empty()
+	rules.AddDefaults()
+	rules.Add("agentuity.yaml")
+	rules.Add("!.agentuity/**")
+	rules.Add("**/*")
+	rules.Add("!agentuity.yaml")
+	assert.False(t, rules.Ignore(".agentuity/foo.py", nil))
+	assert.False(t, rules.Ignore("agentuity.yaml", nil))
+	assert.True(t, rules.Ignore("bar.py", nil))
+}
