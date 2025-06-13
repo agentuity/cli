@@ -66,12 +66,12 @@ func (c *MCPConfig) UnmarshalJSON(data []byte) error {
 	}{
 		Alias: (*Alias)(c),
 	}
-	if err := json.Unmarshal(data, &aux); err != nil {
+	if err := jsonc.Unmarshal(data, &aux); err != nil {
 		return err
 	}
 	// Unmarshal into a map to find extra fields
 	var all map[string]json.RawMessage
-	if err := json.Unmarshal(data, &all); err != nil {
+	if err := jsonc.Unmarshal(data, &all); err != nil {
 		return err
 	}
 	// Remove known fields
@@ -82,7 +82,7 @@ func (c *MCPConfig) UnmarshalJSON(data []byte) error {
 	c.Extra = make(map[string]interface{})
 	for k, v := range all {
 		var val interface{}
-		if err := json.Unmarshal(v, &val); err != nil {
+		if err := jsonc.Unmarshal(v, &val); err != nil {
 			c.Extra[k] = string(v) // fallback to raw string
 		} else {
 			c.Extra[k] = val
@@ -105,7 +105,7 @@ func (c *MCPConfig) MarshalJSON() ([]byte, error) {
 	}
 	// Unmarshal back into a map to merge with Extra
 	var m map[string]interface{}
-	if err := json.Unmarshal(data, &m); err != nil {
+	if err := jsonc.Unmarshal(data, &m); err != nil {
 		return nil, err
 	}
 	for k, v := range c.Extra {
