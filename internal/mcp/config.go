@@ -105,7 +105,7 @@ func (c *MCPConfig) MarshalJSON() ([]byte, error) {
 	}
 	// Unmarshal back into a map to merge with Extra
 	var m map[string]interface{}
-	if err := json.Unmarshal(data, &m); err != nil {
+	if err := jsonc.Unmarshal(data, &m); err != nil {
 		return nil, err
 	}
 	for k, v := range c.Extra {
