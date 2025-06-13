@@ -164,19 +164,6 @@ func loadConfig(path string) (*MCPConfig, error) {
 		return nil, err
 	}
 	var config MCPConfig
-	if err := json.Unmarshal(content, &config); err != nil {
-		return nil, err
-	}
-	config.filename = path
-	return &config, nil
-}
-
-func loadConfigForAmp(path string) (*MCPConfig, error) {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var config MCPConfig
 	if err := jsonc.Unmarshal(content, &config); err != nil {
 		return nil, err
 	}
@@ -247,11 +234,7 @@ func Detect(logger logger.Logger, all bool) ([]MCPClientConfig, error) {
 		config.Installed = true
 		var mcpconfig *MCPConfig
 		if util.Exists(config.ConfigLocation) {
-			if config.IsAMP {
-				mcpconfig, err = loadConfigForAmp(config.ConfigLocation)
-			} else {
-				mcpconfig, err = loadConfig(config.ConfigLocation)
-			}
+			mcpconfig, err = loadConfig(config.ConfigLocation)
 			if err != nil {
 				logger.Error("failed to load MCP config for %s: %s", config.Name, err)
 				return nil, nil
@@ -367,12 +350,7 @@ func Uninstall(ctx context.Context, logger logger.Logger) error {
 	for _, config := range detected {
 		config.ConfigLocation = strings.Replace(config.ConfigLocation, "$HOME", home, 1)
 		if util.Exists(config.ConfigLocation) {
-			var mcpconfig *MCPConfig
-			if config.IsAMP {
-				mcpconfig, err = loadConfigForAmp(config.ConfigLocation)
-			} else {
-				mcpconfig, err = loadConfig(config.ConfigLocation)
-			}
+			mcpconfig, err := loadConfig(config.ConfigLocation)
 			if err != nil {
 				return err
 			}
