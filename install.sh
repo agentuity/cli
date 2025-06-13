@@ -248,12 +248,24 @@ download_release() {
   debug "  > DOWNLOAD_FILENAME: $DOWNLOAD_FILENAME"
   debug "  > TMP_DIR: $TMP_DIR"
 
-  if curl --head --silent --fail "$DOWNLOAD_URL" > /dev/null 2>&1; then
-    ohai "Downloading Agentuity CLI v${VERSION} for ${OS}/${ARCH}..."
-    curl -L --progress-bar "$DOWNLOAD_URL" -o "$TMP_DIR/$DOWNLOAD_FILENAME" || abort "Failed to download from $DOWNLOAD_URL"
-  else
-    abort "Failed to download from $DOWNLOAD_URL"
-  fi
+  ohai "Downloading Agentuity CLI v${VERSION} for ${OS}/${ARCH}..."
+  
+  RETRY_COUNT=0
+  MAX_RETRIES=3
+  
+  while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    if curl -L --fail --progress-bar "$DOWNLOAD_URL" -o "$TMP_DIR/$DOWNLOAD_FILENAME"; then
+      break
+    else
+      RETRY_COUNT=$((RETRY_COUNT + 1))
+      if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+        warn "Download failed, retrying in 2 seconds... (attempt $RETRY_COUNT/$MAX_RETRIES)"
+        sleep 2
+      else
+        abort "Failed to download from $DOWNLOAD_URL after $MAX_RETRIES attempts"
+      fi
+    fi
+  done
 
 
 }
