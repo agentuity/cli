@@ -242,13 +242,13 @@ func TransformUrl(urlString string) string {
 			if strings.HasPrefix(urlString, "https://api.agentuity.dev") {
 				u, _ := url.Parse(urlString)
 				u.Scheme = "http"
-				u.Host = "host.docker.internal:3012"
+				u.Host = "host.docker.agentuity.io:3012"
 				return u.String()
 			}
 			port := regexp.MustCompile(`:(\d+)`)
-			host := "host.docker.internal:3000"
+			host := "host.docker.agentuity.io:3000"
 			if port.MatchString(urlString) {
-				host = "host.docker.internal:" + port.FindStringSubmatch(urlString)[1]
+				host = "host.docker.agentuity.io:" + port.FindStringSubmatch(urlString)[1]
 			}
 			u, _ := url.Parse(urlString)
 			u.Scheme = "http"
