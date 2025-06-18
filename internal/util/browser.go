@@ -165,7 +165,7 @@ func BrowserFlow(opts BrowserFlowOptions) error {
 		}
 		if !skip {
 			if berr := browser.OpenURL(u.String()); berr != nil {
- returnErr = fmt.Errorf("failed to open browser: %w", berr)
+				returnErr = fmt.Errorf("failed to open browser: %w", berr)
 				return
 			}
 		}
@@ -208,7 +208,7 @@ func PromptBrowserOpen(logger interface{ Error(string, ...interface{}) }, url st
 	} else {
 		fmt.Print(tui.Secondary("Press Enter to open browser, or Ctrl+C to skip: "))
 	}
-	
+
 	reader := bufio.NewReader(os.Stdin)
 	reader.ReadLine()
 
