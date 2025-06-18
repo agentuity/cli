@@ -24,10 +24,10 @@ func TestUrlParse(t *testing.T) {
 		url  string
 		want string
 	}{
-		{"localhost", "http://localhost:3000", "http://host.docker.internal:3000"},
-		{"localhost", "http://localhost:3000/test", "http://host.docker.internal:3000/test"},
-		{"localhost", "http://localhost:3123/test", "http://host.docker.internal:3123/test"},
-		{"localhost", "https://api.agentuity.dev/test", "http://host.docker.internal:3012/test"},
+		{"localhost", "http://localhost:3000", "http://host.docker.agentuity.io:3000"},
+		{"localhost", "http://localhost:3000/test", "http://host.docker.agentuity.io:3000/test"},
+		{"localhost", "http://localhost:3123/test", "http://host.docker.agentuity.io:3123/test"},
+		{"localhost", "https://api.agentuity.dev/test", "http://host.docker.agentuity.io:3012/test"},
 		{"non-localhost", "https://api.example.com/test", "https://api.example.com/test"},
 	}
 	for _, test := range tests {
