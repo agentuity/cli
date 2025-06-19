@@ -537,7 +537,7 @@ Examples:
 		started := time.Now()
 		var webhookToken string
 
-		action := func() {
+		uploadAction := func() {
 			url := util.TransformUrl(startResponse.Data.Url)
 			// send the zip file to the upload endpoint provided
 			logger.Trace("uploading to %s", url)
@@ -573,7 +573,11 @@ Examples:
 			}
 			resp.Body.Close()
 			logger.Debug("deployment uploaded %d bytes in %v", fi.Size(), time.Since(started))
+		}
 
+		tui.ShowSpinner("Uploading ...", uploadAction)
+
+		deployAction := func() {
 			// tell the api that we've completed the upload for the deployment
 			if err := updateDeploymentStatusCompleted(logger, apiUrl, token, startResponse.Data.DeploymentId); err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err,
@@ -590,7 +594,7 @@ Examples:
 			}
 		}
 
-		tui.ShowSpinner("Uploading ...", action)
+		tui.ShowSpinner("Deploying ...", deployAction)
 
 		format, _ := cmd.Flags().GetString("format")
 		if format == "json" {
