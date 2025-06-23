@@ -1,19 +1,26 @@
 package cmd
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"sort"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/agentuity/cli/internal/deployer"
 	"github.com/agentuity/cli/internal/envutil"
 	"github.com/agentuity/cli/internal/errsystem"
+	"github.com/agentuity/cli/internal/github"
 	"github.com/agentuity/cli/internal/mcp"
 	"github.com/agentuity/cli/internal/organization"
 	"github.com/agentuity/cli/internal/project"
@@ -297,6 +304,7 @@ Arguments:
 
 Examples:
   agentuity project create "My Project" "Project description" "My Agent" "Agent description" --auth bearer
+  agentuity project create "My Project" -e https://github.com/user/repo
   agentuity create --runtime nodejs --template "OpenAI SDK for Typescript"`,
 	Aliases: []string{"new"},
 	Args:    cobra.MaximumNArgs(4),
@@ -308,6 +316,14 @@ Examples:
 		apiUrl, appUrl, _ := util.GetURLs(logger)
 
 		initScreenWithLogo()
+
+		// Check if example flag is provided
+		exampleURL, _ := cmd.Flags().GetString("example")
+
+		if exampleURL != "" {
+			handleGitHubExample(ctx, logger, cmd, apikey, apiUrl, exampleURL, args)
+			return
+		}
 
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -906,6 +922,7 @@ func init() {
 	projectNewCmd.Flags().String("templates-dir", "", "The directory to load the templates. Defaults to loading them from the github.com/agentuity/templates repository")
 	projectNewCmd.Flags().String("auth", "project", "The authentication type for the agent (project, webhook, or none)")
 	projectNewCmd.Flags().String("action", "github-app", "The action to take for the project (github-action, github-app, none)")
+	projectNewCmd.Flags().StringP("example", "e", "", "Create project from a GitHub repository example (provide the GitHub URL)")
 
 	projectImportCmd.Flags().String("name", "", "The name of the project to import")
 	projectImportCmd.Flags().String("description", "", "The description of the project to import")
@@ -918,4 +935,261 @@ func init() {
 
 	projectDeleteCmd.Flags().String("org-id", "", "Only delete the projects in the specified organization")
 
+}
+
+// handleGitHubExample handles downloading a GitHub repository and importing it as a project
+func handleGitHubExample(ctx context.Context, logger logger.Logger, cmd *cobra.Command, apikey, apiUrl, githubURL string, args []string) {
+	// Validate GitHub URL
+	parsedURL, err := github.ValidateGitHubURL(githubURL)
+	if err != nil {
+		logger.Fatal("%s", err)
+	}
+
+	// Get repository information
+	repoInfo, err := github.GetRepoInfo(ctx, logger, parsedURL, "")
+	if err != nil {
+		logger.Fatal("%s", err)
+	}
+
+	// Validate that the specified path contains an agentuity.yaml file
+	if err := github.ValidateAgentuityProjectPath(ctx, logger, repoInfo); err != nil {
+		logger.Fatal("%s", err)
+	}
+
+	// Get project name from args or prompt
+	var name string
+	if len(args) > 0 {
+		name = args[0] // project name from args
+	}
+	if name == "" {
+		name = tui.Input(logger, "What should we name this project?",
+			fmt.Sprintf("This will create a project based on %s/%s", repoInfo.Username, repoInfo.Name))
+	}
+
+	// Determine project directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		errsystem.New(errsystem.ErrListFilesAndDirectories, err).ShowErrorAndExit()
+	}
+
+	projectDir := filepath.Join(cwd, util.SafeProjectFilename(name, false))
+	dir, _ := cmd.Flags().GetString("dir")
+	if dir != "" {
+		absDir, err := filepath.Abs(dir)
+		if err != nil {
+			errsystem.New(errsystem.ErrListFilesAndDirectories, err).ShowErrorAndExit()
+		}
+		projectDir = absDir
+	}
+
+	force, _ := cmd.Flags().GetBool("force")
+
+	// Check if directory exists
+	if util.Exists(projectDir) {
+		if !force {
+			if tui.HasTTY {
+				fmt.Println(tui.Secondary("The directory ") + tui.Bold(projectDir) + tui.Secondary(" already exists."))
+				fmt.Println()
+				if !tui.Ask(logger, "Delete and continue?", true) {
+					return
+				}
+			} else {
+				logger.Fatal("The directory %s already exists. Use --force to overwrite.", projectDir)
+			}
+		}
+		os.RemoveAll(projectDir)
+	}
+
+	// Download and extract repository (without validation)
+	tui.ShowSpinner(fmt.Sprintf("Downloading repository %s/%s...", repoInfo.Username, repoInfo.Name), func() {
+		err = downloadAndExtractRepoWithoutValidation(ctx, logger, projectDir, repoInfo)
+		if err != nil {
+			logger.Fatal("%s", err)
+		}
+	})
+
+	tui.ShowSuccess("Successfully downloaded repository to %s", projectDir)
+
+	// TODO: Import functionality disabled for now - just clone the repository
+	tui.ShowBanner("Agentuity project cloned successfully!",
+		tui.Paragraph("Next steps:",
+			tui.Secondary("1. Switch into the project directory at ")+tui.Directory(projectDir),
+			tui.Secondary("2. Review the cloned code and make any necessary adjustments"),
+			tui.Secondary("3. Run ")+tui.Command("project import")+tui.Secondary(" to import the project into your organization"),
+		),
+		false,
+	)
+}
+
+// downloadAndExtractRepoWithoutValidation downloads and extracts a repository without agentuity.yaml validation
+func downloadAndExtractRepoWithoutValidation(ctx context.Context, logger logger.Logger, projectDir string, repoInfo *github.RepoInfo) error {
+	if repoInfo == nil {
+		return fmt.Errorf("repoInfo cannot be nil")
+	}
+
+	// Create the project directory if it doesn't exist
+	if err := os.MkdirAll(projectDir, 0755); err != nil {
+		return fmt.Errorf("failed to create project directory: %w", err)
+	}
+
+	// Download the repository as a tar.gz file
+	tarURL := fmt.Sprintf("https://codeload.github.com/%s/%s/tar.gz/%s",
+		repoInfo.Username, repoInfo.Name, repoInfo.Branch)
+
+	logger.Debug("Downloading repository from: %s", tarURL)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", tarURL, nil)
+	if err != nil {
+		return errsystem.New(errsystem.ErrDownloadGithubRepository,
+			fmt.Errorf("failed to create download request: %w", err))
+	}
+
+	req.Header.Set("User-Agent", util.UserAgent())
+
+	client := &http.Client{
+		Timeout: 5 * time.Minute, // Longer timeout for large repositories
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return errsystem.New(errsystem.ErrDownloadGithubRepository,
+			fmt.Errorf("failed to download repository: %w", err),
+			errsystem.WithUserMessage("Failed to download the repository from GitHub. Please check your internet connection and try again."))
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return errsystem.New(errsystem.ErrDownloadGithubRepository,
+			fmt.Errorf("failed to download repository: HTTP %d", resp.StatusCode),
+			errsystem.WithUserMessage("Failed to download the repository. The repository may not exist or the branch '%s' may not be available.", repoInfo.Branch))
+	}
+
+	// Extract the tar.gz content using the same extraction logic from github package
+	return extractTarGzSimple(logger, resp.Body, projectDir, repoInfo.FilePath)
+}
+
+// extractTarGzSimple is a simplified version of the tar extraction without complex path manipulation
+func extractTarGzSimple(logger logger.Logger, reader io.Reader, destDir, targetPath string) error {
+	gzr, err := gzip.NewReader(reader)
+	if err != nil {
+		return fmt.Errorf("failed to create gzip reader: %w", err)
+	}
+	defer gzr.Close()
+
+	tr := tar.NewReader(gzr)
+	var rootPath string
+	fileCount := 0
+
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read tar entry: %w", err)
+		}
+
+		logger.Debug("Processing tar entry: %s (type: %d)", header.Name, header.Typeflag)
+
+		// Skip disallowed hidden files
+		fileName := filepath.Base(header.Name)
+		if strings.HasPrefix(fileName, ".") && !github.IsHiddenFileAllowed(fileName) {
+			logger.Debug("Skipping hidden file: %s", header.Name)
+			continue
+		}
+
+		// Determine the root path dynamically from the first directory entry
+		if rootPath == "" && header.Typeflag == tar.TypeDir {
+			pathParts := strings.Split(header.Name, "/")
+			if len(pathParts) > 0 && pathParts[0] != "" {
+				rootPath = pathParts[0]
+				logger.Debug("Detected root path: %s", rootPath)
+			}
+		}
+
+		// Normalize paths for comparison
+		normalizedHeaderName := strings.ReplaceAll(header.Name, "\\", "/")
+
+		var relativePath string
+
+		if targetPath == "" {
+			// Extract everything under the root path
+			if !strings.HasPrefix(normalizedHeaderName, rootPath+"/") && normalizedHeaderName != rootPath {
+				logger.Debug("Skipping file not in root: %s", normalizedHeaderName)
+				continue
+			}
+
+			// Strip the root directory
+			relativePath = strings.TrimPrefix(normalizedHeaderName, rootPath+"/")
+			if relativePath == "" && header.Typeflag == tar.TypeDir {
+				continue // Skip the root directory itself
+			}
+		} else {
+			// Extract only files matching the target path
+			expectedPrefix := filepath.Join(rootPath, targetPath)
+			normalizedPrefix := strings.ReplaceAll(expectedPrefix, "\\", "/")
+
+			if !strings.HasPrefix(normalizedHeaderName, normalizedPrefix+"/") && normalizedHeaderName != normalizedPrefix {
+				logger.Debug("Skipping file due to path filter: %s (expected prefix: %s)", normalizedHeaderName, normalizedPrefix)
+				continue
+			}
+
+			// Strip the root directory and target path
+			relativePath = strings.TrimPrefix(normalizedHeaderName, normalizedPrefix)
+			if relativePath != "" && relativePath[0] == '/' {
+				relativePath = relativePath[1:]
+			}
+		}
+
+		destPath := filepath.Join(destDir, relativePath)
+		logger.Debug("Extracting %s to %s", header.Name, destPath)
+
+		// Security check: ensure the destination path is within the target directory
+		if !strings.HasPrefix(destPath, filepath.Clean(destDir)+string(os.PathSeparator)) {
+			logger.Warn("Skipping file outside target directory: %s", destPath)
+			continue
+		}
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(destPath, 0755); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", destPath, err)
+			}
+			logger.Debug("Created directory: %s", destPath)
+			fileCount++
+
+		case tar.TypeReg:
+			// Ensure parent directory exists
+			if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+				return fmt.Errorf("failed to create parent directory for %s: %w", destPath, err)
+			}
+
+			// Create and write the file
+			file, err := os.Create(destPath)
+			if err != nil {
+				return fmt.Errorf("failed to create file %s: %w", destPath, err)
+			}
+
+			_, err = io.Copy(file, tr)
+			closeErr := file.Close()
+
+			if err != nil {
+				return fmt.Errorf("failed to write file %s: %w", destPath, err)
+			}
+			if closeErr != nil {
+				return fmt.Errorf("failed to close file %s: %w", destPath, closeErr)
+			}
+
+			// Set file permissions
+			if err := os.Chmod(destPath, os.FileMode(header.Mode)); err != nil {
+				logger.Debug("Failed to set permissions for %s: %v", destPath, err)
+			}
+
+			logger.Debug("Extracted file: %s", destPath)
+			fileCount++
+		}
+	}
+
+	logger.Debug("Total files/directories extracted: %d", fileCount)
+	return nil
 }
