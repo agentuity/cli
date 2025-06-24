@@ -316,6 +316,46 @@ Examples:
 
 		checkForUpgrade(ctx, logger, true)
 
+		// Railgurd the user from creating a project in an existing project directory
+		if project.ProjectExists(cwd) {
+			if tui.HasTTY {
+				fmt.Println()
+				tui.ShowWarning("You are currently in an existing Agentuity project directory!")
+				fmt.Println()
+				fmt.Println(tui.Muted("Current directory: ") + tui.Bold(cwd))
+				fmt.Println()
+				fmt.Println(tui.Text("It looks like you might want to:"))
+				fmt.Println(tui.Text("• ") + tui.Command(" dev") + tui.Text(" - Start development mode for this project"))
+				fmt.Println(tui.Text("• ") + tui.Command(" project import") + tui.Text(" - Import this project to your organization"))
+				fmt.Println(tui.Text("• ") + tui.Command(" deploy") + tui.Text(" - Deploy this project"))
+				fmt.Println()
+				
+				continueAnyway := tui.Ask(logger, "Are you sure you want to create a new project here?", false)
+				
+				if !continueAnyway {
+					fmt.Println()
+					tui.ShowSuccess("No worries! Use one of the commands above to work with your existing project.")
+					os.Exit(0)
+				}
+				
+				fmt.Println()
+				tui.ShowWarning("Continuing with new project creation...")
+				fmt.Println()
+			} else {
+				// Non-interactive mode: fail with helpful error
+				logger.Fatal("You are currently in an existing Agentuity project directory (%s).\n\n"+
+					"If you want to work with this project, try:\n"+
+					"  • %s (start development mode)\n"+
+					"  • %s (import to organization)\n"+
+					"  • %s (deploy project)\n\n"+
+					"To create a new project, please run this command from a different directory or use --dir flag.",
+					cwd,
+					tui.Command("agentuity dev"),
+					tui.Command("agentuity project import"),
+					tui.Command("agentuity deploy"))
+			}
+		}
+
 		if tui.HasTTY {
 			// handle MCP server installation
 			detected, err := mcp.Detect(logger, true)
