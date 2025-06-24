@@ -127,7 +127,7 @@ var envTemplateFileNames = []string{".env.example", ".env.template"}
 var border = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).Padding(1).BorderForeground(lipgloss.AdaptiveColor{Light: "#999999", Dark: "#999999"})
 var redDiff = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#990000", Dark: "#EE0000"})
 
-func createProjectIgnoreRules(dir string, theproject *project.Project) *ignore.Rules {
+func createProjectIgnoreRules(dir string, theproject *project.Project, skipProjectIgnore bool) *ignore.Rules {
 	// load up any gitignore files
 	gitignore := filepath.Join(dir, ignore.Ignore)
 	rules := ignore.Empty()
@@ -140,6 +140,10 @@ func createProjectIgnoreRules(dir string, theproject *project.Project) *ignore.R
 		rules = r
 	}
 	rules.AddDefaults()
+
+	if skipProjectIgnore {
+		return rules
+	}
 
 	// add any provider specific ignore rules
 	for _, rule := range theproject.Bundler.Ignore {
@@ -469,7 +473,7 @@ Examples:
 			logger.Debug("saved project with updated Agents")
 		}
 
-		rules := createProjectIgnoreRules(dir, theproject)
+		rules := createProjectIgnoreRules(dir, theproject, false)
 
 		// create a temp file we're going to use for zip and upload
 		tmpfile, err := os.CreateTemp("", "agentuity-deploy-*.zip")

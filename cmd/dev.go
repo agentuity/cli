@@ -207,7 +207,7 @@ Examples:
 			}
 		}
 
-		rules := createProjectIgnoreRules(dir, theproject.Project)
+		rules := createProjectIgnoreRules(dir, theproject.Project, true)
 
 		// Watch for changes
 		watcher, err := dev.NewWatcher(log, dir, rules, func(path string) {
