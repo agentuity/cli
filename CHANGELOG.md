@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.152] - 2025-06-24
+
+### Fixed
+- Railgurd the user from creating a project in an existing project directory ([#396](https://github.com/agentuity/cli/pull/396))
+- Fix regression in hot reload for new bun/node templates ([#398](https://github.com/agentuity/cli/pull/398))
+
+## [v0.0.151] - 2025-06-18
+
+### Changed
+- Switch to using a more compatible docker internal hostname that works cross platform ([#394](https://github.com/agentuity/cli/pull/394))
+- Split up the upload vs deploy status messages ([#395](https://github.com/agentuity/cli/pull/395))
+
+## [v0.0.150] - 2025-06-13
+
+### Added
+- Add groq patch module ([#390](https://github.com/agentuity/cli/pull/390))
+
+### Fixed
+- Complete JSONC parsing fix for MCPConfig.UnmarshalJSON method ([#388](https://github.com/agentuity/cli/pull/388))
+- Fix install script race condition by eliminating separate HEAD request ([#389](https://github.com/agentuity/cli/pull/389))
+
 ## [v0.0.149] - 2025-06-13
 
 ### Fixed
