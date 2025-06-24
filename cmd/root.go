@@ -170,8 +170,10 @@ func initConfig() {
 }
 
 func initScreenWithLogo() {
-	tui.ClearScreen()
-	tui.Logo()
+	if tui.HasTTY {
+		tui.ClearScreen()
+		tui.Logo()
+	}
 }
 
 func createPromptHelper() deployer.PromptHelpers {
