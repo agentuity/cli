@@ -70,7 +70,7 @@ Examples:
 
 		var envfile *deployer.EnvFile
 
-		envfile, project = envutil.ProcessEnvFiles(ctx, log, dir, theproject.Project, project, theproject.APIURL, apiKey, false)
+		envfile, project = envutil.ProcessEnvFiles(ctx, log, dir, theproject.Project, project, theproject.APIURL, apiKey, false, true)
 
 		if envfile == nil {
 			// we don't have an env file so we need to create one since this likely means you have cloned a new project
