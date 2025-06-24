@@ -329,15 +329,15 @@ Examples:
 				fmt.Println(tui.Text("• ") + tui.Command(" project import") + tui.Text(" - Import this project to your organization"))
 				fmt.Println(tui.Text("• ") + tui.Command(" deploy") + tui.Text(" - Deploy this project"))
 				fmt.Println()
-				
+
 				continueAnyway := tui.Ask(logger, "Are you sure you want to create a new project here?", false)
-				
+
 				if !continueAnyway {
 					fmt.Println()
 					tui.ShowSuccess("No worries! Use one of the commands above to work with your existing project.")
 					os.Exit(0)
 				}
-				
+
 				fmt.Println()
 				tui.ShowWarning("Continuing with new project creation...")
 				fmt.Println()
@@ -899,7 +899,7 @@ Examples:
 		if !tui.HasTTY {
 			force = true
 		}
-		_, _ = envutil.ProcessEnvFiles(ctx, logger, context.Dir, context.Project, nil, context.APIURL, context.Token, force)
+		_, _ = envutil.ProcessEnvFiles(ctx, logger, context.Dir, context.Project, nil, context.APIURL, context.Token, force, false)
 
 	},
 }

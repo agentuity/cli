@@ -262,7 +262,7 @@ Examples:
 				force = true
 			}
 			// check to see if we have any env vars that are not in the project
-			envFile, projectData = envutil.ProcessEnvFiles(ctx, logger, dir, theproject, projectData, apiUrl, token, force)
+			envFile, projectData = envutil.ProcessEnvFiles(ctx, logger, dir, theproject, projectData, apiUrl, token, force, false)
 
 			if tui.HasTTY {
 				_, localIssues, remoteIssues, err := buildAgentTree(keys, state, context)

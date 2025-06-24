@@ -31,8 +31,23 @@ var looksLikeSecret = regexp.MustCompile(`(?i)(^|_|-)(APIKEY|API_KEY|PRIVATE_KEY
 var isAgentuityEnv = regexp.MustCompile(`(?i)AGENTUITY_`)
 
 // ProcessEnvFiles handles .env and template env processing
-func ProcessEnvFiles(ctx context.Context, logger logger.Logger, dir string, theproject *project.Project, projectData *project.ProjectData, apiUrl, token string, force bool) (*deployer.EnvFile, *project.ProjectData) {
+func ProcessEnvFiles(ctx context.Context, logger logger.Logger, dir string, theproject *project.Project, projectData *project.ProjectData, apiUrl, token string, force bool, isLocalDev bool) (*deployer.EnvFile, *project.ProjectData) {
 	envfilename := filepath.Join(dir, ".env")
+	if isLocalDev {
+		f := filepath.Join(dir, ".env.development")
+		if util.Exists(f) {
+			envfilename = f
+		} else {
+			// create it but don't load it -- this is required because uv expects a .env.development file to exist from the template
+			// but since its gitignore it won't get checked in and might not exist when you clone a project
+			of, err := os.Create(f)
+			if err != nil {
+				errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to create .env.development file")).ShowErrorAndExit()
+			}
+			defer of.Close()
+			of.WriteString("# This file is used to store development environment variables\n")
+		}
+	}
 	var envFile *deployer.EnvFile
 	if (tui.HasTTY || force) && util.Exists(envfilename) {
 		// attempt to see if we have any template files
