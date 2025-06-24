@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.152] - 2025-06-24
+
+### Fixed
+- Railgurd the user from creating a project in an existing project directory ([#396](https://github.com/agentuity/cli/pull/396))
+- Fix regression in hot reload for new bun/node templates ([#398](https://github.com/agentuity/cli/pull/398))
+
 ## [v0.0.149] - 2025-06-13
 
 ### Fixed
