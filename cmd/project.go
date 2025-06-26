@@ -810,10 +810,6 @@ Examples:
 			tui.ShowSpinner("fetching projects ...", action)
 			var options []tui.Option
 			for _, project := range projects {
-				desc := project.Description
-				if desc == "" {
-					desc = emptyProjectDescription
-				}
 				options = append(options, tui.Option{
 					ID:   project.ID,
 					Text: tui.Bold(tui.PadRight(project.Name, 20, " ")) + tui.Muted(project.ID),
