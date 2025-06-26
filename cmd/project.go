@@ -790,7 +790,6 @@ Examples:
   agentuity project delete
   agentuity project rm`,
 	Aliases: []string{"rm", "del"},
-	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
@@ -799,43 +798,47 @@ Examples:
 		apiUrl, _, _ := util.GetURLs(logger)
 		orgId, _ := cmd.Flags().GetString("org-id")
 
-		var projects []project.ProjectListData
-		action := func() {
-			projects = listProjects(ctx, logger, apiUrl, apikey, orgId)
-		}
-		tui.ShowSpinner("fetching projects ...", action)
-		var options []tui.Option
-		for _, project := range projects {
-			desc := project.Description
-			if desc == "" {
-				desc = emptyProjectDescription
+		var selected []string
+		if len(args) > 0 {
+			selected = args
+		} else {
+
+			var projects []project.ProjectListData
+			action := func() {
+				projects = listProjects(ctx, logger, apiUrl, apikey, orgId)
 			}
-			options = append(options, tui.Option{
-				ID:   project.ID,
-				Text: tui.Bold(tui.PadRight(project.Name, 20, " ")) + tui.Muted(project.ID),
-			})
+			tui.ShowSpinner("fetching projects ...", action)
+			var options []tui.Option
+			for _, project := range projects {
+				options = append(options, tui.Option{
+					ID:   project.ID,
+					Text: tui.Bold(tui.PadRight(project.Name, 20, " ")) + tui.Muted(project.ID),
+				})
+			}
+
+			if len(options) == 0 {
+				showNoProjects(orgId)
+				return
+			}
+
+			selected = tui.MultiSelect(logger, "Select one or more projects to delete", "", options)
+
+			if len(selected) == 0 {
+				tui.ShowWarning("no projects selected")
+				return
+			}
 		}
 
-		if len(options) == 0 {
-			showNoProjects(orgId)
-			return
-		}
+		force, _ := cmd.Flags().GetBool("force")
 
-		selected := tui.MultiSelect(logger, "Select one or more projects to delete", "", options)
-
-		if len(selected) == 0 {
-			tui.ShowWarning("no projects selected")
-			return
-		}
-
-		if !tui.Ask(logger, "Are you sure you want to delete the selected projects?", true) {
+		if !force && !tui.Ask(logger, "Are you sure you want to delete the selected projects?", true) {
 			tui.ShowWarning("cancelled")
 			return
 		}
 
 		var deleted []string
 
-		action = func() {
+		action := func() {
 			var err error
 			deleted, err = project.DeleteProjects(ctx, logger, apiUrl, apikey, selected)
 			if err != nil {
@@ -957,5 +960,5 @@ func init() {
 	projectImportCmd.Flags().MarkHidden("org-id")
 
 	projectDeleteCmd.Flags().String("org-id", "", "Only delete the projects in the specified organization")
-
+	projectDeleteCmd.Flags().Bool("force", false, "Force the removal without confirmation")
 }
