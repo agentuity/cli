@@ -93,6 +93,7 @@ func (r *Rules) AddDefaults() {
 	r.parseRule("**/.vscode/**")
 	r.parseRule("**/.agentuity-*")
 	r.parseRule("**/biome.json")
+	r.parseRule("**/.DS_Store")
 }
 
 // Add a rule to the ignore set.
