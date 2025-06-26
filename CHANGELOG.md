@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.154] - 2025-06-26
+
+### Added
+- Add project delete in headless mode with support for specifying project IDs as arguments and --force flag ([#402](https://github.com/agentuity/cli/pull/402))
+
 ## [v0.0.153] - 2025-06-24
 
 ### Changed
@@ -755,6 +760,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks for new agent creation
 
 
+[v0.0.154]: https://github.com/agentuity/cli/compare/v0.0.153...v0.0.154
+[v0.0.153]: https://github.com/agentuity/cli/compare/v0.0.152...v0.0.153
+[v0.0.152]: https://github.com/agentuity/cli/compare/v0.0.151...v0.0.152
+[v0.0.151]: https://github.com/agentuity/cli/compare/v0.0.150...v0.0.151
+[v0.0.150]: https://github.com/agentuity/cli/compare/v0.0.149...v0.0.150
+[v0.0.149]: https://github.com/agentuity/cli/compare/v0.0.148...v0.0.149
 [v0.0.148]: https://github.com/agentuity/cli/compare/v0.0.147...v0.0.148
 [v0.0.147]: https://github.com/agentuity/cli/compare/v0.0.146...v0.0.147
 [v0.0.146]: https://github.com/agentuity/cli/compare/v0.0.145...v0.0.146
