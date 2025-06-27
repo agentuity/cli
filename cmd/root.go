@@ -217,7 +217,7 @@ func checkForUpgrade(ctx context.Context, logger logger.Logger, force bool) {
 			logger.Error("Failed to check for latest release: %s", err)
 		}
 		if ok && force {
-			tui.ShowWarning("Agentuity CLI was upgraded. Please re-run the command again to continue.")
+			tui.ShowSuccess("Agentuity CLI was upgraded. Please re-run the command again to continue.")
 			os.Exit(1) // force an exit after upgrade if executed
 		}
 	}
