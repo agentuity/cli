@@ -633,8 +633,24 @@ Examples:
 		}
 		logger.Debug("git info: %+v", gitInfo)
 
+		// Only initialize a new git repo if there is no parent git repo
+		// (i.e., if the closest .git is the projectDir itself, not a parent)
 		if !gitInfo.IsRepo {
 			projectGitFlow(ctx, provider, tmplContext, githubAction)
+		} else {
+			// Check if there's a .git directory directly in the project directory
+			// If so, it's safe to run projectGitFlow; otherwise, we're in a parent git repo
+			projectDirGitInfo, err := deployer.GetGitInfo(logger, projectDir)
+			if err != nil {
+				logger.Debug("failed to get git info for project directory: %s", err)
+			}
+			if projectDirGitInfo != nil && projectDirGitInfo.IsRepo {
+				// There is a .git directly in projectDir, so it's safe to run projectGitFlow
+				projectGitFlow(ctx, provider, tmplContext, githubAction)
+			} else {
+				// We're inside a parent git repository, do not create a nested repo
+				logger.Info("Project is inside an existing git repository; not creating a new git repo.")
+			}
 		}
 
 		if format == "json" {
