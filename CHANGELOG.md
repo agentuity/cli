@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.155] - 2025-06-30
+
+### Added
+- List deployments ([#405](https://github.com/agentuity/cli/pull/405))
+
+### Fixed
+- Fix upgrade success message styling ([#404](https://github.com/agentuity/cli/pull/404))
+
+### Security
+- Don't upload masked values to backend ([#407](https://github.com/agentuity/cli/pull/407))
+
 ## [v0.0.154] - 2025-06-26
 
 ### Added
