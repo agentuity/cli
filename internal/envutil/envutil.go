@@ -200,7 +200,7 @@ func HandleMissingProjectEnvs(ctx context.Context, logger logger.Logger, le []en
 					if projectData.Secrets == nil {
 						projectData.Secrets = make(map[string]string)
 					}
-					projectData.Secrets[key] = cstr.Mask(val)
+					projectData.Secrets[key] = val
 				} else {
 					if projectData.Env == nil {
 						projectData.Env = make(map[string]string)
