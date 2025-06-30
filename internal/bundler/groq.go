@@ -8,4 +8,4 @@ func init() {
 			Before: generateEnvGuard("GROQ_API_KEY", generateGatewayEnvGuard("GROQ_API_KEY", "process.env.AGENTUITY_SDK_KEY", "GROQ_BASE_URL", "groq")),
 		},
 	}
-} 
+}
