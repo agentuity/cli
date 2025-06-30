@@ -162,7 +162,7 @@ func HandleMissingProjectEnvs(ctx context.Context, logger logger.Logger, le []en
 		if projectData.Env != nil && projectData.Env[ev.Key] == ev.Val {
 			continue
 		}
-		if projectData.Secrets != nil && projectData.Secrets[ev.Key] == cstr.Mask(ev.Val) {
+		if projectData.Secrets != nil && projectData.Secrets[ev.Key] == ev.Val {
 			continue
 		}
 		keyvalue[ev.Key] = ev.Val
