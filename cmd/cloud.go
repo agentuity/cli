@@ -855,6 +855,75 @@ func cloudSelectDeployment(ctx context.Context, logger logger.Logger, apiUrl, ap
 	return selectedDeployment
 }
 
+var cloudDeploymentsCmd = &cobra.Command{
+	Use:   "deployments",
+	Short: "List deployments for a project",
+	Long: `List all deployments for a selected project, showing which is active and their tags.
+
+Examples:
+  agentuity cloud deployments
+  agentuity cloud deployments --project <projectId>
+`,
+	Args: cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		logger := env.NewLogger(cmd)
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
+		apiUrl, _, _ := util.GetURLs(logger)
+		projectId, _ := cmd.Flags().GetString("project")
+		format, _ := cmd.Flags().GetString("format")
+
+		var selectedProject string
+		if projectId != "" {
+			selectedProject = projectId
+		} else {
+			selectedProject = cloudSelectProject(ctx, logger, apiUrl, apikey, "Select a project to list deployments")
+		}
+
+		if selectedProject == "" {
+			return
+		}
+
+		var deployments []project.DeploymentListData
+		action := func() {
+			var err error
+			deployments, err = project.ListDeployments(ctx, logger, apiUrl, apikey, selectedProject)
+			if err != nil {
+				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list deployments")).ShowErrorAndExit()
+			}
+		}
+		tui.ShowSpinner("fetching deployments ...", action)
+
+		if len(deployments) == 0 {
+			tui.ShowWarning("no deployments found for this project")
+			return
+		}
+
+		if format == "json" {
+			json.NewEncoder(os.Stdout).Encode(deployments)
+			return
+		}
+
+		headers := []string{"Active", "Deployment Id", "Tags", "Message", "Created At"}
+		rows := [][]string{}
+		for _, d := range deployments {
+			active := ""
+			if d.Active {
+				active = "✅"
+			}
+			tags := strings.Join(d.Tags, ", ")
+			msg := d.Message
+			if len(msg) > 60 {
+				msg = msg[:57] + "..."
+			}
+			created := d.CreatedAt
+			rows = append(rows, []string{active, tui.Muted(d.ID), tui.Bold(tags), tui.Text(msg), tui.Title(created)})
+		}
+		tui.Table(headers, rows)
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(cloudCmd)
 	rootCmd.AddCommand(cloudDeployCmd)
@@ -894,4 +963,8 @@ func init() {
 	cloudRollbackCmd.Flags().String("dir", "", "The directory to the project to rollback if project is not specified")
 	cloudRollbackCmd.Flags().Bool("force", false, "Force the rollback or delete")
 	cloudRollbackCmd.Flags().Bool("delete", false, "Delete the deployment instead of rolling back")
+
+	cloudCmd.AddCommand(cloudDeploymentsCmd)
+	cloudDeploymentsCmd.Flags().String("project", "", "Project to list deployments for")
+	cloudDeploymentsCmd.Flags().String("format", "text", "The output format to use for results which can be either 'text' or 'json'")
 }
