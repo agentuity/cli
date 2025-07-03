@@ -109,7 +109,7 @@
 						},
 						"idle": {
 							"type": "string",
-							"description": "The duration as a formatted string such as 1m, 10m, 1h, etc. This is only used if the mode is on-demand. If not provided, the default and the minimum idle period is 1m."
+							"description": "The duration as a formatted string such as 1m, 10m, 1h, etc. This is only used if the mode is on-demand. If not provided, the default and the minimum idle period is 10m."
 						}
 					}
 				},
