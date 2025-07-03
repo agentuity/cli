@@ -117,10 +117,17 @@ type Resources struct {
 	DiskQuantity   resource.Quantity `json:"-" yaml:"-"`
 }
 
+type Mode struct {
+	Type string  `json:"type" yaml:"type" hc:"on-demand or provisioned"`                                       // on-demand or provisioned
+	Idle *string `json:"idle,omitempty" yaml:"idle,omitempty" hc:"duration in seconds if on-demand, optional"` // duration in seconds if on-demand, optional
+}
+
 type Deployment struct {
-	Command   string     `json:"command" yaml:"command"`
-	Args      []string   `json:"args" yaml:"args"`
-	Resources *Resources `json:"resources" yaml:"resources" hc:"You should tune the resources for the deployment"`
+	Command      string     `json:"command" yaml:"command"`
+	Args         []string   `json:"args" yaml:"args"`
+	Resources    *Resources `json:"resources" yaml:"resources" hc:"You should tune the resources for the deployment"`
+	Mode         *Mode      `json:"mode,omitempty" yaml:"mode,omitempty" hc:"The deployment mode"`
+	Dependencies []string   `json:"dependencies,omitempty" yaml:"dependencies,omitempty" hc:"The dependencies to install before running the deployment"`
 }
 
 type Watch struct {
@@ -216,6 +223,11 @@ func (p *Project) Load(dir string) error {
 				return fmt.Errorf("error validating deploy disk value '%s'. %w", p.Deployment.Resources.Disk, err)
 			}
 			p.Deployment.Resources.DiskQuantity = val
+		}
+		if p.Deployment.Mode != nil {
+			if p.Deployment.Mode.Type != "on-demand" && p.Deployment.Mode.Type != "provisioned" {
+				return fmt.Errorf("invalid deployment mode value: %s. only on-demand or provisioned are supported", p.Deployment.Mode.Type)
+			}
 		}
 	}
 	return nil
