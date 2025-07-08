@@ -9,8 +9,8 @@ github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERo
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/ProtonMail/go-crypto v1.1.5 h1:eoAQfK2dwL+tFSFpr7TbOaPNUbPiJj4fLYwwGE1FQO4=
 github.com/ProtonMail/go-crypto v1.1.5/go.mod h1:rA3QumHc/FZ8pAHreoekgiAbzpNsfQAosU5td4SnOrE=
-github.com/agentuity/go-common v1.0.64 h1:E7PRLFcrPDd32doxSzI2reCpaHtHr3mcSmVl9yz+Ffc=
-github.com/agentuity/go-common v1.0.64/go.mod h1:cy1EPYpZUkp3JSMgTb+Sa3sLnS7vQQupj/RwO4An6L4=
+github.com/agentuity/go-common v1.0.67 h1:Pw6Lv/2eJ+F4kZZgnZhYy3JyTzA3VEa64h/BPSfayxw=
+github.com/agentuity/go-common v1.0.67/go.mod h1:cy1EPYpZUkp3JSMgTb+Sa3sLnS7vQQupj/RwO4An6L4=
 github.com/agentuity/mcp-golang/v2 v2.0.2 h1:wZqS/aHWZsQoU/nd1E1/iMsVY2dywWT9+PFlf+3YJxo=
 github.com/agentuity/mcp-golang/v2 v2.0.2/go.mod h1:U105tZXyTatxxOBlcObRgLb/ULvGgT2DJ1nq/8++P6Q=
 github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be h1:9AeTilPcZAjCFIImctFaOjnTIavg87rW78vTPkQqLI8=
