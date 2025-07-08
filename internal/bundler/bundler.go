@@ -106,7 +106,7 @@ func installSourceMapSupportIfNeeded(ctx BundleContext, dir string) error {
 	// only bun needs to install this library to aide in parsing the source maps
 	path := filepath.Join(dir, "node_modules", "source-map-js", "package.json")
 	if !util.Exists(path) {
-		cmd := exec.CommandContext(ctx.Context, "bun", "add", "source-map-js", "--no-save", "--silent", "--no-progress", "--no-summary", "--ignore-scripts")
+		cmd := exec.CommandContext(ctx.Context, "bun", "add", "source-map-js", "--silent", "--no-progress", "--no-summary", "--ignore-scripts")
 		cmd.Dir = dir
 		out, err := cmd.CombinedOutput()
 		if err != nil {
@@ -147,9 +147,9 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		var install *exec.Cmd
 		switch theproject.Bundler.Runtime {
 		case "nodejs":
-			install = exec.CommandContext(ctx.Context, "npm", "install", "--no-save", "--no-audit", "--no-fund", "--include=prod", "--ignore-scripts")
+			install = exec.CommandContext(ctx.Context, "npm", "install", "--no-audit", "--no-fund", "--include=prod", "--ignore-scripts")
 		case "bunjs":
-			args := []string{"install", "--production", "--no-save", "--ignore-scripts"}
+			args := []string{"install", "--production", "--ignore-scripts"}
 			if ctx.CI {
 				args = append(args, "--verbose", "--no-cache")
 			} else {
