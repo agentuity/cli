@@ -141,6 +141,18 @@ func runTypecheck(ctx BundleContext, dir string) error {
 	return nil
 }
 
+func generateBunLockfile(ctx BundleContext, logger logger.Logger, dir string) error {
+	args := []string{"install", "--lockfile-only"}
+	install := exec.CommandContext(ctx.Context, "bun", args...)
+	install.Dir = dir
+	out, err := install.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to generate bun lockfile: %w. %s", err, string(out))
+	}
+	logger.Debug("re-generated bun lockfile: %s", strings.TrimSpace(string(out)))
+	return nil
+}
+
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
 
 	if ctx.Install || !util.Exists(filepath.Join(dir, "node_modules")) {
@@ -149,6 +161,11 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		case "nodejs":
 			install = exec.CommandContext(ctx.Context, "npm", "install", "--no-audit", "--no-fund", "--include=prod", "--ignore-scripts")
 		case "bunjs":
+			// for bun, we need to ensure the lockfile is up to date before we can run the install below
+			// otherwise we'll get an error about the lockfile being out of date
+			if err := generateBunLockfile(ctx, ctx.Logger, dir); err != nil {
+				return err
+			}
 			args := []string{"install", "--production", "--ignore-scripts"}
 			if ctx.CI {
 				args = append(args, "--verbose", "--no-cache")
