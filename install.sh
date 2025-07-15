@@ -234,6 +234,7 @@ install_mac() {
 
   else
       ohai "Installing Agentuity CLI using curl..."
+      curl -fsS https://agentuity.sh | sh
   fi
 
 }
