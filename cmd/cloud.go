@@ -207,7 +207,6 @@ Examples:
 			tags = []string{"latest"}
 		}
 
-		//cbeck if latest tag is present in the tags array
 		if len(tags) != 0 && !slices.Contains(tags, "latest") {
 			logger.Debug("latest tag not found in tags array, setting preview to true")
 			preview = true
