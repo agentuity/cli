@@ -200,7 +200,7 @@ Examples:
 		tags = util.RemoveDuplicates(tags)
 		tags = util.RemoveEmpty(tags)
 
-		preview := false
+		var preview bool
 
 		// If no tags are provided, default to ["latest"]
 		if len(tags) == 0 {
