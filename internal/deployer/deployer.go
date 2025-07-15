@@ -2,6 +2,7 @@ package deployer
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/agentuity/cli/internal/bundler"
@@ -75,6 +76,7 @@ func PreflightCheck(ctx context.Context, logger logger.Logger, data DeployPrefli
 		ProjectDir: data.Dir,
 		Production: true,
 		Project:    data.Project,
+		Writer:     os.Stderr,
 	}
 	if err := bundler.Bundle(bundleCtx); err != nil {
 		return nil, err
