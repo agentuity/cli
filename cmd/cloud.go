@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -199,9 +200,16 @@ Examples:
 		tags = util.RemoveDuplicates(tags)
 		tags = util.RemoveEmpty(tags)
 
+		var preview bool
+
 		// If no tags are provided, default to ["latest"]
 		if len(tags) == 0 {
 			tags = []string{"latest"}
+		}
+
+		if len(tags) != 0 && !slices.Contains(tags, "latest") {
+			logger.Debug("latest tag not found in tags array, setting preview to true")
+			preview = true
 		}
 
 		deploymentConfig := project.NewDeploymentConfig()
@@ -583,7 +591,7 @@ Examples:
 
 		deployAction := func() {
 			// tell the api that we've completed the upload for the deployment
-			if err := updateDeploymentStatusCompleted(logger, apiUrl, token, startResponse.Data.DeploymentId); err != nil {
+			if err := updateDeploymentStatusCompleted(logger, apiUrl, token, startResponse.Data.DeploymentId, preview); err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err,
 					errsystem.WithContextMessage("Error updating deployment status to completed")).ShowErrorAndExit()
 			}
@@ -637,9 +645,9 @@ func updateDeploymentStatus(logger logger.Logger, apiUrl, token, deploymentId, s
 	return client.Do("PUT", fmt.Sprintf("/cli/deploy/upload/%s", deploymentId), payload, nil)
 }
 
-func updateDeploymentStatusCompleted(logger logger.Logger, apiUrl, token, deploymentId string) error {
+func updateDeploymentStatusCompleted(logger logger.Logger, apiUrl, token, deploymentId string, preview bool) error {
 	client := util.NewAPIClient(context.Background(), logger, apiUrl, token)
-	payload := map[string]any{"state": "completed"}
+	payload := map[string]any{"state": "completed", "preview": preview}
 	return client.Do("PUT", fmt.Sprintf("/cli/deploy/upload/%s", deploymentId), payload, nil)
 }
 
