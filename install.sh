@@ -233,7 +233,12 @@ install_mac() {
     fi
 
   else
-      ohai "Installing Agentuity CLI using curl..."
+    ohai "Installing Agentuity CLI using curl..."
+    # Use the overridable CURL var, abort on error, and stop this script afterwards
+    if ! "$CURL" -fsSL https://agentuity.sh | sh; then
+      abort "cURL installation failed. Please check your connection or try --no-brew again."
+    fi
+    success      # print final message & exit 0
   fi
 
 }
