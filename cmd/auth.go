@@ -16,6 +16,7 @@ import (
 	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.design/x/clipboard"
 )
 
 var authCmd = &cobra.Command{
@@ -72,17 +73,31 @@ Examples:
 			os.Exit(1)
 		}
 
+		authURL := fmt.Sprintf("%s/auth/cli", appUrl)
+
+		copyMessage := "Copy the following code:"
+		openMessage := "Then open the url in your browser (or press ENTER) and paste the code:"
+
+		err := clipboard.Init()
+		if err == nil {
+			clipboard.Write(clipboard.FmtText, []byte(otp))
+			copyMessage = "This code was copied to your clipboard:"
+			openMessage = "Open the url in your browser (or press ENTER) and paste the code from your clipboard:"
+		}
+
 		body := tui.Paragraph(
-			"Copy the following code:",
+			copyMessage,
 			tui.Bold(otp),
-			"Then open the url in your browser and paste the code:",
-			tui.Link("%s/auth/cli", appUrl),
+			openMessage,
+			tui.Link("%s", authURL),
 			tui.Muted("This code will expire in 60 seconds"),
 		)
 
 		tui.ShowBanner("Login to Agentuity", body, false)
 
 		tui.ShowSpinner("Waiting for login to complete...", func() {
+			go util.PromptBrowserOpen(logger, authURL)
+
 			authResult, err := auth.PollForLoginCompletion(ctx, logger, apiUrl, otp)
 			if err != nil {
 				if isCancelled(ctx) {
