@@ -71,14 +71,14 @@ Examples:
 			tui.ShowWarning("Please re-run the login command to continue")
 			os.Exit(1)
 		}
-		
+
 		authURL := fmt.Sprintf("%s/auth/cli", appUrl)
-		
+
 		body := tui.Paragraph(
 			"Copy the following code:",
 			tui.Bold(otp),
-			"Then open the url in your browser (Or just press ENTER) and paste the code:",
-			tui.Link(authURL),
+			"Then open the url in your browser (or just press ENTER) and paste the code:",
+			tui.Link("%s", authURL),
 			tui.Muted("This code will expire in 60 seconds"),
 		)
 
@@ -221,9 +221,6 @@ Examples:
 		tui.ShowSuccess("Welcome to Agentuity! You are now logged in")
 	},
 }
-
-
-
 
 func init() {
 	rootCmd.AddCommand(authCmd)
