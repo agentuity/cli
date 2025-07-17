@@ -204,13 +204,16 @@ Examples:
 
 		// If no tags are provided, default to ["latest"]
 		if len(tags) == 0 {
+			logger.Debug("no tags provided, setting to latest")
 			tags = []string{"latest"}
 		}
 
-		if len(tags) != 0 && !slices.Contains(tags, "latest") {
+		if !slices.Contains(tags, "latest") {
 			logger.Debug("latest tag not found in tags array, setting preview to true")
 			preview = true
 		}
+
+		logger.Debug("preview: %v", preview)
 
 		deploymentConfig := project.NewDeploymentConfig()
 		client := util.NewAPIClient(ctx, logger, apiUrl, token)
