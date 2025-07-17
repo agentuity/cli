@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.161] - 2025-07-16
+
+### Added
+- Support for multiple deployment tags in bundle command ([#422](https://github.com/agentuity/cli/pull/422))
+
+## [v0.0.160] - 2025-07-15
+
+### Added
+- Support for preview environments ([#418](https://github.com/agentuity/cli/pull/418))
+
 ## [v0.0.159] - 2025-07-15
 
 ### Fixed
