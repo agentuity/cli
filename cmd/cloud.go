@@ -244,7 +244,7 @@ Examples:
 
 			if !context.NewProject {
 				action = func() {
-					projectData, err = theproject.GetProject(ctx, logger, apiUrl, token, true, false)
+					projectData, err = theproject.GetProject(ctx, logger, apiUrl, token, false, false)
 					if err != nil {
 						if err == project.ErrProjectNotFound {
 							return
@@ -498,10 +498,23 @@ Examples:
 		zipaction := func() {
 			// zip up our directory
 			started := time.Now()
+			var seenGit, seenNodeModules bool
 			logger.Debug("creating a zip file of %s into %s", dir, tmpfile.Name())
 			if err := util.ZipDir(dir, tmpfile.Name(), util.WithMutator(zipMutator), util.WithMatcher(func(fn string, fi os.FileInfo) bool {
 				notok := rules.Ignore(fn, fi)
 				if notok {
+					if strings.HasPrefix(fn, ".git") {
+						if seenGit {
+							return false
+						}
+						seenGit = true
+					}
+					if strings.HasPrefix(fn, "node_modules") {
+						if seenNodeModules {
+							return false
+						}
+						seenNodeModules = true
+					}
 					logger.Trace("❌ %s", fn)
 				} else {
 					logger.Trace("❎ %s", fn)
