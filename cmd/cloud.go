@@ -498,7 +498,7 @@ Examples:
 		zipaction := func() {
 			// zip up our directory
 			started := time.Now()
-			var seenGit, seenNodeModules bool
+			var seenGit, seenNodeModules, sendVenv bool
 			logger.Debug("creating a zip file of %s into %s", dir, tmpfile.Name())
 			if err := util.ZipDir(dir, tmpfile.Name(), util.WithMutator(zipMutator), util.WithMatcher(func(fn string, fi os.FileInfo) bool {
 				notok := rules.Ignore(fn, fi)
@@ -514,6 +514,12 @@ Examples:
 							return false
 						}
 						seenNodeModules = true
+					}
+					if strings.HasPrefix(fn, ".venv") {
+						if sendVenv {
+							return false
+						}
+						sendVenv = true
 					}
 					logger.Trace("❌ %s", fn)
 				} else {
