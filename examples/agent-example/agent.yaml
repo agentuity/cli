@@ -1,0 +1,23 @@
+name: vector-store
+version: 1.0.0
+description: Semantic memory with vector storage using Pinecone
+author: agentuity
+language: typescript
+dependencies:
+  npm:
+    - "@pinecone-database/pinecone"
+    - "openai"
+    - "uuid"
+files:
+  - src/vector-store.ts
+  - src/types.ts
+  - config/vector-store.yaml
+  - README.md
+config:
+  pinecone:
+    index_name: "agent-memory"
+    dimension: 1536
+    metric: "cosine"
+  openai:
+    model: "text-embedding-ada-002"
+    max_tokens: 8191
