@@ -538,18 +538,10 @@ Examples:
 
 		tui.ShowSpinner("Packaging ...", zipaction)
 
-		// Handle dry-run case - check if flag was specified
-		dryRunSpecified := cmd.Flags().Changed("dry-run")
-		if dryRunSpecified {
-			// Default to current directory if empty string
-			if dryRun == "" {
-				dryRun = "."
-			}
+		if dryRun != "" {
 
-			// Create the output filename
 			outputFile := filepath.Join(dryRun, fmt.Sprintf("agentuity-deploy-%s.zip", theproject.ProjectId))
 
-			// Copy the zip file to the specified location
 			if _, err := util.CopyFile(tmpfile.Name(), outputFile); err != nil {
 				errsystem.New(errsystem.ErrCreateZipFile, err,
 					errsystem.WithContextMessage("Error copying deployment zip file")).ShowErrorAndExit()
