@@ -167,12 +167,14 @@ and starts the deployment process. It will reconcile any differences
 between local and remote agents.
 
 Flags:
-  --dir    The directory containing the project to deploy
+  --dir       The directory containing the project to deploy
+  --dry-run   Save deployment zip file to specified directory instead of uploading
 
 Examples:
   agentuity cloud deploy
   agentuity deploy
-  agentuity cloud deploy --dir /path/to/project`,
+  agentuity cloud deploy --dir /path/to/project
+  agentuity deploy --dry-run ./output`,
 	Run: func(cmd *cobra.Command, args []string) {
 		parentCtx := context.Background()
 		ctx, cancel := signal.NotifyContext(parentCtx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -195,6 +197,7 @@ Examples:
 		tags, _ := cmd.Flags().GetStringArray("tag")
 		description, _ := cmd.Flags().GetString("description")
 		message, _ := cmd.Flags().GetString("message")
+		dryRun, _ := cmd.Flags().GetString("dry-run")
 
 		// remove duplicates and empty strings
 		tags = util.RemoveDuplicates(tags)
@@ -534,6 +537,37 @@ Examples:
 		}
 
 		tui.ShowSpinner("Packaging ...", zipaction)
+
+		// Handle dry-run case - check if flag was specified
+		dryRunSpecified := cmd.Flags().Changed("dry-run")
+		if dryRunSpecified {
+			// Default to current directory if empty string
+			if dryRun == "" {
+				dryRun = "."
+			}
+
+			// Create the output filename
+			outputFile := filepath.Join(dryRun, fmt.Sprintf("agentuity-deploy-%s.zip", theproject.ProjectId))
+
+			// Copy the zip file to the specified location
+			if _, err := util.CopyFile(tmpfile.Name(), outputFile); err != nil {
+				errsystem.New(errsystem.ErrCreateZipFile, err,
+					errsystem.WithContextMessage("Error copying deployment zip file")).ShowErrorAndExit()
+			}
+
+			format, _ := cmd.Flags().GetString("format")
+			if format == "json" {
+				result := map[string]interface{}{
+					"dry_run":    true,
+					"zip_file":   outputFile,
+					"project_id": theproject.ProjectId,
+				}
+				json.NewEncoder(os.Stdout).Encode(result)
+			} else {
+				tui.ShowSuccess("Deployment zip saved to: %s", outputFile)
+			}
+			return
+		}
 
 		dof, err := os.Open(tmpfile.Name())
 		if err != nil {
@@ -972,6 +1006,7 @@ func init() {
 	cloudDeployCmd.Flags().String("description", "", "Description for the deployment")
 	cloudDeployCmd.Flags().String("message", "", "A shorter description for the deployment")
 	cloudDeployCmd.Flags().Bool("force", false, "Force the processing of environment files")
+	cloudDeployCmd.Flags().String("dry-run", "", "Save deployment zip file to specified directory (defaults to current directory) instead of uploading")
 
 	cloudDeployCmd.Flags().MarkHidden("deploymentId")
 	cloudDeployCmd.Flags().MarkHidden("ci")
