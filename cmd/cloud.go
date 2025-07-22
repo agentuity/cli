@@ -540,6 +540,14 @@ Examples:
 
 		if dryRun != "" {
 
+			// Validate and create the dryRun directory if it doesn't exist
+			if !util.Exists(dryRun) {
+				if err := os.MkdirAll(dryRun, 0755); err != nil {
+					errsystem.New(errsystem.ErrCreateZipFile, err,
+						errsystem.WithContextMessage(fmt.Sprintf("Error creating dry run directory '%s': %v", dryRun, err))).ShowErrorAndExit()
+				}
+			}
+
 			outputFile := filepath.Join(dryRun, fmt.Sprintf("agentuity-deploy-%s.zip", theproject.ProjectId))
 
 			if _, err := util.CopyFile(tmpfile.Name(), outputFile); err != nil {
