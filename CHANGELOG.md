@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.163] - 2025-07-22
+
+### Added
+- Support for dry-run command ([#425](https://github.com/agentuity/cli/pull/425))
+
+## [v0.0.162] - 2025-07-18
+
+### Fixed
+- Fix issue with env on deploy asking for setting when set. Suppress some logs ([#424](https://github.com/agentuity/cli/pull/424))
+- Added an option to open login OTP with enter ([#420](https://github.com/agentuity/cli/pull/420))
+
 ## [v0.0.161] - 2025-07-16
 
 ### Added
@@ -804,6 +815,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.163]: https://github.com/agentuity/cli/compare/v0.0.162...v0.0.163
+[v0.0.162]: https://github.com/agentuity/cli/compare/v0.0.161...v0.0.162
+[v0.0.161]: https://github.com/agentuity/cli/compare/v0.0.160...v0.0.161
+[v0.0.160]: https://github.com/agentuity/cli/compare/v0.0.159...v0.0.160
+[v0.0.159]: https://github.com/agentuity/cli/compare/v0.0.158...v0.0.159
 [v0.0.158]: https://github.com/agentuity/cli/compare/v0.0.157...v0.0.158
 [v0.0.157]: https://github.com/agentuity/cli/compare/v0.0.156...v0.0.157
 [v0.0.156]: https://github.com/agentuity/cli/compare/v0.0.155...v0.0.156
