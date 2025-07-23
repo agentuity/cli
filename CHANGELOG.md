@@ -817,6 +817,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [v0.0.163]: https://github.com/agentuity/cli/compare/v0.0.162...v0.0.163
 [v0.0.162]: https://github.com/agentuity/cli/compare/v0.0.161...v0.0.162
+[v0.0.161]: https://github.com/agentuity/cli/compare/v0.0.160...v0.0.161
+[v0.0.160]: https://github.com/agentuity/cli/compare/v0.0.159...v0.0.160
+[v0.0.159]: https://github.com/agentuity/cli/compare/v0.0.158...v0.0.159
 [v0.0.158]: https://github.com/agentuity/cli/compare/v0.0.157...v0.0.158
 [v0.0.157]: https://github.com/agentuity/cli/compare/v0.0.156...v0.0.157
 [v0.0.156]: https://github.com/agentuity/cli/compare/v0.0.155...v0.0.156
