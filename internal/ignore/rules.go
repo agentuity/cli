@@ -151,6 +151,10 @@ func (r *Rules) Ignore(path string, fi os.FileInfo) bool {
 		return false
 	}
 
+	if path == "setup.sh" {
+		return false
+	}
+
 	var fullWildcard bool
 
 	for n, p := range r.patterns {
