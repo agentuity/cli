@@ -59,18 +59,9 @@ var (
 	paginatorActiveDotStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.AdaptiveColor{Light: "#0087D7", Dark: "#00FFFF"})
 
-	errorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "#D70000", Dark: "#FF0000"}).
-			MarginTop(1)
-
 	successStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.AdaptiveColor{Light: "#00875F", Dark: "#00FF00"}).
 			MarginTop(1)
-
-	overlayStyle = lipgloss.NewStyle().
-			Background(lipgloss.AdaptiveColor{Light: "0", Dark: "0"}).
-			Width(width).
-			Height(1)
 
 	modalStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -79,12 +70,6 @@ var (
 			Foreground(lipgloss.AdaptiveColor{Light: "#000000", Dark: "#FFFFFF"}).
 			Padding(1, 2).
 			Width(50).
-			Align(lipgloss.Left)
-
-	modalTitleStyle = lipgloss.NewStyle().
-			Background(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#1A1A1A"}).
-			Foreground(lipgloss.AdaptiveColor{Light: "#000000", Dark: "#FFFFFF"}).
-			Width(46).
 			Align(lipgloss.Left)
 
 	contentStyle = lipgloss.NewStyle().
@@ -216,10 +201,11 @@ type projectFormModel struct {
 	quit            bool
 	showErrorModal  bool
 	// New fields for scrolling
-	viewport      viewport.Model
-	scrollOffset  int
-	itemHeight    int
-	contentHeight int
+    viewport      viewport.Model
+    itemHeight    int
+    contentHeight int
+    windowStart   int
+    windowSize    int
 	ready         bool
 }
 
@@ -365,7 +351,7 @@ func initialProjectModel(initialForm ProjectForm) projectFormModel {
 		depsError:      "",
 		form:           initialForm,
 		showErrorModal: false,
-		itemHeight:     4,
+        itemHeight:     3,
 		ready:          false,
 	}
 
@@ -428,64 +414,43 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
+    case tea.WindowSizeMsg:
 		m.height = msg.Height
 		m.width = msg.Width
 
 		// Update styles that depend on window width
 		titleStyle = titleStyle.Width(m.width)
 		helpStyle = helpStyle.Width(m.width)
-		// Always reinitialize the viewport on resize to avoid invalid state
+        // Recompute window size on resize
 		m.initViewport()
 
 		return m, nil
 
-	case tea.MouseMsg:
-		if !m.ready {
-			return m, nil
-		}
+    case tea.MouseMsg:
+        if !m.ready {
+            return m, nil
+        }
+        if msg.String() == "MouseLeft" {
+            m.mouseY = msg.Y
+            // Approximate top offset of list area; keep prior 6-line offset heuristic
+            localIndex := (msg.Y - 6) / m.itemHeight
+            clickedIndex := m.windowStart + localIndex
 
-		switch msg.String() {
-		case "MouseWheelUp":
-			m.viewport.LineUp(1)
-			// Update cursor based on scroll position if needed
-			m.updateCursorFromScroll()
-		case "MouseWheelDown":
-			m.viewport.LineDown(1)
-			// Update cursor based on scroll position if needed
-			m.updateCursorFromScroll()
-		case "MouseLeft":
-			m.mouseY = msg.Y
-			// Convert mouse Y to list index considering scroll position
-			clickedIndex := (msg.Y - 6 + m.viewport.YOffset) / m.itemHeight
-
-			switch m.step {
-			case 0:
-				if clickedIndex >= 0 && clickedIndex < len(m.choices) {
-					m.cursor = clickedIndex
-					if m.runtime == m.choices[clickedIndex].ID {
-						m.stepCursors[m.step] = m.cursor
-						m.runtime = m.choices[m.cursor].ID
-						m.runtimeName = m.choices[m.cursor].Name
-						m.step++
-						m.cursor = m.stepCursors[m.step]
-					}
-				}
-			case 1:
-				if templates, ok := m.templates[m.runtime]; ok {
-					if clickedIndex >= 0 && clickedIndex < len(templates) {
-						m.cursor = clickedIndex
-						if m.template == templates[clickedIndex].Name {
-							m.stepCursors[m.step] = m.cursor
-							m.template = templates[m.cursor].Name
-							m.step++
-							m.cursor = 0
-							m.projectName.Focus()
-						}
-					}
-				}
-			}
-		}
+            switch m.step {
+            case 0:
+                if clickedIndex >= 0 && clickedIndex < len(m.choices) {
+                    m.cursor = clickedIndex
+                    m.ensureCursorVisible()
+                }
+            case 1:
+                if templates, ok := m.templates[m.runtime]; ok {
+                    if clickedIndex >= 0 && clickedIndex < len(templates) {
+                        m.cursor = clickedIndex
+                        m.ensureCursorVisible()
+                    }
+                }
+            }
+        }
 
 	case spinner.TickMsg:
 		if m.checkingName || m.checkingDeps {
@@ -548,6 +513,8 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.cursor = 0
 					m.stepCursors[m.step] = 0
 				}
+            // Ensure selection is visible when entering template step
+            m.ensureCursorVisible()
 			} else {
 				m.cursor = 0
 				m.stepCursors[m.step] = 0
@@ -569,7 +536,7 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quit = true
 			return m, tea.Quit
 
-		case "left", "esc":
+        case "left", "esc":
 			if m.step == 3 && !m.agentName.Focused() && !m.agentDesc.Focused() {
 				if m.authCursor > 0 {
 					m.authCursor--
@@ -583,7 +550,7 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					break
 				}
 			}
-			if m.step > 0 {
+            if m.step > 0 {
 				// Store current cursor position before going back
 				m.stepCursors[m.step] = m.cursor
 				m.step--
@@ -600,7 +567,7 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 				// Restore cursor position for the previous step
-				if savedCursor, ok := m.stepCursors[m.step]; ok {
+                if savedCursor, ok := m.stepCursors[m.step]; ok {
 					m.cursor = savedCursor
 					// Update the selection based on the restored cursor position
 					if m.step == 0 {
@@ -611,6 +578,9 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							m.template = templates[m.cursor].Name
 						}
 					}
+                    if m.step <= 1 {
+                        m.ensureCursorVisible()
+                    }
 				} else {
 					m.cursor = 0
 					if m.step == 0 {
@@ -619,6 +589,9 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					} else if m.step == 1 {
 						m.template = ""
 					}
+                    if m.step <= 1 {
+                        m.windowStart = 0
+                    }
 				}
 				m.projectName.Blur()
 				m.description.Blur()
@@ -626,7 +599,7 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.agentDesc.Blur()
 			}
 
-		case "right":
+        case "right":
 			if m.step == 3 && !m.agentName.Focused() && !m.agentDesc.Focused() {
 				// Toggle between None, Project API Key, and Agent API Key
 				if m.authCursor < 2 {
@@ -639,7 +612,7 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.agentAuthType = "agent"
 					}
 				}
-			} else {
+            } else {
 				// Only advance if current step is valid
 				if m.step == 0 && m.cursor < len(m.choices) {
 					m.runtime = m.choices[m.cursor].ID
@@ -652,6 +625,7 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.step++
 					m.cursor = m.stepCursors[m.step]
 					m.projectName.Focus()
+                    m.windowStart = 0
 				} else if m.step == 2 {
 					if m.nameValidated && !m.checkingName && m.projectName.Value() != "" {
 						// Store current cursor position before moving forward
@@ -674,19 +648,16 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							m.agentName.Focus()
 						}
 					}
-				} else if m.step == 4 {
+                } else if m.step == 4 {
 					return m, tea.Quit
 				}
 			}
 
-		case "up":
+        case "up":
 			if m.step <= 1 { // Only for list views
 				if m.cursor > 0 {
 					m.cursor--
-					// Ensure cursor is visible after moving up
-					if m.ready {
-						m.ensureCursorVisible()
-					}
+                    m.ensureCursorVisible()
 				}
 			}
 			if m.step == 2 {
@@ -713,7 +684,7 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-		case "down":
+        case "down":
 			if m.step <= 1 { // Only for list views
 				maxItems := 0
 				if m.step == 0 {
@@ -724,10 +695,7 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				if m.cursor < maxItems-1 {
 					m.cursor++
-					// Ensure cursor is visible after moving down
-					if m.ready {
-						m.ensureCursorVisible()
-					}
+                    m.ensureCursorVisible()
 				}
 			}
 			if m.step == 2 {
@@ -771,7 +739,7 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-		case "enter":
+        case "enter":
 			if m.step == 0 {
 				m.runtime = m.choices[m.cursor].ID
 				m.runtimeName = m.choices[m.cursor].Name
@@ -785,6 +753,7 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Focus the project name input when entering step 2
 				m.projectName.Focus()
 				m.nameEnter = false
+                m.windowStart = 0
 
 			} else if m.step == 2 {
 				if m.projectName.Focused() {
@@ -844,17 +813,7 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 
-		case "pgup":
-			if m.step <= 1 {
-				m.viewport.HalfViewUp()
-				m.updateCursorFromScroll()
-			}
-
-		case "pgdown":
-			if m.step <= 1 {
-				m.viewport.HalfViewDown()
-				m.updateCursorFromScroll()
-			}
+        // Remove free scrolling keys
 
 		case "tab", "shift+tab":
 			if m.step == 2 {
@@ -931,12 +890,16 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Handle viewport updates
-	if m.ready {
-		var cmd tea.Cmd
-		m.viewport, cmd = m.viewport.Update(msg)
-		cmds = append(cmds, cmd)
-	}
+    // Handle viewport updates: set YOffset based on windowStart so items are fully shown
+    if m.ready && m.step <= 1 {
+        // In paged mode the content is already sliced; keep offset at 0
+        if m.viewport.YOffset != 0 {
+            m.viewport.SetYOffset(0)
+        }
+        var cmd tea.Cmd
+        m.viewport, cmd = m.viewport.Update(msg)
+        cmds = append(cmds, cmd)
+    }
 
 	// Update error modal state
 	if m.depsError != "" || m.validationError != "" {
@@ -948,15 +911,14 @@ func (m projectFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // Add helper methods for scroll handling
 func (m *projectFormModel) initViewport() {
-	// Fixed element heights (always including both scroll indicators)
-	titleBarHeight := 3   // Title + description + spacing
-	headerHeight := 4     // Step title + description + spacing
-	footerHeight := 4     // Help text + spacing
-	verticalMargins := 2  // Top and bottom margins
-	scrollIndicators := 4 // Space for both scroll indicators (↑ and ↓)
+    // Fixed element heights
+    titleBarHeight := 3  // Title + spacing
+    headerHeight := 4    // Step title + description + spacing
+    footerHeight := 4    // Help text + spacing
+    verticalMargins := 2 // Top and bottom margins
 
-	// Calculate total fixed height (including both scroll indicators)
-	totalFixedHeight := titleBarHeight + headerHeight + footerHeight + verticalMargins + scrollIndicators
+    // Calculate total fixed height
+    totalFixedHeight := titleBarHeight + headerHeight + footerHeight + verticalMargins
 
 	// Calculate available height for viewport
 	availableHeight := m.height - totalFixedHeight
@@ -970,16 +932,24 @@ func (m *projectFormModel) initViewport() {
 		contentWidth = 20
 	}
 
-	// Initialize viewport with calculated dimensions
-	m.viewport = viewport.New(contentWidth, availableHeight)
-	m.viewport.Style = lipgloss.NewStyle().Padding(0, 1) // Add left/right padding within viewport
+    // Initialize viewport with calculated dimensions
+    m.viewport = viewport.New(contentWidth, availableHeight)
+    m.viewport.Style = lipgloss.NewStyle().Padding(0, 1) // Add left/right padding within viewport
 
-	// Set item height and mark model as ready
-	m.itemHeight = 6 // Each item takes 6 lines (title + description + spacing)
-	m.ready = true
+    // Set item height and mark model as ready
+    m.itemHeight = 3 // Each item uses 3 lines (title + description + spacing)
+    if availableHeight <= 0 {
+        m.windowSize = 0
+    } else {
+        m.windowSize = availableHeight / m.itemHeight
+        if m.windowSize < 1 {
+            m.windowSize = 1
+        }
+    }
+    m.ready = true
 
-	// Force initial update of viewport content
-	if m.step <= 1 {
+        // Force initial update of viewport content
+        if m.step <= 1 {
 		var content strings.Builder
 
 		// Build content based on current step
@@ -1009,61 +979,40 @@ func (m *projectFormModel) initViewport() {
 			}
 		}
 
-		m.updateViewportContent(content.String())
+        // Ensure selected option will be in frame after resize
+        m.ensureCursorVisible()
+        m.updateViewportContent(content.String())
 	}
 }
 
 func (m *projectFormModel) ensureCursorVisible() {
-	if !m.ready {
-		return
-	}
+    if !m.ready || m.step > 1 {
+        return
+    }
 
-	// Calculate the actual position of the cursor in the content
-	cursorPos := m.cursor * m.itemHeight
+    // Compute window so that selected item is fully visible
+    if m.windowSize <= 0 {
+        return
+    }
 
-	// Calculate visible area
-	visibleStart := m.viewport.YOffset
-	visibleEnd := visibleStart + m.viewport.Height - m.itemHeight
+    // If cursor above window, move windowStart up to cursor
+    if m.cursor < m.windowStart {
+        m.windowStart = m.cursor
+    }
 
-	// If cursor is above visible area, scroll up
-	if cursorPos < visibleStart {
-		m.viewport.SetYOffset(cursorPos)
-	}
+    // If cursor beyond window end, shift window to include it
+    windowEnd := m.windowStart + m.windowSize - 1
+    if m.cursor > windowEnd {
+        m.windowStart = m.cursor - (m.windowSize - 1)
+    }
 
-	// If cursor is below visible area, scroll down
-	if cursorPos > visibleEnd {
-		// Set offset to show cursor at the bottom of viewport
-		m.viewport.SetYOffset(cursorPos - m.viewport.Height + m.itemHeight)
-	}
+    if m.windowStart < 0 {
+        m.windowStart = 0
+    }
 }
 
 func (m *projectFormModel) updateCursorFromScroll() {
-	if !m.ready {
-		return
-	}
-
-	// Update cursor based on scroll position
-	viewTop := m.viewport.YOffset
-
-	// Find the first fully visible item
-	newCursor := viewTop / m.itemHeight
-
-	// Ensure cursor stays within bounds
-	maxItems := 0
-	if m.step == 0 {
-		maxItems = len(m.choices)
-	} else if m.step == 1 && m.runtime != "" {
-		maxItems = len(m.templates[m.runtime])
-	}
-
-	if newCursor >= maxItems {
-		newCursor = maxItems - 1
-	}
-	if newCursor < 0 {
-		newCursor = 0
-	}
-
-	m.cursor = newCursor
+    // No free scroll; nothing to do
 }
 
 func (m projectFormModel) View() string {
@@ -1177,9 +1126,33 @@ func (m projectFormModel) View() string {
 		content.WriteString(descriptionStyle.UnsetWidth().UnsetPaddingLeft().Render(description))
 		content.WriteString("\n\n")
 
-		// Build scrollable content
-		var scrollContent strings.Builder
-		for _, item := range items {
+        // Build paged content: only full items that fit
+        var scrollContent strings.Builder
+        // Derive visible slice
+        totalItems := len(items)
+        if m.windowSize <= 0 {
+            m.windowSize = 1
+        }
+        // Make sure selection is clamped and window follows selection
+        if m.cursor >= totalItems {
+            m.cursor = totalItems - 1
+        }
+        if m.cursor < 0 {
+            m.cursor = 0
+        }
+        m.ensureCursorVisible()
+        if m.windowStart < 0 {
+            m.windowStart = 0
+        }
+        if m.windowStart > totalItems {
+            m.windowStart = 0
+        }
+        end := m.windowStart + m.windowSize
+        if end > totalItems {
+            end = totalItems
+        }
+        visible := items[m.windowStart:end]
+        for _, item := range visible {
 			if item.selected {
 				scrollContent.WriteString(fmt.Sprintf("> %s\n", selectedItemStyle.Render(item.name)))
 				scrollContent.WriteString(descriptionSelectedStyle.PaddingLeft(2).Render(item.desc) + "\n")
@@ -1191,37 +1164,36 @@ func (m projectFormModel) View() string {
 			}
 		}
 
-		// Add scrollable content within viewport
-		if m.ready {
-			m.updateViewportContent(scrollContent.String())
-			content.WriteString(m.viewport.View())
-
-			// Add scroll indicators if content exceeds viewport
-			if m.contentHeight > m.viewport.Height {
-				var indicators strings.Builder
-				if m.viewport.YOffset > 0 {
-					indicators.WriteString("↑")
-				} else {
-					indicators.WriteString(" ")
-				}
-				indicators.WriteString(" • ")
-				if m.viewport.YOffset+m.viewport.Height < m.contentHeight {
-					indicators.WriteString("↓")
-				} else {
-					indicators.WriteString(" ")
-				}
-				content.WriteString("\n" + descriptionStyle.Copy().Align(lipgloss.Center).Render(indicators.String()))
-			}
-		} else {
+        // Add content within viewport
+        if m.ready {
+            m.updateViewportContent(scrollContent.String())
+            content.WriteString(m.viewport.View())
+            // Paged-mode indicators based on window position
+            if totalItems > m.windowSize {
+                var indicators strings.Builder
+                if m.windowStart > 0 {
+                    indicators.WriteString("↑")
+                } else {
+                    indicators.WriteString(" ")
+                }
+                indicators.WriteString(" • ")
+                if m.windowStart+m.windowSize < totalItems {
+                    indicators.WriteString("↓")
+                } else {
+                    indicators.WriteString(" ")
+                }
+                content.WriteString("\n" + descriptionStyle.Copy().Align(lipgloss.Center).Render(indicators.String()))
+            }
+        } else {
 			content.WriteString(scrollContent.String())
 		}
 
-		// Add dependency check status to step 0 view
-		if m.step == 0 {
-			if m.checkingDeps {
-				content.WriteString("\n" + descriptionStyle.UnsetWidth().UnsetPaddingLeft().UnsetMarginLeft().MarginTop(1).Render(m.spinner.View()+" checking dependencies..."))
-			}
-		}
+        // Add dependency check status to step 0 view
+        if m.step == 0 {
+            if m.checkingDeps {
+                content.WriteString("\n" + descriptionStyle.UnsetWidth().UnsetPaddingLeft().UnsetMarginLeft().MarginTop(1).Render(m.spinner.View()+" checking dependencies..."))
+            }
+        }
 
 	case 2:
 		content.WriteString(titleStyle.UnsetBackground().UnsetWidth().Underline(true).Render("Project Details:"))
@@ -1333,9 +1305,7 @@ func (m projectFormModel) View() string {
 
 	// Help bar (fixed at bottom)
 	help := []string{"↑ up", "↓ down"}
-	if m.step <= 1 {
-		help = append(help, "pgup/pgdn scroll")
-	}
+    // No free scrolling in list views
 	switch m.step {
 	case 2:
 		if m.projectName.Value() != "" && m.nameValidated && !m.checkingName {
