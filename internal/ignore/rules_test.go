@@ -36,12 +36,14 @@ func TestRules(t *testing.T) {
 	assert.True(t, rules.Ignore("/Users/foobar/example/.foo.swp", nil))
 	assert.True(t, rules.Ignore("/Users/foobar/example/src/__test__/test_bar.py", nil))
 	assert.True(t, rules.Ignore("/Users/foobar/example/.agentuity-12345", nil))
+	assert.False(t, rules.Ignore("/Users/foobar/setup.sh", nil))
 }
 
 func TestNegateRules(t *testing.T) {
 	rules := Empty()
 	rules.AddDefaults()
-	rules.Add("!**/foo.py")
+	rules.Add("**/*.py")    // First ignore all Python files
+	rules.Add("!**/foo.py") // Then negate foo.py specifically
 	assert.False(t, rules.Ignore("/Users/foobar/example/src/foo.py", nil))
 	assert.False(t, rules.Ignore("foo.py", nil))
 	assert.True(t, rules.Ignore("bar.py", nil))

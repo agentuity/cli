@@ -94,6 +94,7 @@ func (r *Rules) AddDefaults() {
 	r.parseRule("**/.agentuity-*")
 	r.parseRule("**/biome.json")
 	r.parseRule("**/.DS_Store")
+	r.parseRule("!setup.sh") // Explicitly don't ignore setup.sh
 }
 
 // Add a rule to the ignore set.
@@ -151,11 +152,8 @@ func (r *Rules) Ignore(path string, fi os.FileInfo) bool {
 		return false
 	}
 
-	if path == "setup.sh" {
-		return false
-	}
-
 	var fullWildcard bool
+	var matched bool
 
 	for n, p := range r.patterns {
 		if p.match == nil {
@@ -176,19 +174,19 @@ func (r *Rules) Ignore(path string, fi os.FileInfo) bool {
 		if p.negate {
 			// if full wildcard, we inverse the negation to only match files that match the following rules
 			if fullWildcard {
-				if p.mustDir && fi.IsDir() {
+				if p.mustDir && fi != nil && fi.IsDir() {
 					return false
 				}
 				if p.match(path, fi) {
 					return false
 				}
 			} else {
-				// otherwise, we only match files that don't match the rule
-				if p.mustDir && !fi.IsDir() {
-					return true
+				// For negation rules, if the path matches the pattern, it should NOT be ignored
+				if p.mustDir && fi != nil && !fi.IsDir() {
+					continue
 				}
-				if !p.match(path, fi) {
-					return true
+				if p.match(path, fi) {
+					return false
 				}
 			}
 			continue
@@ -196,14 +194,19 @@ func (r *Rules) Ignore(path string, fi os.FileInfo) bool {
 
 		// If the rule is looking for directories, and this is not a directory,
 		// skip it.
-		if p.mustDir && !fi.IsDir() {
+		if p.mustDir && fi != nil && !fi.IsDir() {
 			continue
 		}
 		if p.match(path, fi) {
-			return true
+			matched = true
+			// Don't return immediately - keep checking for negation rules
 		}
 	}
-	return fullWildcard
+
+	if fullWildcard {
+		return true
+	}
+	return matched
 }
 
 // parseRule parses a rule string and creates a pattern, which is then stored in the Rules object.
