@@ -990,8 +990,18 @@ func (m *projectFormModel) ensureCursorVisible() {
 		return
 	}
 
+	// Get the total number of items based on current step
+	var totalItems int
+	if m.step == 0 {
+		totalItems = len(m.choices)
+	} else if m.step == 1 {
+		if templates, ok := m.templates[m.runtime]; ok {
+			totalItems = len(templates)
+		}
+	}
+
 	// Compute window so that selected item is fully visible
-	if m.windowSize <= 0 {
+	if m.windowSize <= 0 || totalItems == 0 {
 		return
 	}
 
@@ -1008,6 +1018,15 @@ func (m *projectFormModel) ensureCursorVisible() {
 
 	if m.windowStart < 0 {
 		m.windowStart = 0
+	}
+
+	// Clamp windowStart to ensure it doesn't exceed valid bounds
+	maxWindowStart := totalItems - m.windowSize
+	if maxWindowStart < 0 {
+		maxWindowStart = 0
+	}
+	if m.windowStart > maxWindowStart {
+		m.windowStart = maxWindowStart
 	}
 }
 
