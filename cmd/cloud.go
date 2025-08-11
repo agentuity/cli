@@ -80,6 +80,7 @@ type startRequest struct {
 	Tags           []string           `json:"tags,omitempty"`
 	TagDescription string             `json:"description,omitempty"`
 	TagMessage     string             `json:"message,omitempty"`
+	UsePrivateKey  bool               `json:"usePrivateKey,omitempty"`
 }
 
 func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.Command, apiUrl string, apikey string, projectId string, project *project.Project, dir string, isImport bool) {
@@ -421,6 +422,7 @@ Examples:
 		startRequest.Tags = tags
 		startRequest.TagDescription = description
 		startRequest.TagMessage = message
+		startRequest.UsePrivateKey = true
 
 		// Start deployment
 		if err := client.Do("PUT", fmt.Sprintf("/cli/deploy/start/%s%s", theproject.ProjectId, deploymentId), startRequest, &startResponse); err != nil {
