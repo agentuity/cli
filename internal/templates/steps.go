@@ -43,14 +43,24 @@ var _ Step = (*CommandStep)(nil)
 func (s *CommandStep) Run(ctx TemplateContext) error {
 	ctx.Logger.Debug("Running command: %s with args: %s", s.Command, strings.Join(s.Args, " "))
 
-	timeoutCtx, cancel := context.WithTimeout(ctx.Context, 1*time.Minute)
+	timeoutCtx, cancel := context.WithTimeout(ctx.Context, 2*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(timeoutCtx, s.Command, s.Args...)
 	cmd.Dir = ctx.ProjectDir
 	cmd.Stdin = nil
 
 	out, err := cmd.CombinedOutput()
+
+	buf := strings.TrimSpace(string(out))
+	if buf != "" {
+		ctx.Logger.Debug("Command output: %s", buf)
+		if cmd.ProcessState != nil {
+			ctx.Logger.Debug("command exit code %d", cmd.ProcessState.ExitCode())
+		}
+	}
+
 	if err != nil {
+		ctx.Logger.Debug("command failed with error: %s (%T)", err, err)
 		if s.Command == "uv" && len(s.Args) >= 3 && s.Args[0] == "add" {
 			exitErr, ok := err.(*exec.ExitError)
 			if ok && exitErr.ExitCode() == 130 {
@@ -60,6 +70,7 @@ func (s *CommandStep) Run(ctx TemplateContext) error {
 				altCmd := exec.CommandContext(ctx.Context, "uv", "pip", "install")
 				altCmd.Args = append(altCmd.Args, packages...)
 				altCmd.Dir = ctx.ProjectDir
+				altCmd.Stdin = nil
 				altOut, altErr := altCmd.CombinedOutput()
 
 				if altErr == nil {
@@ -71,6 +82,7 @@ func (s *CommandStep) Run(ctx TemplateContext) error {
 				pipCmd := exec.CommandContext(ctx.Context, "pip", "install")
 				pipCmd.Args = append(pipCmd.Args, packages...)
 				pipCmd.Dir = ctx.ProjectDir
+				pipCmd.Stdin = nil
 				pipOut, pipErr := pipCmd.CombinedOutput()
 
 				if pipErr == nil {
@@ -83,13 +95,9 @@ func (s *CommandStep) Run(ctx TemplateContext) error {
 			}
 		}
 
-		return fmt.Errorf("failed to run command: %s with args: %s: %w (%s)", s.Command, strings.Join(s.Args, " "), err, string(out))
+		return fmt.Errorf("failed to run command: %s with args: %s: %w (%s)", s.Command, strings.Join(s.Args, " "), err, buf)
 	}
 
-	buf := strings.TrimSpace(string(out))
-	if buf != "" {
-		ctx.Logger.Debug("Command output: %s", buf)
-	}
 	return nil
 }
 
