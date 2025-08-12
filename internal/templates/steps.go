@@ -43,6 +43,7 @@ var _ Step = (*CommandStep)(nil)
 func (s *CommandStep) Run(ctx TemplateContext) error {
 	ctx.Logger.Debug("Running command: %s with args: %s", s.Command, strings.Join(s.Args, " "))
 
+	started := time.Now()
 	timeoutCtx, cancel := context.WithTimeout(ctx.Context, 2*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(timeoutCtx, s.Command, s.Args...)
@@ -57,7 +58,11 @@ func (s *CommandStep) Run(ctx TemplateContext) error {
 	}
 
 	if cmd.ProcessState != nil {
-		ctx.Logger.Debug("command exit code %d", cmd.ProcessState.ExitCode())
+		ctx.Logger.Debug("command exit code %d (took %v)", cmd.ProcessState.ExitCode(), time.Since(started))
+	}
+
+	if timeoutCtx.Err() == context.DeadlineExceeded {
+		ctx.Logger.Error("command: %s %s timed out after %v", s.Command, strings.Join(s.Args, " "), time.Since(started))
 	}
 
 	if err != nil {
