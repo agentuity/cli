@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.164] - 2025-08-12
+
+### Added
+- Allow setup.sh in case we need to run some script in docker image ([#427](https://github.com/agentuity/cli/pull/427))
+
+### Changed
+- Add more debugging around new project to debug failure ([#430](https://github.com/agentuity/cli/pull/430))
+- Make it scroll with arrows as well ([#428](https://github.com/agentuity/cli/pull/428))
+
 ## [v0.0.163] - 2025-07-22
 
 ### Added
