@@ -54,9 +54,10 @@ func (s *CommandStep) Run(ctx TemplateContext) error {
 	buf := strings.TrimSpace(string(out))
 	if buf != "" {
 		ctx.Logger.Debug("Command output: %s", buf)
-		if cmd.ProcessState != nil {
-			ctx.Logger.Debug("command exit code %d", cmd.ProcessState.ExitCode())
-		}
+	}
+
+	if cmd.ProcessState != nil {
+		ctx.Logger.Debug("command exit code %d", cmd.ProcessState.ExitCode())
 	}
 
 	if err != nil {
