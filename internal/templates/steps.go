@@ -40,11 +40,13 @@ type CommandStep struct {
 
 var _ Step = (*CommandStep)(nil)
 
+const commandExecTimeout = time.Minute * 2
+
 func (s *CommandStep) Run(ctx TemplateContext) error {
 	ctx.Logger.Debug("Running command: %s with args: %s", s.Command, strings.Join(s.Args, " "))
 
 	started := time.Now()
-	timeoutCtx, cancel := context.WithTimeout(ctx.Context, 2*time.Minute)
+	timeoutCtx, cancel := context.WithTimeout(ctx.Context, commandExecTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(timeoutCtx, s.Command, s.Args...)
 	cmd.Dir = ctx.ProjectDir
@@ -73,7 +75,9 @@ func (s *CommandStep) Run(ctx TemplateContext) error {
 				packages := s.Args[2:]
 				ctx.Logger.Debug("Command interrupted with SIGINT (130), trying alternative installation methods for: %v", packages)
 
-				altCmd := exec.CommandContext(ctx.Context, "uv", "pip", "install")
+				fallbackCtx1, fallbackCancel1 := context.WithTimeout(ctx.Context, commandExecTimeout)
+				defer fallbackCancel1()
+				altCmd := exec.CommandContext(fallbackCtx1, "uv", "pip", "install")
 				altCmd.Args = append(altCmd.Args, packages...)
 				altCmd.Dir = ctx.ProjectDir
 				altCmd.Stdin = nil
@@ -85,7 +89,9 @@ func (s *CommandStep) Run(ctx TemplateContext) error {
 				}
 
 				ctx.Logger.Debug("Failed to install with uv pip, trying with pip: %v", altErr)
-				pipCmd := exec.CommandContext(ctx.Context, "pip", "install")
+				fallbackCtx2, fallbackCancel2 := context.WithTimeout(ctx.Context, commandExecTimeout)
+				defer fallbackCancel2()
+				pipCmd := exec.CommandContext(fallbackCtx2, "pip", "install")
 				pipCmd.Args = append(pipCmd.Args, packages...)
 				pipCmd.Dir = ctx.ProjectDir
 				pipCmd.Stdin = nil
