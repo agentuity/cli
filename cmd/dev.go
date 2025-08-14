@@ -145,31 +145,34 @@ Examples:
 		}
 
 		var build func(initial bool) bool
-		if !noBuild {
-			build = func(initial bool) bool {
-				started := time.Now()
-				var ok bool
-				tui.ShowSpinner("Building project ...", func() {
-					if err := bundler.Bundle(bundler.BundleContext{
-						Context:    ctx,
-						Logger:     log,
-						ProjectDir: dir,
-						Production: false,
-						DevMode:    true,
-						Writer:     os.Stdout,
-					}); err != nil {
-						if err == bundler.ErrBuildFailed {
-							return
-						}
-						errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to bundle project: %s", err))).ShowErrorAndExit()
-					}
-					ok = true
-				})
-				if ok && !initial {
-					log.Info("✨ Built in %s", time.Since(started).Round(time.Millisecond))
-				}
-				return ok
+
+		build = func(initial bool) bool {
+			if noBuild {
+				log.Info("Skipping build (no-build flag set)")
+				return true
 			}
+			started := time.Now()
+			var ok bool
+			tui.ShowSpinner("Building project ...", func() {
+				if err := bundler.Bundle(bundler.BundleContext{
+					Context:    ctx,
+					Logger:     log,
+					ProjectDir: dir,
+					Production: false,
+					DevMode:    true,
+					Writer:     os.Stdout,
+				}); err != nil {
+					if err == bundler.ErrBuildFailed {
+						return
+					}
+					errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to bundle project: %s", err))).ShowErrorAndExit()
+				}
+				ok = true
+			})
+			if ok && !initial {
+				log.Info("✨ Built in %s", time.Since(started).Round(time.Millisecond))
+			}
+			return ok
 		}
 
 		runServer := func() {
@@ -195,10 +198,9 @@ Examples:
 		}
 
 		// Initial build must exit if it fails
-		if !noBuild {
-			if !build(true) {
-				return
-			}
+
+		if !build(true) {
+			return
 		}
 
 		var restartingLock sync.Mutex
@@ -271,5 +273,6 @@ func init() {
 	rootCmd.AddCommand(devCmd)
 	devCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
 	devCmd.Flags().Int("port", 0, "The port to run the development server on (uses project default if not provided)")
-	devCmd.Flags().Bool("no-build", false, "Do not build the project before running it")
+	devCmd.Flags().Bool("no-build", false, "Do not build the project before running it (useful for debugging)")
+	devCmd.Flags().MarkHidden("no-build")
 }

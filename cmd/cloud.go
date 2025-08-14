@@ -1017,7 +1017,8 @@ func init() {
 	cloudDeployCmd.Flags().MarkHidden("ci-message")
 	cloudDeployCmd.Flags().MarkHidden("ci-git-provider")
 	cloudDeployCmd.Flags().MarkHidden("ci-logs-url")
-	cloudDeployCmd.Flags().Bool("no-build", false, "Do not build the project before running it")
+	cloudDeployCmd.Flags().Bool("no-build", false, "Do not build the project before running it (useful for debugging)")
+	cloudDeployCmd.Flags().MarkHidden("no-build")
 
 	cloudDeployCmd.Flags().String("format", "text", "The output format to use for results which can be either 'text' or 'json'")
 	cloudDeployCmd.Flags().String("org-id", "", "The organization to create the project in")
