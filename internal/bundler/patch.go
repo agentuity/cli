@@ -100,6 +100,7 @@ func createPlugin(logger logger.Logger, dir string, shimSourceMap bool) api.Plug
 						return api.OnLoadResult{}, err
 					}
 					contents := string(buf)
+					// fmt.Println(contents)
 					var suffix strings.Builder
 					isJS := strings.HasSuffix(args.Path, ".js")
 					for fn, mod := range mod.Functions {
@@ -121,6 +122,9 @@ func createPlugin(logger logger.Logger, dir string, shimSourceMap bool) api.Plug
 						prefix := strings.TrimSpace(contents[eol+1 : index])
 						isAsync := strings.Contains(prefix, "async")
 						isExport := strings.Contains(prefix, "export")
+						isArrow := strings.Contains(contents[index:], "=>")
+						fmt.Println(fnname, contents[index:index+20])
+						fmt.Println(isArrow)
 						newname := "__agentuity_" + fn
 						var newfnname string
 						if isConstVariable {
@@ -137,7 +141,11 @@ func createPlugin(logger logger.Logger, dir string, shimSourceMap bool) api.Plug
 						}
 						contents = strings.Replace(contents, fnname, newfnname, 1)
 						if isJS {
-							suffix.WriteString(fnprefix + fnname + "() => {\n")
+							if isArrow {
+								suffix.WriteString(fnprefix + fnname + "() => {\n")
+							} else {
+								suffix.WriteString(fnprefix + fnname + "() {\n")
+							}
 							suffix.WriteString("let args = arguments;\n")
 						} else {
 							suffix.WriteString(fnprefix + fnname + "(...args) {\n")
