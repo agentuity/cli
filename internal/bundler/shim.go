@@ -10,7 +10,7 @@ import { dirname as __agentuity_dirname } from 'path';
 import { readFileSync as __agentuity_readFileSync, existsSync as __agentuity_existsSync } from 'fs';
 
 const __filename = __agentuity_fileURLToPath(import.meta.url);
-const __dirname = __agentuity_dirname(__filename);
+const __ag_dirname = __agentuity_dirname(__filename);
 
 // List of Node.js built-in modules that might be dynamically required
 const nodeBuiltins = [

@@ -40,11 +40,13 @@ Flags:
 
 Examples:
   agentuity dev
-  agentuity dev --dir /path/to/project`,
+  agentuity dev --dir /path/to/project
+  agentuity dev --no-build`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log := env.NewLogger(cmd)
 		logLevel := env.LogLevel(cmd)
 		apiUrl, appUrl, transportUrl := util.GetURLs(log)
+		noBuild, _ := cmd.Flags().GetBool("no-build")
 
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
@@ -142,29 +144,32 @@ Examples:
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 		}
 
-		build := func(initial bool) bool {
-			started := time.Now()
-			var ok bool
-			tui.ShowSpinner("Building project ...", func() {
-				if err := bundler.Bundle(bundler.BundleContext{
-					Context:    ctx,
-					Logger:     log,
-					ProjectDir: dir,
-					Production: false,
-					DevMode:    true,
-					Writer:     os.Stdout,
-				}); err != nil {
-					if err == bundler.ErrBuildFailed {
-						return
+		var build func(initial bool) bool
+		if !noBuild {
+			build = func(initial bool) bool {
+				started := time.Now()
+				var ok bool
+				tui.ShowSpinner("Building project ...", func() {
+					if err := bundler.Bundle(bundler.BundleContext{
+						Context:    ctx,
+						Logger:     log,
+						ProjectDir: dir,
+						Production: false,
+						DevMode:    true,
+						Writer:     os.Stdout,
+					}); err != nil {
+						if err == bundler.ErrBuildFailed {
+							return
+						}
+						errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to bundle project: %s", err))).ShowErrorAndExit()
 					}
-					errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to bundle project: %s", err))).ShowErrorAndExit()
+					ok = true
+				})
+				if ok && !initial {
+					log.Info("✨ Built in %s", time.Since(started).Round(time.Millisecond))
 				}
-				ok = true
-			})
-			if ok && !initial {
-				log.Info("✨ Built in %s", time.Since(started).Round(time.Millisecond))
+				return ok
 			}
-			return ok
 		}
 
 		runServer := func() {
@@ -190,8 +195,10 @@ Examples:
 		}
 
 		// Initial build must exit if it fails
-		if !build(true) {
-			return
+		if !noBuild {
+			if !build(true) {
+				return
+			}
 		}
 
 		var restartingLock sync.Mutex
@@ -264,4 +271,5 @@ func init() {
 	rootCmd.AddCommand(devCmd)
 	devCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
 	devCmd.Flags().Int("port", 0, "The port to run the development server on (uses project default if not provided)")
+	devCmd.Flags().Bool("no-build", false, "Do not build the project before running it")
 }
