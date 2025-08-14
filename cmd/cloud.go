@@ -198,6 +198,7 @@ Examples:
 		description, _ := cmd.Flags().GetString("description")
 		message, _ := cmd.Flags().GetString("message")
 		dryRun, _ := cmd.Flags().GetString("dry-run")
+		noBuild, _ := cmd.Flags().GetBool("no-build")
 
 		// remove duplicates and empty strings
 		tags = util.RemoveDuplicates(tags)
@@ -308,7 +309,7 @@ Examples:
 				Config:        deploymentConfig,
 				OSEnvironment: loadOSEnv(),
 				PromptHelpers: createPromptHelper(),
-			})
+			}, noBuild)
 			if err != nil {
 				errsystem.New(errsystem.ErrDeployProject, err).ShowErrorAndExit()
 			}
@@ -1016,6 +1017,7 @@ func init() {
 	cloudDeployCmd.Flags().MarkHidden("ci-message")
 	cloudDeployCmd.Flags().MarkHidden("ci-git-provider")
 	cloudDeployCmd.Flags().MarkHidden("ci-logs-url")
+	cloudDeployCmd.Flags().Bool("no-build", false, "Do not build the project before running it")
 
 	cloudDeployCmd.Flags().String("format", "text", "The output format to use for results which can be either 'text' or 'json'")
 	cloudDeployCmd.Flags().String("org-id", "", "The organization to create the project in")
