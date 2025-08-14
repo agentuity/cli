@@ -1,9 +1,6 @@
 package bundler
 
-import "fmt"
-
 func init() {
-	fmt.Println("patching node-fetch")
 	patches["node-fetch"] = patchModule{
 		Module:   "node-fetch",
 		Filename: "lib/index",
