@@ -101,11 +101,18 @@ func createPlugin(logger logger.Logger, dir string, shimSourceMap bool) api.Plug
 					}
 					contents := string(buf)
 					var suffix strings.Builder
+					isJS := strings.HasSuffix(args.Path, ".js")
 					for fn, mod := range mod.Functions {
 						fnname := "function " + fn
 						index := strings.Index(contents, fnname)
+						var isConstVariable bool
 						if index == -1 {
-							continue
+							fnname = "const " + fn + " = "
+							index = strings.Index(contents, fnname)
+							isConstVariable = true
+							if index == -1 {
+								continue
+							}
 						}
 						eol := searchBackwards(contents, index, '\n')
 						if eol < 0 {
@@ -113,20 +120,42 @@ func createPlugin(logger logger.Logger, dir string, shimSourceMap bool) api.Plug
 						}
 						prefix := strings.TrimSpace(contents[eol+1 : index])
 						isAsync := strings.Contains(prefix, "async")
+						isExport := strings.Contains(prefix, "export")
 						newname := "__agentuity_" + fn
-						newfnname := "function " + newname
+						var newfnname string
+						if isConstVariable {
+							newfnname = "const " + newname + " = "
+						} else {
+							newfnname = "function " + newname
+						}
 						var fnprefix string
 						if isAsync {
 							fnprefix = "async "
 						}
+						if isExport {
+							fnprefix += "export " + fnprefix
+						}
 						contents = strings.Replace(contents, fnname, newfnname, 1)
-						suffix.WriteString(fnprefix + fnname + "(...args) {\n")
+						if isJS {
+							suffix.WriteString(fnprefix + "function " + fn + "() {\n")
+							suffix.WriteString("let args = arguments;\n")
+						} else {
+							suffix.WriteString(fnprefix + fnname + "(...args) {\n")
+						}
 						suffix.WriteString("\tlet _args = args;\n")
 						if mod.Before != "" {
 							suffix.WriteString(mod.Before)
 							suffix.WriteString("\n")
 						}
-						suffix.WriteString("\tlet result = " + newname + "(..._args);\n")
+
+						if isJS {
+							// For JS: use .apply to preserve 'this' context
+							suffix.WriteString("\tlet result = " + newname + ".apply(this, _args);\n")
+						} else {
+							// For TS: use spread operator
+							suffix.WriteString("\tlet result = " + newname + "(..._args);\n")
+						}
+
 						if isAsync {
 							suffix.WriteString("\tif (result instanceof Promise) {\n")
 							suffix.WriteString("\t\tresult = await result;\n")
@@ -150,7 +179,7 @@ func createPlugin(logger logger.Logger, dir string, shimSourceMap bool) api.Plug
 						}
 					}
 					loader := api.LoaderJS
-					if strings.HasSuffix(args.Path, ".ts") {
+					if !isJS {
 						loader = api.LoaderTS
 					}
 					return api.OnLoadResult{
