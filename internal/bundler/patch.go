@@ -121,7 +121,6 @@ func createPlugin(logger logger.Logger, dir string, shimSourceMap bool) api.Plug
 						prefix := strings.TrimSpace(contents[eol+1 : index])
 						isAsync := strings.Contains(prefix, "async")
 						isExport := strings.Contains(prefix, "export")
-						isArrow := strings.Contains(contents[index:], "=>")
 						newname := "__agentuity_" + fn
 						var newfnname string
 						if isConstVariable {
@@ -138,11 +137,7 @@ func createPlugin(logger logger.Logger, dir string, shimSourceMap bool) api.Plug
 						}
 						contents = strings.Replace(contents, fnname, newfnname, 1)
 						if isJS {
-							if isArrow {
-								suffix.WriteString(fnprefix + fnname + "() => {\n")
-							} else {
-								suffix.WriteString(fnprefix + fnname + "() {\n")
-							}
+							suffix.WriteString(fnprefix + "function " + fn + "() {\n")
 							suffix.WriteString("let args = arguments;\n")
 						} else {
 							suffix.WriteString(fnprefix + fnname + "(...args) {\n")
@@ -152,7 +147,15 @@ func createPlugin(logger logger.Logger, dir string, shimSourceMap bool) api.Plug
 							suffix.WriteString(mod.Before)
 							suffix.WriteString("\n")
 						}
-						suffix.WriteString("\tlet result = " + newname + "(..._args);\n")
+
+						if isJS {
+							// For JS: use .apply to preserve 'this' context
+							suffix.WriteString("\tlet result = " + newname + ".apply(this, _args);\n")
+						} else {
+							// For TS: use spread operator
+							suffix.WriteString("\tlet result = " + newname + "(..._args);\n")
+						}
+
 						if isAsync {
 							suffix.WriteString("\tif (result instanceof Promise) {\n")
 							suffix.WriteString("\t\tresult = await result;\n")
