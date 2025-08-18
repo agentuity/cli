@@ -296,6 +296,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		}
 
 		if ctx.DevMode {
+			ctx.Logger.Debug("build failed: %v", result.Errors)
 			return ErrBuildFailed
 		}
 
