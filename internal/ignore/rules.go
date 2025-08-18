@@ -65,6 +65,8 @@ func (r *Rules) AddDefaults() {
 	r.parseRule("**/.venv/**/*")
 	r.parseRule("**/.git/**/*")
 	r.parseRule("**/.git")
+	r.parseRule("**/.jj/**/*")
+	r.parseRule("**/.jj")
 	r.parseRule("**/__pycache__/**")
 	r.parseRule("**/__tests__/**")
 	r.parseRule("**/*.zip")
