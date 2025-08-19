@@ -140,6 +140,9 @@ Examples:
 			name = args[0]
 		}
 
+		// Get organization ID
+		orgId := promptForClusterOrganization(ctx, logger, cmd, apiUrl, apikey)
+
 		provider, _ := cmd.Flags().GetString("provider")
 		size, _ := cmd.Flags().GetString("size")
 		region, _ := cmd.Flags().GetString("region")
@@ -189,6 +192,7 @@ Examples:
 			}
 
 			if region == "" {
+				// TODO: move these to use an option based on the selected provider
 				region = tui.Input(logger, "Which region should we use?", "The region to deploy the cluster")
 			}
 		} else {
@@ -206,9 +210,6 @@ Examples:
 				errsystem.New(errsystem.ErrMissingRequiredArgument, fmt.Errorf("region is required"), errsystem.WithContextMessage("Missing region")).ShowErrorAndExit()
 			}
 		}
-
-		// Get organization ID
-		orgId := promptForClusterOrganization(ctx, logger, cmd, apiUrl, apikey)
 
 		var cluster *infrastructure.Cluster
 
