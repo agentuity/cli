@@ -131,7 +131,7 @@ Dashboard:      %s`,
 		fmt.Print(tui.Muted(globalFlags))
 		fmt.Println()
 	}
-	fmt.Printf(tui.Muted(fmt.Sprintf("Use \"%s [command] --help\" for more information about a command.\n", cmd.CommandPath())))
+	fmt.Println(tui.Muted(fmt.Sprintf("Use \"%s [command] --help\" for more information about a command.", cmd.CommandPath())))
 }
 
 // rootCmd represents the base command when called without any subcommands
@@ -153,6 +153,7 @@ Dashboard:      %s`,
 			tui.Link("https://discord.gg/agentuity"),
 			tui.Link("https://app.agentuity.com"),
 		))
+
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		if version, _ := cmd.Flags().GetBool("version"); version {
@@ -199,6 +200,11 @@ func init() {
 	// commands its a natural flag to expect
 	rootCmd.Flags().BoolP("version", "v", false, "print out the version")
 	rootCmd.Flags().MarkHidden("version")
+
+	// Set custom help template to always use our customHelp function
+	rootCmd.SetHelpFunc(func(command *cobra.Command, strings []string) {
+		customHelp(command)
+	})
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/agentuity/config.yaml)")
 	rootCmd.PersistentFlags().String("log-level", "info", "The log level to use")
