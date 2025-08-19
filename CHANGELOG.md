@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.165] - 2025-08-18
+
+### Changed
+- Exclude the .jj folder automatically ([#434](https://github.com/agentuity/cli/pull/434))
+- Changes to make teams work ([#432](https://github.com/agentuity/cli/pull/432))
+
 ## [v0.0.164] - 2025-08-12
 
 ### Added
@@ -824,6 +830,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.165]: https://github.com/agentuity/cli/compare/v0.0.164...v0.0.165
 [v0.0.164]: https://github.com/agentuity/cli/compare/v0.0.163...v0.0.164
 [v0.0.163]: https://github.com/agentuity/cli/compare/v0.0.162...v0.0.163
 [v0.0.162]: https://github.com/agentuity/cli/compare/v0.0.161...v0.0.162
