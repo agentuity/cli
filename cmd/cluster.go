@@ -217,7 +217,7 @@ Examples:
 			cluster, err = infrastructure.CreateCluster(ctx, logger, apiUrl, apikey, infrastructure.CreateClusterArgs{
 				Name:     name,
 				Provider: provider,
-				Type:     size,  // CLI uses "size" but backend expects "type"
+				Type:     size, // CLI uses "size" but backend expects "type"
 				Region:   region,
 				OrgID:    orgId,
 			})
@@ -231,11 +231,10 @@ Examples:
 		} else {
 			tui.ShowSuccess("Cluster %s created successfully with ID: %s", cluster.Name, cluster.ID)
 			fmt.Printf("Provider: %s\n", cluster.Provider)
-			fmt.Printf("Size: %s\n", cluster.Type)  // backend field is "type" but display as "size"
+			fmt.Printf("Size: %s\n", cluster.Type) // backend field is "type" but display as "size"
 			fmt.Printf("Region: %s\n", cluster.Region)
 			fmt.Printf("Created: %s\n", cluster.CreatedAt)
 		}
-
 
 	},
 }
@@ -319,7 +318,6 @@ Examples:
 
 		tui.Table(headers, rows)
 
-
 	},
 }
 
@@ -363,7 +361,6 @@ Examples:
 		})
 
 		tui.ShowSuccess("Cluster %s removed successfully", clusterID)
-
 
 	},
 }
@@ -428,7 +425,6 @@ Examples:
 			fmt.Printf("Updated: %s\n", *cluster.UpdatedAt)
 		}
 
-
 	},
 }
 
@@ -442,7 +438,7 @@ func init() {
 		ID:    "info",
 		Title: "Information:",
 	})
-	
+
 	rootCmd.AddCommand(clusterCmd)
 	clusterCmd.AddCommand(clusterNewCmd)
 	clusterCmd.AddCommand(clusterListCmd)

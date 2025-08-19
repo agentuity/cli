@@ -1,10 +1,14 @@
-.PHONY: build fmt generate test_install_linux test_install_alpine
+.PHONY: build fmt lint generate test_install_linux test_install_alpine
 
 build: fmt generate
 	@go build -o agentuity
 
 fmt:
 	@go fmt ./...
+
+lint:
+	@$(MAKE) fmt
+	@go mod tidy
 
 generate:
 	@echo "Running go generate..."

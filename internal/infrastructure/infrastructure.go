@@ -20,7 +20,7 @@ type Cluster struct {
 	ID        string  `json:"id"`
 	Name      string  `json:"name"`
 	Provider  string  `json:"provider"`
-	Type      string  `json:"type"`      // backend uses "type" instead of "size"
+	Type      string  `json:"type"` // backend uses "type" instead of "size"
 	Region    string  `json:"region"`
 	OrgID     *string `json:"orgId"`     // nullable in response from list
 	OrgName   *string `json:"orgName"`   // joined from org table in list
@@ -31,9 +31,9 @@ type Cluster struct {
 // Machine represents a machine in the infrastructure
 type Machine struct {
 	ID          string                 `json:"id"`
-	ClusterID   string                 `json:"clusterId"`   // backend uses camelCase
-	InstanceID  string                 `json:"instanceId"`  // provider specific instance id
-	Status      string                 `json:"status"`      // enum: provisioned, running, stopping, stopped, paused, resuming, error
+	ClusterID   string                 `json:"clusterId"`  // backend uses camelCase
+	InstanceID  string                 `json:"instanceId"` // provider specific instance id
+	Status      string                 `json:"status"`     // enum: provisioned, running, stopping, stopped, paused, resuming, error
 	Provider    string                 `json:"provider"`
 	Region      string                 `json:"region"`
 	Metadata    map[string]interface{} `json:"metadata"`    // provider specific metadata (only in detail view)
@@ -53,7 +53,7 @@ type Machine struct {
 type CreateClusterArgs struct {
 	Name     string `json:"name"`
 	Provider string `json:"provider"`
-	Type     string `json:"type"`  // backend expects "type" instead of "size"
+	Type     string `json:"type"` // backend expects "type" instead of "size"
 	Region   string `json:"region"`
 	OrgID    string `json:"orgId"` // backend expects camelCase orgId
 }
@@ -65,9 +65,9 @@ func CreateCluster(ctx context.Context, logger logger.Logger, baseURL string, to
 	payload := map[string]any{
 		"name":     args.Name,
 		"provider": args.Provider,
-		"type":     args.Type,   // backend expects "type" instead of "size"
+		"type":     args.Type, // backend expects "type" instead of "size"
 		"region":   args.Region,
-		"orgId":    args.OrgID,  // backend expects camelCase orgId
+		"orgId":    args.OrgID, // backend expects camelCase orgId
 	}
 
 	var resp Response[Cluster]

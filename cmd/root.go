@@ -42,6 +42,8 @@ var logoBox = lipgloss.NewStyle().
 	AlignVertical(lipgloss.Top).
 	AlignHorizontal(lipgloss.Left).
 	Foreground(logoColor)
+var titleColor = lipgloss.AdaptiveColor{Light: "#000000", Dark: "#ffffff"}
+var titleStyle = lipgloss.NewStyle().Foreground(titleColor).Bold(true)
 
 // customHelp renders organized help output
 func customHelp(cmd *cobra.Command) {
@@ -52,15 +54,12 @@ Docs:           %s
 Community:      %s
 Dashboard:      %s`,
 		tui.Bold("⨺ Agentuity"),
-		tui.Muted("Build, manage and deploy AI agents"),
+		titleStyle.Render("Build, manage and deploy AI agents"),
 		Version,
 		tui.Link("https://agentuity.dev"),
 		tui.Link("https://discord.gg/agentuity"),
 		tui.Link("https://app.agentuity.com"),
 	)))
-
-	var titleColor = lipgloss.AdaptiveColor{Light: "#000000", Dark: "#ffffff"}
-	var titleStyle = lipgloss.NewStyle().Foreground(titleColor).Bold(true)
 
 	fmt.Println()
 	fmt.Println()
@@ -76,17 +75,23 @@ Dashboard:      %s`,
 	authCommands := []string{"auth", "login", "logout", "apikey"}
 	toolCommands := []string{"mcp", "upgrade", "version"}
 
+	var helpSectionCount int
+
 	printCommandGroup := func(title string, commands []string) {
-		fmt.Printf("%s\n", titleStyle.Render(fmt.Sprintf("%s", title)))
+		var buf strings.Builder
 		for _, cmdName := range commands {
 			for _, subCmd := range cmd.Commands() {
 				if subCmd.Name() == cmdName && subCmd.IsAvailableCommand() {
-					fmt.Printf("  %s %s\n", tui.Bold(fmt.Sprintf("%-12s", subCmd.Name())), tui.Muted(subCmd.Short))
+					fmt.Fprintf(&buf, "  %s %s\n", tui.Bold(fmt.Sprintf("%-12s", subCmd.Name())), tui.Muted(subCmd.Short))
 					break
 				}
 			}
 		}
-		fmt.Println()
+		if buf.Len() > 0 {
+			fmt.Printf("%s\n", titleStyle.Render(fmt.Sprintf("%s", title)))
+			fmt.Println(buf.String())
+			helpSectionCount++
+		}
 	}
 
 	printCommandGroup("Core Commands", coreCommands)
@@ -110,7 +115,11 @@ Dashboard:      %s`,
 	}
 
 	if len(otherCommands) > 0 {
-		fmt.Printf("%s\n", titleStyle.Render(fmt.Sprintf("%s", "Other Commands")))
+		if helpSectionCount > 0 {
+			fmt.Printf("%s\n", titleStyle.Render(fmt.Sprintf("%s", "Other Commands")))
+		} else {
+			fmt.Printf("%s\n", titleStyle.Render(fmt.Sprintf("%s", "Commands")))
+		}
 		for _, cmdName := range otherCommands {
 			for _, subCmd := range cmd.Commands() {
 				if subCmd.Name() == cmdName {
@@ -122,12 +131,12 @@ Dashboard:      %s`,
 		fmt.Println()
 	}
 
-	fmt.Printf("%s\n", titleStyle.Render(fmt.Sprintf("%s", "Flags")))
+	fmt.Printf("%s\n", titleStyle.Render("Flags"))
 	fmt.Print(tui.Muted(cmd.LocalFlags().FlagUsages()))
 	fmt.Println()
 	globalFlags := cmd.InheritedFlags().FlagUsages()
 	if globalFlags != "" {
-		fmt.Println("Global Flags:")
+		fmt.Println(titleStyle.Render("Global Flags"))
 		fmt.Print(tui.Muted(globalFlags))
 		fmt.Println()
 	}

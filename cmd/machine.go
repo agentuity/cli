@@ -16,8 +16,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-
-
 var machineCmd = &cobra.Command{
 	Use:   "machine",
 	Short: "Machine management commands",
@@ -144,7 +142,6 @@ Examples:
 
 		tui.Table(headers, rows)
 
-
 	},
 }
 
@@ -188,7 +185,6 @@ Examples:
 		})
 
 		tui.ShowSuccess("Machine %s removed successfully", machineID)
-
 
 	},
 }
@@ -256,7 +252,7 @@ Examples:
 		if machine.UpdatedAt != nil {
 			fmt.Printf("Updated: %s\n", *machine.UpdatedAt)
 		}
-		
+
 		if machine.StartedAt != nil {
 			fmt.Printf("Started: %s\n", *machine.StartedAt)
 		}
@@ -272,7 +268,7 @@ Examples:
 		if machine.Error != nil {
 			fmt.Printf("Error: %s\n", *machine.Error)
 		}
-		
+
 		// Display metadata if present
 		if len(machine.Metadata) > 0 {
 			fmt.Printf("Metadata:\n")
@@ -280,7 +276,6 @@ Examples:
 				fmt.Printf("  %s: %v\n", key, value)
 			}
 		}
-
 
 	},
 }
@@ -295,7 +290,7 @@ func init() {
 		ID:    "info",
 		Title: "Information:",
 	})
-	
+
 	rootCmd.AddCommand(machineCmd)
 	machineCmd.AddCommand(machineListCmd)
 	machineCmd.AddCommand(machineRemoveCmd)
