@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
@@ -17,15 +18,17 @@ type Response[T any] struct {
 
 // Cluster represents a cluster in the infrastructure
 type Cluster struct {
-	ID        string  `json:"id"`
-	Name      string  `json:"name"`
-	Provider  string  `json:"provider"`
-	Type      string  `json:"type"` // backend uses "type" instead of "size"
-	Region    string  `json:"region"`
-	OrgID     *string `json:"orgId"`     // nullable in response from list
-	OrgName   *string `json:"orgName"`   // joined from org table in list
-	CreatedAt string  `json:"createdAt"` // from baseProperties
-	UpdatedAt *string `json:"updatedAt"` // only in detail view
+	ID              string    `json:"id"`
+	Name            string    `json:"name"`
+	Provider        string    `json:"provider"`
+	Type            string    `json:"type"` // backend uses "type" instead of "size"
+	Region          string    `json:"region"`
+	OrgID           *string   `json:"orgId"`     // nullable in response from list
+	OrgName         *string   `json:"orgName"`   // joined from org table in list
+	CreatedAt       string    `json:"createdAt"` // from baseProperties
+	UpdatedAt       *string   `json:"updatedAt"` // only in detail view
+	Token           string    `json:"token"`
+	TokenExpiration time.Time `json:"tokenExpiration"`
 }
 
 // Machine represents a machine in the infrastructure

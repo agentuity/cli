@@ -15,13 +15,14 @@ import (
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	"github.com/agentuity/go-common/slice"
 	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 // Provider types for infrastructure
-var validProviders = []string{"gcp", "aws", "azure", "vmware", "other"}
+var validProviders = map[string]string{"gcp": "Google Cloud", "aws": "Amazon Web Services", "azure": "Microsoft Azure", "vmware": "VMware"}
 
 // Size types for clusters
 var validSizes = []string{"dev", "small", "medium", "large"}
@@ -30,7 +31,7 @@ var validSizes = []string{"dev", "small", "medium", "large"}
 var validFormats = []string{"table", "json"}
 
 func validateProvider(provider string) error {
-	for _, p := range validProviders {
+	for p := range validProviders {
 		if p == provider {
 			return nil
 		}
@@ -39,19 +40,15 @@ func validateProvider(provider string) error {
 }
 
 func validateSize(size string) error {
-	for _, s := range validSizes {
-		if s == size {
-			return nil
-		}
+	if slice.Contains(validSizes, size) {
+		return nil
 	}
 	return fmt.Errorf("invalid size %s, must be one of: %s", size, validSizes)
 }
 
 func validateFormat(format string) error {
-	for _, f := range validFormats {
-		if f == format {
-			return nil
-		}
+	if slice.Contains(validFormats, format) {
+		return nil
 	}
 	return fmt.Errorf("invalid format %s, must be one of: %s", format, validFormats)
 }
@@ -169,32 +166,43 @@ Examples:
 
 		// Interactive prompts if TTY available and values not provided
 		if tui.HasTTY {
-			if name == "" {
-				name = tui.Input(logger, "What should we name the cluster?", "A unique name for your cluster")
-			}
-
 			if provider == "" {
 				opts := []tui.Option{}
-				for _, p := range validProviders {
-					opts = append(opts, tui.Option{ID: p, Text: p})
+				var keys []string
+				for k := range validProviders {
+					keys = append(keys, k)
+				}
+				sort.Strings(keys)
+				for _, id := range keys {
+					opts = append(opts, tui.Option{ID: id, Text: validProviders[id]})
 				}
 				provider = tui.Select(logger, "Which provider should we use?", "", opts)
 			}
 
 			if size == "" {
 				opts := []tui.Option{
-					{ID: "dev", Text: "Development (small resources)"},
-					{ID: "small", Text: "Small (basic production)"},
-					{ID: "medium", Text: "Medium (standard production)"},
-					{ID: "large", Text: "Large (high performance)"},
+					{ID: "dev", Text: tui.PadRight("Dev", 15, " ") + tui.Muted("1 x 2 CPU, 8 GB RAM, 50GB Disk")},
+					{ID: "small", Text: tui.PadRight("Small", 15, " ") + tui.Muted("1 x 4 CPU, 16 GB RAM, 100GB Disk")},
+					{ID: "medium", Text: tui.PadRight("Medium", 15, " ") + tui.Muted("2 x 8 CPU, 32 GB RAM, 500GB Disk")},
+					{ID: "large", Text: tui.PadRight("Large", 15, " ") + tui.Muted("3 x 16 CPU, 128 GB RAM, 1500GB Disk")},
 				}
-				size = tui.Select(logger, "What size cluster do you need?", "", opts)
+				size = tui.Select(logger, "What size cluster do you need?", "This will be used to provision the cluster", opts)
 			}
 
 			if region == "" {
 				// TODO: move these to use an option based on the selected provider
-				region = tui.Input(logger, "Which region should we use?", "The region to deploy the cluster")
+				opts := []tui.Option{
+					{ID: "us-central1", Text: tui.PadRight("US Central", 15, " ") + tui.Muted("us-central1")},
+					{ID: "us-west1", Text: tui.PadRight("US West", 15, " ") + tui.Muted("us-west1")},
+					{ID: "us-east1", Text: tui.PadRight("US East", 15, " ") + tui.Muted("us-east1")},
+				}
+				region = tui.Select(logger, "Which region should we use?", "The region to deploy the cluster", opts)
 			}
+
+			if name == "" {
+				name = tui.Input(logger, "What should we name the cluster?", "A unique name for your cluster")
+			}
+
 		} else {
 			// Non-interactive validation
 			if name == "" {
@@ -211,6 +219,11 @@ Examples:
 			}
 		}
 
+		if err := infrastructure.Setup(ctx, logger, &infrastructure.Cluster{ID: "1234", Token: "", Provider: provider, Name: name, Type: size, Region: region}, format); err != nil {
+			logger.Fatal("%s", err)
+		}
+		os.Exit(0)
+
 		var cluster *infrastructure.Cluster
 
 		tui.ShowSpinner("Creating cluster...", func() {
@@ -218,7 +231,7 @@ Examples:
 			cluster, err = infrastructure.CreateCluster(ctx, logger, apiUrl, apikey, infrastructure.CreateClusterArgs{
 				Name:     name,
 				Provider: provider,
-				Type:     size, // CLI uses "size" but backend expects "type"
+				Type:     size,
 				Region:   region,
 				OrgID:    orgId,
 			})
@@ -231,12 +244,7 @@ Examples:
 			outputJSON(cluster)
 		} else {
 			tui.ShowSuccess("Cluster %s created successfully with ID: %s", cluster.Name, cluster.ID)
-			fmt.Printf("Provider: %s\n", cluster.Provider)
-			fmt.Printf("Size: %s\n", cluster.Type) // backend field is "type" but display as "size"
-			fmt.Printf("Region: %s\n", cluster.Region)
-			fmt.Printf("Created: %s\n", cluster.CreatedAt)
 		}
-
 	},
 }
 
@@ -286,7 +294,7 @@ Examples:
 			fmt.Println()
 			tui.ShowWarning("no clusters found")
 			fmt.Println()
-			tui.ShowBanner("Create a new cluster", tui.Text("Use the ")+tui.Command("new")+tui.Text(" command to create a new cluster"), false)
+			tui.ShowBanner("Create a new cluster", tui.Text("Use the ")+tui.Command("cluster new")+tui.Text(" command to create a new cluster"), false)
 			return
 		}
 
