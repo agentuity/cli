@@ -1,6 +1,7 @@
 package errsystem
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,6 +20,7 @@ import (
 	"github.com/agentuity/go-common/tui"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-isatty"
+	"github.com/mdp/qrterminal/v3"
 )
 
 var Version string = "dev"
@@ -94,6 +96,19 @@ func (e *errSystem) sendReport(filename string) {
 	}
 }
 
+// generateQRCode creates a QR code for the given URL and returns it as a string
+func generateQRCode(url string) string {
+	var buf bytes.Buffer
+	config := qrterminal.Config{
+		Level:      qrterminal.M,
+		Writer:     &buf,
+		HalfBlocks: true, // Use half blocks to make QR code more square and compact
+		QuietZone:  1,
+	}
+	qrterminal.GenerateWithConfig(url, config)
+	return buf.String()
+}
+
 // ShowErrorAndExit shows an error message and exits the program.
 // If the program is running in a terminal, it will wait for a key press
 // and then upload the error report to the Agentuity team.
@@ -107,6 +122,14 @@ func (e *errSystem) ShowErrorAndExit() {
 	} else {
 		body.WriteString(e.code.Message + "\n\n")
 	}
+
+	// Add community help message and QR code when running in terminal
+	qrCode := generateQRCode(discordURL)
+	body.WriteString(qrCode)
+	body.WriteString("\n" + tui.Bold("Get help from the Agentuity community at "))
+	body.WriteString(tui.Link(discordURL) + " ")
+	body.WriteString(tui.Muted("(or scan the QR code)") + "\n\n")
+
 	var detail []string
 	if e.err != nil {
 		var apiError *util.APIError
@@ -138,6 +161,7 @@ func (e *errSystem) ShowErrorAndExit() {
 	for _, d := range detail {
 		body.WriteString(tui.Muted(d) + "\n")
 	}
+
 	if !tui.HasTTY {
 		fmt.Println(body.String())
 		for k, v := range e.attributes {
