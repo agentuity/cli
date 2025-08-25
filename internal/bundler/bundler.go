@@ -141,6 +141,25 @@ func runTypecheck(ctx BundleContext, dir string) error {
 	return nil
 }
 
+// jsInstallCommandSpec returns the base command name and arguments for installing JavaScript dependencies
+// This function returns the base command without CI-specific modifications
+func jsInstallCommandSpec(ctx context.Context, projectDir, runtime string) (string, []string, error) {
+	switch runtime {
+	case "nodejs":
+		if util.Exists(filepath.Join(projectDir, "yarn.lock")) {
+			return "yarn", []string{"install", "--frozen-lockfile"}, nil
+		} else {
+			return "npm", []string{"install", "--no-audit", "--no-fund", "--include=prod", "--ignore-scripts"}, nil
+		}
+	case "bunjs":
+		return "bun", []string{"install", "--production", "--ignore-scripts", "--no-progress", "--no-summary", "--silent"}, nil
+	case "pnpm":
+		return "pnpm", []string{"install", "--prod", "--ignore-scripts", "--silent"}, nil
+	default:
+		return "", nil, fmt.Errorf("unsupported runtime: %s", runtime)
+	}
+}
+
 func generateBunLockfile(ctx BundleContext, logger logger.Logger, dir string) error {
 	args := []string{"install", "--lockfile-only"}
 	install := exec.CommandContext(ctx.Context, "bun", args...)
@@ -153,29 +172,57 @@ func generateBunLockfile(ctx BundleContext, logger logger.Logger, dir string) er
 	return nil
 }
 
+// getJSInstallCommand returns the complete install command with CI modifications applied
+func getJSInstallCommand(ctx BundleContext, projectDir, runtime string) (string, []string, error) {
+	// For bun, we need to ensure the lockfile is up to date before we can run the install
+	// otherwise we'll get an error about the lockfile being out of date
+	// Only do this if we have a logger (i.e., not in tests)
+	if runtime == "bunjs" && ctx.Logger != nil {
+		if err := generateBunLockfile(ctx, ctx.Logger, projectDir); err != nil {
+			return "", nil, err
+		}
+	}
+
+	cmd, args, err := jsInstallCommandSpec(ctx.Context, projectDir, runtime)
+	if err != nil {
+		return "", nil, err
+	}
+
+	// Apply CI-specific modifications
+	if ctx.CI {
+		if runtime == "bunjs" {
+			// Replace silent flags with verbose for CI
+			for i, arg := range args {
+				if arg == "--no-progress" || arg == "--no-summary" || arg == "--silent" {
+					args = append(args[:i], args[i+1:]...)
+					i--
+				}
+			}
+			args = append(args, "--verbose", "--no-cache")
+		} else if runtime == "pnpm" {
+			// Remove silent flag and add CI-specific flags
+			for i, arg := range args {
+				if arg == "--silent" {
+					args = append(args[:i], args[i+1:]...)
+					break
+				}
+			}
+			args = append(args, "--reporter=append-only", "--frozen-lockfile")
+		}
+	}
+
+	return cmd, args, nil
+}
+
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
 
 	if ctx.Install || !util.Exists(filepath.Join(dir, "node_modules")) {
-		var install *exec.Cmd
-		switch theproject.Bundler.Runtime {
-		case "nodejs":
-			install = exec.CommandContext(ctx.Context, "npm", "install", "--no-audit", "--no-fund", "--include=prod", "--ignore-scripts")
-		case "bunjs":
-			// for bun, we need to ensure the lockfile is up to date before we can run the install below
-			// otherwise we'll get an error about the lockfile being out of date
-			if err := generateBunLockfile(ctx, ctx.Logger, dir); err != nil {
-				return err
-			}
-			args := []string{"install", "--production", "--ignore-scripts"}
-			if ctx.CI {
-				args = append(args, "--verbose", "--no-cache")
-			} else {
-				args = append(args, "--no-progress", "--no-summary", "--silent")
-			}
-			install = exec.CommandContext(ctx.Context, "bun", args...)
-		default:
-			return fmt.Errorf("unsupported runtime: %s", theproject.Bundler.Runtime)
+		cmd, args, err := getJSInstallCommand(ctx, dir, theproject.Bundler.Runtime)
+		if err != nil {
+			return err
 		}
+
+		install := exec.CommandContext(ctx.Context, cmd, args...)
 		util.ProcessSetup(install)
 		install.Dir = dir
 		out, err := install.CombinedOutput()
@@ -343,10 +390,6 @@ func bundlePython(ctx BundleContext, dir string, outdir string, theproject *proj
 		switch theproject.Bundler.Runtime {
 		case "uv":
 			install = exec.CommandContext(ctx.Context, "uv", "sync", "--no-dev", "--frozen", "--quiet", "--no-progress")
-		case "pip":
-			install = exec.CommandContext(ctx.Context, "uv", "pip", "install", "--quiet", "--no-progress")
-		case "poetry":
-			return fmt.Errorf("poetry is not supported yet")
 		default:
 			return fmt.Errorf("unsupported runtime: %s", theproject.Bundler.Runtime)
 		}

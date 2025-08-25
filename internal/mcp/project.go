@@ -23,7 +23,7 @@ type CreateProjectArguments struct {
 }
 
 type ListTemplatesArguments struct {
-	Provider string `json:"provider" jsonschema:"required,description=The provider to use for the project which can be either 'bunjs' for BunJS, 'nodejs' for NodeJS or 'python-uv' for Python with UV"`
+	Provider string `json:"provider" jsonschema:"required,description=The provider to use for the project which can be either 'bunjs' for BunJS, 'nodejs' for NodeJS, 'pnpm' for PNPM, or 'python-uv' for Python with UV"`
 }
 
 func init() {
