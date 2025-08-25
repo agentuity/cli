@@ -1,6 +1,7 @@
 package bundler
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -37,26 +38,17 @@ func TestPyProject(t *testing.T) {
 }
 
 // Helper function to test package manager detection logic
-func testPackageManagerCommand(t *testing.T, tempDir string, runtime string, expectedCmd string, expectedArgs []string) {
-	// Test the command creation logic directly by examining what would be created
-	switch runtime {
-	case "nodejs":
-		if _, err := os.Stat(filepath.Join(tempDir, "yarn.lock")); err == nil {
-			// yarn.lock exists
-			assert.Equal(t, "yarn", expectedCmd)
-			assert.Equal(t, []string{"install", "--frozen-lockfile"}, expectedArgs)
-		} else {
-			// no yarn.lock
-			assert.Equal(t, "npm", expectedCmd)
-			assert.Equal(t, []string{"install", "--no-audit", "--no-fund", "--include=prod", "--ignore-scripts"}, expectedArgs)
-		}
-	case "pnpm":
-		assert.Equal(t, "pnpm", expectedCmd)
-		assert.Equal(t, []string{"install", "--prod", "--ignore-scripts", "--silent"}, expectedArgs)
-	case "bunjs":
-		assert.Equal(t, "bun", expectedCmd)
-		assert.Equal(t, []string{"install", "--production", "--no-save", "--ignore-scripts", "--no-progress", "--no-summary", "--silent"}, expectedArgs)
+func testPackageManagerCommand(t *testing.T, tempDir string, runtime string, isCI bool, expectedCmd string, expectedArgs []string) {
+	ctx := BundleContext{
+		Context: context.Background(),
+		CI:      isCI,
 	}
+	
+	actualCmd, actualArgs, err := getJSInstallCommand(ctx, tempDir, runtime)
+	require.NoError(t, err)
+	
+	assert.Equal(t, expectedCmd, actualCmd)
+	assert.Equal(t, expectedArgs, actualArgs)
 }
 
 func TestJavaScriptPackageManagerDetection(t *testing.T) {
@@ -123,34 +115,31 @@ func TestJavaScriptPackageManagerDetection(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			// Test the logic
-			testPackageManagerCommand(t, tempDir, tt.runtime, tt.expectedCmd, tt.expectedArgs)
+			// Test the logic with CI=false
+			testPackageManagerCommand(t, tempDir, tt.runtime, false, tt.expectedCmd, tt.expectedArgs)
 		})
 	}
 }
 
 func TestPnpmCIFlags(t *testing.T) {
-	// Test that pnpm in CI mode uses correct flags
 	tempDir := t.TempDir()
-	
-	// Create pnpm-lock.yaml
-	lockFile := filepath.Join(tempDir, "pnpm-lock.yaml")
-	err := os.WriteFile(lockFile, []byte(""), 0644)
-	require.NoError(t, err)
-	
-	// Test CI mode
-	expectedCmdCI := "pnpm"
-	expectedArgsCI := []string{"install", "--prod", "--ignore-scripts", "--reporter=append-only", "--frozen-lockfile"}
-	
-	// Test non-CI mode  
-	expectedCmdNonCI := "pnpm"
-	expectedArgsNonCI := []string{"install", "--prod", "--ignore-scripts", "--silent"}
-	
-	// Test that CI flags are correct
-	assert.Equal(t, "pnpm", expectedCmdCI)
-	assert.Equal(t, []string{"install", "--prod", "--ignore-scripts", "--reporter=append-only", "--frozen-lockfile"}, expectedArgsCI)
-	
-	// Test that non-CI flags are correct
-	assert.Equal(t, "pnpm", expectedCmdNonCI) 
-	assert.Equal(t, []string{"install", "--prod", "--ignore-scripts", "--silent"}, expectedArgsNonCI)
+	require.NoError(t, os.WriteFile(filepath.Join(tempDir, "pnpm-lock.yaml"), []byte(""), 0644))
+	// CI=true
+	testPackageManagerCommand(
+		t,
+		tempDir,
+		"pnpm",
+		true,
+		"pnpm",
+		[]string{"install", "--prod", "--ignore-scripts", "--reporter=append-only", "--frozen-lockfile"},
+	)
+	// CI=false
+	testPackageManagerCommand(
+		t,
+		tempDir,
+		"pnpm",
+		false,
+		"pnpm",
+		[]string{"install", "--prod", "--ignore-scripts", "--silent"},
+	)
 }

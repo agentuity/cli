@@ -141,36 +141,67 @@ func runTypecheck(ctx BundleContext, dir string) error {
 	return nil
 }
 
+// jsInstallCommandSpec returns the base command name and arguments for installing JavaScript dependencies
+// This function returns the base command without CI-specific modifications
+func jsInstallCommandSpec(ctx context.Context, projectDir, runtime string) (string, []string, error) {
+	switch runtime {
+	case "nodejs":
+		if util.Exists(filepath.Join(projectDir, "yarn.lock")) {
+			return "yarn", []string{"install", "--frozen-lockfile"}, nil
+		} else {
+			return "npm", []string{"install", "--no-audit", "--no-fund", "--include=prod", "--ignore-scripts"}, nil
+		}
+	case "bunjs":
+		return "bun", []string{"install", "--production", "--no-save", "--ignore-scripts", "--no-progress", "--no-summary", "--silent"}, nil
+	case "pnpm":
+		return "pnpm", []string{"install", "--prod", "--ignore-scripts", "--silent"}, nil
+	default:
+		return "", nil, fmt.Errorf("unsupported runtime: %s", runtime)
+	}
+}
+
+// getJSInstallCommand returns the complete install command with CI modifications applied
+func getJSInstallCommand(ctx BundleContext, projectDir, runtime string) (string, []string, error) {
+	cmd, args, err := jsInstallCommandSpec(ctx.Context, projectDir, runtime)
+	if err != nil {
+		return "", nil, err
+	}
+	
+	// Apply CI-specific modifications
+	if ctx.CI {
+		if runtime == "bunjs" {
+			// Replace silent flags with verbose for CI
+			for i, arg := range args {
+				if arg == "--no-progress" || arg == "--no-summary" || arg == "--silent" {
+					args = append(args[:i], args[i+1:]...)
+					i--
+				}
+			}
+			args = append(args, "--verbose", "--no-cache")
+		} else if runtime == "pnpm" {
+			// Remove silent flag and add CI-specific flags
+			for i, arg := range args {
+				if arg == "--silent" {
+					args = append(args[:i], args[i+1:]...)
+					break
+				}
+			}
+			args = append(args, "--reporter=append-only", "--frozen-lockfile")
+		}
+	}
+	
+	return cmd, args, nil
+}
+
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
 
 	if ctx.Install || !util.Exists(filepath.Join(dir, "node_modules")) {
-		var install *exec.Cmd
-		switch theproject.Bundler.Runtime {
-		case "nodejs":
-			if util.Exists(filepath.Join(dir, "yarn.lock")) {
-				install = exec.CommandContext(ctx.Context, "yarn", "install", "--frozen-lockfile")
-			} else {
-				install = exec.CommandContext(ctx.Context, "npm", "install", "--no-audit", "--no-fund", "--include=prod", "--ignore-scripts")
-			}
-		case "bunjs":
-			args := []string{"install", "--production", "--no-save", "--ignore-scripts"}
-			if ctx.CI {
-				args = append(args, "--verbose", "--no-cache")
-			} else {
-				args = append(args, "--no-progress", "--no-summary", "--silent")
-			}
-			install = exec.CommandContext(ctx.Context, "bun", args...)
-		case "pnpm":
-			args := []string{"install", "--prod", "--ignore-scripts"}
-			if ctx.CI {
-				args = append(args, "--reporter=append-only", "--frozen-lockfile")
-			} else {
-				args = append(args, "--silent")
-			}
-			install = exec.CommandContext(ctx.Context, "pnpm", args...)
-		default:
-			return fmt.Errorf("unsupported runtime: %s", theproject.Bundler.Runtime)
-		}
+	cmd, args, err := getJSInstallCommand(ctx, dir, theproject.Bundler.Runtime)
+	if err != nil {
+	return err
+	}
+	
+	install := exec.CommandContext(ctx.Context, cmd, args...)
 		util.ProcessSetup(install)
 		install.Dir = dir
 		out, err := install.CombinedOutput()
