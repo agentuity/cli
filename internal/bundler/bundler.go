@@ -156,6 +156,14 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 				args = append(args, "--no-progress", "--no-summary", "--silent")
 			}
 			install = exec.CommandContext(ctx.Context, "bun", args...)
+		case "pnpm":
+			args := []string{"install", "--prod", "--ignore-scripts"}
+			if ctx.CI {
+				args = append(args, "--reporter=default")
+			} else {
+				args = append(args, "--reporter=silent")
+			}
+			install = exec.CommandContext(ctx.Context, "pnpm", args...)
 		default:
 			return fmt.Errorf("unsupported runtime: %s", theproject.Bundler.Runtime)
 		}

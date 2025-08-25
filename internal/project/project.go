@@ -186,8 +186,8 @@ func (p *Project) Load(dir string) error {
 	}
 	switch p.Bundler.Language {
 	case "js", "javascript", "typescript":
-		if p.Bundler.Runtime != "bunjs" && p.Bundler.Runtime != "nodejs" && p.Bundler.Runtime != "deno" {
-			return fmt.Errorf("invalid bundler.runtime value: %s. only bunjs, nodejs, and deno are supported", p.Bundler.Runtime)
+		if p.Bundler.Runtime != "bunjs" && p.Bundler.Runtime != "nodejs" && p.Bundler.Runtime != "deno" && p.Bundler.Runtime != "pnpm" {
+			return fmt.Errorf("invalid bundler.runtime value: %s. only bunjs, nodejs, pnpm, and deno are supported", p.Bundler.Runtime)
 		}
 	case "py", "python":
 		if p.Bundler.Runtime != "uv" && p.Bundler.Runtime != "python" && p.Bundler.Runtime != "" {

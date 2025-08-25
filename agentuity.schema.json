@@ -125,6 +125,7 @@
 				},
 				"runtime": {
 					"type": "string",
+					"enum": ["nodejs", "bunjs", "pnpm"],
 					"description": "The runtime environment"
 				},
 				"agents": {
