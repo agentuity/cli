@@ -1,6 +1,7 @@
 package util
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -164,7 +165,7 @@ func BrowserFlow(opts BrowserFlowOptions) error {
 		}
 		if !skip {
 			if berr := browser.OpenURL(u.String()); berr != nil {
-				returnErr = fmt.Errorf("failed to open browser: %s", err)
+				returnErr = fmt.Errorf("failed to open browser: %w", berr)
 				return
 			}
 		}
@@ -188,4 +189,43 @@ func BrowserFlow(opts BrowserFlowOptions) error {
 	wg.Wait()
 
 	return returnErr
+}
+
+// PromptBrowserOpen prompts the user to press Enter to open a browser to the given URL.
+// It handles display detection on Linux and provides appropriate user feedback.
+func PromptBrowserOpen(logger interface{ Error(string, ...interface{}) }, url string) {
+	var skipOpen bool
+	if runtime.GOOS == "linux" {
+		// if we don't have a display, we can't open a browser most likely
+		if _, ok := os.LookupEnv("DISPLAY"); !ok {
+			skipOpen = true
+		}
+	}
+
+	fmt.Println()
+	if skipOpen {
+		fmt.Print(tui.Secondary("Press Enter to continue, or Ctrl+C to skip: "))
+	} else {
+		fmt.Print(tui.Secondary("Press Enter to open browser, or Ctrl+C to skip: "))
+	}
+
+	reader := bufio.NewReader(os.Stdin)
+	reader.ReadLine()
+
+	if !skipOpen {
+		if err := browser.OpenURL(url); err != nil {
+			logger.Error("Failed to open browser: %v", err)
+		} else {
+			// Clear previous line and move cursor up to remove the "Press Enter..." prompt
+			fmt.Print("\r\033[K\033[A\r\033[K")
+			tui.ShowSuccess("Browser opened!")
+			fmt.Println()
+		}
+	} else {
+		// Clear the prompt and show the URL for manual opening (and the loading spinner)
+		fmt.Print("\r\033[K")
+		fmt.Println(tui.Muted("Please visit the URL manually:"))
+		fmt.Println(tui.Link("%s", url))
+		fmt.Println()
+	}
 }

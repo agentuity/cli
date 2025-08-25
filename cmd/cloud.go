@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -166,12 +167,14 @@ and starts the deployment process. It will reconcile any differences
 between local and remote agents.
 
 Flags:
-  --dir    The directory containing the project to deploy
+  --dir       The directory containing the project to deploy
+  --dry-run   Save deployment zip file to specified directory instead of uploading
 
 Examples:
   agentuity cloud deploy
   agentuity deploy
-  agentuity cloud deploy --dir /path/to/project`,
+  agentuity cloud deploy --dir /path/to/project
+  agentuity deploy --dry-run ./output`,
 	Run: func(cmd *cobra.Command, args []string) {
 		parentCtx := context.Background()
 		ctx, cancel := signal.NotifyContext(parentCtx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -194,15 +197,27 @@ Examples:
 		tags, _ := cmd.Flags().GetStringArray("tag")
 		description, _ := cmd.Flags().GetString("description")
 		message, _ := cmd.Flags().GetString("message")
+		dryRun, _ := cmd.Flags().GetString("dry-run")
+		noBuild, _ := cmd.Flags().GetBool("no-build")
 
 		// remove duplicates and empty strings
 		tags = util.RemoveDuplicates(tags)
 		tags = util.RemoveEmpty(tags)
 
+		var preview bool
+
 		// If no tags are provided, default to ["latest"]
 		if len(tags) == 0 {
+			logger.Debug("no tags provided, setting to latest")
 			tags = []string{"latest"}
 		}
+
+		if !slices.Contains(tags, "latest") {
+			logger.Debug("latest tag not found in tags array, setting preview to true")
+			preview = true
+		}
+
+		logger.Debug("preview: %v", preview)
 
 		deploymentConfig := project.NewDeploymentConfig()
 		client := util.NewAPIClient(ctx, logger, apiUrl, token)
@@ -233,7 +248,7 @@ Examples:
 
 			if !context.NewProject {
 				action = func() {
-					projectData, err = theproject.GetProject(ctx, logger, apiUrl, token, true, false)
+					projectData, err = theproject.GetProject(ctx, logger, apiUrl, token, false, false)
 					if err != nil {
 						if err == project.ErrProjectNotFound {
 							return
@@ -294,7 +309,7 @@ Examples:
 				Config:        deploymentConfig,
 				OSEnvironment: loadOSEnv(),
 				PromptHelpers: createPromptHelper(),
-			})
+			}, noBuild)
 			if err != nil {
 				errsystem.New(errsystem.ErrDeployProject, err).ShowErrorAndExit()
 			}
@@ -487,10 +502,29 @@ Examples:
 		zipaction := func() {
 			// zip up our directory
 			started := time.Now()
+			var seenGit, seenNodeModules, seenVenv bool
 			logger.Debug("creating a zip file of %s into %s", dir, tmpfile.Name())
 			if err := util.ZipDir(dir, tmpfile.Name(), util.WithMutator(zipMutator), util.WithMatcher(func(fn string, fi os.FileInfo) bool {
 				notok := rules.Ignore(fn, fi)
 				if notok {
+					if strings.HasPrefix(fn, ".git") {
+						if seenGit {
+							return false
+						}
+						seenGit = true
+					}
+					if strings.HasPrefix(fn, "node_modules") {
+						if seenNodeModules {
+							return false
+						}
+						seenNodeModules = true
+					}
+					if strings.HasPrefix(fn, ".venv") {
+						if seenVenv {
+							return false
+						}
+						seenVenv = true
+					}
 					logger.Trace("❌ %s", fn)
 				} else {
 					logger.Trace("❎ %s", fn)
@@ -504,6 +538,37 @@ Examples:
 		}
 
 		tui.ShowSpinner("Packaging ...", zipaction)
+
+		if dryRun != "" {
+
+			// Validate and create the dryRun directory if it doesn't exist
+			if !util.Exists(dryRun) {
+				if err := os.MkdirAll(dryRun, 0755); err != nil {
+					errsystem.New(errsystem.ErrCreateZipFile, err,
+						errsystem.WithContextMessage(fmt.Sprintf("Error creating dry run directory '%s': %v", dryRun, err))).ShowErrorAndExit()
+				}
+			}
+
+			outputFile := filepath.Join(dryRun, fmt.Sprintf("agentuity-deploy-%s.zip", theproject.ProjectId))
+
+			if _, err := util.CopyFile(tmpfile.Name(), outputFile); err != nil {
+				errsystem.New(errsystem.ErrCreateZipFile, err,
+					errsystem.WithContextMessage("Error copying deployment zip file")).ShowErrorAndExit()
+			}
+
+			format, _ := cmd.Flags().GetString("format")
+			if format == "json" {
+				result := map[string]interface{}{
+					"dry_run":    true,
+					"zip_file":   outputFile,
+					"project_id": theproject.ProjectId,
+				}
+				json.NewEncoder(os.Stdout).Encode(result)
+			} else {
+				tui.ShowSuccess("Deployment zip saved to: %s", outputFile)
+			}
+			return
+		}
 
 		dof, err := os.Open(tmpfile.Name())
 		if err != nil {
@@ -583,7 +648,7 @@ Examples:
 
 		deployAction := func() {
 			// tell the api that we've completed the upload for the deployment
-			if err := updateDeploymentStatusCompleted(logger, apiUrl, token, startResponse.Data.DeploymentId); err != nil {
+			if err := updateDeploymentStatusCompleted(logger, apiUrl, token, startResponse.Data.DeploymentId, preview); err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err,
 					errsystem.WithContextMessage("Error updating deployment status to completed")).ShowErrorAndExit()
 			}
@@ -637,9 +702,9 @@ func updateDeploymentStatus(logger logger.Logger, apiUrl, token, deploymentId, s
 	return client.Do("PUT", fmt.Sprintf("/cli/deploy/upload/%s", deploymentId), payload, nil)
 }
 
-func updateDeploymentStatusCompleted(logger logger.Logger, apiUrl, token, deploymentId string) error {
+func updateDeploymentStatusCompleted(logger logger.Logger, apiUrl, token, deploymentId string, preview bool) error {
 	client := util.NewAPIClient(context.Background(), logger, apiUrl, token)
-	payload := map[string]any{"state": "completed"}
+	payload := map[string]any{"state": "completed", "preview": preview}
 	return client.Do("PUT", fmt.Sprintf("/cli/deploy/upload/%s", deploymentId), payload, nil)
 }
 
@@ -942,6 +1007,7 @@ func init() {
 	cloudDeployCmd.Flags().String("description", "", "Description for the deployment")
 	cloudDeployCmd.Flags().String("message", "", "A shorter description for the deployment")
 	cloudDeployCmd.Flags().Bool("force", false, "Force the processing of environment files")
+	cloudDeployCmd.Flags().String("dry-run", "", "Save deployment zip file to specified directory (defaults to current directory) instead of uploading")
 
 	cloudDeployCmd.Flags().MarkHidden("deploymentId")
 	cloudDeployCmd.Flags().MarkHidden("ci")
@@ -951,6 +1017,8 @@ func init() {
 	cloudDeployCmd.Flags().MarkHidden("ci-message")
 	cloudDeployCmd.Flags().MarkHidden("ci-git-provider")
 	cloudDeployCmd.Flags().MarkHidden("ci-logs-url")
+	cloudDeployCmd.Flags().Bool("no-build", false, "Do not build the project before running it (useful for debugging)")
+	cloudDeployCmd.Flags().MarkHidden("no-build")
 
 	cloudDeployCmd.Flags().String("format", "text", "The output format to use for results which can be either 'text' or 'json'")
 	cloudDeployCmd.Flags().String("org-id", "", "The organization to create the project in")

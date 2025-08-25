@@ -33,7 +33,11 @@
 		},
 		"development": {
 			"type": "object",
-			"required": ["port", "watch", "command"],
+			"required": [
+				"port",
+				"watch",
+				"command"
+			],
 			"properties": {
 				"port": {
 					"type": "integer",
@@ -41,7 +45,10 @@
 				},
 				"watch": {
 					"type": "object",
-					"required": ["enabled", "files"],
+					"required": [
+						"enabled",
+						"files"
+					],
 					"properties": {
 						"enabled": {
 							"type": "boolean",
@@ -71,7 +78,10 @@
 		},
 		"deployment": {
 			"type": "object",
-			"required": ["command", "resources"],
+			"required": [
+				"command",
+				"resources"
+			],
 			"properties": {
 				"command": {
 					"type": "string",
@@ -84,9 +94,39 @@
 					},
 					"description": "The arguments to pass to the command when running in the cloud deployment"
 				},
+				"mode": {
+					"type": "object",
+					"required": [
+						"type"
+					],
+					"properties": {
+						"type": {
+							"type": "string",
+							"enum": [
+								"on-demand",
+								"provisioned"
+							]
+						},
+						"idle": {
+							"type": "string",
+							"description": "The duration as a formatted string such as 1m, 10m, 1h, etc. This is only used if the mode is on-demand. If not provided, the default and the minimum idle period is 10m."
+						}
+					}
+				},
+				"dependencies": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"description": "The apt package dependencies to install before running the deployment"
+				},
 				"resources": {
 					"type": "object",
-					"required": ["memory", "cpu", "disk"],
+					"required": [
+						"memory",
+						"cpu",
+						"disk"
+					],
 					"properties": {
 						"memory": {
 							"type": "string",
@@ -109,7 +149,12 @@
 		},
 		"bundler": {
 			"type": "object",
-			"required": ["enabled", "identifier", "language", "agents"],
+			"required": [
+				"enabled",
+				"identifier",
+				"language",
+				"agents"
+			],
 			"properties": {
 				"enabled": {
 					"type": "boolean",
@@ -130,7 +175,9 @@
 				},
 				"agents": {
 					"type": "object",
-					"required": ["dir"],
+					"required": [
+						"dir"
+					],
 					"properties": {
 						"dir": {
 							"type": "string",
@@ -151,7 +198,10 @@
 			"type": "array",
 			"items": {
 				"type": "object",
-				"required": ["id", "name"],
+				"required": [
+					"id",
+					"name"
+				],
 				"properties": {
 					"id": {
 						"type": "string",

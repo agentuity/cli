@@ -41,6 +41,7 @@ func TestPyProject(t *testing.T) {
 func testPackageManagerCommand(t *testing.T, tempDir string, runtime string, isCI bool, expectedCmd string, expectedArgs []string) {
 	ctx := BundleContext{
 		Context: context.Background(),
+		Logger:  nil, // nil logger will skip bun lockfile generation in tests
 		CI:      isCI,
 	}
 	
@@ -97,9 +98,9 @@ func TestJavaScriptPackageManagerDetection(t *testing.T) {
 		{
 			name:         "bunjs runtime should use bun",
 			runtime:      "bunjs",
-			lockFiles:    []string{"bun.lockb"},
+			lockFiles:    []string{"bun.lockb", "package.json"},
 			expectedCmd:  "bun",
-			expectedArgs: []string{"install", "--production", "--no-save", "--ignore-scripts", "--no-progress", "--no-summary", "--silent"},
+			expectedArgs: []string{"install", "--production", "--ignore-scripts", "--no-progress", "--no-summary", "--silent"},
 		},
 	}
 
@@ -108,10 +109,16 @@ func TestJavaScriptPackageManagerDetection(t *testing.T) {
 			// Create temporary directory
 			tempDir := t.TempDir()
 
-			// Create lock files
+			// Create lock files and package.json
 			for _, lockFile := range tt.lockFiles {
 				filePath := filepath.Join(tempDir, lockFile)
-				err := os.WriteFile(filePath, []byte(""), 0644)
+				var content []byte
+				if lockFile == "package.json" {
+					content = []byte(`{"name": "test-package", "version": "1.0.0"}`)
+				} else {
+					content = []byte("")
+				}
+				err := os.WriteFile(filePath, content, 0644)
 				require.NoError(t, err)
 			}
 

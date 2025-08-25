@@ -2,6 +2,7 @@ package deployer
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/agentuity/cli/internal/bundler"
@@ -67,7 +68,7 @@ type DeployPreflightCheckData struct {
 	OSEnvironment map[string]string
 }
 
-func PreflightCheck(ctx context.Context, logger logger.Logger, data DeployPreflightCheckData) (util.ZipDirCallbackMutator, error) {
+func PreflightCheck(ctx context.Context, logger logger.Logger, data DeployPreflightCheckData, noBuild bool) (util.ZipDirCallbackMutator, error) {
 	started := time.Now()
 	bundleCtx := bundler.BundleContext{
 		Context:    context.Background(),
@@ -75,9 +76,12 @@ func PreflightCheck(ctx context.Context, logger logger.Logger, data DeployPrefli
 		ProjectDir: data.Dir,
 		Production: true,
 		Project:    data.Project,
+		Writer:     os.Stderr,
 	}
-	if err := bundler.Bundle(bundleCtx); err != nil {
-		return nil, err
+	if !noBuild {
+		if err := bundler.Bundle(bundleCtx); err != nil {
+			return nil, err
+		}
 	}
 	logger.Debug("bundled in %s", time.Since(started))
 	return bundler.CreateDeploymentMutator(bundleCtx), nil

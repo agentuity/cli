@@ -5,6 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.165] - 2025-08-18
+
+### Changed
+- Exclude the .jj folder automatically ([#434](https://github.com/agentuity/cli/pull/434))
+- Changes to make teams work ([#432](https://github.com/agentuity/cli/pull/432))
+
+## [v0.0.164] - 2025-08-12
+
+### Added
+- Allow setup.sh in case we need to run some script in docker image ([#427](https://github.com/agentuity/cli/pull/427))
+
+### Changed
+- Add more debugging around new project to debug failure ([#430](https://github.com/agentuity/cli/pull/430))
+- Make it scroll with arrows as well ([#428](https://github.com/agentuity/cli/pull/428))
+
+## [v0.0.163] - 2025-07-22
+
+### Added
+- Support for dry-run command ([#425](https://github.com/agentuity/cli/pull/425))
+
+## [v0.0.162] - 2025-07-18
+
+### Fixed
+- Fix issue with env on deploy asking for setting when set. Suppress some logs ([#424](https://github.com/agentuity/cli/pull/424))
+- Added an option to open login OTP with enter ([#420](https://github.com/agentuity/cli/pull/420))
+
+## [v0.0.161] - 2025-07-16
+
+### Added
+- Support for multiple deployment tags in bundle command ([#422](https://github.com/agentuity/cli/pull/422))
+
+## [v0.0.160] - 2025-07-15
+
+### Added
+- Support for preview environments ([#418](https://github.com/agentuity/cli/pull/418))
+
+## [v0.0.159] - 2025-07-15
+
+### Fixed
+- Fix issue with deployment error not having a write to write out the error ([#416](https://github.com/agentuity/cli/pull/416))
+
+## [v0.0.158] - 2025-07-08
+
+### Fixed
+- Bun: re-generate the lock file when we go to install for the first time or in CI ([#414](https://github.com/agentuity/cli/pull/414))
+
+## [v0.0.157] - 2025-07-07
+
+### Fixed
+- Bun/Node: remove the --no-save flag which was causing issues during package installation ([#412](https://github.com/agentuity/cli/pull/412))
+
+## [v0.0.156] - 2025-07-03
+
+### Added
+- Deployment: add new deployment options ([#410](https://github.com/agentuity/cli/pull/410))
+
+### Fixed
+- [GITHUB-338] Do not create a git repo if we're already in a git repo ([#406](https://github.com/agentuity/cli/pull/406))
+- BUG FIX compare with original, not masked ([#409](https://github.com/agentuity/cli/pull/409))
+
 ## [v0.0.155] - 2025-06-30
 
 ### Added
@@ -770,6 +830,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.165]: https://github.com/agentuity/cli/compare/v0.0.164...v0.0.165
+[v0.0.164]: https://github.com/agentuity/cli/compare/v0.0.163...v0.0.164
+[v0.0.163]: https://github.com/agentuity/cli/compare/v0.0.162...v0.0.163
+[v0.0.162]: https://github.com/agentuity/cli/compare/v0.0.161...v0.0.162
+[v0.0.161]: https://github.com/agentuity/cli/compare/v0.0.160...v0.0.161
+[v0.0.160]: https://github.com/agentuity/cli/compare/v0.0.159...v0.0.160
+[v0.0.159]: https://github.com/agentuity/cli/compare/v0.0.158...v0.0.159
+[v0.0.158]: https://github.com/agentuity/cli/compare/v0.0.157...v0.0.158
+[v0.0.157]: https://github.com/agentuity/cli/compare/v0.0.156...v0.0.157
+[v0.0.156]: https://github.com/agentuity/cli/compare/v0.0.155...v0.0.156
 [v0.0.155]: https://github.com/agentuity/cli/compare/v0.0.154...v0.0.155
 [v0.0.154]: https://github.com/agentuity/cli/compare/v0.0.153...v0.0.154
 [v0.0.153]: https://github.com/agentuity/cli/compare/v0.0.152...v0.0.153

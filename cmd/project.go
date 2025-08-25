@@ -185,6 +185,9 @@ func initProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 	proj.Deployment.Resources.CPU = args.Provider.Deployment.Resources.CPU
 	proj.Deployment.Resources.Memory = args.Provider.Deployment.Resources.Memory
 	proj.Deployment.Resources.Disk = args.Provider.Deployment.Resources.Disk
+	proj.Deployment.Mode = &project.Mode{
+		Type: "on-demand",
+	}
 
 	// set the agents from the result
 	proj.Agents = result.Agents

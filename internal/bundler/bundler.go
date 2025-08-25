@@ -106,7 +106,7 @@ func installSourceMapSupportIfNeeded(ctx BundleContext, dir string) error {
 	// only bun needs to install this library to aide in parsing the source maps
 	path := filepath.Join(dir, "node_modules", "source-map-js", "package.json")
 	if !util.Exists(path) {
-		cmd := exec.CommandContext(ctx.Context, "bun", "add", "source-map-js", "--no-save", "--silent", "--no-progress", "--no-summary", "--ignore-scripts")
+		cmd := exec.CommandContext(ctx.Context, "bun", "add", "source-map-js", "--silent", "--no-progress", "--no-summary", "--ignore-scripts")
 		cmd.Dir = dir
 		out, err := cmd.CombinedOutput()
 		if err != nil {
@@ -152,7 +152,7 @@ func jsInstallCommandSpec(ctx context.Context, projectDir, runtime string) (stri
 			return "npm", []string{"install", "--no-audit", "--no-fund", "--include=prod", "--ignore-scripts"}, nil
 		}
 	case "bunjs":
-		return "bun", []string{"install", "--production", "--no-save", "--ignore-scripts", "--no-progress", "--no-summary", "--silent"}, nil
+		return "bun", []string{"install", "--production", "--ignore-scripts", "--no-progress", "--no-summary", "--silent"}, nil
 	case "pnpm":
 		return "pnpm", []string{"install", "--prod", "--ignore-scripts", "--silent"}, nil
 	default:
@@ -160,13 +160,34 @@ func jsInstallCommandSpec(ctx context.Context, projectDir, runtime string) (stri
 	}
 }
 
+func generateBunLockfile(ctx BundleContext, logger logger.Logger, dir string) error {
+	args := []string{"install", "--lockfile-only"}
+	install := exec.CommandContext(ctx.Context, "bun", args...)
+	install.Dir = dir
+	out, err := install.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to generate bun lockfile: %w. %s", err, string(out))
+	}
+	logger.Debug("re-generated bun lockfile: %s", strings.TrimSpace(string(out)))
+	return nil
+}
+
 // getJSInstallCommand returns the complete install command with CI modifications applied
 func getJSInstallCommand(ctx BundleContext, projectDir, runtime string) (string, []string, error) {
+	// For bun, we need to ensure the lockfile is up to date before we can run the install
+	// otherwise we'll get an error about the lockfile being out of date
+	// Only do this if we have a logger (i.e., not in tests)
+	if runtime == "bunjs" && ctx.Logger != nil {
+		if err := generateBunLockfile(ctx, ctx.Logger, projectDir); err != nil {
+			return "", nil, err
+		}
+	}
+
 	cmd, args, err := jsInstallCommandSpec(ctx.Context, projectDir, runtime)
 	if err != nil {
 		return "", nil, err
 	}
-	
+
 	// Apply CI-specific modifications
 	if ctx.CI {
 		if runtime == "bunjs" {
@@ -189,19 +210,19 @@ func getJSInstallCommand(ctx BundleContext, projectDir, runtime string) (string,
 			args = append(args, "--reporter=append-only", "--frozen-lockfile")
 		}
 	}
-	
+
 	return cmd, args, nil
 }
 
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
 
 	if ctx.Install || !util.Exists(filepath.Join(dir, "node_modules")) {
-	cmd, args, err := getJSInstallCommand(ctx, dir, theproject.Bundler.Runtime)
-	if err != nil {
-	return err
-	}
-	
-	install := exec.CommandContext(ctx.Context, cmd, args...)
+		cmd, args, err := getJSInstallCommand(ctx, dir, theproject.Bundler.Runtime)
+		if err != nil {
+			return err
+		}
+
+		install := exec.CommandContext(ctx.Context, cmd, args...)
 		util.ProcessSetup(install)
 		install.Dir = dir
 		out, err := install.CombinedOutput()
@@ -322,6 +343,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		}
 
 		if ctx.DevMode {
+			ctx.Logger.Debug("build failed: %v", result.Errors)
 			return ErrBuildFailed
 		}
 

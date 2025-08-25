@@ -42,7 +42,7 @@ Examples:
 		install, _ := cmd.Flags().GetBool("install")
 		deploy, _ := cmd.Flags().GetBool("deploy")
 		ci, _ := cmd.Flags().GetBool("ci")
-		tag, _ := cmd.Flags().GetString("tag")
+		tags, _ := cmd.Flags().GetStringArray("tag")
 		description, _ := cmd.Flags().GetString("description")
 
 		if err := bundler.Bundle(bundler.BundleContext{
@@ -73,9 +73,17 @@ Examples:
 			if deploymentId != "" {
 				args = append(args, "--deploymentId", deploymentId)
 			}
-			if tag != "" {
-				args = append(args, "--tag", tag)
+			if len(tags) > 0 {
+				for _, tag := range tags {
+					args = append(args, "--tag", tag)
+				}
 			}
+
+			// if no tags are provided, set the latest tag
+			if len(tags) == 0 {
+				args = append(args, "--tag", "latest")
+			}
+
 			if description != "" {
 				args = append(args, "--description", description)
 			}
@@ -92,10 +100,12 @@ Examples:
 				"ci-logs-url",
 				"ci-git-provider",
 				"ci-logs-url",
+				"tag",
 			}
 
 			f := cmd.Flags()
 			for _, flag := range flags {
+				projectContext.Logger.Debug("flag: %s", flag)
 				if f.Changed(flag) {
 					switch f.Lookup(flag).Value.Type() {
 					case "string":
@@ -103,6 +113,12 @@ Examples:
 						args = append(args, "--"+flag, val)
 					case "bool":
 						args = append(args, "--"+flag)
+					case "stringArray":
+						val, _ := f.GetStringArray(flag)
+						for _, v := range val {
+							projectContext.Logger.Debug("v: %s", v)
+							args = append(args, "--"+flag, v)
+						}
 					}
 				}
 			}
@@ -111,10 +127,6 @@ Examples:
 				if ciMessage, _ := f.GetString("ci-message"); ciMessage != "" {
 					args = append(args, "--message", ciMessage)
 				}
-				if ciCommit, _ := f.GetString("ci-commit"); ciCommit != "" {
-					args = append(args, "--tag", ciCommit)
-				}
-				args = append(args, "--tag", "latest")
 			}
 
 			started = time.Now()
@@ -146,7 +158,7 @@ func init() {
 	bundleCmd.Flags().BoolP("install", "i", false, "Whether to install dependencies before bundling")
 	bundleCmd.Flags().Bool("deploy", false, "Whether to deploy after bundling")
 	bundleCmd.Flags().String("deploymentId", "", "Used to track a specific deployment")
-	bundleCmd.Flags().String("tag", "", "Used to set the tag of the deployment")
+	bundleCmd.Flags().StringArray("tag", nil, "Tag(s) to associate with this deployment (can be specified multiple times)")
 	bundleCmd.Flags().String("description", "", "Used to set the description of the deployment")
 	bundleCmd.Flags().MarkHidden("deploymentId")
 	bundleCmd.Flags().Bool("ci", false, "Used to track a specific CI job")
