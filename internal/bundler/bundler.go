@@ -147,7 +147,11 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		var install *exec.Cmd
 		switch theproject.Bundler.Runtime {
 		case "nodejs":
-			install = exec.CommandContext(ctx.Context, "npm", "install", "--no-save", "--no-audit", "--no-fund", "--include=prod", "--ignore-scripts")
+			if util.Exists(filepath.Join(dir, "yarn.lock")) {
+				install = exec.CommandContext(ctx.Context, "yarn", "install", "--frozen-lockfile")
+			} else {
+				install = exec.CommandContext(ctx.Context, "npm", "install", "--no-audit", "--no-fund", "--include=prod", "--ignore-scripts")
+			}
 		case "bunjs":
 			args := []string{"install", "--production", "--no-save", "--ignore-scripts"}
 			if ctx.CI {
@@ -159,9 +163,9 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		case "pnpm":
 			args := []string{"install", "--prod", "--ignore-scripts"}
 			if ctx.CI {
-				args = append(args, "--reporter=default")
+				args = append(args, "--reporter=append-only", "--frozen-lockfile")
 			} else {
-				args = append(args, "--reporter=silent")
+				args = append(args, "--silent")
 			}
 			install = exec.CommandContext(ctx.Context, "pnpm", args...)
 		default:
@@ -333,10 +337,6 @@ func bundlePython(ctx BundleContext, dir string, outdir string, theproject *proj
 		switch theproject.Bundler.Runtime {
 		case "uv":
 			install = exec.CommandContext(ctx.Context, "uv", "sync", "--no-dev", "--frozen", "--quiet", "--no-progress")
-		case "pip":
-			install = exec.CommandContext(ctx.Context, "uv", "pip", "install", "--quiet", "--no-progress")
-		case "poetry":
-			return fmt.Errorf("poetry is not supported yet")
 		default:
 			return fmt.Errorf("unsupported runtime: %s", theproject.Bundler.Runtime)
 		}

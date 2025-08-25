@@ -190,8 +190,8 @@ func (p *Project) Load(dir string) error {
 			return fmt.Errorf("invalid bundler.runtime value: %s. only bunjs, nodejs, pnpm, and deno are supported", p.Bundler.Runtime)
 		}
 	case "py", "python":
-		if p.Bundler.Runtime != "uv" && p.Bundler.Runtime != "python" && p.Bundler.Runtime != "" {
-			return fmt.Errorf("invalid bundler.runtime value: %s. only uv or python is supported", p.Bundler.Runtime)
+		if p.Bundler.Runtime != "uv" {
+			return fmt.Errorf("invalid bundler.runtime value: %s. only uv is supported", p.Bundler.Runtime)
 		}
 	default:
 		return fmt.Errorf("invalid bundler.language value: %s. only js or py are supported", p.Bundler.Language)
