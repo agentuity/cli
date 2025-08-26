@@ -170,7 +170,7 @@
 				},
 				"runtime": {
 					"type": "string",
-					"enum": ["nodejs", "bunjs", "pnpm", "deno", "uv"],
+					"enum": ["nodejs", "bunjs", "uv"],
 					"description": "The runtime environment"
 				},
 				"agents": {
