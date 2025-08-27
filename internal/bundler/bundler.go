@@ -146,7 +146,7 @@ func runTypecheck(ctx BundleContext, dir string) error {
 func jsInstallCommandSpec(projectDir string) (string, []string, error) {
 	if util.Exists(filepath.Join(projectDir, "pnpm-lock.yaml")) {
 		return "pnpm", []string{"install", "--prod", "--ignore-scripts", "--silent"}, nil
-	} else if util.Exists(filepath.Join(projectDir, "bun.lock")) {
+	} else if util.Exists(filepath.Join(projectDir, "bun.lockb")) {
 		return "bun", []string{"install", "--production", "--ignore-scripts", "--no-progress", "--no-summary", "--silent"}, nil
 	} else if util.Exists(filepath.Join(projectDir, "yarn.lock")) {
 		return "yarn", []string{"install", "--frozen-lockfile"}, nil

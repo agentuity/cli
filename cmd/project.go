@@ -46,8 +46,8 @@ func detectPackageManager(dir string, defaultRuntime string) string {
 		return defaultRuntime
 	}
 
-	// Check for bun lockfiles
-	if util.Exists(filepath.Join(dir, "bun.lockb")) || util.Exists(filepath.Join(dir, "bun.lock")) {
+	// Check for bun lockfile
+	if util.Exists(filepath.Join(dir, "bun.lockb")) {
 		return "bunjs"
 	}
 
