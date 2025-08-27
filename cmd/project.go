@@ -42,18 +42,18 @@ Use the subcommands to manage your projects.`,
 // If no lockfile is found, falls back to the default runtime from the template
 func detectPackageManager(dir string, defaultRuntime string) string {
 	// Only auto-detect for JavaScript-based runtimes
-	if defaultRuntime != "nodejs" && defaultRuntime != "bunjs" && defaultRuntime != "pnpm" {
+	if defaultRuntime != "nodejs" && defaultRuntime != "bunjs" {
 		return defaultRuntime
-	}
-
-	// Check for pnpm lockfile first (most specific)
-	if util.Exists(filepath.Join(dir, "pnpm-lock.yaml")) {
-		return "pnpm"
 	}
 
 	// Check for bun lockfiles
 	if util.Exists(filepath.Join(dir, "bun.lockb")) || util.Exists(filepath.Join(dir, "bun.lock")) {
 		return "bunjs"
+	}
+
+	// Check for pnpm lockfile first
+	if util.Exists(filepath.Join(dir, "pnpm-lock.yaml")) {
+		return "nodejs"
 	}
 
 	// Check for npm lockfile
