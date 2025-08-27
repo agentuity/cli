@@ -141,6 +141,38 @@ func runTypecheck(ctx BundleContext, dir string) error {
 	return nil
 }
 
+// detectPackageManager detects which package manager to use based on lockfiles
+func detectPackageManager(projectDir string) string {
+	if util.Exists(filepath.Join(projectDir, "pnpm-lock.yaml")) {
+		return "pnpm"
+	} else if util.Exists(filepath.Join(projectDir, "bun.lockb")) || util.Exists(filepath.Join(projectDir, "bun.lock")) {
+		return "bun"
+	} else if util.Exists(filepath.Join(projectDir, "yarn.lock")) {
+		return "yarn"
+	} else {
+		return "npm"
+	}
+}
+
+// jsInstallCommandSpec returns the base command name and arguments for installing JavaScript dependencies
+// This function returns the base command without CI-specific modifications
+func jsInstallCommandSpec(projectDir string) (string, []string, error) {
+	packageManager := detectPackageManager(projectDir)
+
+	switch packageManager {
+	case "pnpm":
+		return "pnpm", []string{"install", "--prod", "--ignore-scripts", "--silent"}, nil
+	case "bun":
+		return "bun", []string{"install", "--production", "--ignore-scripts", "--no-progress", "--no-summary", "--silent"}, nil
+	case "yarn":
+		return "yarn", []string{"install", "--frozen-lockfile"}, nil
+	case "npm":
+		return "npm", []string{"install", "--no-audit", "--no-fund", "--omit=dev", "--ignore-scripts"}, nil
+	default:
+		return "npm", []string{"install", "--no-audit", "--no-fund", "--omit=dev", "--ignore-scripts"}, nil
+	}
+}
+
 func generateBunLockfile(ctx BundleContext, logger logger.Logger, dir string) error {
 	args := []string{"install", "--lockfile-only"}
 	install := exec.CommandContext(ctx.Context, "bun", args...)
@@ -153,29 +185,69 @@ func generateBunLockfile(ctx BundleContext, logger logger.Logger, dir string) er
 	return nil
 }
 
+// applyCIModifications applies CI-specific modifications to install command arguments
+func applyCIModifications(ctx BundleContext, cmd, runtime string, args []string) []string {
+	if !ctx.CI {
+		return args
+	}
+
+	if cmd == "bun" {
+		// Drop quiet flags for CI using a filtered copy
+		filtered := make([]string, 0, len(args))
+		for _, arg := range args {
+			if arg == "--no-progress" || arg == "--no-summary" || arg == "--silent" {
+				continue
+			}
+			filtered = append(filtered, arg)
+		}
+		return filtered
+	} else if cmd == "pnpm" {
+		// Remove silent flag and add CI-specific flags
+		filtered := make([]string, 0, len(args)+2)
+		for _, arg := range args {
+			if arg == "--silent" {
+				continue
+			}
+			filtered = append(filtered, arg)
+		}
+		filtered = append(filtered, "--reporter=append-only", "--frozen-lockfile")
+		return filtered
+	}
+
+	return args
+}
+
+// getJSInstallCommand returns the complete install command with CI modifications applied
+func getJSInstallCommand(ctx BundleContext, projectDir, runtime string) (string, []string, error) {
+	// For bun, we need to ensure the lockfile is up to date before we can run the install
+	// otherwise we'll get an error about the lockfile being out of date
+	// Only do this if we have a logger (i.e., not in tests)
+	if runtime == "bunjs" && ctx.Logger != nil {
+		if err := generateBunLockfile(ctx, ctx.Logger, projectDir); err != nil {
+			return "", nil, err
+		}
+	}
+
+	cmd, args, err := jsInstallCommandSpec(projectDir)
+	if err != nil {
+		return "", nil, err
+	}
+
+	// Apply CI-specific modifications
+	args = applyCIModifications(ctx, cmd, runtime, args)
+
+	return cmd, args, nil
+}
+
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
 
 	if ctx.Install || !util.Exists(filepath.Join(dir, "node_modules")) {
-		var install *exec.Cmd
-		switch theproject.Bundler.Runtime {
-		case "nodejs":
-			install = exec.CommandContext(ctx.Context, "npm", "install", "--no-audit", "--no-fund", "--include=prod", "--ignore-scripts")
-		case "bunjs":
-			// for bun, we need to ensure the lockfile is up to date before we can run the install below
-			// otherwise we'll get an error about the lockfile being out of date
-			if err := generateBunLockfile(ctx, ctx.Logger, dir); err != nil {
-				return err
-			}
-			args := []string{"install", "--production", "--ignore-scripts"}
-			if ctx.CI {
-				args = append(args, "--verbose", "--no-cache")
-			} else {
-				args = append(args, "--no-progress", "--no-summary", "--silent")
-			}
-			install = exec.CommandContext(ctx.Context, "bun", args...)
-		default:
-			return fmt.Errorf("unsupported runtime: %s", theproject.Bundler.Runtime)
+		cmd, args, err := getJSInstallCommand(ctx, dir, theproject.Bundler.Runtime)
+		if err != nil {
+			return err
 		}
+
+		install := exec.CommandContext(ctx.Context, cmd, args...)
 		util.ProcessSetup(install)
 		install.Dir = dir
 		out, err := install.CombinedOutput()
