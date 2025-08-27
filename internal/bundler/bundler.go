@@ -143,20 +143,15 @@ func runTypecheck(ctx BundleContext, dir string) error {
 
 // jsInstallCommandSpec returns the base command name and arguments for installing JavaScript dependencies
 // This function returns the base command without CI-specific modifications
-func jsInstallCommandSpec(ctx context.Context, projectDir, runtime string) (string, []string, error) {
-	switch runtime {
-	case "nodejs":
-		if util.Exists(filepath.Join(projectDir, "yarn.lock")) {
-			return "yarn", []string{"install", "--frozen-lockfile"}, nil
-		} else {
-			return "npm", []string{"install", "--no-audit", "--no-fund", "--include=prod", "--ignore-scripts"}, nil
-		}
-	case "bunjs":
-		return "bun", []string{"install", "--production", "--ignore-scripts", "--no-progress", "--no-summary", "--silent"}, nil
-	case "pnpm":
+func jsInstallCommandSpec(projectDir string) (string, []string, error) {
+	if util.Exists(filepath.Join(projectDir, "pnpm-lock.yaml")) {
 		return "pnpm", []string{"install", "--prod", "--ignore-scripts", "--silent"}, nil
-	default:
-		return "", nil, fmt.Errorf("unsupported runtime: %s", runtime)
+	} else if util.Exists(filepath.Join(projectDir, "bun.lock")) {
+		return "bun", []string{"install", "--production", "--ignore-scripts", "--no-progress", "--no-summary", "--silent"}, nil
+	} else if util.Exists(filepath.Join(projectDir, "yarn.lock")) {
+		return "yarn", []string{"install", "--frozen-lockfile"}, nil
+	} else {
+		return "npm", []string{"install", "--no-audit", "--no-fund", "--include=prod", "--ignore-scripts"}, nil
 	}
 }
 
@@ -183,7 +178,7 @@ func getJSInstallCommand(ctx BundleContext, projectDir, runtime string) (string,
 		}
 	}
 
-	cmd, args, err := jsInstallCommandSpec(ctx.Context, projectDir, runtime)
+	cmd, args, err := jsInstallCommandSpec(projectDir)
 	if err != nil {
 		return "", nil, err
 	}
