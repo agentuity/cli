@@ -158,7 +158,7 @@ func detectPackageManager(projectDir string) string {
 // This function returns the base command without CI-specific modifications
 func jsInstallCommandSpec(projectDir string) (string, []string, error) {
 	packageManager := detectPackageManager(projectDir)
-	
+
 	switch packageManager {
 	case "pnpm":
 		return "pnpm", []string{"install", "--prod", "--ignore-scripts", "--silent"}, nil
@@ -415,6 +415,10 @@ func bundlePython(ctx BundleContext, dir string, outdir string, theproject *proj
 		switch theproject.Bundler.Runtime {
 		case "uv":
 			install = exec.CommandContext(ctx.Context, "uv", "sync", "--no-dev", "--frozen", "--quiet", "--no-progress")
+		case "pip":
+			install = exec.CommandContext(ctx.Context, "uv", "pip", "install", "--quiet", "--no-progress")
+		case "poetry":
+			return fmt.Errorf("poetry is not supported yet")
 		default:
 			return fmt.Errorf("unsupported runtime: %s", theproject.Bundler.Runtime)
 		}
