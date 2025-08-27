@@ -141,17 +141,35 @@ func runTypecheck(ctx BundleContext, dir string) error {
 	return nil
 }
 
+// detectPackageManager detects which package manager to use based on lockfiles
+func detectPackageManager(projectDir string) string {
+	if util.Exists(filepath.Join(projectDir, "pnpm-lock.yaml")) {
+		return "pnpm"
+	} else if util.Exists(filepath.Join(projectDir, "bun.lockb")) || util.Exists(filepath.Join(projectDir, "bun.lock")) {
+		return "bun"
+	} else if util.Exists(filepath.Join(projectDir, "yarn.lock")) {
+		return "yarn"
+	} else {
+		return "npm"
+	}
+}
+
 // jsInstallCommandSpec returns the base command name and arguments for installing JavaScript dependencies
 // This function returns the base command without CI-specific modifications
 func jsInstallCommandSpec(projectDir string) (string, []string, error) {
-	if util.Exists(filepath.Join(projectDir, "pnpm-lock.yaml")) {
+	packageManager := detectPackageManager(projectDir)
+	
+	switch packageManager {
+	case "pnpm":
 		return "pnpm", []string{"install", "--prod", "--ignore-scripts", "--silent"}, nil
-	} else if util.Exists(filepath.Join(projectDir, "bun.lockb")) {
+	case "bun":
 		return "bun", []string{"install", "--production", "--ignore-scripts", "--no-progress", "--no-summary", "--silent"}, nil
-	} else if util.Exists(filepath.Join(projectDir, "yarn.lock")) {
+	case "yarn":
 		return "yarn", []string{"install", "--frozen-lockfile"}, nil
-	} else {
-		return "npm", []string{"install", "--no-audit", "--no-fund", "--include=prod", "--ignore-scripts"}, nil
+	case "npm":
+		return "npm", []string{"install", "--no-audit", "--no-fund", "--omit=dev", "--ignore-scripts"}, nil
+	default:
+		return "npm", []string{"install", "--no-audit", "--no-fund", "--omit=dev", "--ignore-scripts"}, nil
 	}
 }
 
@@ -165,6 +183,38 @@ func generateBunLockfile(ctx BundleContext, logger logger.Logger, dir string) er
 	}
 	logger.Debug("re-generated bun lockfile: %s", strings.TrimSpace(string(out)))
 	return nil
+}
+
+// applyCIModifications applies CI-specific modifications to install command arguments
+func applyCIModifications(ctx BundleContext, cmd, runtime string, args []string) []string {
+	if !ctx.CI {
+		return args
+	}
+
+	if cmd == "bun" {
+		// Drop quiet flags for CI using a filtered copy
+		filtered := make([]string, 0, len(args))
+		for _, arg := range args {
+			if arg == "--no-progress" || arg == "--no-summary" || arg == "--silent" {
+				continue
+			}
+			filtered = append(filtered, arg)
+		}
+		return filtered
+	} else if cmd == "pnpm" {
+		// Remove silent flag and add CI-specific flags
+		filtered := make([]string, 0, len(args)+2)
+		for _, arg := range args {
+			if arg == "--silent" {
+				continue
+			}
+			filtered = append(filtered, arg)
+		}
+		filtered = append(filtered, "--reporter=append-only", "--frozen-lockfile")
+		return filtered
+	}
+
+	return args
 }
 
 // getJSInstallCommand returns the complete install command with CI modifications applied
@@ -184,27 +234,7 @@ func getJSInstallCommand(ctx BundleContext, projectDir, runtime string) (string,
 	}
 
 	// Apply CI-specific modifications
-	if ctx.CI {
-		if runtime == "bunjs" {
-			// Replace silent flags with verbose for CI
-			for i, arg := range args {
-				if arg == "--no-progress" || arg == "--no-summary" || arg == "--silent" {
-					args = append(args[:i], args[i+1:]...)
-					i--
-				}
-			}
-			args = append(args, "--verbose", "--no-cache")
-		} else if runtime == "pnpm" {
-			// Remove silent flag and add CI-specific flags
-			for i, arg := range args {
-				if arg == "--silent" {
-					args = append(args[:i], args[i+1:]...)
-					break
-				}
-			}
-			args = append(args, "--reporter=append-only", "--frozen-lockfile")
-		}
-	}
+	args = applyCIModifications(ctx, cmd, runtime, args)
 
 	return cmd, args, nil
 }

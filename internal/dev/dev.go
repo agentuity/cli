@@ -127,7 +127,7 @@ func CreateRunProjectCmd(ctx context.Context, log logger.Logger, theproject proj
 
 	// for nodejs and pnpm, we need to enable source maps directly in the environment.
 	// for bun, we need to inject a shim helper to parse the source maps
-	if theproject.Project.Bundler.Runtime == "nodejs" || theproject.Project.Bundler.Runtime == "pnpm" {
+	if theproject.Project.Bundler.Runtime == "nodejs" {
 		nodeOptions := os.Getenv("NODE_OPTIONS")
 		if nodeOptions == "" {
 			nodeOptions = "--enable-source-maps"

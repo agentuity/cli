@@ -38,31 +38,24 @@ Use the subcommands to manage your projects.`,
 	},
 }
 
-// detectPackageManager auto-detects the package manager based on lockfiles in the directory
+// detectRuntime auto-detects the runtime based on lockfiles in the directory
 // If no lockfile is found, falls back to the default runtime from the template
-func detectPackageManager(dir string, defaultRuntime string) string {
+func detectRuntime(dir string, defaultRuntime string) string {
 	// Only auto-detect for JavaScript-based runtimes
 	if defaultRuntime != "nodejs" && defaultRuntime != "bunjs" {
 		return defaultRuntime
 	}
 
-	// Check for bun lockfile
-	if util.Exists(filepath.Join(dir, "bun.lockb")) {
+	// Check for bun lockfiles - use bunjs runtime
+	if util.Exists(filepath.Join(dir, "bun.lockb")) ||
+		util.Exists(filepath.Join(dir, "bun.lock")) {
 		return "bunjs"
 	}
 
-	// Check for pnpm lockfile first
-	if util.Exists(filepath.Join(dir, "pnpm-lock.yaml")) {
-		return "nodejs"
-	}
-
-	// Check for npm lockfile
-	if util.Exists(filepath.Join(dir, "package-lock.json")) {
-		return "nodejs"
-	}
-
-	// Check for yarn lockfile (fallback to nodejs for yarn projects)
-	if util.Exists(filepath.Join(dir, "yarn.lock")) {
+	// Check for nodejs runtime
+	if util.Exists(filepath.Join(dir, "pnpm-lock.yaml")) ||
+		util.Exists(filepath.Join(dir, "package-lock.json")) ||
+		util.Exists(filepath.Join(dir, "yarn.lock")) {
 		return "nodejs"
 	}
 
@@ -172,7 +165,7 @@ func initProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 		Identifier: args.Provider.Identifier,
 		Language:   args.Provider.Language,
 		Framework:  args.Provider.Framework,
-		Runtime:    detectPackageManager(args.Dir, args.Provider.Runtime),
+		Runtime:    detectRuntime(args.Dir, args.Provider.Runtime),
 		Ignore:     args.Provider.Bundle.Ignore,
 		AgentConfig: project.AgentBundlerConfig{
 			Dir: args.Provider.SrcDir,
