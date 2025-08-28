@@ -27,12 +27,17 @@ func (s *gcpSetup) Setup(ctx context.Context, logger logger.Logger, cluster *Clu
 	}
 	_, err = exec.LookPath("gcloud")
 	if err == nil {
-		val, err := runCommand(ctx, logger, "Checking gcloud account...", "gcloud", "config", "get-value", "project")
-		if err == nil {
-			canExecuteGCloud = true
-			projectName = strings.TrimSpace(val)
-			tui.ShowBanner("Google Cloud Tools Detected", "I’ll show you the command to run against the "+projectName+" gcloud project. You can choose to have me execute it for you, or run it yourself. If you prefer to run it on your own, the command will automatically be copied to your clipboard at each step.", false)
-		} else {
+		_, err := runCommand(ctx, logger, "Checking gcloud authentication...", "gcloud", "auth", "print-access-token")
+		authenticated := err == nil
+		if authenticated {
+			val, err := runCommand(ctx, logger, "Checking gcloud account...", "gcloud", "config", "get-value", "project")
+			if err == nil {
+				canExecuteGCloud = true
+				projectName = strings.TrimSpace(val)
+				tui.ShowBanner("Google Cloud Tools Detected", "I’ll show you the command to run against the "+projectName+" gcloud project. You can choose to have me execute it for you, or run it yourself. If you prefer to run it on your own, the command will automatically be copied to your clipboard at each step.", false)
+			}
+		}
+		if !canExecuteGCloud && projectName != "" {
 			tui.ShowBanner("Google Cloud Tools Detected but not Authenticated", "I’ll show you the command to run against "+projectName+". You can choose to have me execute it for you, or run it yourself. If you prefer to run it on your own, the command will automatically be copied to your clipboard at each step.", false)
 		}
 		skipFailedDetection = true
