@@ -13,6 +13,8 @@ github.com/ProtonMail/go-crypto v1.1.5 h1:eoAQfK2dwL+tFSFpr7TbOaPNUbPiJj4fLYwwGE
 github.com/ProtonMail/go-crypto v1.1.5/go.mod h1:rA3QumHc/FZ8pAHreoekgiAbzpNsfQAosU5td4SnOrE=
 github.com/agentuity/go-common v1.0.71 h1:W8ynuxcXKfrDNcCWNAoAzqhfMt8oTBR4ALVJJelE0Yw=
 github.com/agentuity/go-common v1.0.71/go.mod h1:qMuSKhvnSAyje6MB1XLSp6xC4d17Hy6FiE3NDYFr9pk=
+github.com/agentuity/go-common v1.0.72 h1:Tt2jcPwSPLMcoySV7veypxiAKJmduemeAi89Kmq3/f4=
+github.com/agentuity/go-common v1.0.72/go.mod h1:qMuSKhvnSAyje6MB1XLSp6xC4d17Hy6FiE3NDYFr9pk=
 github.com/agentuity/mcp-golang/v2 v2.0.2 h1:wZqS/aHWZsQoU/nd1E1/iMsVY2dywWT9+PFlf+3YJxo=
 github.com/agentuity/mcp-golang/v2 v2.0.2/go.mod h1:U105tZXyTatxxOBlcObRgLb/ULvGgT2DJ1nq/8++P6Q=
 github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be h1:9AeTilPcZAjCFIImctFaOjnTIavg87rW78vTPkQqLI8=

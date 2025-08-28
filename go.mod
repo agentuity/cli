@@ -4,7 +4,7 @@ go 1.25
 
 require (
 	github.com/Masterminds/semver v1.5.0
-	github.com/agentuity/go-common v1.0.71
+	github.com/agentuity/go-common v1.0.72
 	github.com/agentuity/mcp-golang/v2 v2.0.2
 	github.com/bmatcuk/doublestar/v4 v4.8.1
 	github.com/charmbracelet/bubbles v0.20.0
