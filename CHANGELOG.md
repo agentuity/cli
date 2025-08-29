@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.166] - 2025-08-28
+
+### Added
+- Adds support for pnpm as a bundler ([#438](https://github.com/agentuity/cli/pull/438))
+
+### Fixed
+- bump go-common to get light mode color fixes
+
 ## [v0.0.165] - 2025-08-18
 
 ### Changed
