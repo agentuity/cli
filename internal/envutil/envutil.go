@@ -66,7 +66,11 @@ func ProcessEnvFiles(ctx context.Context, logger logger.Logger, dir string, thep
 				errsystem.WithContextMessage("Error parsing .env file")).ShowErrorAndExit()
 		}
 
-		projectData = HandleMissingProjectEnvs(ctx, logger, le, projectData, theproject, apiUrl, token, force)
+		// Only sync env vars to production when not in local development mode
+		// Local development files (.env.development, .env.local, etc.) should never be synced to production
+		if !isLocalDev {
+			projectData = HandleMissingProjectEnvs(ctx, logger, le, projectData, theproject, apiUrl, token, force)
+		}
 		envFile.Env = le
 		return envFile, projectData
 	}
