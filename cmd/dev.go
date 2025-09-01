@@ -88,6 +88,9 @@ Examples:
 			for k, v := range project.Secrets {
 				fmt.Fprintf(of, "%s=%s\n", k, v)
 			}
+			// Add the required Agentuity SDK and project keys
+			fmt.Fprintf(of, "AGENTUITY_SDK_KEY=%s\n", apiKey)
+			fmt.Fprintf(of, "AGENTUITY_PROJECT_KEY=%s\n", project.ProjectKey)
 			of.Close()
 			tui.ShowSuccess("Synchronized project to .env file: %s", tui.Muted(filename))
 		}
