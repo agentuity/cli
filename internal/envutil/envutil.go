@@ -66,7 +66,11 @@ func ProcessEnvFiles(ctx context.Context, logger logger.Logger, dir string, thep
 				errsystem.WithContextMessage("Error parsing .env file")).ShowErrorAndExit()
 		}
 
-		projectData = HandleMissingProjectEnvs(ctx, logger, le, projectData, theproject, apiUrl, token, force)
+		// Only sync env vars to production when not in local development mode
+		// Local development files (.env.development, .env.local, etc.) should never be synced to production
+		if !isLocalDev {
+			projectData = HandleMissingProjectEnvs(ctx, logger, le, projectData, theproject, apiUrl, token, force, envfilename)
+		}
 		envFile.Env = le
 		return envFile, projectData
 	}
@@ -149,7 +153,7 @@ func HandleMissingTemplateEnvs(logger logger.Logger, dir, envfilename string, le
 }
 
 // HandleMissingProjectEnvs handles missing envs in project
-func HandleMissingProjectEnvs(ctx context.Context, logger logger.Logger, le []env.EnvLineComment, projectData *project.ProjectData, theproject *project.Project, apiUrl, token string, force bool) *project.ProjectData {
+func HandleMissingProjectEnvs(ctx context.Context, logger logger.Logger, le []env.EnvLineComment, projectData *project.ProjectData, theproject *project.Project, apiUrl, token string, force bool, envFilename string) *project.ProjectData {
 
 	if projectData == nil {
 		projectData = &project.ProjectData{}
@@ -171,14 +175,18 @@ func HandleMissingProjectEnvs(ctx context.Context, logger logger.Logger, le []en
 		if !force {
 			var title string
 			var suffix string
+			var question string
+			envFileDisplayName := tui.Bold(filepath.Base(envFilename))
+
 			switch {
 			case len(keyvalue) < 3 && len(keyvalue) > 1:
-				suffix = "it"
+				suffix = "them"
 				var colorized []string
 				for key := range keyvalue {
 					colorized = append(colorized, tui.Bold(key))
 				}
-				title = fmt.Sprintf("The environment variables %s from %s are not been set in the project.", strings.Join(colorized, ", "), tui.Bold(".env"))
+				title = fmt.Sprintf("The environment variables %s from %s are not set in your cloud project.", strings.Join(colorized, ", "), envFileDisplayName)
+				question = fmt.Sprintf("Would you like to sync %s to your cloud project now?", suffix)
 			case len(keyvalue) == 1:
 				var key string
 				for _key := range keyvalue {
@@ -186,13 +194,16 @@ func HandleMissingProjectEnvs(ctx context.Context, logger logger.Logger, le []en
 					break
 				}
 				suffix = "it"
-				title = fmt.Sprintf("The environment variable %s from %s has not been set in the project.", tui.Bold(key), tui.Bold(".env"))
+				title = fmt.Sprintf("The environment variable %s from %s has not been set in your cloud project.", tui.Bold(key), envFileDisplayName)
+				question = fmt.Sprintf("Would you like to sync %s to your cloud project now?", suffix)
 			default:
 				suffix = "them"
-				title = fmt.Sprintf("There are %d environment variables from %s that are not set in the project.", len(keyvalue), tui.Bold(".env"))
+				title = fmt.Sprintf("There are %d environment variables from %s that are not set in your cloud project.", len(keyvalue), envFileDisplayName)
+				question = fmt.Sprintf("Would you like to sync %s to your cloud project now?", suffix)
 			}
 			fmt.Println(title)
-			force = tui.Ask(logger, "Would you like to set "+suffix+" now?", true)
+			fmt.Println(tui.Muted("(Choosing 'no' won't affect your local development - these variables will still work locally)"))
+			force = tui.Ask(logger, question, true)
 		}
 		if force {
 			for key, val := range keyvalue {
