@@ -30,8 +30,8 @@ var IsAgentuityEnv = isAgentuityEnv
 var looksLikeSecret = regexp.MustCompile(`(?i)(^|_|-)(APIKEY|API_KEY|PRIVATE_KEY|KEY|SECRET|TOKEN|CREDENTIAL|CREDENTIALS|PASSWORD|sk_[a-zA-Z0-9_-]*|BEARER|AUTH|JWT|WEBHOOK)($|_|-)`)
 var isAgentuityEnv = regexp.MustCompile(`(?i)AGENTUITY_`)
 
-// ProcessEnvFiles handles .env and template env processing
-func ProcessEnvFiles(ctx context.Context, logger logger.Logger, dir string, theproject *project.Project, projectData *project.ProjectData, apiUrl, token string, force bool, isLocalDev bool) (*deployer.EnvFile, *project.ProjectData) {
+// DetermineEnvFilename determines which env file to use based on isLocalDev flag
+func DetermineEnvFilename(dir string, isLocalDev bool) (string, error) {
 	envfilename := filepath.Join(dir, ".env")
 	if isLocalDev {
 		f := filepath.Join(dir, ".env.development")
@@ -42,36 +42,60 @@ func ProcessEnvFiles(ctx context.Context, logger logger.Logger, dir string, thep
 			// but since its gitignore it won't get checked in and might not exist when you clone a project
 			of, err := os.Create(f)
 			if err != nil {
-				errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to create .env.development file")).ShowErrorAndExit()
+				return "", err
 			}
 			defer of.Close()
 			of.WriteString("# This file is used to store development environment variables\n")
+			envfilename = f
 		}
 	}
+	return envfilename, nil
+}
+
+// ParseAndProcessEnvFile parses an env file and processes template envs
+func ParseAndProcessEnvFile(logger logger.Logger, dir, envfilename string, force bool) (*deployer.EnvFile, error) {
+	templateEnvs := ReadPossibleEnvTemplateFiles(dir)
+
+	le, err := env.ParseEnvFileWithComments(envfilename)
+	if err != nil {
+		return nil, err
+	}
+	envFile := &deployer.EnvFile{Filepath: envfilename, Env: le}
+
+	le, err = HandleMissingTemplateEnvs(logger, dir, envfilename, le, templateEnvs, force)
+	if err != nil {
+		return nil, err
+	}
+
+	envFile.Env = le
+	return envFile, nil
+}
+
+// ShouldSyncToProduction determines if env vars should be synced to production based on mode
+func ShouldSyncToProduction(isLocalDev bool) bool {
+	// Only sync env vars to production when not in local development mode
+	// Local development files (.env.development, .env.local, etc.) should never be synced to production
+	return !isLocalDev
+}
+
+// ProcessEnvFiles handles .env and template env processing
+func ProcessEnvFiles(ctx context.Context, logger logger.Logger, dir string, theproject *project.Project, projectData *project.ProjectData, apiUrl, token string, force bool, isLocalDev bool) (*deployer.EnvFile, *project.ProjectData) {
+	envfilename, err := DetermineEnvFilename(dir, isLocalDev)
+	if err != nil {
+		errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to create .env.development file")).ShowErrorAndExit()
+	}
+
 	var envFile *deployer.EnvFile
 	if (tui.HasTTY || force) && util.Exists(envfilename) {
-		// attempt to see if we have any template files
-		templateEnvs := ReadPossibleEnvTemplateFiles(dir)
-
-		le, err := env.ParseEnvFileWithComments(envfilename)
-		if err != nil {
-			errsystem.New(errsystem.ErrParseEnvironmentFile, err,
-				errsystem.WithContextMessage("Error parsing .env file")).ShowErrorAndExit()
-		}
-		envFile = &deployer.EnvFile{Filepath: envfilename, Env: le}
-
-		le, err = HandleMissingTemplateEnvs(logger, dir, envfilename, le, templateEnvs, force)
+		envFile, err = ParseAndProcessEnvFile(logger, dir, envfilename, force)
 		if err != nil {
 			errsystem.New(errsystem.ErrParseEnvironmentFile, err,
 				errsystem.WithContextMessage("Error parsing .env file")).ShowErrorAndExit()
 		}
 
-		// Only sync env vars to production when not in local development mode
-		// Local development files (.env.development, .env.local, etc.) should never be synced to production
-		if !isLocalDev {
-			projectData = HandleMissingProjectEnvs(ctx, logger, le, projectData, theproject, apiUrl, token, force, envfilename)
+		if ShouldSyncToProduction(isLocalDev) {
+			projectData = HandleMissingProjectEnvs(ctx, logger, envFile.Env, projectData, theproject, apiUrl, token, force, envfilename)
 		}
-		envFile.Env = le
 		return envFile, projectData
 	}
 	return envFile, projectData
