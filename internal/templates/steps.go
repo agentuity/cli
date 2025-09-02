@@ -40,26 +40,47 @@ type CommandStep struct {
 
 var _ Step = (*CommandStep)(nil)
 
+const commandExecTimeout = time.Minute * 2
+
 func (s *CommandStep) Run(ctx TemplateContext) error {
 	ctx.Logger.Debug("Running command: %s with args: %s", s.Command, strings.Join(s.Args, " "))
 
-	timeoutCtx, cancel := context.WithTimeout(ctx.Context, 1*time.Minute)
+	started := time.Now()
+	timeoutCtx, cancel := context.WithTimeout(ctx.Context, commandExecTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(timeoutCtx, s.Command, s.Args...)
 	cmd.Dir = ctx.ProjectDir
 	cmd.Stdin = nil
 
 	out, err := cmd.CombinedOutput()
+
+	buf := strings.TrimSpace(string(out))
+	if buf != "" {
+		ctx.Logger.Debug("Command output: %s", buf)
+	}
+
+	if cmd.ProcessState != nil {
+		ctx.Logger.Debug("command exit code %d (took %v)", cmd.ProcessState.ExitCode(), time.Since(started))
+	}
+
+	if timeoutCtx.Err() == context.DeadlineExceeded {
+		ctx.Logger.Error("command: %s %s timed out after %v", s.Command, strings.Join(s.Args, " "), time.Since(started))
+	}
+
 	if err != nil {
+		ctx.Logger.Debug("command failed with error: %s (%T)", err, err)
 		if s.Command == "uv" && len(s.Args) >= 3 && s.Args[0] == "add" {
 			exitErr, ok := err.(*exec.ExitError)
 			if ok && exitErr.ExitCode() == 130 {
 				packages := s.Args[2:]
 				ctx.Logger.Debug("Command interrupted with SIGINT (130), trying alternative installation methods for: %v", packages)
 
-				altCmd := exec.CommandContext(ctx.Context, "uv", "pip", "install")
+				fallbackCtx1, fallbackCancel1 := context.WithTimeout(ctx.Context, commandExecTimeout)
+				defer fallbackCancel1()
+				altCmd := exec.CommandContext(fallbackCtx1, "uv", "pip", "install")
 				altCmd.Args = append(altCmd.Args, packages...)
 				altCmd.Dir = ctx.ProjectDir
+				altCmd.Stdin = nil
 				altOut, altErr := altCmd.CombinedOutput()
 
 				if altErr == nil {
@@ -68,9 +89,12 @@ func (s *CommandStep) Run(ctx TemplateContext) error {
 				}
 
 				ctx.Logger.Debug("Failed to install with uv pip, trying with pip: %v", altErr)
-				pipCmd := exec.CommandContext(ctx.Context, "pip", "install")
+				fallbackCtx2, fallbackCancel2 := context.WithTimeout(ctx.Context, commandExecTimeout)
+				defer fallbackCancel2()
+				pipCmd := exec.CommandContext(fallbackCtx2, "pip", "install")
 				pipCmd.Args = append(pipCmd.Args, packages...)
 				pipCmd.Dir = ctx.ProjectDir
+				pipCmd.Stdin = nil
 				pipOut, pipErr := pipCmd.CombinedOutput()
 
 				if pipErr == nil {
@@ -83,13 +107,9 @@ func (s *CommandStep) Run(ctx TemplateContext) error {
 			}
 		}
 
-		return fmt.Errorf("failed to run command: %s with args: %s: %w (%s)", s.Command, strings.Join(s.Args, " "), err, string(out))
+		return fmt.Errorf("failed to run command: %s with args: %s: %w (%s)", s.Command, strings.Join(s.Args, " "), err, buf)
 	}
 
-	buf := strings.TrimSpace(string(out))
-	if buf != "" {
-		ctx.Logger.Debug("Command output: %s", buf)
-	}
 	return nil
 }
 

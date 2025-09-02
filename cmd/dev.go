@@ -40,11 +40,13 @@ Flags:
 
 Examples:
   agentuity dev
-  agentuity dev --dir /path/to/project`,
+  agentuity dev --dir /path/to/project
+  agentuity dev --no-build`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log := env.NewLogger(cmd)
 		logLevel := env.LogLevel(cmd)
 		apiUrl, appUrl, transportUrl := util.GetURLs(log)
+		noBuild, _ := cmd.Flags().GetBool("no-build")
 
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
@@ -86,6 +88,9 @@ Examples:
 			for k, v := range project.Secrets {
 				fmt.Fprintf(of, "%s=%s\n", k, v)
 			}
+			// Add the required Agentuity SDK and project keys
+			fmt.Fprintf(of, "AGENTUITY_SDK_KEY=%s\n", apiKey)
+			fmt.Fprintf(of, "AGENTUITY_PROJECT_KEY=%s\n", project.ProjectKey)
 			of.Close()
 			tui.ShowSuccess("Synchronized project to .env file: %s", tui.Muted(filename))
 		}
@@ -142,7 +147,13 @@ Examples:
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 		}
 
-		build := func(initial bool) bool {
+		var build func(initial bool) bool
+
+		build = func(initial bool) bool {
+			if noBuild {
+				log.Info("Skipping build (no-build flag set)")
+				return true
+			}
 			started := time.Now()
 			var ok bool
 			tui.ShowSpinner("Building project ...", func() {
@@ -190,6 +201,7 @@ Examples:
 		}
 
 		// Initial build must exit if it fails
+
 		if !build(true) {
 			return
 		}
@@ -264,4 +276,6 @@ func init() {
 	rootCmd.AddCommand(devCmd)
 	devCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
 	devCmd.Flags().Int("port", 0, "The port to run the development server on (uses project default if not provided)")
+	devCmd.Flags().Bool("no-build", false, "Do not build the project before running it (useful for debugging)")
+	devCmd.Flags().MarkHidden("no-build")
 }

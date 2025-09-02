@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"context"
-	"crypto/ed25519"
+	"crypto/ecdsa"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -202,6 +202,7 @@ Examples:
 		description, _ := cmd.Flags().GetString("description")
 		message, _ := cmd.Flags().GetString("message")
 		dryRun, _ := cmd.Flags().GetString("dry-run")
+		noBuild, _ := cmd.Flags().GetBool("no-build")
 
 		// remove duplicates and empty strings
 		tags = util.RemoveDuplicates(tags)
@@ -312,7 +313,7 @@ Examples:
 				Config:        deploymentConfig,
 				OSEnvironment: loadOSEnv(),
 				PromptHelpers: createPromptHelper(),
-			})
+			}, noBuild)
 			if err != nil {
 				errsystem.New(errsystem.ErrDeployProject, err).ShowErrorAndExit()
 			}
@@ -597,8 +598,12 @@ Examples:
 				errsystem.New(errsystem.ErrEncryptingDeploymentZipFile, err,
 					errsystem.WithContextMessage("Error parsing the PEM formatted public key for encrypting the deployment zip file")).ShowErrorAndExit()
 			}
-			pubKey := pub.(ed25519.PublicKey)
-			if _, err := crypto.EncryptHybridKEMDEMStream(pubKey, dof, ef); err != nil {
+			pubKey, ok := pub.(*ecdsa.PublicKey)
+			if !ok {
+				errsystem.New(errsystem.ErrEncryptingDeploymentZipFile, err,
+					errsystem.WithContextMessage("Error parsing the PEM x509 public key for encrypting the deployment zip file")).ShowErrorAndExit()
+			}
+			if _, err := crypto.EncryptFIPSKEMDEMStream(pubKey, dof, ef); err != nil {
 				errsystem.New(errsystem.ErrEncryptingDeploymentZipFile, err,
 					errsystem.WithContextMessage("Error encrypting deployment zip file (public key)")).ShowErrorAndExit()
 			}
@@ -1037,6 +1042,8 @@ func init() {
 	cloudDeployCmd.Flags().MarkHidden("ci-message")
 	cloudDeployCmd.Flags().MarkHidden("ci-git-provider")
 	cloudDeployCmd.Flags().MarkHidden("ci-logs-url")
+	cloudDeployCmd.Flags().Bool("no-build", false, "Do not build the project before running it (useful for debugging)")
+	cloudDeployCmd.Flags().MarkHidden("no-build")
 
 	cloudDeployCmd.Flags().String("format", "text", "The output format to use for results which can be either 'text' or 'json'")
 	cloudDeployCmd.Flags().String("org-id", "", "The organization to create the project in")

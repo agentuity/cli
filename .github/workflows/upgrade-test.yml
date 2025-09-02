@@ -33,14 +33,14 @@ jobs:
         uses: actions/setup-go@v5
         if: ${{ matrix.os != 'blacksmith-4vcpu-ubuntu-2204' }}
         with:
-          go-version: '1.24'
+          go-version: '1.25'
           cache: true
       
       - name: Set up Go
         uses: useblacksmith/setup-go@v6
         if: ${{ matrix.os == 'blacksmith-4vcpu-ubuntu-2204' }}
         with:
-          go-version: '1.24'
+          go-version: '1.25'
           cache: true
 
       - name: Build current version
