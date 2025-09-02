@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -41,6 +42,106 @@ var logoBox = lipgloss.NewStyle().
 	AlignVertical(lipgloss.Top).
 	AlignHorizontal(lipgloss.Left).
 	Foreground(logoColor)
+var titleColor = lipgloss.AdaptiveColor{Light: "#000000", Dark: "#ffffff"}
+var titleStyle = lipgloss.NewStyle().Foreground(titleColor).Bold(true)
+
+// customHelp renders organized help output
+func customHelp(cmd *cobra.Command) {
+	fmt.Print(logoBox.Render(fmt.Sprintf(`%s     %s
+
+Version:        %s
+Docs:           %s
+Community:      %s
+Dashboard:      %s`,
+		tui.Bold("⨺ Agentuity"),
+		titleStyle.Render("Build, manage and deploy AI agents"),
+		Version,
+		tui.Link("https://agentuity.dev"),
+		tui.Link("https://discord.gg/agentuity"),
+		tui.Link("https://app.agentuity.com"),
+	)))
+
+	fmt.Println()
+	fmt.Println()
+	fmt.Printf("%s\n", titleStyle.Render(fmt.Sprintf("%s", "Usage")))
+	fmt.Printf("  %s %s\n", tui.Bold(cmd.CommandPath()), tui.Muted("[flags]"))
+	fmt.Printf("  %s %s\n", tui.Bold(cmd.CommandPath()), tui.Muted("[command]"))
+	fmt.Println()
+
+	// Group commands by category
+	coreCommands := []string{"dev", "create", "deploy", "rollback"}
+	projectCommands := []string{"project", "agent", "env", "logs"}
+	infraCommands := []string{"cluster", "machine"}
+	authCommands := []string{"auth", "login", "logout", "apikey"}
+	toolCommands := []string{"mcp", "upgrade", "version"}
+
+	var helpSectionCount int
+
+	printCommandGroup := func(title string, commands []string) {
+		var buf strings.Builder
+		for _, cmdName := range commands {
+			for _, subCmd := range cmd.Commands() {
+				if subCmd.Name() == cmdName && subCmd.IsAvailableCommand() {
+					fmt.Fprintf(&buf, "  %s %s\n", tui.Bold(fmt.Sprintf("%-12s", subCmd.Name())), tui.Muted(subCmd.Short))
+					break
+				}
+			}
+		}
+		if buf.Len() > 0 {
+			fmt.Printf("%s\n", titleStyle.Render(fmt.Sprintf("%s", title)))
+			fmt.Println(buf.String())
+			helpSectionCount++
+		}
+	}
+
+	printCommandGroup("Core Commands", coreCommands)
+	printCommandGroup("Project Management", projectCommands)
+	printCommandGroup("Infrastructure Management", infraCommands)
+	printCommandGroup("Authentication", authCommands)
+	printCommandGroup("Tools & Utilities", toolCommands)
+
+	otherSkips := map[string]bool{"cloud": true}
+
+	// Other commands
+	otherCommands := []string{}
+	allGrouped := append(append(append(append(coreCommands, projectCommands...), infraCommands...), authCommands...), toolCommands...)
+	for _, subCmd := range cmd.Commands() {
+		if subCmd.IsAvailableCommand() {
+			found := slices.Contains(allGrouped, subCmd.Name())
+			if !found && !otherSkips[subCmd.Name()] {
+				otherCommands = append(otherCommands, subCmd.Name())
+			}
+		}
+	}
+
+	if len(otherCommands) > 0 {
+		if helpSectionCount > 0 {
+			fmt.Printf("%s\n", titleStyle.Render(fmt.Sprintf("%s", "Other Commands")))
+		} else {
+			fmt.Printf("%s\n", titleStyle.Render(fmt.Sprintf("%s", "Commands")))
+		}
+		for _, cmdName := range otherCommands {
+			for _, subCmd := range cmd.Commands() {
+				if subCmd.Name() == cmdName {
+					fmt.Printf("  %s %s\n", tui.Bold(fmt.Sprintf("%-12s", subCmd.Name())), tui.Muted(subCmd.Short))
+					break
+				}
+			}
+		}
+		fmt.Println()
+	}
+
+	fmt.Printf("%s\n", titleStyle.Render("Flags"))
+	fmt.Print(tui.Muted(cmd.LocalFlags().FlagUsages()))
+	fmt.Println()
+	globalFlags := cmd.InheritedFlags().FlagUsages()
+	if globalFlags != "" {
+		fmt.Println(titleStyle.Render("Global Flags"))
+		fmt.Print(tui.Muted(globalFlags))
+		fmt.Println()
+	}
+	fmt.Println(tui.Muted(fmt.Sprintf("Use \"%s [command] --help\" for more information about a command.", cmd.CommandPath())))
+}
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -61,13 +162,14 @@ Dashboard:      %s`,
 			tui.Link("https://discord.gg/agentuity"),
 			tui.Link("https://app.agentuity.com"),
 		))
+
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		if version, _ := cmd.Flags().GetBool("version"); version {
 			fmt.Println(Version)
 			return
 		}
-		cmd.Help()
+		customHelp(cmd)
 	},
 }
 
@@ -107,6 +209,11 @@ func init() {
 	// commands its a natural flag to expect
 	rootCmd.Flags().BoolP("version", "v", false, "print out the version")
 	rootCmd.Flags().MarkHidden("version")
+
+	// Set custom help template to always use our customHelp function
+	rootCmd.SetHelpFunc(func(command *cobra.Command, strings []string) {
+		customHelp(command)
+	})
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/agentuity/config.yaml)")
 	rootCmd.PersistentFlags().String("log-level", "info", "The log level to use")
