@@ -81,9 +81,9 @@ func TestIsAgentuityEnv(t *testing.T) {
 
 func TestShouldSyncToProduction(t *testing.T) {
 	tests := []struct {
-		name        string
-		isLocalDev  bool
-		shouldSync  bool
+		name       string
+		isLocalDev bool
+		shouldSync bool
 	}{
 		{
 			name:       "production mode should sync",
