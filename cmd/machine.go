@@ -280,6 +280,33 @@ Examples:
 	},
 }
 
+var machineCreateCmd = &cobra.Command{
+	Use:     "create [cluster_id] [provider] [region]",
+	GroupID: "info",
+	Short:   "Create a new machine for a cluster",
+	Args:    cobra.ExactArgs(3),
+	Aliases: []string{"new"},
+	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		logger := env.NewLogger(cmd)
+		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
+		apiUrl, _, _ := util.GetURLs(logger)
+
+		clusterID := args[0]
+		provider := args[1]
+		region := args[2]
+
+		orgId := promptForClusterOrganization(ctx, logger, cmd, apiUrl, apikey)
+
+		resp, err := infrastructure.CreateMachine(ctx, logger, apiUrl, apikey, clusterID, orgId, provider, region)
+		if err != nil {
+			logger.Fatal("error creating machine: %s", err)
+		}
+		fmt.Printf("Machine created successfully with ID: %s and Token: %s\n", resp.ID, resp.Token)
+	},
+}
+
 func init() {
 	// Add command groups for machine operations
 	machineCmd.AddGroup(&cobra.Group{
@@ -295,6 +322,7 @@ func init() {
 	machineCmd.AddCommand(machineListCmd)
 	machineCmd.AddCommand(machineRemoveCmd)
 	machineCmd.AddCommand(machineStatusCmd)
+	machineCmd.AddCommand(machineCreateCmd)
 
 	// Flags for machine list command
 	machineListCmd.Flags().String("format", "table", "Output format (table, json)")

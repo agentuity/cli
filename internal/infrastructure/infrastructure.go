@@ -177,3 +177,30 @@ func DeleteMachine(ctx context.Context, logger logger.Logger, baseURL string, to
 
 	return nil
 }
+
+type CreateMachineResponse struct {
+	ID    string `json:"id"`
+	Token string `json:"token"`
+}
+
+// CreateMachine creates a new machine in the provisioning state
+func CreateMachine(ctx context.Context, logger logger.Logger, baseURL string, token string, clusterID string, orgID string, provider string, region string) (*CreateMachineResponse, error) {
+	client := util.NewAPIClient(ctx, logger, baseURL, token)
+
+	var resp Response[CreateMachineResponse]
+	var data = map[string]string{
+		"clusterId": clusterID,
+		"orgId":     orgID,
+		"provider":  provider,
+		"region":    region,
+	}
+	if err := client.Do("POST", "/cli/machine", data, &resp); err != nil {
+		return nil, fmt.Errorf("error deleting machine: %w", err)
+	}
+
+	if !resp.Success {
+		return nil, fmt.Errorf("machine creation failed: %s", resp.Message)
+	}
+
+	return &resp.Data, nil
+}
