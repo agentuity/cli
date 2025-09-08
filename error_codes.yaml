@@ -88,3 +88,9 @@ errors:
 
   - code: CLI-0028
     message: Failed to delete API key
+  
+  - code: CLI-0029
+    message: Invalid argument provided
+  
+  - code: CLI-0030
+    message: Missing required argument

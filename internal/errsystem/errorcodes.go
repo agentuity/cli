@@ -114,4 +114,12 @@ var (
 		Code:    "CLI-0028",
 		Message: "Failed to delete API key",
 	}
+	ErrInvalidArgumentProvided = errorType{
+		Code:    "CLI-0029",
+		Message: "Invalid argument provided",
+	}
+	ErrMissingRequiredArgument = errorType{
+		Code:    "CLI-0030",
+		Message: "Missing required argument",
+	}
 )
