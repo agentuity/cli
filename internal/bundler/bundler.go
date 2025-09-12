@@ -376,6 +376,10 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		return nil // This line will never be reached due to os.Exit
 	}
 
+	if err := copyPromptsFromSrc(ctx.Logger, dir, outdir); err != nil {
+		return fmt.Errorf("copy prompts.yaml: %w", err)
+	}
+
 	if err := validateDiskRequest(ctx, outdir); err != nil {
 		return err
 	}
@@ -469,7 +473,49 @@ func bundlePython(ctx BundleContext, dir string, outdir string, theproject *proj
 		}
 		config["app"] = app
 	}
-	return os.WriteFile(filepath.Join(outdir, "config.json"), []byte(cstr.JSONStringify(config)), 0644)
+	if err := os.WriteFile(filepath.Join(outdir, "config.json"), []byte(cstr.JSONStringify(config)), 0644); err != nil {
+		return err
+	}
+	
+	if err := copyPromptsFromSrc(ctx.Logger, dir, outdir); err != nil {
+		return fmt.Errorf("copy prompts.yaml: %w", err)
+	}
+	
+	return nil
+}
+
+func copyPromptsFromSrc(logger logger.Logger, projectDir, outdir string) error {
+	srcRoot := filepath.Join(projectDir, "src")
+	if !util.Exists(srcRoot) {
+		return nil // nothing to do
+	}
+
+	return filepath.Walk(srcRoot, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		name := strings.ToLower(info.Name())
+		if name != "prompts.yaml" && name != "prompts.yml" {
+			return nil
+		}
+
+		rel, err := filepath.Rel(projectDir, path)
+		if err != nil {
+			return err
+		}
+		destPath := filepath.Join(outdir, rel)
+
+		if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
+			return err
+		}
+		
+		logger.Debug("copying prompts file: %s -> %s", path, destPath)
+		_, err = util.CopyFile(path, destPath)
+		return err
+	})
 }
 
 func getAgents(theproject *project.Project, filename string) []AgentConfig {
