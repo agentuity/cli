@@ -2,7 +2,6 @@ package prompts
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -27,9 +26,8 @@ type PromptsFile struct {
 }
 
 type PromptRequest struct {
-	Slug        string                 `json:"slug"`
-	Content     map[string]interface{} `json:"content"`
-	ContentHash string                 `json:"content_hash"`
+	Slug    string                 `json:"slug"`
+	Content map[string]interface{} `json:"content"`
 }
 
 type PromptsAPIRequest struct {
@@ -63,6 +61,7 @@ func ProcessPrompts(ctx context.Context, logger logger.Logger, client *util.APIC
 		if prompt.Name == "" {
 			return fmt.Errorf("prompt '%s' missing required 'name' field", prompt.ID)
 		}
+		// Either / or
 		if prompt.System == "" {
 			return fmt.Errorf("prompt '%s' missing required 'system' field", prompt.ID)
 		}
@@ -85,16 +84,12 @@ func ProcessPrompts(ctx context.Context, logger logger.Logger, client *util.APIC
 			return fmt.Errorf("failed to unmarshal prompt %s content: %w", prompt.ID, err)
 		}
 
-		// Calculate content hash for change detection
-		contentHash := calculateContentHash(content)
-
 		apiRequest.Prompts = append(apiRequest.Prompts, PromptRequest{
-			Slug:        prompt.ID,
-			Content:     content,
-			ContentHash: contentHash,
+			Slug:    prompt.ID,
+			Content: content,
 		})
 
-		logger.Debug("processing prompt: %s (hash: %s)", prompt.ID, contentHash)
+		logger.Debug("processing prompt: %s", prompt.ID)
 	}
 
 	// Send to API
@@ -126,12 +121,4 @@ func parsePromptsFile(filename string) ([]Prompt, error) {
 	}
 
 	return promptsFile.Prompts, nil
-}
-
-// calculateContentHash generates a SHA256 hash of the prompt content for change detection
-func calculateContentHash(content map[string]interface{}) string {
-	// Sort keys for consistent hashing
-	contentBytes, _ := json.Marshal(content)
-	hash := sha256.Sum256(contentBytes)
-	return fmt.Sprintf("%x", hash)
 }
