@@ -46,12 +46,14 @@ func WaitForAnyKeyMessage(message string) {
 	select {
 	case <-ctx.Done():
 		fmt.Println()
+		term.Restore(int(os.Stdin.Fd()), oldState)
 		os.Exit(1)
 		return
 	case <-ch:
 		select {
 		case <-ctx.Done():
 			fmt.Println()
+			term.Restore(int(os.Stdin.Fd()), oldState)
 			os.Exit(1)
 		default:
 			return
