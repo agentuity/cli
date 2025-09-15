@@ -44,10 +44,10 @@ func testPackageManagerCommand(t *testing.T, tempDir string, runtime string, isC
 		Logger:  nil, // nil logger will skip bun lockfile generation in tests
 		CI:      isCI,
 	}
-	
+
 	actualCmd, actualArgs, err := getJSInstallCommand(ctx, tempDir, runtime)
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, expectedCmd, actualCmd)
 	assert.Equal(t, expectedArgs, actualArgs)
 }
