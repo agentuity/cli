@@ -20,7 +20,6 @@ import (
 	"github.com/agentuity/cli/internal/envutil"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/ignore"
-	"github.com/agentuity/cli/internal/input"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/crypto"
@@ -94,7 +93,7 @@ func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.
 		}
 	}
 	tui.ShowBanner(title, message, false)
-	input.WaitForAnyKey()
+	tui.WaitForAnyKey()
 	tui.ClearScreen()
 	orgId := promptForOrganization(ctx, logger, cmd, apiUrl, apikey)
 	name, description := promptForProjectDetail(ctx, logger, apiUrl, apikey, project.Name, project.Description, orgId)

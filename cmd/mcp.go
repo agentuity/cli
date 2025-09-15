@@ -9,7 +9,6 @@ import (
 	"syscall"
 
 	"github.com/agentuity/cli/internal/errsystem"
-	"github.com/agentuity/cli/internal/input"
 	"github.com/agentuity/cli/internal/mcp"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/go-common/env"
@@ -120,7 +119,7 @@ Examples:
 			if needsInstall > 1 {
 				text = "clients"
 			}
-			input.WaitForAnyKeyMessage(fmt.Sprintf("Press any key to install the Agentuity MCP server for the missing %s...", text))
+			tui.WaitForAnyKeyMessage(fmt.Sprintf("Press any key to install the Agentuity MCP server for the missing %s...", text))
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 			defer cancel()
 			if err := mcp.Install(ctx, logger); err != nil {
