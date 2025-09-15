@@ -61,12 +61,8 @@ func ProcessPrompts(ctx context.Context, logger logger.Logger, client *util.APIC
 		if prompt.Name == "" {
 			return fmt.Errorf("prompt '%s' missing required 'name' field", prompt.ID)
 		}
-		// Either / or
-		if prompt.System == "" {
-			return fmt.Errorf("prompt '%s' missing required 'system' field", prompt.ID)
-		}
-		if prompt.Prompt == "" {
-			return fmt.Errorf("prompt '%s' missing required 'prompt' field", prompt.ID)
+		if prompt.System == "" && prompt.Prompt == "" {
+			return fmt.Errorf("prompt '%s' must have either 'system' or 'prompt' field", prompt.ID)
 		}
 	}
 
