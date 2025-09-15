@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agentuity/cli/internal/input"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/tui"
 	"github.com/charmbracelet/lipgloss"
@@ -147,7 +148,7 @@ func (e *errSystem) ShowErrorAndExit() {
 	}
 	tui.ShowBanner(tui.Warning("☹ Error Detected"), body.String(), false)
 	if isatty.IsTerminal(os.Stdout.Fd()) && Version != "dev" {
-		tui.WaitForAnyKeyMessage(" Press any key to upload the error report\n to the Agentuity team or press Ctrl+C to cancel ...")
+		input.WaitForAnyKeyMessage(" Press any key to upload the error report\n to the Agentuity team or press Ctrl+C to cancel ...")
 		fmt.Println()
 		action := func() {
 			e.sendReport(crashReportFile)

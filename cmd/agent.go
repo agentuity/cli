@@ -17,6 +17,7 @@ import (
 	"github.com/agentuity/cli/internal/agent"
 	"github.com/agentuity/cli/internal/dev"
 	"github.com/agentuity/cli/internal/errsystem"
+	"github.com/agentuity/cli/internal/input"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/templates"
 	"github.com/agentuity/cli/internal/util"
@@ -582,7 +583,7 @@ func showAgentWarnings(remoteIssues int, localIssues int, deploying bool) bool {
 		body := fmt.Sprintf("Detected %s in your project. %s\n\n", util.Pluralize(issues, "discrepancy", "discrepancies"), msg) + tui.Muted("$ ") + tui.Command("deploy")
 		tui.ShowBanner(tui.Warning(fmt.Sprintf("⚠ Agent %s Detected", title)), body, false)
 		if deploying {
-			tui.WaitForAnyKey()
+			input.WaitForAnyKey()
 		}
 		return true
 	}

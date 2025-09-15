@@ -14,6 +14,7 @@ import (
 	"github.com/agentuity/cli/internal/deployer"
 	"github.com/agentuity/cli/internal/envutil"
 	"github.com/agentuity/cli/internal/errsystem"
+	"github.com/agentuity/cli/internal/input"
 	"github.com/agentuity/cli/internal/mcp"
 	"github.com/agentuity/cli/internal/organization"
 	"github.com/agentuity/cli/internal/project"
@@ -420,7 +421,7 @@ Examples:
 						tui.ShowWarning("You can install the Agentuity tooling later by running: \n\n\t%s", tui.Command("mcp", "install"))
 					}
 					fmt.Println()
-					tui.WaitForAnyKeyMessage("Press any key to continue with project creation ...")
+					input.WaitForAnyKeyMessage("Press any key to continue with project creation ...")
 					fmt.Println()
 					initScreenWithLogo() // re-clear the screen
 				}
