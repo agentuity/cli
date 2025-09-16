@@ -14,7 +14,7 @@ import (
 )
 
 type Prompt struct {
-	ID          string `yaml:"id" json:"id"`
+	Slug        string `yaml:"slug" json:"slug"`
 	Name        string `yaml:"name" json:"name"`
 	Description string `yaml:"description,omitempty" json:"description,omitempty"`
 	System      string `yaml:"system,omitempty" json:"system,omitempty"`
@@ -43,7 +43,7 @@ func ProcessPrompts(ctx context.Context, logger logger.Logger, client *util.APIC
 		return nil
 	}
 
-	prompts, err := parsePromptsFile(promptsFile)
+	prompts, err := ParsePromptsFile(promptsFile)
 	if err != nil {
 		return fmt.Errorf("failed to parse prompts.yaml: %w", err)
 	}
@@ -55,18 +55,18 @@ func ProcessPrompts(ctx context.Context, logger logger.Logger, client *util.APIC
 
 	// Validate prompts have required fields
 	for _, prompt := range prompts {
-		if prompt.ID == "" {
+		if prompt.Slug == "" {
 			return fmt.Errorf("prompt missing required 'id' field")
 		}
 		if prompt.Name == "" {
-			return fmt.Errorf("prompt '%s' missing required 'name' field", prompt.ID)
+			return fmt.Errorf("prompt '%s' missing required 'name' field", prompt.Slug)
 		}
 		// Either / or
 		if prompt.System == "" {
-			return fmt.Errorf("prompt '%s' missing required 'system' field", prompt.ID)
+			return fmt.Errorf("prompt '%s' missing required 'system' field", prompt.Slug)
 		}
 		if prompt.Prompt == "" {
-			return fmt.Errorf("prompt '%s' missing required 'prompt' field", prompt.ID)
+			return fmt.Errorf("prompt '%s' missing required 'prompt' field", prompt.Slug)
 		}
 	}
 
@@ -76,20 +76,20 @@ func ProcessPrompts(ctx context.Context, logger logger.Logger, client *util.APIC
 		// Convert prompt to map for JSON serialization
 		contentBytes, err := json.Marshal(prompt)
 		if err != nil {
-			return fmt.Errorf("failed to marshal prompt %s: %w", prompt.ID, err)
+			return fmt.Errorf("failed to marshal prompt %s: %w", prompt.Slug, err)
 		}
 
 		var content map[string]interface{}
 		if err := json.Unmarshal(contentBytes, &content); err != nil {
-			return fmt.Errorf("failed to unmarshal prompt %s content: %w", prompt.ID, err)
+			return fmt.Errorf("failed to unmarshal prompt %s content: %w", prompt.Slug, err)
 		}
 
 		apiRequest.Prompts = append(apiRequest.Prompts, PromptRequest{
-			Slug:    prompt.ID,
+			Slug:    prompt.Slug,
 			Content: content,
 		})
 
-		logger.Debug("processing prompt: %s", prompt.ID)
+		logger.Debug("processing prompt: %s", prompt.Slug)
 	}
 
 	// Send to API
@@ -102,8 +102,8 @@ func ProcessPrompts(ctx context.Context, logger logger.Logger, client *util.APIC
 	return nil
 }
 
-// parsePromptsFile parses a single prompts.yaml file
-func parsePromptsFile(filename string) ([]Prompt, error) {
+// ParsePromptsFile parses a single prompts.yaml file
+func ParsePromptsFile(filename string) ([]Prompt, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err
