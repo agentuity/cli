@@ -42,27 +42,27 @@ func Slugify(name string) string {
 	return slug
 }
 
-// generateUniqueID creates a unique ID by appending numbers if needed
-func generateUniqueID(baseID string, existingPrompts []prompts.Prompt) string {
-	id := baseID
+// generateUniqueSlug creates a unique slug by appending numbers if needed
+func generateUniqueSlug(baseSlug string, existingPrompts []prompts.Prompt) string {
+	slug := baseSlug
 	counter := 2
 	
 	for {
-		// Check if ID already exists
+		// Check if slug already exists
 		exists := false
 		for _, prompt := range existingPrompts {
-			if prompt.ID == id {
+			if prompt.Slug == slug {
 				exists = true
 				break
 			}
 		}
 		
 		if !exists {
-			return id
+			return slug
 		}
 		
 		// Try with counter
-		id = fmt.Sprintf("%s-%d", baseID, counter)
+		slug = fmt.Sprintf("%s-%d", baseSlug, counter)
 		counter++
 	}
 }
@@ -122,8 +122,8 @@ var promptCreateCmd = &cobra.Command{
 	Long: `Create a new prompt template in src/prompts.yaml.
 
 This command will add a new prompt entry to your project's prompts.yaml file.
-If the file doesn't exist, it will be created. The ID will be automatically
-generated from the name using underscores.
+If the file doesn't exist, it will be created. The slug will be automatically
+generated from the name using dashes (kebab-case).
 
 Arguments:
   [name]        Optional name for the prompt
@@ -181,8 +181,8 @@ Examples:
 			promptBody = tui.Input(logger, "Enter the USER prompt text", "Leave blank to skip; you can edit prompts.yaml later")
 		}
 
-		// Generate ID from name
-		baseID := Slugify(name)
+		// Generate slug from name
+		baseSlug := Slugify(name)
 
 		// Read existing prompts file
 		promptsFile := filepath.Join(dir, "src", "prompts.yaml")
@@ -191,12 +191,12 @@ Examples:
 			errsystem.New(errsystem.ErrOpenFile, err, errsystem.WithUserMessage("Failed to read prompts file")).ShowErrorAndExit()
 		}
 
-		// Generate unique ID
-		uniqueID := generateUniqueID(baseID, promptsYaml.Prompts)
+		// Generate unique slug
+		uniqueSlug := generateUniqueSlug(baseSlug, promptsYaml.Prompts)
 
 		// Confirm create unless force flag is set
 		if !force {
-			confirmMessage := fmt.Sprintf("Create prompt '%s' (%s) in src/prompts.yaml?", name, uniqueID)
+			confirmMessage := fmt.Sprintf("Create prompt '%s' (%s) in src/prompts.yaml?", name, uniqueSlug)
 			if !tui.Ask(logger, confirmMessage, true) {
 				tui.ShowWarning("cancelled")
 				return
@@ -205,7 +205,7 @@ Examples:
 
 		// Create new prompt with collected system and prompt fields
 		newPrompt := prompts.Prompt{
-			ID:          uniqueID,
+			Slug:        uniqueSlug,
 			Name:        name,
 			Description: description,
 			System:      systemMsg,
@@ -226,14 +226,14 @@ Examples:
 			absPath = promptsFile
 		}
 
-		tui.ShowSuccess("Prompt '%s' (%s) created successfully", name, uniqueID)
+		tui.ShowSuccess("Prompt '%s' (%s) created successfully", name, uniqueSlug)
 		
 		// Show next steps guidance
 		nextSteps := "1. Review the prompt in " + absPath + "\n"
 		if systemMsg == "" || promptBody == "" {
 			nextSteps += "2. Fill in any missing 'system' or 'prompt' fields\n"
 		}
-		nextSteps += "3. Add the prompt ID to your agent code"
+		nextSteps += "3. Add the prompt slug to your agent code"
 		
 		tui.ShowBanner("Next steps", nextSteps, false)
 	},
