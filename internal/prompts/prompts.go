@@ -14,11 +14,12 @@ import (
 )
 
 type Prompt struct {
-	Slug        string `yaml:"slug" json:"slug"`
-	Name        string `yaml:"name" json:"name"`
-	Description string `yaml:"description,omitempty" json:"description,omitempty"`
-	System      string `yaml:"system,omitempty" json:"system,omitempty"`
-	Prompt      string `yaml:"prompt,omitempty" json:"prompt,omitempty"`
+	Slug        string   `yaml:"slug" json:"slug"`
+	Name        string   `yaml:"name" json:"name"`
+	Description string   `yaml:"description,omitempty" json:"description,omitempty"`
+	System      string   `yaml:"system,omitempty" json:"system,omitempty"`
+	Prompt      string   `yaml:"prompt,omitempty" json:"prompt,omitempty"`
+	Eval        []string `yaml:"eval,omitempty" json:"eval,omitempty"`
 }
 
 type PromptsFile struct {
@@ -56,17 +57,26 @@ func ProcessPrompts(ctx context.Context, logger logger.Logger, client *util.APIC
 	// Validate prompts have required fields
 	for _, prompt := range prompts {
 		if prompt.Slug == "" {
+<<<<<<< HEAD
 			return fmt.Errorf("prompt missing required 'id' field")
+=======
+			return fmt.Errorf("prompt missing required 'slug' field")
+>>>>>>> ec4370965ca48f3091d7fb35b2711a6709557677
 		}
 		if prompt.Name == "" {
 			return fmt.Errorf("prompt '%s' missing required 'name' field", prompt.Slug)
 		}
+<<<<<<< HEAD
 		// Either / or
 		if prompt.System == "" {
 			return fmt.Errorf("prompt '%s' missing required 'system' field", prompt.Slug)
 		}
 		if prompt.Prompt == "" {
 			return fmt.Errorf("prompt '%s' missing required 'prompt' field", prompt.Slug)
+=======
+		if prompt.System == "" && prompt.Prompt == "" {
+			return fmt.Errorf("prompt '%s' must have either 'system' or 'prompt' field", prompt.Slug)
+>>>>>>> ec4370965ca48f3091d7fb35b2711a6709557677
 		}
 	}
 
