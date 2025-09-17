@@ -114,4 +114,32 @@ var (
 		Code:    "CLI-0028",
 		Message: "Failed to delete API key",
 	}
+	ErrProcessGithubRepository = errorType{
+		Code:    "CLI-0029",
+		Message: "Failed to process GitHub repository",
+	}
+	ErrInvalidGithubUrlFormat = errorType{
+		Code:    "CLI-0030",
+		Message: "Invalid GitHub URL format",
+	}
+	ErrGithubRepositoryNotFoundOrNotAccessible = errorType{
+		Code:    "CLI-0031",
+		Message: "GitHub repository not found or not accessible",
+	}
+	ErrDownloadGithubRepository = errorType{
+		Code:    "CLI-0032",
+		Message: "Failed to download GitHub repository",
+	}
+	ErrExtractGithubRepository = errorType{
+		Code:    "CLI-0033",
+		Message: "Failed to extract GitHub repository",
+	}
+	ErrGithubApiRequest = errorType{
+		Code:    "CLI-0034",
+		Message: "GitHub API request failed",
+	}
+	ErrNotValidAgentuityProject = errorType{
+		Code:    "CLI-0035",
+		Message: "Not a valid Agentuity project",
+	}
 )
