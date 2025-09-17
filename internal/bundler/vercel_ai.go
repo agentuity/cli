@@ -36,6 +36,9 @@ func init() {
 	const metadata = { promptId: opts.prompt.id };
 	opts.experimental_telemetry = { isEnabled: true , metadata: metadata };
 	opts.prompt = opts.prompt.toString();
+	if (opts.system) {
+		opts.system = opts.system.toString();
+	}
 	_args[0] = opts;
 	`)
 	vercelAIPatches := patchModule{
