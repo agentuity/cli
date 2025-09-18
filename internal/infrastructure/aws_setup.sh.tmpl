@@ -1,0 +1,313 @@
+#!/bin/bash
+set -e  # Exit on any error
+set -o pipefail  # Exit on pipe failures
+
+AWS_REGION="{{AWS_REGION}}"
+AWS_ROLE_NAME="{{AWS_ROLE_NAME}}"
+AWS_POLICY_NAME="{{AWS_POLICY_NAME}}"
+AWS_SECRET_NAME="{{AWS_SECRET_NAME}}"
+AWS_INSTANCE_NAME="{{AWS_INSTANCE_NAME}}"
+ENCRYPTION_PRIVATE_KEY="{{ENCRYPTION_PRIVATE_KEY}}"
+CLUSTER_TOKEN="{{CLUSTER_TOKEN}}"
+CLUSTER_ID="{{CLUSTER_ID}}"
+
+echo "=== Setting up AWS Infrastructure for Agentuity Cluster ==="
+
+# Function to check if resource exists and skip if so
+check_and_create_role() {
+    echo "Checking/Creating IAM Role: $AWS_ROLE_NAME"
+    if aws iam get-role --role-name "$AWS_ROLE_NAME" >/dev/null 2>&1; then
+        echo "✓ IAM Role $AWS_ROLE_NAME already exists"
+        return 0
+    fi
+    
+    OUTPUT=$(aws iam create-role \
+        --role-name "$AWS_ROLE_NAME" \
+        --assume-role-policy-document '{
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": {"Service": "ec2.amazonaws.com"},
+                "Action": "sts:AssumeRole"
+            }]
+        }' 2>&1)
+    
+    if [ $? -eq 0 ]; then
+        echo "✓ Created IAM Role: $AWS_ROLE_NAME"
+    elif echo "$OUTPUT" | grep -q "EntityAlreadyExists\|AlreadyExists\|already exists"; then
+        echo "✓ IAM Role $AWS_ROLE_NAME already exists"
+    else
+        echo "✗ Failed to create IAM Role: $AWS_ROLE_NAME"
+        echo "$OUTPUT"
+        return 1
+    fi
+}
+
+check_and_create_policy() {
+    echo "Checking/Creating IAM Policy: $AWS_POLICY_NAME"
+    ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+    POLICY_ARN="arn:aws:iam::${ACCOUNT_ID}:policy/${AWS_POLICY_NAME}"
+    
+    # Try to check if policy exists first, but don't fail if we can't check due to permissions
+    if aws iam get-policy --policy-arn "$POLICY_ARN" >/dev/null 2>&1; then
+        echo "✓ IAM Policy $AWS_POLICY_NAME already exists"
+        return 0
+    fi
+    
+    # Try to create the policy, capture output to check for "already exists"
+    OUTPUT=$(aws iam create-policy \
+        --policy-name "$AWS_POLICY_NAME" \
+        --policy-document '{
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "secretsmanager:GetSecretValue",
+                        "secretsmanager:DescribeSecret"
+                    ],
+                    "Resource": "arn:aws:secretsmanager:'"$AWS_REGION"':*:secret:'"$AWS_SECRET_NAME"'*"
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "ec2:DescribeInstances",
+                        "ec2:DescribeTags"
+                    ],
+                    "Resource": "*"
+                }
+            ]
+        }' 2>&1)
+    
+    if [ $? -eq 0 ]; then
+        echo "✓ Created IAM Policy: $AWS_POLICY_NAME"
+    elif echo "$OUTPUT" | grep -q "EntityAlreadyExists\|AlreadyExists\|already exists"; then
+        echo "✓ IAM Policy $AWS_POLICY_NAME already exists"
+    else
+        echo "✗ Failed to create IAM Policy: $AWS_POLICY_NAME"
+        echo "$OUTPUT"
+        return 1
+    fi
+}
+
+attach_policy_to_role() {
+    echo "Attaching policy to role..."
+    ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+    POLICY_ARN="arn:aws:iam::${ACCOUNT_ID}:policy/${AWS_POLICY_NAME}"
+    
+    if aws iam list-attached-role-policies --role-name "$AWS_ROLE_NAME" --query "AttachedPolicies[?PolicyName=='$AWS_POLICY_NAME']" --output text 2>/dev/null | grep -q "$AWS_POLICY_NAME"; then
+        echo "✓ Policy already attached to role"
+        return 0
+    fi
+    
+    OUTPUT=$(aws iam attach-role-policy --role-name "$AWS_ROLE_NAME" --policy-arn "$POLICY_ARN" 2>&1)
+    if [ $? -eq 0 ]; then
+        echo "✓ Attached policy to role"
+    else
+        echo "✗ Failed to attach policy to role"
+        echo "$OUTPUT"
+        return 1
+    fi
+}
+
+create_instance_profile() {
+    echo "Creating instance profile..."
+    if aws iam get-instance-profile --instance-profile-name "$AWS_ROLE_NAME" >/dev/null 2>&1; then
+        echo "✓ Instance profile already exists"
+    else
+        OUTPUT=$(aws iam create-instance-profile --instance-profile-name "$AWS_ROLE_NAME" 2>&1)
+        if [ $? -eq 0 ]; then
+            echo "✓ Created instance profile"
+        elif echo "$OUTPUT" | grep -q "EntityAlreadyExists\|AlreadyExists\|already exists"; then
+            echo "✓ Instance profile already exists"
+        else
+            echo "✗ Failed to create instance profile"
+            echo "$OUTPUT"
+            return 1
+        fi
+    fi
+    
+    # Add role to instance profile
+    if aws iam get-instance-profile --instance-profile-name "$AWS_ROLE_NAME" --query "InstanceProfile.Roles[?RoleName=='$AWS_ROLE_NAME']" --output text 2>/dev/null | grep -q "$AWS_ROLE_NAME"; then
+        echo "✓ Role already in instance profile"
+    else
+        OUTPUT=$(aws iam add-role-to-instance-profile --instance-profile-name "$AWS_ROLE_NAME" --role-name "$AWS_ROLE_NAME" 2>&1)
+        if [ $? -eq 0 ]; then
+            echo "✓ Added role to instance profile"
+        elif echo "$OUTPUT" | grep -q "EntityAlreadyExists\|AlreadyExists\|already exists"; then
+            echo "✓ Role already in instance profile"
+        else
+            echo "✗ Failed to add role to instance profile"
+            echo "$OUTPUT"
+            return 1
+        fi
+    fi
+}
+
+create_secret() {
+    echo "Creating encryption secret..."
+    if aws secretsmanager describe-secret --secret-id "$AWS_SECRET_NAME" >/dev/null 2>&1; then
+        echo "✓ Secret already exists"
+        return 0
+    fi
+    
+    # Create temp file for binary data to avoid pipe issues in command substitution
+    TEMP_KEY_FILE=$(mktemp)
+    echo "$ENCRYPTION_PRIVATE_KEY" | base64 -d > "$TEMP_KEY_FILE"
+    
+    # Create the secret using the temp file
+    OUTPUT=$(aws secretsmanager create-secret \
+        --name "$AWS_SECRET_NAME" \
+        --description "Agentuity Cluster Private Key" \
+        --secret-binary fileb://"$TEMP_KEY_FILE" 2>&1)
+    EXIT_CODE=$?
+    
+    # Clean up temp file
+    rm -f "$TEMP_KEY_FILE"
+    
+    if [ $EXIT_CODE -eq 0 ]; then
+        echo "✓ Created secret: $AWS_SECRET_NAME"
+    elif echo "$OUTPUT" | grep -q "ResourceExistsException\|AlreadyExists\|already exists"; then
+        echo "✓ Secret already exists"
+    else
+        echo "✗ Failed to create secret: $AWS_SECRET_NAME"
+        echo "$OUTPUT"
+        return 1
+    fi
+}
+
+setup_networking() {
+    echo "Setting up networking..."
+    
+    # Get default VPC
+    VPC_ID=$(aws ec2 describe-vpcs --filters Name=isDefault,Values=true --query 'Vpcs[0].VpcId' --output text)
+    echo "Using VPC: $VPC_ID"
+    
+    # Get default subnet
+    SUBNET_ID=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID Name=default-for-az,Values=true --query 'Subnets[0].SubnetId' --output text)
+    echo "Using Subnet: $SUBNET_ID"
+    
+    # Create security group
+    SG_NAME="${AWS_ROLE_NAME}-sg"
+    if SG_ID=$(aws ec2 describe-security-groups --filters Name=group-name,Values=$SG_NAME --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null) && [ "$SG_ID" != "None" ] && [ "$SG_ID" != "" ]; then
+        echo "✓ Security group already exists: $SG_ID"
+    else
+        OUTPUT=$(aws ec2 create-security-group --group-name "$SG_NAME" --description "Agentuity Cluster Security Group" --vpc-id "$VPC_ID" --query 'GroupId' --output text 2>&1)
+        if [ $? -eq 0 ]; then
+            SG_ID="$OUTPUT"
+            echo "✓ Created security group: $SG_ID"
+        elif echo "$OUTPUT" | grep -q "InvalidGroup.Duplicate\|AlreadyExists\|already exists"; then
+            # Get the existing security group ID
+            SG_ID=$(aws ec2 describe-security-groups --filters Name=group-name,Values=$SG_NAME --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null)
+            echo "✓ Security group already exists: $SG_ID"
+        else
+            echo "✗ Failed to create security group"
+            echo "$OUTPUT"
+            return 1
+        fi
+        
+        # Add SSH and HTTPS rules (ignore errors if rules already exist)
+        aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port 22 --cidr 0.0.0.0/0 2>/dev/null || true
+        aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port 443 --cidr 0.0.0.0/0 2>/dev/null || true
+        echo "✓ Configured security group rules"
+    fi
+    
+    echo "Security Group ID: $SG_ID"
+}
+
+create_instance() {
+    echo "Creating EC2 instance..."
+    
+    # Get latest Amazon Linux AMI
+    AMI_ID=$(aws ec2 describe-images --owners amazon --filters 'Name=name,Values=al2023-ami-*-x86_64' 'Name=state,Values=available' --query 'Images | sort_by(@, &CreationDate) | [-1].ImageId' --output text)
+    echo "Using AMI: $AMI_ID"
+    
+    # Get networking info
+    VPC_ID=$(aws ec2 describe-vpcs --filters Name=isDefault,Values=true --query 'Vpcs[0].VpcId' --output text)
+    SUBNET_ID=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID Name=default-for-az,Values=true --query 'Subnets[0].SubnetId' --output text)
+    SG_ID=$(aws ec2 describe-security-groups --filters Name=group-name,Values=${AWS_ROLE_NAME}-sg --query 'SecurityGroups[0].GroupId' --output text)
+    
+    echo "Using VPC: $VPC_ID"
+    echo "Using Subnet: $SUBNET_ID"
+    echo "Using Security Group: $SG_ID"
+    
+    # Validate we have all required IDs
+    if [ "$AMI_ID" = "None" ] || [ "$AMI_ID" = "" ]; then
+        echo "✗ Could not find Amazon Linux AMI"
+        return 1
+    fi
+    if [ "$VPC_ID" = "None" ] || [ "$VPC_ID" = "" ]; then
+        echo "✗ Could not find default VPC"
+        return 1
+    fi
+    if [ "$SUBNET_ID" = "None" ] || [ "$SUBNET_ID" = "" ]; then
+        echo "✗ Could not find default subnet"
+        return 1
+    fi
+    if [ "$SG_ID" = "None" ] || [ "$SG_ID" = "" ]; then
+        echo "✗ Could not find security group"
+        return 1
+    fi
+    
+    # Launch instance
+    OUTPUT=$(aws ec2 run-instances \
+        --image-id "$AMI_ID" \
+        --count 1 \
+        --instance-type t3.medium \
+        --security-group-ids "$SG_ID" \
+        --subnet-id "$SUBNET_ID" \
+        --iam-instance-profile Name="$AWS_ROLE_NAME" \
+        --user-data "$CLUSTER_TOKEN" \
+        --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$AWS_INSTANCE_NAME},{Key=AgentuityCluster,Value=$CLUSTER_ID}]" \
+        --query 'Instances[0].InstanceId' --output text 2>&1)
+    
+    if [ $? -eq 0 ]; then
+        INSTANCE_ID="$OUTPUT"
+        echo "✓ Created instance: $INSTANCE_ID"
+        echo "✓ AWS Infrastructure setup complete!"
+    else
+        echo "✗ Failed to create instance"
+        echo "$OUTPUT"
+        return 1
+    fi
+}
+
+# Execute specific function based on argument
+case "${1:-}" in
+    "check_and_create_role")
+        check_and_create_role
+        ;;
+    "check_and_create_policy")
+        check_and_create_policy
+        ;;
+    "attach_policy_to_role")
+        attach_policy_to_role
+        ;;
+    "create_instance_profile")
+        create_instance_profile
+        ;;
+    "create_secret")
+        create_secret
+        ;;
+    "setup_networking")
+        setup_networking
+        ;;
+    "create_instance")
+        create_instance
+        ;;
+    "all"|"")
+        # Execute all steps
+        check_and_create_role
+        check_and_create_policy
+        attach_policy_to_role
+        create_instance_profile
+        create_secret
+        setup_networking
+        create_instance
+        echo "🎉 AWS Cluster setup completed successfully!"
+        ;;
+    *)
+        echo "Usage: $0 [check_and_create_role|check_and_create_policy|attach_policy_to_role|create_instance_profile|create_secret|setup_networking|create_instance|all]"
+        exit 1
+        ;;
+esac
