@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os/exec"
 	"strings"
 
@@ -16,6 +17,11 @@ type sequenceCommand struct {
 }
 
 func buildCommandSequences(command string, args []string) []sequenceCommand {
+	// If using sh -c, don't parse for pipes - let the shell handle it
+	if command == "sh" && len(args) > 0 && args[0] == "-c" {
+		return []sequenceCommand{{command: command, args: args}}
+	}
+
 	var sequences []sequenceCommand
 	current := sequenceCommand{
 		command: command,
@@ -59,7 +65,18 @@ func runCommand(ctx context.Context, logger logger.Logger, message string, comma
 	})
 	if err != nil {
 		logger.Trace("ran: %s, errored: %s", command, strings.TrimSpace(string(output)), err)
-		return string(output), err
+
+		// Handle AWS "already exists" errors as success since resource is in desired state
+		outputStr := strings.TrimSpace(string(output))
+		if strings.Contains(outputStr, "EntityAlreadyExists") ||
+			strings.Contains(outputStr, "AlreadyExists") ||
+			strings.Contains(outputStr, "already exists") {
+			logger.Trace("AWS resource already exists, treating as success")
+			return outputStr, nil
+		}
+
+		// Include command output in the error for better debugging
+		return outputStr, fmt.Errorf("command failed: %w\nOutput: %s", err, outputStr)
 	}
 	logger.Trace("ran: %s %s", command, strings.TrimSpace(string(output)))
 	return string(output), nil
