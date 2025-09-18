@@ -24,7 +24,7 @@ builds:
 
 archives:
   - id: "agentuity"
-    formats: ['tar.gz']
+    formats: ["tar.gz"]
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       agentuity_
@@ -41,7 +41,6 @@ snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
 changelog:
-  sort: asc
   filters:
     exclude:
       - "^docs:"
