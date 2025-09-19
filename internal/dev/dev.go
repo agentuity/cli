@@ -65,7 +65,7 @@ func isPortAvailable(port int) bool {
 	return false
 }
 
-func findAvailablePort() (int, error) {
+func FindAvailableOpenPort() (int, error) {
 	listener, err := net.Listen("tcp4", "0.0.0.0:0")
 	if err != nil {
 		return 0, err
@@ -101,19 +101,21 @@ func FindAvailablePort(p project.ProjectContext, tryPort int) (int, error) {
 	if isPortAvailable(p.Project.Development.Port) {
 		return p.Project.Development.Port, nil
 	}
-	return findAvailablePort()
+	return FindAvailableOpenPort()
 }
 
 func CreateRunProjectCmd(ctx context.Context, log logger.Logger, theproject project.ProjectContext, server *Server, dir string, orgId string, port int, stdout io.Writer, stderr io.Writer) (*exec.Cmd, error) {
 	// set the vars
 	projectServerCmd := exec.CommandContext(ctx, theproject.Project.Development.Command, theproject.Project.Development.Args...)
 	projectServerCmd.Env = os.Environ()[:]
-	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_OTLP_BEARER_TOKEN=%s", server.otelToken))
-	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_OTLP_URL=%s", server.otelUrl))
+	telemetryURL := server.TelemetryURL()
+	telemetryAPIKey := server.TelemetryAPIKey()
+	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_OTLP_URL=%s", telemetryURL))
+	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_OTLP_BEARER_TOKEN=%s", telemetryAPIKey))
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_URL=%s", theproject.APIURL))
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_TRANSPORT_URL=%s", theproject.TransportURL))
 
-	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_DEPLOYMENT_ID=%s", server.ID))
+	// projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_DEPLOYMENT_ID=%s", server.ID))
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_PROJECT_ID=%s", theproject.Project.ProjectId))
 	projectServerCmd.Env = append(projectServerCmd.Env, fmt.Sprintf("AGENTUITY_CLOUD_ORG_ID=%s", orgId))
 

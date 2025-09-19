@@ -17,6 +17,7 @@ import (
 	"github.com/agentuity/cli/internal/dev"
 	"github.com/agentuity/cli/internal/envutil"
 	"github.com/agentuity/cli/internal/errsystem"
+	"github.com/agentuity/cli/internal/gravity"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
@@ -44,14 +45,13 @@ Examples:
   agentuity dev --no-build`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log := env.NewLogger(cmd)
-		logLevel := env.LogLevel(cmd)
-		apiUrl, appUrl, transportUrl := util.GetURLs(log)
+		apiUrl, appUrl, _ := util.GetURLs(log)
 		noBuild, _ := cmd.Flags().GetBool("no-build")
 
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		apiKey, userId := util.EnsureLoggedIn(ctx, log, cmd)
+		apiKey, _ := util.EnsureLoggedIn(ctx, log, cmd)
 		theproject := project.EnsureProject(ctx, cmd)
 		dir := theproject.Dir
 
@@ -89,7 +89,6 @@ Examples:
 				fmt.Fprintf(of, "%s=%s\n", k, v)
 			}
 			// Add the required Agentuity SDK and project keys
-			fmt.Fprintf(of, "AGENTUITY_SDK_KEY=%s\n", apiKey)
 			fmt.Fprintf(of, "AGENTUITY_PROJECT_KEY=%s\n", project.ProjectKey)
 			of.Close()
 			tui.ShowSuccess("Synchronized project to .env file: %s", tui.Muted(filename))
@@ -97,24 +96,33 @@ Examples:
 
 		orgId := project.OrgId
 
-		port, _ := cmd.Flags().GetInt("port")
-		port, err = dev.FindAvailablePort(theproject, port)
+		agentPort, _ := cmd.Flags().GetInt("port")
+		agentPort, err = dev.FindAvailablePort(theproject, agentPort)
+		if err != nil {
+			log.Fatal("failed to find available port: %s", err)
+		}
+		proxyPort, err := dev.FindAvailableOpenPort()
 		if err != nil {
 			log.Fatal("failed to find available port: %s", err)
 		}
 
 		server, err := dev.New(dev.ServerArgs{
-			Ctx:          ctx,
-			Logger:       log,
-			LogLevel:     logLevel,
-			APIURL:       apiUrl,
-			TransportURL: transportUrl,
-			APIKey:       apiKey,
-			OrgId:        orgId,
-			Project:      theproject,
-			Version:      Version,
-			UserId:       userId,
-			Port:         port,
+			APIURL: apiUrl,
+			APIKey: apiKey,
+			Config: &gravity.Config{
+				Context: ctx,
+				Logger:  log,
+				Version: Version,
+				OrgID:   orgId,
+				Project: theproject,
+				// FIXME
+				EndpointID: "endpoint_1234",
+				URL:        "grpc://gravity.agentuity.io:8443",
+				SDKKey:     project.Secrets["AGENTUITY_SDK_KEY"],
+				ProxyPort:  uint(proxyPort),
+				AgentPort:  uint(agentPort),
+				Ephemeral:  true,
+			},
 		})
 		if err != nil {
 			log.Fatal("failed to create live dev connection: %s", err)
@@ -129,7 +137,7 @@ Examples:
 				if errors.Is(err, context.Canceled) {
 					return
 				}
-				log.Error("failed to start live dev connection: %s", err)
+				log.Fatal("failed to start devmode connection: %s", err)
 				return
 			}
 		}
@@ -138,11 +146,11 @@ Examples:
 
 		publicUrl := server.PublicURL(appUrl)
 		consoleUrl := server.WebURL(appUrl)
-		devModeUrl := fmt.Sprintf("http://127.0.0.1:%d", port)
+		devModeUrl := fmt.Sprintf("http://127.0.0.1:%d", agentPort)
 		infoBox := server.GenerateInfoBox(publicUrl, consoleUrl, devModeUrl)
 		fmt.Println(infoBox)
 
-		projectServerCmd, err := dev.CreateRunProjectCmd(processCtx, log, theproject, server, dir, orgId, port, os.Stdout, os.Stderr)
+		projectServerCmd, err := dev.CreateRunProjectCmd(processCtx, log, theproject, server, dir, orgId, agentPort, os.Stdout, os.Stderr)
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 		}
@@ -179,7 +187,7 @@ Examples:
 		}
 
 		runServer := func() {
-			projectServerCmd, err = dev.CreateRunProjectCmd(processCtx, log, theproject, server, dir, orgId, port, os.Stdout, os.Stderr)
+			projectServerCmd, err = dev.CreateRunProjectCmd(processCtx, log, theproject, server, dir, orgId, agentPort, os.Stdout, os.Stderr)
 			if err != nil {
 				errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 			}
