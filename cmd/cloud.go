@@ -725,7 +725,9 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
+		apiUrl := urls.API
+
 		deleteFlag, _ := cmd.Flags().GetBool("delete")
 		dir, _ := cmd.Flags().GetString("dir")
 
@@ -935,7 +937,9 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
+		apiUrl := urls.API
+
 		projectId, _ := cmd.Flags().GetString("project")
 		format, _ := cmd.Flags().GetString("format")
 

@@ -586,7 +586,10 @@ func isVersionCheckRequired(ver string) bool {
 func EnsureProject(ctx context.Context, cmd *cobra.Command) ProjectContext {
 	logger := env.NewLogger(cmd)
 	dir := ResolveProjectDir(logger, cmd, true)
-	apiUrl, appUrl, transportUrl := util.GetURLs(logger)
+	urls := util.GetURLs(logger)
+	apiUrl := urls.API
+	appUrl := urls.App
+	transportUrl := urls.Transport
 	var token string
 	// if the --api-key flag is used, we only need to verify the api key
 	if cmd.Flags().Changed("api-key") {
@@ -612,7 +615,10 @@ func EnsureProject(ctx context.Context, cmd *cobra.Command) ProjectContext {
 func TryProject(ctx context.Context, cmd *cobra.Command) ProjectContext {
 	logger := env.NewLogger(cmd)
 	dir := ResolveProjectDir(logger, cmd, false)
-	apiUrl, appUrl, transportUrl := util.GetURLs(logger)
+	urls := util.GetURLs(logger)
+	apiUrl := urls.API
+	appUrl := urls.App
+	transportUrl := urls.Transport
 	var token string
 	// if the --api-key flag is used, we only need to verify the api key
 	if cmd.Flags().Changed("api-key") {

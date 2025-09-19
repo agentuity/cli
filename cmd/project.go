@@ -333,7 +333,9 @@ Examples:
 		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
-		apiUrl, appUrl, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
+		apiUrl := urls.API
+		appUrl := urls.App
 
 		initScreenWithLogo()
 
@@ -747,7 +749,9 @@ Examples:
 		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
+		apiUrl := urls.API
+
 		orgId, _ := cmd.Flags().GetString("org-id")
 
 		var projects []project.ProjectListData
@@ -839,7 +843,9 @@ Examples:
 		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
+		apiUrl := urls.API
+
 		orgId, _ := cmd.Flags().GetString("org-id")
 
 		var selected []string

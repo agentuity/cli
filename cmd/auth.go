@@ -42,7 +42,9 @@ Examples:
   agentuity auth login`,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apiUrl, appUrl, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
+		apiUrl := urls.API
+		appUrl := urls.App
 		var otp string
 		var upgrade bool
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -143,7 +145,8 @@ Examples:
   agentuity auth whoami`,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
+		apiUrl := urls.API
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		apiKey, userId := util.EnsureLoggedIn(ctx, logger, cmd)
@@ -182,7 +185,10 @@ Examples:
   agentuity auth signup`,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apiUrl, appUrl, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
+		apiUrl := urls.API
+		appUrl := urls.App
+
 		var otp string
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()

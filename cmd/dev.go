@@ -26,10 +26,9 @@ import (
 )
 
 var devCmd = &cobra.Command{
-	Use:     "dev",
-	Aliases: []string{"run"},
-	Args:    cobra.NoArgs,
-	Short:   "Run the development server",
+	Use:   "dev",
+	Args:  cobra.NoArgs,
+	Short: "Run the development server",
 	Long: `Run the development server for local testing and development.
 
 This command starts a local development server that connects to the Agentuity Cloud
@@ -45,7 +44,11 @@ Examples:
   agentuity dev --no-build`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log := env.NewLogger(cmd)
-		apiUrl, appUrl, _ := util.GetURLs(log)
+		urls := util.GetURLs(log)
+		apiUrl := urls.API
+		appUrl := urls.App
+		gravityUrl := urls.Gravity
+
 		noBuild, _ := cmd.Flags().GetBool("no-build")
 
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -116,12 +119,14 @@ Examples:
 				OrgID:   orgId,
 				Project: theproject,
 				// FIXME
-				EndpointID: "endpoint_1234",
-				URL:        "grpc://gravity.agentuity.io:8443",
-				SDKKey:     project.Secrets["AGENTUITY_SDK_KEY"],
-				ProxyPort:  uint(proxyPort),
-				AgentPort:  uint(agentPort),
-				Ephemeral:  true,
+				EndpointID:      "ep_1234",
+				URL:             gravityUrl,
+				SDKKey:          project.Secrets["AGENTUITY_SDK_KEY"],
+				ProxyPort:       uint(proxyPort),
+				AgentPort:       uint(agentPort),
+				Ephemeral:       true,
+				ClientName:      "cli/devmode",
+				DynamicHostname: true,
 			},
 		})
 		if err != nil {

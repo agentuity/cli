@@ -22,6 +22,8 @@ THE SOFTWARE.
 package main
 
 import (
+	"runtime/debug"
+
 	"github.com/agentuity/cli/cmd"
 	"github.com/agentuity/cli/internal/bundler"
 	"github.com/agentuity/cli/internal/errsystem"
@@ -36,6 +38,17 @@ var (
 )
 
 func main() {
+	// goreleaser will set version using ldflags to the latest tag (eg. v0.0.59)
+	if version == "dev" {
+		// if dev use git sha (build info is only present from go build not go run)
+		if info, ok := debug.ReadBuildInfo(); ok {
+			for _, s := range info.Settings {
+				if s.Key == "vcs.revision" {
+					version = s.Value
+				}
+			}
+		}
+	}
 	cmd.Version = version
 	cmd.Commit = commit
 	cmd.Date = date

@@ -14,6 +14,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,53 +39,63 @@ const (
 )
 
 type Client struct {
-	context    context.Context
-	logger     logger.Logger
-	version    string
-	orgID      string
-	projectID  string
-	project    project.ProjectContext
-	endpointID string
-	url        string
-	sdkKey     string
-	proxyPort  uint
-	agentPort  uint
-	ephemeral  bool
-	server     *http.Server
-	client     *gravity.GravityClient
-	once       sync.Once
-	stack      *stack.Stack
-	endpoint   *channel.Endpoint
-	provider   *cliProvider
+	context         context.Context
+	logger          logger.Logger
+	version         string
+	orgID           string
+	projectID       string
+	project         project.ProjectContext
+	endpointID      string
+	url             string
+	sdkKey          string
+	proxyPort       uint
+	agentPort       uint
+	ephemeral       bool
+	clientname      string
+	dynamicHostname bool
+	dynamicProject  bool
+	server          *http.Server
+	client          *gravity.GravityClient
+	once            sync.Once
+	stack           *stack.Stack
+	endpoint        *channel.Endpoint
+	provider        *cliProvider
 }
 
 type Config struct {
-	Context    context.Context
-	Logger     logger.Logger
-	Version    string // of the cli
-	OrgID      string
-	Project    project.ProjectContext
-	EndpointID string
-	URL        string
-	SDKKey     string
-	ProxyPort  uint
-	AgentPort  uint
-	Ephemeral  bool
+	Context         context.Context
+	Logger          logger.Logger
+	Version         string // of the cli
+	OrgID           string
+	Project         project.ProjectContext
+	EndpointID      string
+	URL             string
+	SDKKey          string
+	ProxyPort       uint
+	AgentPort       uint
+	Ephemeral       bool
+	ClientName      string
+	DynamicHostname bool
+	DynamicProject  bool
 }
 
 func New(config Config) *Client {
 	return &Client{
-		context:    config.Context,
-		logger:     config.Logger.WithPrefix("[gravity]"),
-		orgID:      config.OrgID,
-		projectID:  config.Project.Project.ProjectId,
-		project:    config.Project,
-		endpointID: config.EndpointID,
-		url:        config.URL,
-		sdkKey:     config.SDKKey,
-		ephemeral:  config.Ephemeral,
-		proxyPort:  config.ProxyPort,
-		agentPort:  config.AgentPort,
+		context:         config.Context,
+		logger:          config.Logger.WithPrefix("[gravity]"),
+		version:         config.Version,
+		orgID:           config.OrgID,
+		projectID:       config.Project.Project.ProjectId,
+		project:         config.Project,
+		endpointID:      config.EndpointID,
+		url:             config.URL,
+		sdkKey:          config.SDKKey,
+		ephemeral:       config.Ephemeral,
+		proxyPort:       config.ProxyPort,
+		agentPort:       config.AgentPort,
+		clientname:      config.ClientName,
+		dynamicHostname: config.DynamicHostname,
+		dynamicProject:  config.DynamicProject,
 	}
 }
 
@@ -111,6 +122,11 @@ func (c *Client) TelemetryAPIKey() string {
 // Hostname returns the hostname of the client.
 func (c *Client) Hostname() string {
 	return c.provider.config.Hostname
+}
+
+// OrgID returns the organization ID of the client.
+func (c *Client) OrgID() string {
+	return c.provider.config.OrgID
 }
 
 // For each TCP connection: connect to local HTTPS server and proxy bytes.
@@ -185,7 +201,7 @@ type Welcome struct {
 
 func (c *Client) getWelcome(ctx context.Context, port int) (map[string]Welcome, error) {
 	url := fmt.Sprintf("http://127.0.0.1:%d/welcome", port)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
 			return nil, err
@@ -346,49 +362,58 @@ func (c *Client) Start() error {
 		WriteTimeout:                 0,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			log.Debug("incoming request: %s %s", r.Method, r.URL.Path)
-			switch r.URL.Path {
-			case "/_health":
-				sendCORSHeaders(w.Header())
-				w.WriteHeader(http.StatusOK)
-			case "/_agents":
-				sendCORSHeaders(w.Header())
-				agents, err := c.getAgents(r.Context(), c.project.Project)
-				if err != nil {
-					c.logger.Error("failed to marshal agents control response: %s", err)
-					w.WriteHeader(http.StatusInternalServerError)
+			if c.ephemeral {
+				switch r.URL.Path {
+				case "/_health":
+					sendCORSHeaders(w.Header())
+					w.WriteHeader(http.StatusOK)
 					return
-				}
-				w.Header().Set("Content-Type", "application/json")
-				io.WriteString(w, cstr.JSONStringify(agents))
-				return
-			case "/_control":
-				sendCORSHeaders(w.Header())
-				w.Header().Set("Content-Type", "text/event-stream")
-				w.Header().Set("Cache-Control", "no-cache")
-				w.Header().Set("Connection", "keep-alive")
-				w.WriteHeader(http.StatusOK)
-				rc := http.NewResponseController(w)
-				rc.Flush()
-				c.HealthCheck(fmt.Sprintf("http://127.0.0.1:%d", c.agentPort)) // make sure the server is running
-				io.WriteString(w, "event: start\ndata: connected\n\n")
-				agents, err := c.getAgents(r.Context(), c.project.Project)
-				if err != nil {
-					c.logger.Error("failed to marshal agents control response: %s", err)
-					io.WriteString(w, fmt.Sprintf("event: error\ndata: %q\n\n", err.Error()))
+				case "/_agents":
+					sendCORSHeaders(w.Header())
+					agents, err := c.getAgents(r.Context(), c.project.Project)
+					if err != nil {
+						c.logger.Error("failed to marshal agents control response: %s", err)
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+					w.Header().Set("Content-Type", "application/json")
+					io.WriteString(w, cstr.JSONStringify(agents))
+					return
+				case "/_control":
+					sendCORSHeaders(w.Header())
+					w.Header().Set("Content-Type", "text/event-stream")
+					w.Header().Set("Cache-Control", "no-cache")
+					w.Header().Set("Connection", "keep-alive")
+					w.WriteHeader(http.StatusOK)
+					rc := http.NewResponseController(w)
+					rc.Flush()
+					c.HealthCheck(fmt.Sprintf("http://127.0.0.1:%d", c.agentPort)) // make sure the server is running
+					io.WriteString(w, "event: start\ndata: connected\n\n")
+					agents, err := c.getAgents(r.Context(), c.project.Project)
+					if err != nil {
+						c.logger.Error("failed to marshal agents control response: %s", err)
+						io.WriteString(w, fmt.Sprintf("event: error\ndata: %q\n\n", err.Error()))
+						rc.Flush()
+						return
+					}
+					io.WriteString(w, fmt.Sprintf("event: agents\ndata: %s\n\n", cstr.JSONStringify(agents)))
+					rc.Flush()
+					select {
+					case <-c.context.Done():
+					case <-r.Context().Done():
+					}
+					io.WriteString(w, "event: stop\ndata: disconnected\n\n")
 					rc.Flush()
 					return
+				default:
 				}
-				io.WriteString(w, fmt.Sprintf("event: agents\ndata: %s\n\n", cstr.JSONStringify(agents)))
-				rc.Flush()
-				select {
-				case <-c.context.Done():
-				case <-r.Context().Done():
-				}
-				io.WriteString(w, "event: stop\ndata: disconnected\n\n")
-				rc.Flush()
-				return
-			default:
-				proxy.ServeHTTP(w, r)
+			}
+			started := time.Now()
+			proxy.ServeHTTP(w, r)
+			tp := r.Header.Get("traceparent")
+			if tp != "" {
+				tok := strings.Split(tp, "-")
+				c.logger.Info("%s %s (sess_%s) in %s", r.Method, r.URL.Path, tok[1], time.Since(started))
 			}
 		}),
 	}
@@ -498,11 +523,16 @@ func (c *Client) Start() error {
 		}
 	}()
 
+	var dynamicProjectRouting string
+	if c.dynamicProject {
+		dynamicProjectRouting = c.projectID
+	}
+
 	client, err := gravity.New(gravity.GravityConfig{
 		Context:       c.context,
 		Logger:        log,
 		URL:           c.url,
-		ClientName:    "cli",
+		ClientName:    c.clientname,
 		ClientVersion: c.version,
 		AuthToken:     resp.ClientToken,
 		Cert:          string(resp.Certificate),
@@ -519,7 +549,8 @@ func (c *Client) Start() error {
 			FailoverTimeout:      time.Second,
 		},
 		Capabilities: &proto.ClientCapabilities{
-			DynamicHostname: true,
+			DynamicHostname:       c.dynamicHostname,
+			DynamicProjectRouting: dynamicProjectRouting,
 		},
 		NetworkInterface: &network,
 		Provider:         &provider,

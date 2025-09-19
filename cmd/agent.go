@@ -48,7 +48,8 @@ var agentDeleteCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		theproject := project.EnsureProject(ctx, cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
+		apiUrl := urls.API
 
 		if !tui.HasTTY && len(args) == 0 {
 			logger.Fatal("No TTY detected, please specify an Agent id from the command line")
@@ -231,7 +232,8 @@ var agentCreateCmd = &cobra.Command{
 		logger := env.NewLogger(cmd)
 		theproject := project.EnsureProject(ctx, cmd)
 		apikey := theproject.Token
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
+		apiUrl := urls.API
 
 		var remoteAgents []agent.Agent
 
@@ -598,7 +600,8 @@ var agentListCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		project := project.EnsureProject(ctx, cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
+		apiUrl := urls.API
 
 		// perform the reconcilation
 		keys, state := reconcileAgentList(logger, cmd, apiUrl, project.Token, project)
@@ -647,7 +650,8 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		project := project.EnsureProject(ctx, cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
+		apiUrl := urls.API
 
 		// perform the reconcilation
 		keys, state := reconcileAgentList(logger, cmd, apiUrl, project.Token, project)
