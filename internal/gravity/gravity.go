@@ -304,20 +304,28 @@ func (c *Client) Start() error {
 		return fmt.Errorf("error getting hostname: %w", err)
 	}
 
-	resp, err := gravity.ProvisionMachine(
-		c.context,
-		c.url,
-		c.endpointID, // instanceid
-		"unknown",    // region
-		"",           // availabilityZone
-		"other",      // provider
-		ipv4addr,     // privateIP
-		c.sdkKey,     //token
-		"",           // publickey
-		hostname,     // hostname
-		"",           // errorMessage
-		c.ephemeral,
-	)
+	var dynamicProjectRouting string
+	if c.dynamicProject {
+		dynamicProjectRouting = c.projectID
+	}
+
+	capabilities := &proto.ClientCapabilities{
+		DynamicHostname:       c.dynamicHostname,
+		DynamicProjectRouting: dynamicProjectRouting,
+	}
+
+	resp, err := gravity.Provision(gravity.ProvisionRequest{
+		Context:      c.context,
+		GravityURL:   c.url,
+		InstanceID:   c.endpointID,
+		Region:       "unknown",
+		Provider:     "other", // TODO: change this to support this provider
+		PrivateIP:    ipv4addr,
+		Token:        c.sdkKey,
+		Hostname:     hostname,
+		Ephemeral:    c.ephemeral,
+		Capabilities: capabilities,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to provision machine: %w", err)
 	}
@@ -523,11 +531,6 @@ func (c *Client) Start() error {
 		}
 	}()
 
-	var dynamicProjectRouting string
-	if c.dynamicProject {
-		dynamicProjectRouting = c.projectID
-	}
-
 	client, err := gravity.New(gravity.GravityConfig{
 		Context:       c.context,
 		Logger:        log,
@@ -548,10 +551,7 @@ func (c *Client) Start() error {
 			HealthCheckInterval:  time.Second * 30,
 			FailoverTimeout:      time.Second,
 		},
-		Capabilities: &proto.ClientCapabilities{
-			DynamicHostname:       c.dynamicHostname,
-			DynamicProjectRouting: dynamicProjectRouting,
-		},
+		Capabilities:     capabilities,
 		NetworkInterface: &network,
 		Provider:         &provider,
 		IP4Address:       ipv4addr,
