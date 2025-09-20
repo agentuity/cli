@@ -58,7 +58,8 @@ type LogsResponse struct {
 
 func printLogs(ctx context.Context, logger logger.Logger, cmd *cobra.Command, query url.Values, tail bool, hideDate bool, hideTime bool) {
 
-	apiUrl, _, _ := util.GetURLs(logger)
+	urls := util.GetURLs(logger)
+	apiUrl := urls.API
 	apiKey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 	client := util.NewAPIClient(ctx, logger, apiUrl, apiKey)
 

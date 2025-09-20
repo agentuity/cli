@@ -73,7 +73,7 @@ var apikeyListCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	Short:   "List API keys",
 	Long: `List all API keys.
-	
+
 This command displays all apikeys set for your org or project.
 
 Examples:
@@ -83,7 +83,8 @@ Examples:
   agentuity apikey ls --mask`,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
+		apiUrl := urls.API
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		format, _ := cmd.Flags().GetString("format")
@@ -152,7 +153,7 @@ var apikeyCreateCmd = &cobra.Command{
 	Args:    cobra.MaximumNArgs(1),
 	Short:   "Create an API key",
 	Long: `Create an API key.
-	
+
 This command creates an API key for your org or project.
 
 Examples:
@@ -161,7 +162,8 @@ Examples:
   agentuity apikey create <name> --expires-at <expiresAt> --project-id <projectId>`,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
+		apiUrl := urls.API
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		apiKey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
@@ -223,7 +225,8 @@ var apikeyDeleteCmd = &cobra.Command{
 	Long:    `Delete an API key.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
+		apiUrl := urls.API
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		apiKey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
@@ -264,13 +267,14 @@ var apikeyGetCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Short: "Get an API key",
 	Long: `Get an API key.
-	
+
 Examples:
   agentuity apikey get <id>
   agentuity apikey get <id> --mask`,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := env.NewLogger(cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
+		apiUrl := urls.API
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		apiKey, _ := util.EnsureLoggedIn(ctx, logger, cmd)

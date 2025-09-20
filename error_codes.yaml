@@ -1,46 +1,46 @@
 # Error Codes for CLI
 # This file defines all error codes used in the CLI application
-# Format: 
+# Format:
 #   - code: Unique error code identifier (e.g., CLI-XXXX)
 #   - message: Human-readable error message
 
 errors:
   - code: CLI-0001
     message: Failed to delete agents
-  
+
   - code: CLI-0002
     message: Failed to create project
-  
+
   - code: CLI-0003
     message: Unable to authenticate user
-  
+
   - code: CLI-0004
     message: Environment variables not set
-  
+
   - code: CLI-0005
     message: API request failed
-  
+
   - code: CLI-0006
     message: Invalid configuration
-  
+
   - code: CLI-0007
     message: Failed to save project
-  
+
   - code: CLI-0008
     message: Failed to deploy project
-  
+
   - code: CLI-0009
     message: Failed to upload project
-  
+
   - code: CLI-0010
     message: Failed to parse environment file
-  
+
   - code: CLI-0011
     message: Invalid command flag error
 
   - code: CLI-0012
     message: Failed to list files and directories
-  
+
   - code: CLI-0013
     message: Failed to write configuration file
 
@@ -52,7 +52,7 @@ errors:
 
   - code: CLI-0016
     message: Failed to create temporary file
-  
+
   - code: CLI-0017
     message: Failed to create zip file
 
@@ -88,3 +88,6 @@ errors:
 
   - code: CLI-0028
     message: Failed to delete API key
+
+  - code: CLI-0029
+    message: Failed to retrieve devmode endpoint

@@ -8,6 +8,9 @@ import (
 )
 
 func ProcessKill(cmd *exec.Cmd) {
+	if cmd.Process == nil {
+		return
+	}
 	syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 }
 
