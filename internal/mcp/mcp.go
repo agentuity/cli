@@ -3,8 +3,8 @@ package mcp
 import (
 	"context"
 
-	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/go-common/logger"
+	"github.com/agentuity/go-common/project"
 	mcp_golang "github.com/agentuity/mcp-golang/v2"
 	"github.com/spf13/cobra"
 )

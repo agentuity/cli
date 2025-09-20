@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"os"
 	"os/exec"
 	"strconv"
@@ -149,4 +150,31 @@ func CreateRunProjectCmd(ctx context.Context, log logger.Logger, theproject proj
 	util.ProcessSetup(projectServerCmd)
 
 	return projectServerCmd, nil
+}
+
+type Endpoint struct {
+	ID       string `json:"id"`
+	Hostname string `json:"hostname"`
+}
+
+type Response[T any] struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Data    T      `json:"data"`
+}
+
+func GetDevModeEndpoint(ctx context.Context, logger logger.Logger, baseUrl string, token string, projectId string, hostname string) (*Endpoint, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
+
+	var resp Response[Endpoint]
+	body := map[string]string{
+		"hostname": hostname,
+	}
+	if err := client.Do("POST", fmt.Sprintf("/cli/devmode/2/%s", url.PathEscape(projectId)), body, &resp); err != nil {
+		return nil, fmt.Errorf("error fetching devmode endpoint: %s", err)
+	}
+	if !resp.Success {
+		return nil, fmt.Errorf("error fetching devmode endpoint: %s", resp.Message)
+	}
+	return &resp.Data, nil
 }

@@ -23,6 +23,7 @@ import (
 	"github.com/agentuity/go-common/gravity/proto"
 	"github.com/agentuity/go-common/logger"
 	cnet "github.com/agentuity/go-common/network"
+	cproject "github.com/agentuity/go-common/project"
 	cstr "github.com/agentuity/go-common/string"
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/adapters/gonet"
@@ -181,7 +182,7 @@ func (c *Client) Close() error {
 }
 
 type AgentWelcome struct {
-	project.AgentConfig
+	cproject.AgentConfig
 	Welcome
 }
 
@@ -227,7 +228,7 @@ func (c *Client) getWelcome(ctx context.Context, port int) (map[string]Welcome, 
 	return nil, fmt.Errorf("failed to inspect agents after 5 attempts")
 }
 
-func (c *Client) getAgents(ctx context.Context, project *project.Project) (*AgentsControlResponse, error) {
+func (c *Client) getAgents(ctx context.Context, project *cproject.Project) (*AgentsControlResponse, error) {
 	var resp = &AgentsControlResponse{
 		ProjectID:   project.ProjectId,
 		ProjectName: project.Name,

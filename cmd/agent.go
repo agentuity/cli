@@ -22,6 +22,7 @@ import (
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	cproject "github.com/agentuity/go-common/project"
 	"github.com/agentuity/go-common/slice"
 	"github.com/agentuity/go-common/tui"
 	"github.com/charmbracelet/lipgloss/tree"
@@ -100,7 +101,7 @@ var agentDeleteCmd = &cobra.Command{
 					maybedelete = append(maybedelete, agent.Filename)
 				}
 			}
-			var agents []project.AgentConfig
+			var agents []cproject.AgentConfig
 			for _, agent := range theproject.Project.Agents {
 				if !slice.Contains(deleted, agent.ID) {
 					agents = append(agents, agent)
@@ -330,7 +331,7 @@ var agentCreateCmd = &cobra.Command{
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithAttributes(map[string]any{"name": name})).ShowErrorAndExit()
 			}
 
-			theproject.Project.Agents = append(theproject.Project.Agents, project.AgentConfig{
+			theproject.Project.Agents = append(theproject.Project.Agents, cproject.AgentConfig{
 				ID:          agentID,
 				Name:        name,
 				Description: description,
@@ -394,8 +395,8 @@ func reconcileAgentList(logger logger.Logger, cmd *cobra.Command, apiUrl string,
 	}
 
 	// make a map of the agents in the agentuity config file
-	fileAgents := make(map[string]project.AgentConfig)
-	fileAgentsByID := make(map[string]project.AgentConfig)
+	fileAgents := make(map[string]cproject.AgentConfig)
+	fileAgentsByID := make(map[string]cproject.AgentConfig)
 	for _, agent := range theproject.Project.Agents {
 		key := normalAgentName(agent.Name, theproject.Project.IsPython())
 		if existing, ok := fileAgents[key]; ok {

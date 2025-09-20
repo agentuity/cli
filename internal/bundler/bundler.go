@@ -14,9 +14,10 @@ import (
 	"time"
 
 	"github.com/agentuity/cli/internal/errsystem"
-	"github.com/agentuity/cli/internal/project"
+	iproject "github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
+	"github.com/agentuity/go-common/project"
 	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/sys"
 	"github.com/agentuity/go-common/tui"
@@ -496,7 +497,7 @@ func CreateDeploymentMutator(ctx BundleContext) util.ZipDirCallbackMutator {
 }
 
 func Bundle(ctx BundleContext) error {
-	theproject := project.NewProject()
+	theproject := iproject.NewProject()
 	if err := theproject.Load(ctx.ProjectDir); err != nil {
 		return fmt.Errorf("failed to load project from %s: %w", ctx.ProjectDir, err)
 	}

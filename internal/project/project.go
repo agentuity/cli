@@ -15,13 +15,13 @@ import (
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	"github.com/agentuity/go-common/project"
+	"github.com/agentuity/go-common/slice"
 	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	yc "github.com/zijiren233/yaml-comment"
 	"gopkg.in/yaml.v3"
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
@@ -30,11 +30,6 @@ const (
 
 var Version string
 
-var (
-	ErrProjectNotFound         = errors.New("project not found")
-	ErrProjectMissingProjectId = errors.New("missing project_id value")
-)
-
 type initProjectResult struct {
 	Success bool        `json:"success"`
 	Data    ProjectData `json:"data"`
@@ -42,14 +37,14 @@ type initProjectResult struct {
 }
 
 type ProjectData struct {
-	APIKey           string            `json:"api_key"`
-	ProjectKey       string            `json:"projectKey"`
-	ProjectId        string            `json:"id"`
-	OrgId            string            `json:"orgId"`
-	Env              map[string]string `json:"env"`
-	Secrets          map[string]string `json:"secrets"`
-	WebhookAuthToken string            `json:"webhookAuthToken,omitempty"`
-	Agents           []AgentConfig     `json:"agents"`
+	APIKey           string                `json:"api_key"`
+	ProjectKey       string                `json:"projectKey"`
+	ProjectId        string                `json:"id"`
+	OrgId            string                `json:"orgId"`
+	Env              map[string]string     `json:"env"`
+	Secrets          map[string]string     `json:"secrets"`
+	WebhookAuthToken string                `json:"webhookAuthToken,omitempty"`
+	Agents           []project.AgentConfig `json:"agents"`
 }
 
 type InitProjectArgs struct {
@@ -61,7 +56,7 @@ type InitProjectArgs struct {
 	Name              string
 	Description       string
 	EnableWebhookAuth bool
-	Agents            []AgentConfig
+	Agents            []project.AgentConfig
 	AuthType          string
 	Framework         string
 }
@@ -98,162 +93,6 @@ func InitProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 	return &result.Data, nil
 }
 
-func getFilename(dir string) string {
-	return filepath.Join(dir, "agentuity.yaml")
-}
-
-func ProjectExists(dir string) bool {
-	fn := getFilename(dir)
-	return util.Exists(fn)
-}
-
-type Resources struct {
-	Memory string `json:"memory,omitempty" yaml:"memory,omitempty" hc:"The memory requirements"`
-	CPU    string `json:"cpu,omitempty" yaml:"cpu,omitempty" hc:"The CPU requirements"`
-	Disk   string `json:"disk,omitempty" yaml:"disk,omitempty" hc:"The disk size requirements"`
-
-	CPUQuantity    resource.Quantity `json:"-" yaml:"-"`
-	MemoryQuantity resource.Quantity `json:"-" yaml:"-"`
-	DiskQuantity   resource.Quantity `json:"-" yaml:"-"`
-}
-
-type Mode struct {
-	Type string  `json:"type" yaml:"type" hc:"on-demand or provisioned"`                                       // on-demand or provisioned
-	Idle *string `json:"idle,omitempty" yaml:"idle,omitempty" hc:"duration in seconds if on-demand, optional"` // duration in seconds if on-demand, optional
-}
-
-type Deployment struct {
-	Command      string     `json:"command" yaml:"command"`
-	Args         []string   `json:"args" yaml:"args"`
-	Resources    *Resources `json:"resources" yaml:"resources" hc:"You should tune the resources for the deployment"`
-	Mode         *Mode      `json:"mode,omitempty" yaml:"mode,omitempty" hc:"The deployment mode"`
-	Dependencies []string   `json:"dependencies,omitempty" yaml:"dependencies,omitempty" hc:"The dependencies to install before running the deployment"`
-}
-
-type Watch struct {
-	Enabled bool     `json:"enabled" yaml:"enabled" hc:"Whether to watch for changes and automatically restart the server"`
-	Files   []string `json:"files" yaml:"files" hc:"Rules for files to watch for changes"`
-}
-
-type Development struct {
-	Port    int      `json:"port" yaml:"port" hc:"The port to run the development server on which can be overridden by setting the PORT environment variable"`
-	Watch   Watch    `json:"watch" yaml:"watch"`
-	Command string   `json:"command" yaml:"command" hc:"The command to run the development server"`
-	Args    []string `json:"args" yaml:"args" hc:"The arguments to pass to the development server"`
-}
-
-type AgentConfig struct {
-	ID          string   `json:"id" yaml:"id" hc:"The ID of the Agent which is automatically generated"`
-	Name        string   `json:"name" yaml:"name" hc:"The name of the Agent which is editable"`
-	Description string   `json:"description,omitempty" yaml:"description,omitempty" hc:"The description of the Agent which is editable"`
-	Types       []string `json:"io_types,omitempty" yaml:"io_types,omitempty" hc:"The IO types of the Agent which is editable"`
-}
-
-type Project struct {
-	Version     string        `json:"version" yaml:"version" hc:"The version semver range required to run this project"`
-	ProjectId   string        `json:"project_id" yaml:"project_id" hc:"The ID of the project which is automatically generated"`
-	Name        string        `json:"name" yaml:"name" hc:"The name of the project which is editable"`
-	Description string        `json:"description" yaml:"description" hc:"The description of the project which is editable"`
-	Development *Development  `json:"development,omitempty" yaml:"development,omitempty" hc:"The development configuration for the project"`
-	Deployment  *Deployment   `json:"deployment,omitempty" yaml:"deployment,omitempty"`
-	Bundler     *Bundler      `json:"bundler,omitempty" yaml:"bundler,omitempty" hc:"You should not need to change these value"`
-	Agents      []AgentConfig `json:"agents" yaml:"agents" hc:"The agents that are part of this project"`
-}
-
-func (p *Project) SafeFilename() string {
-	return util.SafeProjectFilename(p.Name, p.IsPython())
-}
-
-func (p *Project) IsPython() bool {
-	return p.Bundler.Language == "python" || p.Bundler.Language == "py"
-}
-
-// Load will load the project from a file in the given directory.
-func (p *Project) Load(dir string) error {
-	fn := getFilename(dir)
-	if !util.Exists(fn) {
-		return nil
-	}
-	of, err := os.Open(fn)
-	if err != nil {
-		return fmt.Errorf("failed to open project file: %s. %w", fn, err)
-	}
-	defer of.Close()
-	if err := yaml.NewDecoder(of).Decode(p); err != nil {
-		return fmt.Errorf("failed to decode YAML project file: %s. %w", fn, err)
-	}
-	if p.ProjectId == "" {
-		return ErrProjectMissingProjectId
-	}
-	if p.Bundler == nil {
-		return fmt.Errorf("missing bundler value, please run `agentuity new` to create a new project")
-	}
-	if p.Bundler.Language == "" {
-		return fmt.Errorf("missing bundler.language value, please run `agentuity new` to create a new project")
-	}
-	switch p.Bundler.Language {
-	case "js", "javascript", "typescript":
-		if p.Bundler.Runtime != "bunjs" && p.Bundler.Runtime != "nodejs" {
-			return fmt.Errorf("invalid bundler.runtime value: %s. only bunjs and nodejs are supported", p.Bundler.Runtime)
-		}
-	case "py", "python":
-		if p.Bundler.Runtime != "uv" {
-			return fmt.Errorf("invalid bundler.runtime value: %s. only uv is supported", p.Bundler.Runtime)
-		}
-	default:
-		return fmt.Errorf("invalid bundler.language value: %s. only js or py are supported", p.Bundler.Language)
-	}
-	if p.Bundler.AgentConfig.Dir == "" {
-		return fmt.Errorf("missing bundler.Agents.dir value (or its empty), please run `agentuity new` to create a new project")
-	}
-	if p.Deployment != nil {
-		if p.Deployment.Resources != nil {
-			val, err := resource.ParseQuantity(p.Deployment.Resources.CPU)
-			if err != nil {
-				return fmt.Errorf("error validating deploy cpu value '%s'. %w", p.Deployment.Resources.CPU, err)
-			}
-			p.Deployment.Resources.CPUQuantity = val
-			val, err = resource.ParseQuantity(p.Deployment.Resources.Memory)
-			if err != nil {
-				return fmt.Errorf("error validating deploy memory value '%s'. %w", p.Deployment.Resources.Memory, err)
-			}
-			p.Deployment.Resources.MemoryQuantity = val
-			val, err = resource.ParseQuantity(p.Deployment.Resources.Disk)
-			if err != nil {
-				return fmt.Errorf("error validating deploy disk value '%s'. %w", p.Deployment.Resources.Disk, err)
-			}
-			p.Deployment.Resources.DiskQuantity = val
-		}
-		if p.Deployment.Mode != nil {
-			if p.Deployment.Mode.Type != "on-demand" && p.Deployment.Mode.Type != "provisioned" {
-				return fmt.Errorf("invalid deployment mode value: %s. only on-demand or provisioned are supported", p.Deployment.Mode.Type)
-			}
-		}
-	}
-	return nil
-}
-
-// Save will save the project to a file in the given directory.
-func (p *Project) Save(dir string) error {
-	fn := getFilename(dir)
-	of, err := os.Create(fn)
-	if err != nil {
-		return err
-	}
-	defer of.Close()
-	of.WriteString("# yaml-language-server: $schema=https://raw.githubusercontent.com/agentuity/cli/refs/heads/main/agentuity.schema.json\n")
-	of.WriteString("\n")
-	of.WriteString("# ------------------------------------------------\n")
-	of.WriteString("# This file is generated by Agentuity\n")
-	of.WriteString("# You should check this file into version control\n")
-	of.WriteString("# ------------------------------------------------\n")
-	of.WriteString("\n")
-	enc := yaml.NewEncoder(of)
-	enc.SetIndent(2)
-	yenc := yc.NewEncoder(enc)
-	return yenc.Encode(p)
-}
-
 const (
 	defaultMemory = "1Gi"
 	defaultCPU    = "1000M"
@@ -261,17 +100,17 @@ const (
 )
 
 // NewProject will create a new project that is empty.
-func NewProject() *Project {
+func NewProject() *project.Project {
 	var version string
 	if Version == "" || Version == "dev" {
 		version = ">=0.0.0" // should only happen in dev cli
 	} else {
 		version = ">=" + Version
 	}
-	return &Project{
+	return &project.Project{
 		Version: version,
-		Deployment: &Deployment{
-			Resources: &Resources{
+		Deployment: &project.Deployment{
+			Resources: &project.Resources{
 				Memory: defaultMemory,
 				CPU:    defaultCPU,
 				Disk:   defaultDisk,
@@ -385,18 +224,18 @@ func DeleteProjects(ctx context.Context, logger logger.Logger, baseUrl string, t
 	return resp.Data, nil
 }
 
-func (p *Project) GetProject(ctx context.Context, logger logger.Logger, baseUrl string, token string, shouldMask bool, includeProjectKeys bool) (*ProjectData, error) {
-	if p.ProjectId == "" {
-		return nil, ErrProjectNotFound
+func GetProject(ctx context.Context, logger logger.Logger, baseUrl string, token string, projectId string, shouldMask bool, includeProjectKeys bool) (*ProjectData, error) {
+	if projectId == "" {
+		return nil, project.ErrProjectNotFound
 	}
 	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var projectResponse ProjectResponse
-	if err := client.Do("GET", fmt.Sprintf("/cli/project/%s?mask=%t&includeProjectKeys=%t", p.ProjectId, shouldMask, includeProjectKeys), nil, &projectResponse); err != nil {
+	if err := client.Do("GET", fmt.Sprintf("/cli/project/%s?mask=%t&includeProjectKeys=%t", projectId, shouldMask, includeProjectKeys), nil, &projectResponse); err != nil {
 		var apiErr *util.APIError
 		if errors.As(err, &apiErr) {
 			if apiErr.Status == 404 {
-				return nil, ErrProjectNotFound
+				return nil, project.ErrProjectNotFound
 			}
 		}
 		return nil, fmt.Errorf("error getting project env: %w", err)
@@ -407,7 +246,7 @@ func (p *Project) GetProject(ctx context.Context, logger logger.Logger, baseUrl 
 	return &projectResponse.Data, nil
 }
 
-func (p *Project) SetProjectEnv(ctx context.Context, logger logger.Logger, baseUrl string, token string, env map[string]string, secrets map[string]string) (*ProjectData, error) {
+func SetProjectEnv(ctx context.Context, logger logger.Logger, baseUrl string, token string, projectId string, env map[string]string, secrets map[string]string) (*ProjectData, error) {
 	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 	var projectResponse ProjectResponse
 	_env := make(map[string]string)
@@ -422,7 +261,7 @@ func (p *Project) SetProjectEnv(ctx context.Context, logger logger.Logger, baseU
 			_secrets[k] = v
 		}
 	}
-	if err := client.Do("PUT", fmt.Sprintf("/cli/project/%s/env", p.ProjectId), map[string]any{
+	if err := client.Do("PUT", fmt.Sprintf("/cli/project/%s/env", projectId), map[string]any{
 		"env":     _env,
 		"secrets": _secrets,
 	}, &projectResponse); err != nil {
@@ -434,10 +273,10 @@ func (p *Project) SetProjectEnv(ctx context.Context, logger logger.Logger, baseU
 	return &projectResponse.Data, nil
 }
 
-func (p *Project) DeleteProjectEnv(ctx context.Context, logger logger.Logger, baseUrl string, token string, env []string, secrets []string) error {
+func DeleteProjectEnv(ctx context.Context, logger logger.Logger, baseUrl string, token string, projectId string, env []string, secrets []string) error {
 	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 	var projectResponse ProjectResponse
-	if err := client.Do("DELETE", fmt.Sprintf("/cli/project/%s/env", p.ProjectId), map[string]any{
+	if err := client.Do("DELETE", fmt.Sprintf("/cli/project/%s/env", projectId), map[string]any{
 		"env":     env,
 		"secrets": secrets,
 	}, &projectResponse); err != nil {
@@ -450,24 +289,24 @@ func (p *Project) DeleteProjectEnv(ctx context.Context, logger logger.Logger, ba
 }
 
 type ProjectImportRequest struct {
-	Name                string        `json:"name"`
-	Description         string        `json:"description"`
-	Provider            string        `json:"provider"`
-	OrgId               string        `json:"orgId"`
-	Agents              []AgentConfig `json:"agents"`
-	EnableWebhookAuth   bool          `json:"enableWebhookAuth"`
-	CopiedFromProjectId string        `json:"copiedFromProjectId"`
+	Name                string                `json:"name"`
+	Description         string                `json:"description"`
+	Provider            string                `json:"provider"`
+	OrgId               string                `json:"orgId"`
+	Agents              []project.AgentConfig `json:"agents"`
+	EnableWebhookAuth   bool                  `json:"enableWebhookAuth"`
+	CopiedFromProjectId string                `json:"copiedFromProjectId"`
 }
 
 type ProjectImportResponse struct {
-	ID          string        `json:"id"`
-	Agents      []AgentConfig `json:"agents"`
-	APIKey      string        `json:"apiKey"`
-	ProjectKey  string        `json:"projectKey"`
-	IOAuthToken string        `json:"ioAuthToken"`
+	ID          string                `json:"id"`
+	Agents      []project.AgentConfig `json:"agents"`
+	APIKey      string                `json:"apiKey"`
+	ProjectKey  string                `json:"projectKey"`
+	IOAuthToken string                `json:"ioAuthToken"`
 }
 
-func (p *Project) Import(ctx context.Context, logger logger.Logger, baseUrl string, token string, orgId string, enableWebhookAuth bool) (*ProjectImportResponse, error) {
+func ProjectImport(ctx context.Context, logger logger.Logger, baseUrl string, token string, orgId string, p *project.Project, enableWebhookAuth bool) (*ProjectImportResponse, error) {
 	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 
 	var resp Response[ProjectImportResponse]
@@ -538,7 +377,7 @@ func (c *DeploymentConfig) Write(logger logger.Logger, dir string) error {
 
 type ProjectContext struct {
 	Logger       logger.Logger
-	Project      *Project
+	Project      *project.Project
 	Dir          string
 	APIURL       string
 	APPURL       string
@@ -550,7 +389,7 @@ type ProjectContext struct {
 func LoadProject(logger logger.Logger, dir string, apiUrl string, appUrl string, transportUrl, token string) ProjectContext {
 	theproject := NewProject()
 	if err := theproject.Load(dir); err != nil {
-		if err == ErrProjectMissingProjectId {
+		if err == project.ErrProjectMissingProjectId {
 			return ProjectContext{
 				Logger:       logger,
 				Dir:          dir,
@@ -629,7 +468,7 @@ func TryProject(ctx context.Context, cmd *cobra.Command) ProjectContext {
 			token = apikey
 		}
 	}
-	if token == "" || dir == "" || !util.Exists(filepath.Join(dir, "agentuity.yaml")) {
+	if token == "" || dir == "" || !util.Exists(project.GetProjectFilename(dir)) {
 		return ProjectContext{
 			Logger:       logger,
 			Dir:          dir,
@@ -675,9 +514,9 @@ func ResolveProjectDir(logger logger.Logger, cmd *cobra.Command, required bool) 
 		errsystem.New(errsystem.ErrEnvironmentVariablesNotSet, err,
 			errsystem.WithUserMessage("Failed to get absolute path to %s: %s", dir, err)).ShowErrorAndExit()
 	}
-	if !ProjectExists(abs) && required {
+	if !project.ProjectExists(abs) && required {
 		dir = viper.GetString("preferences.project_dir")
-		if ProjectExists(dir) {
+		if project.ProjectExists(dir) {
 			tui.ShowWarning("Using your last used project directory (%s). You should change into the correct directory or use the --dir flag.", dir)
 			os.Chdir(dir)
 			return dir
@@ -690,7 +529,7 @@ func ResolveProjectDir(logger logger.Logger, cmd *cobra.Command, required bool) 
 		}
 		os.Exit(1)
 	}
-	if ProjectExists(abs) {
+	if project.ProjectExists(abs) {
 		// if we are successful, set the project dir in the config
 		viper.Set("preferences.project_dir", abs)
 		viper.WriteConfig()
@@ -728,13 +567,7 @@ func RemoveEnvValues(ctx context.Context, logger logger.Logger, dir string, keys
 	}
 	newenvs := make([]env.EnvLine, 0)
 	for _, env := range envs {
-		var found bool
-		for _, k := range keys {
-			if env.Key == k {
-				found = true
-				break
-			}
-		}
+		found := slice.Contains(keys, env.Key)
 		if !found {
 			newenvs = append(newenvs, env)
 		}

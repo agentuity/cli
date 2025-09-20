@@ -15,16 +15,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/agentuity/cli/internal/agent"
 	"github.com/agentuity/cli/internal/deployer"
 	"github.com/agentuity/cli/internal/envutil"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/ignore"
-	"github.com/agentuity/cli/internal/project"
+	iproject "github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/crypto"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	"github.com/agentuity/go-common/project"
 	"github.com/agentuity/go-common/tui"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -106,7 +106,7 @@ func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.
 	}
 	tui.ClearScreen()
 	tui.ShowSpinner("Importing project ...", func() {
-		result, err := project.Import(ctx, logger, apiUrl, apikey, orgId, createWebhookAuth)
+		result, err := iproject.ProjectImport(ctx, logger, apiUrl, apikey, orgId, project, createWebhookAuth)
 		if err != nil {
 			if isCancelled(ctx) {
 				os.Exit(1)
@@ -180,7 +180,7 @@ Examples:
 		ctx, cancel := signal.NotifyContext(parentCtx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		logger := env.NewLogger(cmd)
-		context := project.EnsureProject(ctx, cmd)
+		context := iproject.EnsureProject(ctx, cmd)
 		theproject := context.Project
 		dir := context.Dir
 		apiUrl := context.APIURL
@@ -219,10 +219,10 @@ Examples:
 
 		logger.Debug("preview: %v", preview)
 
-		deploymentConfig := project.NewDeploymentConfig()
+		deploymentConfig := iproject.NewDeploymentConfig()
 		client := util.NewAPIClient(ctx, logger, apiUrl, token)
 		var envFile *deployer.EnvFile
-		var projectData *project.ProjectData
+		var projectData *iproject.ProjectData
 		var state map[string]agentListState
 
 		if !ci {
@@ -248,7 +248,7 @@ Examples:
 
 			if !context.NewProject {
 				action = func() {
-					projectData, err = theproject.GetProject(ctx, logger, apiUrl, token, false, false)
+					projectData, err = iproject.GetProject(ctx, logger, apiUrl, token, context.Project.ProjectId, false, false)
 					if err != nil {
 						if err == project.ErrProjectNotFound {
 							return
@@ -462,7 +462,11 @@ Examples:
 				if agent.Agent.ID == "" {
 					continue
 				}
-				newagents = append(newagents, project.AgentConfig(*agent.Agent))
+				newagents = append(newagents, project.AgentConfig{
+					ID:          agent.Agent.ID,
+					Name:        agent.Agent.Name,
+					Description: agent.Agent.Description,
+				})
 			}
 			theproject.Agents = newagents
 			saveProject = true
@@ -652,15 +656,15 @@ Examples:
 				errsystem.New(errsystem.ErrApiRequest, err,
 					errsystem.WithContextMessage("Error updating deployment status to completed")).ShowErrorAndExit()
 			}
-			if len(theproject.Agents) == 1 {
-				if len(theproject.Agents[0].Types) > 0 {
-					webhookToken, err = agent.GetApiKey(ctx, logger, apiUrl, token, theproject.Agents[0].ID, theproject.Agents[0].Types[0])
-					if err != nil {
-						errsystem.New(errsystem.ErrApiRequest, err,
-							errsystem.WithContextMessage("Error getting Agent API key")).ShowErrorAndExit()
-					}
-				}
-			}
+			// if len(theproject.Agents) == 1 {
+			// 	if len(theproject.Agents[0].Types) > 0 {
+			// 		webhookToken, err = agent.GetApiKey(ctx, logger, apiUrl, token, theproject.Agents[0].ID, theproject.Agents[0].Types[0])
+			// 		if err != nil {
+			// 			errsystem.New(errsystem.ErrApiRequest, err,
+			// 				errsystem.WithContextMessage("Error getting Agent API key")).ShowErrorAndExit()
+			// 		}
+			// 	}
+			// }
 		}
 
 		tui.ShowSpinner("Deploying ...", deployAction)
@@ -733,7 +737,7 @@ Examples:
 
 		var selectedProject string
 		if dir != "" {
-			proj := project.EnsureProject(ctx, cmd)
+			proj := iproject.EnsureProject(ctx, cmd)
 			if proj.Project == nil {
 				errsystem.New(errsystem.ErrApiRequest, fmt.Errorf("project not found")).ShowErrorAndExit()
 			}
@@ -742,7 +746,7 @@ Examples:
 			projectId, _ := cmd.Flags().GetString("project")
 			if projectId != "" {
 				// look up the project by id
-				projects, err := project.ListProjects(ctx, logger, apiUrl, apikey)
+				projects, err := iproject.ListProjects(ctx, logger, apiUrl, apikey)
 				if err != nil {
 					errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 				}
@@ -777,10 +781,10 @@ Examples:
 		var selectedDeployment string
 		if tag != "" {
 			// List deployments and match by tag
-			var deployments []project.DeploymentListData
+			var deployments []iproject.DeploymentListData
 			action := func() {
 				var err error
-				deployments, err = project.ListDeployments(ctx, logger, apiUrl, apikey, selectedProject)
+				deployments, err = iproject.ListDeployments(ctx, logger, apiUrl, apikey, selectedProject)
 				if err != nil {
 					errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list deployments")).ShowErrorAndExit()
 				}
@@ -829,13 +833,13 @@ Examples:
 		}
 
 		if deleteFlag {
-			err := project.DeleteDeployment(ctx, logger, apiUrl, apikey, selectedProject, selectedDeployment)
+			err := iproject.DeleteDeployment(ctx, logger, apiUrl, apikey, selectedProject, selectedDeployment)
 			if err != nil {
 				errsystem.New(errsystem.ErrDeleteApiKey, err, errsystem.WithContextMessage("Failed to delete deployment")).ShowErrorAndExit()
 			}
 			tui.ShowSuccess("Deployment deleted successfully")
 		} else {
-			err := project.RollbackDeployment(ctx, logger, apiUrl, apikey, selectedProject, selectedDeployment)
+			err := iproject.RollbackDeployment(ctx, logger, apiUrl, apikey, selectedProject, selectedDeployment)
 			if err != nil {
 				errsystem.New(errsystem.ErrDeployProject, err, errsystem.WithContextMessage("Failed to rollback deployment")).ShowErrorAndExit()
 			}
@@ -846,10 +850,10 @@ Examples:
 
 // Helper to fetch projects and prompt user to select one. Returns selected project ID or empty string.
 func cloudSelectProject(ctx context.Context, logger logger.Logger, apiUrl, apikey string, prompt string) string {
-	var projects []project.ProjectListData
+	var projects []iproject.ProjectListData
 	action := func() {
 		var err error
-		projects, err = project.ListProjects(ctx, logger, apiUrl, apikey)
+		projects, err = iproject.ListProjects(ctx, logger, apiUrl, apikey)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list projects")).ShowErrorAndExit()
 		}
@@ -876,10 +880,10 @@ func cloudSelectProject(ctx context.Context, logger logger.Logger, apiUrl, apike
 }
 
 func cloudSelectDeployment(ctx context.Context, logger logger.Logger, apiUrl, apikey, projectId string, prompt string) string {
-	var deployments []project.DeploymentListData
+	var deployments []iproject.DeploymentListData
 	fetchDeploymentsAction := func() {
 		var err error
-		deployments, err = project.ListDeployments(ctx, logger, apiUrl, apikey, projectId)
+		deployments, err = iproject.ListDeployments(ctx, logger, apiUrl, apikey, projectId)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list deployments")).ShowErrorAndExit()
 		}
@@ -954,10 +958,10 @@ Examples:
 			return
 		}
 
-		var deployments []project.DeploymentListData
+		var deployments []iproject.DeploymentListData
 		action := func() {
 			var err error
-			deployments, err = project.ListDeployments(ctx, logger, apiUrl, apikey, selectedProject)
+			deployments, err = iproject.ListDeployments(ctx, logger, apiUrl, apikey, selectedProject)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list deployments")).ShowErrorAndExit()
 			}

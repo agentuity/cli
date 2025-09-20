@@ -9,13 +9,15 @@ import (
 )
 
 type Server struct {
+	args   ServerArgs
 	client *gravity.Client
 	config *gravity.Config
 }
 
 type ServerArgs struct {
-	APIURL string
-	APIKey string
+	APIURL   string
+	APIKey   string
+	Hostname string
 	*gravity.Config
 }
 
@@ -25,12 +27,11 @@ func (s *Server) Close() error {
 }
 
 func (s *Server) WebURL(appUrl string) string {
-	return "web url"
-	// return fmt.Sprintf("%s/devmode/%s", appUrl, s.ID)
+	return fmt.Sprintf("%s/devmode/%s", appUrl, s.args.EndpointID)
 }
 
 func (s *Server) PublicURL(appUrl string) string {
-	return fmt.Sprintf("https://%s", s.client.Hostname())
+	return fmt.Sprintf("https://%s", s.args.Hostname)
 }
 
 func (s *Server) AgentURL(agentId string) string {
@@ -93,6 +94,7 @@ func (s *Server) GenerateInfoBox(publicUrl string, appUrl string, devModeUrl str
 
 func New(args ServerArgs) (*Server, error) {
 	server := &Server{
+		args:   args,
 		config: args.Config,
 		client: gravity.New(*args.Config),
 	}

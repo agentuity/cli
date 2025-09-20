@@ -23,6 +23,7 @@ import (
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var devCmd = &cobra.Command{
@@ -58,8 +59,6 @@ Examples:
 		theproject := project.EnsureProject(ctx, cmd)
 		dir := theproject.Dir
 
-		checkForUpgrade(ctx, log, false)
-
 		if theproject.NewProject {
 			var projectId string
 			if theproject.Project.ProjectId != "" {
@@ -68,9 +67,21 @@ Examples:
 			ShowNewProjectImport(ctx, log, cmd, theproject.APIURL, apiKey, projectId, theproject.Project, dir, false)
 		}
 
-		project, err := theproject.Project.GetProject(ctx, log, theproject.APIURL, apiKey, false, true)
+		project, err := project.GetProject(ctx, log, theproject.APIURL, apiKey, theproject.Project.ProjectId, false, true)
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithUserMessage("Failed to validate project (%s). This is most likely due to the API key being invalid or the project has been deleted.\n\nYou can import this project using the following command:\n\n"+tui.Command("project import"), theproject.Project.ProjectId), errsystem.WithContextMessage(fmt.Sprintf("Failed to get project: %s", err))).ShowErrorAndExit()
+		}
+
+		hostname := viper.GetString("devmode.hostname")
+
+		endpoint, err := dev.GetDevModeEndpoint(ctx, log, theproject.APIURL, apiKey, theproject.Project.ProjectId, hostname)
+		if err != nil {
+			errsystem.New(errsystem.ErrRetrieveDevmodeEndpoint, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to get generate devmode endpoint: %s", err))).ShowErrorAndExit()
+		}
+
+		if hostname != endpoint.Hostname {
+			viper.Set("devmode.hostname", endpoint.Hostname)
+			viper.WriteConfig()
 		}
 
 		var envfile *deployer.EnvFile
@@ -110,16 +121,16 @@ Examples:
 		}
 
 		server, err := dev.New(dev.ServerArgs{
-			APIURL: apiUrl,
-			APIKey: apiKey,
+			APIURL:   apiUrl,
+			APIKey:   apiKey,
+			Hostname: endpoint.Hostname,
 			Config: &gravity.Config{
-				Context: ctx,
-				Logger:  log,
-				Version: Version,
-				OrgID:   orgId,
-				Project: theproject,
-				// FIXME
-				EndpointID:      "ep_1234",
+				Context:         ctx,
+				Logger:          log,
+				Version:         Version,
+				OrgID:           orgId,
+				Project:         theproject,
+				EndpointID:      endpoint.ID,
 				URL:             gravityUrl,
 				SDKKey:          project.Secrets["AGENTUITY_SDK_KEY"],
 				ProxyPort:       uint(proxyPort),

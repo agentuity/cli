@@ -6,10 +6,11 @@ import (
 	"time"
 
 	"github.com/agentuity/cli/internal/bundler"
-	"github.com/agentuity/cli/internal/project"
+	iproject "github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	"github.com/agentuity/go-common/project"
 )
 
 type EnvFile struct {
@@ -59,9 +60,9 @@ type DeployPreflightCheckData struct {
 	// Project is the project data
 	Project *project.Project
 	// ProjectData is the project data loaded from the backend
-	ProjectData *project.ProjectData
+	ProjectData *iproject.ProjectData
 	// Config is the deployment configuration
-	Config *project.DeploymentConfig
+	Config *iproject.DeploymentConfig
 	// PromptHelpers are a set of funcs to assist in prompting the user on the command line
 	PromptHelpers PromptHelpers
 	// OS Environment as a map
