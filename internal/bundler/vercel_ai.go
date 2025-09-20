@@ -31,7 +31,16 @@ func createVercelAIProviderPatch(module string, createFn string, envkey string, 
 }
 
 func init() {
-	var vercelTelemetryPatch = generateJSArgsPatch(0, `experimental_telemetry: { isEnabled: true }`)
+	var vercelTelemetryPatch = generateJSArgsPatch(0, ``) + fmt.Sprintf(`
+	const opts = {...(_args[0] ?? {}) };
+	const metadata = { promptId: opts.prompt.id };
+	opts.experimental_telemetry = { isEnabled: true , metadata: metadata };
+	opts.prompt = opts.prompt.toString();
+	if (opts.system) {
+		opts.system = opts.system.toString();
+	}
+	_args[0] = opts;
+	`)
 	vercelAIPatches := patchModule{
 		Module: "ai",
 		Functions: map[string]patchAction{

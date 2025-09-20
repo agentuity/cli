@@ -21,6 +21,7 @@ import (
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/ignore"
 	"github.com/agentuity/cli/internal/project"
+	"github.com/agentuity/cli/internal/prompts"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/crypto"
 	"github.com/agentuity/go-common/env"
@@ -448,6 +449,12 @@ Examples:
 			}
 		} else {
 			orgSecret = *startResponse.Data.OrgSecret
+		}
+
+		// Process prompts.yaml if present
+		if err := prompts.ProcessPrompts(ctx, logger, client, dir, startResponse.Data.DeploymentId); err != nil {
+			errsystem.New(errsystem.ErrDeployProject, err,
+				errsystem.WithContextMessage("Error processing prompts")).ShowErrorAndExit()
 		}
 
 		var saveProject bool
