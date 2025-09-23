@@ -130,6 +130,11 @@ func (c *Client) OrgID() string {
 	return c.provider.config.OrgID
 }
 
+// EndpointID returns the endpoint ID of the client.
+func (c *Client) EndpointID() string {
+	return c.endpointID
+}
+
 // For each TCP connection: connect to local HTTPS server and proxy bytes.
 func (c *Client) bridgeToLocalTLS(remote *gonet.TCPConn) {
 	logger := c.logger
