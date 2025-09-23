@@ -10,10 +10,11 @@ import (
 
 	"github.com/agentuity/cli/internal/deployer"
 	"github.com/agentuity/cli/internal/errsystem"
-	"github.com/agentuity/cli/internal/project"
+	iproject "github.com/agentuity/cli/internal/project"
 	util "github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	"github.com/agentuity/go-common/project"
 	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/tui"
 	"github.com/charmbracelet/lipgloss"
@@ -79,7 +80,7 @@ func ShouldSyncToProduction(isLocalDev bool) bool {
 }
 
 // ProcessEnvFiles handles .env and template env processing
-func ProcessEnvFiles(ctx context.Context, logger logger.Logger, dir string, theproject *project.Project, projectData *project.ProjectData, apiUrl, token string, force bool, isLocalDev bool) (*deployer.EnvFile, *project.ProjectData) {
+func ProcessEnvFiles(ctx context.Context, logger logger.Logger, dir string, theproject *project.Project, projectData *iproject.ProjectData, apiUrl, token string, force bool, isLocalDev bool) (*deployer.EnvFile, *iproject.ProjectData) {
 	envfilename, err := DetermineEnvFilename(dir, isLocalDev)
 	if err != nil {
 		errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to create .env.development file")).ShowErrorAndExit()
@@ -177,10 +178,10 @@ func HandleMissingTemplateEnvs(logger logger.Logger, dir, envfilename string, le
 }
 
 // HandleMissingProjectEnvs handles missing envs in project
-func HandleMissingProjectEnvs(ctx context.Context, logger logger.Logger, le []env.EnvLineComment, projectData *project.ProjectData, theproject *project.Project, apiUrl, token string, force bool, envFilename string) *project.ProjectData {
+func HandleMissingProjectEnvs(ctx context.Context, logger logger.Logger, le []env.EnvLineComment, projectData *iproject.ProjectData, theproject *project.Project, apiUrl, token string, force bool, envFilename string) *iproject.ProjectData {
 
 	if projectData == nil {
-		projectData = &project.ProjectData{}
+		projectData = &iproject.ProjectData{}
 	}
 	keyvalue := map[string]string{}
 	for _, ev := range le {
@@ -243,7 +244,7 @@ func HandleMissingProjectEnvs(ctx context.Context, logger logger.Logger, le []en
 					projectData.Env[key] = val
 				}
 			}
-			_, err := theproject.SetProjectEnv(ctx, logger, apiUrl, token, projectData.Env, projectData.Secrets)
+			_, err := iproject.SetProjectEnv(ctx, logger, apiUrl, token, theproject.ProjectId, projectData.Env, projectData.Secrets)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithUserMessage("Failed to save project settings")).ShowErrorAndExit()
 			}

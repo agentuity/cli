@@ -227,7 +227,7 @@ Examples:
 				delete(secrets, k)
 				combined[k] = envs[k]
 			}
-			_, err := theproject.SetProjectEnv(ctx, logger, apiUrl, apiKey, envs, secrets)
+			_, err := project.SetProjectEnv(ctx, logger, apiUrl, apiKey, theproject.ProjectId, envs, secrets)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithUserMessage("Failed to save project settings")).ShowErrorAndExit()
 			}
@@ -276,7 +276,7 @@ Examples:
 
 		mask, _ := cmd.Flags().GetBool("mask")
 
-		projectData, err := theproject.GetProject(ctx, logger, apiUrl, apiKey, mask, false)
+		projectData, err := project.GetProject(ctx, logger, apiUrl, apiKey, theproject.ProjectId, mask, false)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}
@@ -353,7 +353,7 @@ Examples:
 		mask, _ := cmd.Flags().GetBool("mask")
 		includeProjectKeys, _ := cmd.Flags().GetBool("include-project-keys")
 
-		projectData, err := theproject.GetProject(ctx, logger, apiUrl, apiKey, mask, includeProjectKeys)
+		projectData, err := project.GetProject(ctx, logger, apiUrl, apiKey, theproject.ProjectId, mask, includeProjectKeys)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}
@@ -417,7 +417,7 @@ Examples:
 		apiUrl := context.APIURL
 		apiKey := context.Token
 
-		projectData, err := theproject.GetProject(ctx, logger, apiUrl, apiKey, true, false)
+		projectData, err := project.GetProject(ctx, logger, apiUrl, apiKey, theproject.ProjectId, true, false)
 		if err != nil {
 			errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 		}
@@ -499,7 +499,7 @@ Examples:
 					return
 				}
 			}
-			err := theproject.DeleteProjectEnv(ctx, logger, apiUrl, apiKey, envsToDelete, secretsToDelete)
+			err := project.DeleteProjectEnv(ctx, logger, apiUrl, apiKey, theproject.ProjectId, envsToDelete, secretsToDelete)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err).ShowErrorAndExit()
 			}

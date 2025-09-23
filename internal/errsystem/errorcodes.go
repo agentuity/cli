@@ -114,4 +114,8 @@ var (
 		Code:    "CLI-0028",
 		Message: "Failed to delete API key",
 	}
+	ErrRetrieveDevmodeEndpoint = errorType{
+		Code:    "CLI-0029",
+		Message: "Failed to retrieve devmode endpoint",
+	}
 )

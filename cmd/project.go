@@ -22,6 +22,7 @@ import (
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/logger"
+	cproject "github.com/agentuity/go-common/project"
 	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -122,7 +123,7 @@ type InitProjectArgs struct {
 	EnableWebhookAuth bool
 	AuthType          string
 	Provider          *templates.TemplateRules
-	Agents            []project.AgentConfig
+	Agents            []cproject.AgentConfig
 	Framework         string
 }
 
@@ -150,9 +151,9 @@ func initProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 	proj.Name = args.Name
 	proj.Description = args.Description
 
-	proj.Development = &project.Development{
+	proj.Development = &cproject.Development{
 		Port: args.Provider.Development.Port,
-		Watch: project.Watch{
+		Watch: cproject.Watch{
 			Enabled: args.Provider.Development.Watch.Enabled,
 			Files:   args.Provider.Development.Watch.Files,
 		},
@@ -160,14 +161,14 @@ func initProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 		Args:    args.Provider.Development.Args,
 	}
 
-	proj.Bundler = &project.Bundler{
+	proj.Bundler = &cproject.Bundler{
 		Enabled:    args.Provider.Bundle.Enabled,
 		Identifier: args.Provider.Identifier,
 		Language:   args.Provider.Language,
 		Framework:  args.Provider.Framework,
 		Runtime:    detectRuntime(args.Dir, args.Provider.Runtime),
 		Ignore:     args.Provider.Bundle.Ignore,
-		AgentConfig: project.AgentBundlerConfig{
+		AgentConfig: cproject.AgentBundlerConfig{
 			Dir: args.Provider.SrcDir,
 		},
 	}
@@ -178,7 +179,7 @@ func initProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 	proj.Deployment.Resources.CPU = args.Provider.Deployment.Resources.CPU
 	proj.Deployment.Resources.Memory = args.Provider.Deployment.Resources.Memory
 	proj.Deployment.Resources.Disk = args.Provider.Deployment.Resources.Disk
-	proj.Deployment.Mode = &project.Mode{
+	proj.Deployment.Mode = &cproject.Mode{
 		Type: "on-demand",
 	}
 
@@ -333,7 +334,9 @@ Examples:
 		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
-		apiUrl, appUrl, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
+		apiUrl := urls.API
+		appUrl := urls.App
 
 		initScreenWithLogo()
 
@@ -345,7 +348,7 @@ Examples:
 		checkForUpgrade(ctx, logger, true)
 
 		// Railgurd the user from creating a project in an existing project directory
-		if project.ProjectExists(cwd) {
+		if cproject.ProjectExists(cwd) {
 			if tui.HasTTY {
 				fmt.Println()
 				tui.ShowWarning("You are currently in an existing Agentuity project directory!")
@@ -616,16 +619,16 @@ Examples:
 			}
 
 			// check to see if the project already has existing agents returned and if so, we're going to use those
-			var agents []project.AgentConfig
+			var agents []cproject.AgentConfig
 			if len(existingAgents) > 0 {
 				for _, agent := range existingAgents {
-					agents = append(agents, project.AgentConfig{
+					agents = append(agents, cproject.AgentConfig{
 						Name:        agent.Name,
 						Description: agent.Description,
 					})
 				}
 			} else {
-				agents = []project.AgentConfig{
+				agents = []cproject.AgentConfig{
 					{
 						Name:        agentName,
 						Description: agentDescription,
@@ -747,7 +750,9 @@ Examples:
 		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
+		apiUrl := urls.API
+
 		orgId, _ := cmd.Flags().GetString("org-id")
 
 		var projects []project.ProjectListData
@@ -832,6 +837,7 @@ It will prompt you to select which projects to delete and confirm the deletion.
 
 Examples:
   agentuity project delete
+  agentuity project rm project_12345567890ab
   agentuity project rm`,
 	Aliases: []string{"rm", "del"},
 	Run: func(cmd *cobra.Command, args []string) {
@@ -839,7 +845,9 @@ Examples:
 		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
+		apiUrl := urls.API
+
 		orgId, _ := cmd.Flags().GetString("org-id")
 
 		var selected []string
@@ -925,7 +933,7 @@ Examples:
 		if apikey != "" && orgId != "" && name != "" && description != "" {
 			context.Project.Name = name
 			context.Project.Description = description
-			result, err := context.Project.Import(ctx, logger, context.APIURL, apikey, orgId, true)
+			result, err := project.ProjectImport(ctx, logger, context.APIURL, apikey, orgId, context.Project, true)
 			if err != nil {
 				if isCancelled(ctx) {
 					os.Exit(1)

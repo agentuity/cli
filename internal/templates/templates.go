@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver"
-	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
+	cproject "github.com/agentuity/go-common/project"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 )
@@ -161,7 +161,7 @@ type Template struct {
 	Requirements []Requirement `yaml:"requirements"`
 }
 
-func (t *Template) NewProject(ctx TemplateContext) (*TemplateRules, []project.AgentConfig, error) {
+func (t *Template) NewProject(ctx TemplateContext) (*TemplateRules, []cproject.AgentConfig, error) {
 	rules, err := LoadTemplateRuleForIdentifier(ctx.TemplateDir, t.Identifier)
 	if err != nil {
 		return nil, nil, err
@@ -178,9 +178,9 @@ func (t *Template) NewProject(ctx TemplateContext) (*TemplateRules, []project.Ag
 	}
 	// check to see if the project already exists from the template used and if so,
 	// we are going to use the agents from the project template
-	existingProject := project.ProjectExists(ctx.ProjectDir)
+	existingProject := cproject.ProjectExists(ctx.ProjectDir)
 	if existingProject {
-		var p project.Project
+		var p cproject.Project
 		if err := p.Load(ctx.ProjectDir); err != nil {
 			return nil, nil, err
 		}
@@ -223,7 +223,8 @@ func (t *Template) AddGitHubAction(ctx TemplateContext) error {
 	if err := os.MkdirAll(outdir, 0755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", outdir, err)
 	}
-	outfile := filepath.Join(outdir, "agentuity.yaml")
+
+	outfile := cproject.GetProjectFilename(outdir)
 	if err := os.WriteFile(outfile, buf, 0644); err != nil {
 		return fmt.Errorf("failed to write file %s: %w", outfile, err)
 	}
