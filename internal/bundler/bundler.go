@@ -3,6 +3,7 @@ package bundler
 import (
 	"archive/zip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -21,6 +22,7 @@ import (
 	"github.com/agentuity/go-common/sys"
 	"github.com/agentuity/go-common/tui"
 	"github.com/evanw/esbuild/pkg/api"
+	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -117,11 +119,11 @@ func installSourceMapSupportIfNeeded(ctx BundleContext, dir string) error {
 	return nil
 }
 
-func runTypecheck(ctx BundleContext, dir string) error {
+func runTypecheck(ctx BundleContext, dir string, installDir string) error {
 	if ctx.Production {
 		return nil
 	}
-	tsc := filepath.Join(dir, "node_modules", ".bin", "tsc")
+	tsc := filepath.Join(installDir, "node_modules", ".bin", "tsc")
 	if !util.Exists(tsc) {
 		ctx.Logger.Warn("no tsc found at %s, skipping typecheck", tsc)
 		return nil
@@ -141,6 +143,176 @@ func runTypecheck(ctx BundleContext, dir string) error {
 	return nil
 }
 
+// WorkspaceConfig represents workspace configuration
+type WorkspaceConfig struct {
+	Root     string
+	Type     string   // "npm", "yarn", or "pnpm"
+	Patterns []string // workspace patterns
+}
+
+// detectWorkspaceRoot walks up from startDir looking for workspace configuration
+func detectWorkspaceRoot(logger logger.Logger, startDir string) (*WorkspaceConfig, error) {
+	dir := startDir
+	for {
+		// Check for npm/yarn workspaces in package.json
+		packageJsonPath := filepath.Join(dir, "package.json")
+		if util.Exists(packageJsonPath) {
+			var pkg struct {
+				Workspaces interface{} `json:"workspaces"`
+			}
+			data, err := os.ReadFile(packageJsonPath)
+			if err == nil {
+				if json.Unmarshal(data, &pkg) == nil && pkg.Workspaces != nil {
+					patterns, err := parseNpmWorkspaces(pkg.Workspaces)
+					if err == nil && len(patterns) > 0 {
+						logger.Debug("found npm workspace config at %s", packageJsonPath)
+						return &WorkspaceConfig{
+							Root:     dir,
+							Type:     "npm",
+							Patterns: patterns,
+						}, nil
+					}
+				}
+			}
+		}
+
+		// Check for pnpm workspace
+		pnpmWorkspacePath := filepath.Join(dir, "pnpm-workspace.yaml")
+		if util.Exists(pnpmWorkspacePath) {
+			var workspace struct {
+				Packages []string `yaml:"packages"`
+			}
+			data, err := os.ReadFile(pnpmWorkspacePath)
+			if err == nil {
+				if yaml.Unmarshal(data, &workspace) == nil && len(workspace.Packages) > 0 {
+					logger.Debug("found pnpm workspace config at %s", pnpmWorkspacePath)
+					return &WorkspaceConfig{
+						Root:     dir,
+						Type:     "pnpm",
+						Patterns: workspace.Packages,
+					}, nil
+				}
+			}
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// Reached root directory
+			break
+		}
+		dir = parent
+	}
+	return nil, nil
+}
+
+// parseNpmWorkspaces handles different npm workspaces formats
+func parseNpmWorkspaces(workspaces interface{}) ([]string, error) {
+	switch v := workspaces.(type) {
+	case []interface{}:
+		// Array format: ["packages/*", "apps/*"]
+		patterns := make([]string, len(v))
+		for i, pattern := range v {
+			if str, ok := pattern.(string); ok {
+				patterns[i] = str
+			} else {
+				return nil, fmt.Errorf("invalid workspace pattern type")
+			}
+		}
+		return patterns, nil
+	case map[string]interface{}:
+		// Object format: {"packages": ["packages/*"]}
+		if packages, ok := v["packages"].([]interface{}); ok {
+			patterns := make([]string, len(packages))
+			for i, pattern := range packages {
+				if str, ok := pattern.(string); ok {
+					patterns[i] = str
+				} else {
+					return nil, fmt.Errorf("invalid workspace pattern type")
+				}
+			}
+			return patterns, nil
+		}
+	}
+	return nil, fmt.Errorf("unsupported workspace format")
+}
+
+// isAgentInWorkspace checks if the agent directory matches any workspace patterns
+func isAgentInWorkspace(logger logger.Logger, agentDir string, workspace *WorkspaceConfig) bool {
+	// Get relative path from workspace root to agent directory
+	relPath, err := filepath.Rel(workspace.Root, agentDir)
+	if err != nil {
+		logger.Debug("failed to get relative path: %v", err)
+		return false
+	}
+
+	// Check if agent is outside workspace root
+	if strings.HasPrefix(relPath, "..") {
+		logger.Debug("agent directory is outside workspace root")
+		return false
+	}
+
+	// Check each workspace pattern
+	for _, pattern := range workspace.Patterns {
+		if matchesWorkspacePattern(relPath, pattern) {
+			logger.Debug("agent directory matches workspace pattern: %s", pattern)
+			return true
+		}
+	}
+
+	logger.Debug("agent directory doesn't match any workspace patterns")
+	return false
+}
+
+// matchesWorkspacePattern checks if a path matches a workspace pattern
+func matchesWorkspacePattern(path, pattern string) bool {
+	// Handle exact match first
+	if path == pattern {
+		return true
+	}
+
+	// Handle glob patterns like "packages/*" - should match direct children only
+	if strings.HasSuffix(pattern, "/*") {
+		dirPattern := strings.TrimSuffix(pattern, "/*")
+
+		// Check if path starts with the directory pattern
+		if !strings.HasPrefix(path, dirPattern+"/") {
+			return false
+		}
+
+		// Get the relative part after the directory
+		relPart := strings.TrimPrefix(path, dirPattern+"/")
+
+		// Should not contain additional slashes (direct child only)
+		return !strings.Contains(relPart, "/")
+	}
+
+	// Handle other glob patterns using filepath.Match
+	matched, err := filepath.Match(pattern, path)
+	return err == nil && matched
+}
+
+// findWorkspaceInstallDir determines where to install dependencies
+func findWorkspaceInstallDir(logger logger.Logger, agentDir string) string {
+	workspace, err := detectWorkspaceRoot(logger, agentDir)
+	if err != nil {
+		logger.Debug("error detecting workspace: %v", err)
+		return agentDir
+	}
+
+	if workspace == nil {
+		logger.Debug("no workspace detected, using agent directory")
+		return agentDir
+	}
+
+	if isAgentInWorkspace(logger, agentDir, workspace) {
+		logger.Debug("agent is part of %s workspace, using workspace root: %s", workspace.Type, workspace.Root)
+		return workspace.Root
+	}
+
+	logger.Debug("agent is not part of workspace, using agent directory")
+	return agentDir
+}
+
 // detectPackageManager detects which package manager to use based on lockfiles
 func detectPackageManager(projectDir string) string {
 	if util.Exists(filepath.Join(projectDir, "pnpm-lock.yaml")) {
@@ -156,19 +328,33 @@ func detectPackageManager(projectDir string) string {
 
 // jsInstallCommandSpec returns the base command name and arguments for installing JavaScript dependencies
 // This function returns the base command without CI-specific modifications
-func jsInstallCommandSpec(projectDir string) (string, []string, error) {
+func jsInstallCommandSpec(projectDir string, isWorkspace bool, production bool) (string, []string, error) {
 	packageManager := detectPackageManager(projectDir)
 
 	switch packageManager {
 	case "pnpm":
+		if isWorkspace && !production {
+			// In workspaces during development, install all dependencies including devDependencies
+			// This ensures @types packages are available for TypeScript compilation
+			return "pnpm", []string{"install", "--ignore-scripts", "--silent"}, nil
+		}
 		return "pnpm", []string{"install", "--prod", "--ignore-scripts", "--silent"}, nil
 	case "bun":
+		if isWorkspace && !production {
+			return "bun", []string{"install", "--ignore-scripts", "--no-progress", "--no-summary", "--silent"}, nil
+		}
 		return "bun", []string{"install", "--production", "--ignore-scripts", "--no-progress", "--no-summary", "--silent"}, nil
 	case "yarn":
 		return "yarn", []string{"install", "--frozen-lockfile"}, nil
 	case "npm":
+		if isWorkspace && !production {
+			return "npm", []string{"install", "--no-audit", "--no-fund", "--ignore-scripts"}, nil
+		}
 		return "npm", []string{"install", "--no-audit", "--no-fund", "--omit=dev", "--ignore-scripts"}, nil
 	default:
+		if isWorkspace && !production {
+			return "npm", []string{"install", "--no-audit", "--no-fund", "--ignore-scripts"}, nil
+		}
 		return "npm", []string{"install", "--no-audit", "--no-fund", "--omit=dev", "--ignore-scripts"}, nil
 	}
 }
@@ -218,7 +404,7 @@ func applyCIModifications(ctx BundleContext, cmd, runtime string, args []string)
 }
 
 // getJSInstallCommand returns the complete install command with CI modifications applied
-func getJSInstallCommand(ctx BundleContext, projectDir, runtime string) (string, []string, error) {
+func getJSInstallCommand(ctx BundleContext, projectDir, runtime string, isWorkspace bool) (string, []string, error) {
 	// For bun, we need to ensure the lockfile is up to date before we can run the install
 	// otherwise we'll get an error about the lockfile being out of date
 	// Only do this if we have a logger (i.e., not in tests)
@@ -228,7 +414,7 @@ func getJSInstallCommand(ctx BundleContext, projectDir, runtime string) (string,
 		}
 	}
 
-	cmd, args, err := jsInstallCommandSpec(projectDir)
+	cmd, args, err := jsInstallCommandSpec(projectDir, isWorkspace, ctx.Production)
 	if err != nil {
 		return "", nil, err
 	}
@@ -241,15 +427,19 @@ func getJSInstallCommand(ctx BundleContext, projectDir, runtime string) (string,
 
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
 
-	if ctx.Install || !util.Exists(filepath.Join(dir, "node_modules")) {
-		cmd, args, err := getJSInstallCommand(ctx, dir, theproject.Bundler.Runtime)
+	// Determine where to install dependencies (workspace root or agent directory)
+	installDir := findWorkspaceInstallDir(ctx.Logger, dir)
+	isWorkspace := installDir != dir // We're using workspace root if installDir differs from agent dir
+
+	if ctx.Install || !util.Exists(filepath.Join(installDir, "node_modules")) {
+		cmd, args, err := getJSInstallCommand(ctx, installDir, theproject.Bundler.Runtime, isWorkspace)
 		if err != nil {
 			return err
 		}
 
 		install := exec.CommandContext(ctx.Context, cmd, args...)
 		util.ProcessSetup(install)
-		install.Dir = dir
+		install.Dir = installDir
 		out, err := install.CombinedOutput()
 		var ec int
 		if install.ProcessState != nil {
@@ -270,7 +460,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 	var shimSourceMap bool
 
 	if theproject.Bundler.Runtime == "bunjs" {
-		if err := installSourceMapSupportIfNeeded(ctx, dir); err != nil {
+		if err := installSourceMapSupportIfNeeded(ctx, installDir); err != nil {
 			return fmt.Errorf("failed to install bun source-map-support: %w", err)
 		}
 		shimSourceMap = true
@@ -280,7 +470,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		return err
 	}
 
-	if err := runTypecheck(ctx, dir); err != nil {
+	if err := runTypecheck(ctx, dir, installDir); err != nil {
 		return err
 	}
 
@@ -304,7 +494,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		return fmt.Errorf("failed to load %s: %w", pkgjson, err)
 	}
 	ctx.Logger.Debug("resolving agentuity sdk")
-	agentuitypkg, err := resolveAgentuity(ctx.Logger, dir)
+	agentuitypkg, err := resolveAgentuity(ctx.Logger, installDir)
 	if err != nil {
 		return err
 	}
