@@ -385,7 +385,8 @@ install_completions() {
           fi
         fi
         
-        if [ -d "/usr/local/share/zsh/site-functions" ]; then
+        # Check if zsh is installed before attempting to install zsh completion
+        if command -v zsh >/dev/null 2>&1 && [ -d "/usr/local/share/zsh/site-functions" ]; then
           ZSH_COMPLETION_DIR="/usr/local/share/zsh/site-functions"
           if [ -w "$ZSH_COMPLETION_DIR" ]; then
             ohai "Generating zsh completion script..."
@@ -394,6 +395,9 @@ install_completions() {
           else
             warn "No write permission to $ZSH_COMPLETION_DIR. Skipping zsh completion installation."
           fi
+        elif ! command -v zsh >/dev/null 2>&1; then
+          # Only skip silently if zsh is not installed (avoid unnecessary warnings)
+          debug "Zsh not found, skipping zsh completion installation"
         fi
       fi
 
@@ -411,7 +415,8 @@ install_completions() {
           fi
         fi
         
-        if [ -d "/usr/share/zsh/vendor-completions" ]; then
+        # Check if zsh is installed before attempting to install zsh completion
+        if command -v zsh >/dev/null 2>&1 && [ -d "/usr/share/zsh/vendor-completions" ]; then
           ZSH_COMPLETION_DIR="/usr/share/zsh/vendor-completions"
           if [ -w "$ZSH_COMPLETION_DIR" ]; then
             ohai "Generating zsh completion script..."
@@ -425,6 +430,9 @@ install_completions() {
             echo "  echo 'fpath=(~/.zsh/completion \$fpath)' >> ~/.zshrc"
             echo "  echo 'autoload -U compinit && compinit' >> ~/.zshrc"
           fi
+        elif ! command -v zsh >/dev/null 2>&1; then
+          # Only skip silently if zsh is not installed (avoid unnecessary warnings)
+          debug "Zsh not found, skipping zsh completion installation"
         fi
       fi
   fi
