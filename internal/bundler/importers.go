@@ -101,7 +101,7 @@ func createFileImporter(logger logger.Logger) api.Plugin {
 	return api.Plugin{
 		Name: "file",
 		Setup: func(build api.PluginBuild) {
-			filter := "\\.(gif|png|jpg|jpeg|svg|webp)$"
+			filter := "\\.(gif|png|jpg|jpeg|svg|webp|pdf)$"
 			build.OnResolve(api.OnResolveOptions{Filter: filter, Namespace: "file"}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
 				p := makePath(args)
 				if isNodeModulesPath(p) {
@@ -217,6 +217,11 @@ declare module '*.svg' {
 }
 
 declare module '*.webp' {
+  const value: Buffer;
+  export default value;
+}
+
+declare module '*.pdf' {
   const value: Buffer;
   export default value;
 }
