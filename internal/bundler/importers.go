@@ -41,12 +41,12 @@ func createYAMLImporter(logger logger.Logger) api.Plugin {
 					return api.OnLoadResult{}, err
 				}
 				defer of.Close()
-				kv := make(map[string]any)
+				var kv any
 				err = yaml.NewDecoder(of).Decode(&kv)
 				if err != nil {
 					return api.OnLoadResult{}, err
 				}
-				js := "module.exports = " + cstr.JSONStringify(kv)
+				js := "export default " + cstr.JSONStringify(kv)
 				logger.Debug("bundling yaml file from %s", args.Path)
 				return api.OnLoadResult{Contents: &js, Loader: api.LoaderJS}, nil
 			})
@@ -82,12 +82,12 @@ func createJSONImporter(logger logger.Logger) api.Plugin {
 					return api.OnLoadResult{}, err
 				}
 				defer of.Close()
-				kv := make(map[string]any)
+				var kv any
 				err = json.NewDecoder(of).Decode(&kv)
 				if err != nil {
 					return api.OnLoadResult{}, err
 				}
-				js := "module.exports = " + cstr.JSONStringify(kv)
+				js := "export default " + cstr.JSONStringify(kv)
 				logger.Debug("bundling json file from %s", args.Path)
 				return api.OnLoadResult{Contents: &js, Loader: api.LoaderJS}, nil
 			})
@@ -123,7 +123,7 @@ func createFileImporter(logger logger.Logger) api.Plugin {
 					return api.OnLoadResult{}, err
 				}
 				base64Data := base64.StdEncoding.EncodeToString(data)
-				js := "module.exports = Buffer.from('" + base64Data + "', 'base64');"
+				js := "export default Buffer.from(" + cstr.JSONStringify(base64Data) + ", 'base64');"
 				logger.Debug("bundling binary file from %s", args.Path)
 				return api.OnLoadResult{Contents: &js, Loader: api.LoaderJS}, nil
 			})
@@ -138,7 +138,7 @@ func createTextImporter(logger logger.Logger) api.Plugin {
 		Name: "text",
 		Setup: func(build api.PluginBuild) {
 			filter := "\\.(txt)$"
-			build.OnResolve(api.OnResolveOptions{Filter: filter, Namespace: "text"}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
+			build.OnResolve(api.OnResolveOptions{Filter: filter, Namespace: "file"}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
 				p := args.Path
 				abs, err := filepath.Abs(p)
 				if err != nil {
@@ -158,7 +158,7 @@ func createTextImporter(logger logger.Logger) api.Plugin {
 				if err != nil {
 					return api.OnLoadResult{}, err
 				}
-				js := "module.exports = " + cstr.JSONStringify(data)
+				js := "export default " + cstr.JSONStringify(string(data))
 				logger.Debug("bundling text file from %s", args.Path)
 				return api.OnLoadResult{Contents: &js, Loader: api.LoaderJS}, nil
 			})
@@ -206,37 +206,37 @@ declare module '*.json' {
 }
 
 declare module '*.png' {
-  const value: any;
+  const value: Buffer;
   export default value;
 }
 
 declare module '*.gif' {
-  const value: any;
+  const value: Buffer;
   export default value;
 }
 
 declare module '*.jpg' {
-  const value: any;
+  const value: Buffer;
   export default value;
 }
 
 declare module '*.jpeg' {
-  const value: any;
+  const value: Buffer;
   export default value;
 }
 
 declare module '*.svg' {
-  const value: any;
+  const value: Buffer;
   export default value;
 }
 
 declare module '*.webp' {
-  const value: any;
+  const value: Buffer;
   export default value;
 }
 
 declare module '*.txt' {
-  const value: any;
+  const value: string;
   export default value;
 }
 `
