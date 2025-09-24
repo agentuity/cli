@@ -155,6 +155,11 @@ func createTextImporter(logger logger.Logger) api.Plugin {
 }
 
 func possiblyCreateDeclarationFile(logger logger.Logger, dir string) error {
+	mfp := filepath.Join(dir, "node_modules", "@agentuity", "sdk", "dist", "file_types.d.ts")
+	if sys.Exists(mfp) {
+		logger.Debug("found existing declaration file at %s", mfp)
+		return nil
+	}
 	fp := filepath.Join(dir, "node_modules", "@types", "agentuity")
 	fn := filepath.Join(fp, "index.d.ts")
 	if sys.Exists(fn) {
@@ -168,6 +173,11 @@ func possiblyCreateDeclarationFile(logger logger.Logger, dir string) error {
 		logger.Debug("created directory %s", fp)
 	}
 	err := os.WriteFile(fn, []byte(declaration), 0644)
+	if err != nil {
+		return fmt.Errorf("cannot create file: %s. %w", fn, err)
+	}
+	logger.Debug("created declaration file at %s", mfp)
+	err = os.WriteFile(fn, []byte(mfp), 0644)
 	if err != nil {
 		return fmt.Errorf("cannot create file: %s. %w", fn, err)
 	}
