@@ -1,6 +1,7 @@
 package bundler
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -154,45 +155,90 @@ func createTextImporter(logger logger.Logger) api.Plugin {
 
 }
 
-func possiblyCreateDeclarationFile(logger logger.Logger, dir string) error {
-	mfp := filepath.Join(dir, "node_modules", "@agentuity", "sdk", "dist", "file_types.d.ts")
-	fileExists := sys.Exists(mfp)
-	if fileExists {
-		logger.Debug("found existing declaration file at %s", mfp)
+func needsDeclarationUpdate(filePath string, expectedHash string) bool {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return true // File doesn't exist or can't be read, needs update
 	}
+	defer file.Close()
+
+	// Read first 100 bytes to check for hash comment
+	buffer := make([]byte, 100)
+	n, err := file.Read(buffer)
+	if err != nil || n == 0 {
+		return true // Can't read file, needs update
+	}
+
+	content := string(buffer[:n])
+	lines := strings.Split(content, "\n")
+	if len(lines) == 0 {
+		return true
+	}
+
+	// Check if first line contains our hash
+	firstLine := strings.TrimSpace(lines[0])
+	expectedPrefix := "// agentuity-types-hash:"
+	if !strings.HasPrefix(firstLine, expectedPrefix) {
+		return true // No hash found, needs update
+	}
+
+	currentHash := strings.TrimPrefix(firstLine, expectedPrefix)
+	return currentHash != expectedHash
+}
+
+func possiblyCreateDeclarationFile(logger logger.Logger, dir string) error {
+	// Generate hash of declaration content
+	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(declaration)))
+
+	// Create declaration with hash header
+	declarationWithHash := fmt.Sprintf("// agentuity-types-hash:%s\n%s", hash, declaration)
+
+	mfp := filepath.Join(dir, "node_modules", "@agentuity", "sdk", "dist", "file_types.d.ts")
 	fp := filepath.Join(dir, "node_modules", "@types", "agentuity")
 	fn := filepath.Join(fp, "index.d.ts")
-	typesExists := sys.Exists(fn)
-	if typesExists {
-		logger.Debug("declaration file already exists at %s", fn)
+
+	// Check if files need updates
+	mfpNeedsUpdate := needsDeclarationUpdate(mfp, hash)
+	fnNeedsUpdate := needsDeclarationUpdate(fn, hash)
+
+	if !mfpNeedsUpdate && !fnNeedsUpdate {
+		logger.Debug("declaration files are up to date")
+		return nil
 	}
 
-	// Only create files if they don't exist
-	if !fileExists || !typesExists {
-		if !sys.Exists(fp) {
-			if err := os.MkdirAll(fp, 0755); err != nil {
-				return fmt.Errorf("cannot create directory: %s. %w", fp, err)
+	// Create directory if needed
+	if !sys.Exists(fp) {
+		if err := os.MkdirAll(fp, 0755); err != nil {
+			return fmt.Errorf("cannot create directory: %s. %w", fp, err)
+		}
+		logger.Debug("created directory %s", fp)
+	}
+
+	// Create/update the @types/agentuity declaration file
+	if fnNeedsUpdate {
+		err := os.WriteFile(fn, []byte(declarationWithHash), 0644)
+		if err != nil {
+			return fmt.Errorf("cannot create file: %s. %w", fn, err)
+		}
+		logger.Debug("updated declaration file at %s", fn)
+	}
+
+	// Create/update the SDK file_types.d.ts
+	if mfpNeedsUpdate {
+		// Ensure SDK directory exists
+		sdkDir := filepath.Dir(mfp)
+		if !sys.Exists(sdkDir) {
+			if err := os.MkdirAll(sdkDir, 0755); err != nil {
+				return fmt.Errorf("cannot create SDK directory: %s. %w", sdkDir, err)
 			}
-			logger.Debug("created directory %s", fp)
+			logger.Debug("created SDK directory %s", sdkDir)
 		}
 
-		// Create the @types/agentuity declaration file
-		if !typesExists {
-			err := os.WriteFile(fn, []byte(declaration), 0644)
-			if err != nil {
-				return fmt.Errorf("cannot create file: %s. %w", fn, err)
-			}
-			logger.Debug("created declaration file at %s", fn)
+		err := os.WriteFile(mfp, []byte(declarationWithHash), 0644)
+		if err != nil {
+			return fmt.Errorf("cannot create file: %s. %w", mfp, err)
 		}
-
-		// Create the SDK file_types.d.ts
-		if !fileExists {
-			err := os.WriteFile(mfp, []byte(declaration), 0644)
-			if err != nil {
-				return fmt.Errorf("cannot create file: %s. %w", mfp, err)
-			}
-			logger.Debug("created declaration file at %s", mfp)
-		}
+		logger.Debug("updated declaration file at %s", mfp)
 	}
 
 	// Patch the SDK's main index.d.ts to import file_types if it exists and doesn't already import it
