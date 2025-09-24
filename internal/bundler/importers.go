@@ -25,6 +25,10 @@ func makePath(args api.OnResolveArgs) string {
 	return p
 }
 
+func isNodeModulesPath(p string) bool {
+	return strings.Contains(filepath.ToSlash(p), "/node_modules/")
+}
+
 func createYAMLImporter(logger logger.Logger) api.Plugin {
 	return api.Plugin{
 		Name: "yaml",
@@ -32,7 +36,7 @@ func createYAMLImporter(logger logger.Logger) api.Plugin {
 			filter := "\\.ya?ml$"
 			build.OnResolve(api.OnResolveOptions{Filter: filter, Namespace: "file"}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
 				p := makePath(args)
-				if strings.Contains(p, "node_modules/") {
+				if isNodeModulesPath(p) {
 					return api.OnResolveResult{}, nil
 				}
 				return api.OnResolveResult{Path: p, Namespace: "yaml"}, nil
@@ -66,7 +70,7 @@ func createJSONImporter(logger logger.Logger) api.Plugin {
 			filter := "\\.json$"
 			build.OnResolve(api.OnResolveOptions{Filter: filter, Namespace: "file"}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
 				p := makePath(args)
-				if strings.Contains(p, "node_modules/") {
+				if isNodeModulesPath(p) {
 					return api.OnResolveResult{}, nil
 				}
 				return api.OnResolveResult{Path: p, Namespace: "json"}, nil
@@ -100,7 +104,7 @@ func createFileImporter(logger logger.Logger) api.Plugin {
 			filter := "\\.(gif|png|jpg|jpeg|svg|webp)$"
 			build.OnResolve(api.OnResolveOptions{Filter: filter, Namespace: "file"}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
 				p := makePath(args)
-				if strings.Contains(p, "node_modules/") {
+				if isNodeModulesPath(p) {
 					return api.OnResolveResult{}, nil
 				}
 				return api.OnResolveResult{Path: p, Namespace: "file"}, nil
@@ -129,7 +133,7 @@ func createTextImporter(logger logger.Logger) api.Plugin {
 			filter := "\\.(txt)$"
 			build.OnResolve(api.OnResolveOptions{Filter: filter, Namespace: "file"}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
 				p := makePath(args)
-				if strings.Contains(p, "node_modules/") {
+				if isNodeModulesPath(p) {
 					return api.OnResolveResult{}, nil
 				}
 				return api.OnResolveResult{Path: p, Namespace: "text"}, nil
