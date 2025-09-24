@@ -156,32 +156,94 @@ func createTextImporter(logger logger.Logger) api.Plugin {
 
 func possiblyCreateDeclarationFile(logger logger.Logger, dir string) error {
 	mfp := filepath.Join(dir, "node_modules", "@agentuity", "sdk", "dist", "file_types.d.ts")
-	if sys.Exists(mfp) {
+	fileExists := sys.Exists(mfp)
+	if fileExists {
 		logger.Debug("found existing declaration file at %s", mfp)
-		return nil
 	}
 	fp := filepath.Join(dir, "node_modules", "@types", "agentuity")
 	fn := filepath.Join(fp, "index.d.ts")
-	if sys.Exists(fn) {
+	typesExists := sys.Exists(fn)
+	if typesExists {
 		logger.Debug("declaration file already exists at %s", fn)
-		return nil
 	}
-	if !sys.Exists(fp) {
-		if err := os.MkdirAll(fp, 0755); err != nil {
-			return fmt.Errorf("cannot create directory: %s. %w", fp, err)
+
+	// Only create files if they don't exist
+	if !fileExists || !typesExists {
+		if !sys.Exists(fp) {
+			if err := os.MkdirAll(fp, 0755); err != nil {
+				return fmt.Errorf("cannot create directory: %s. %w", fp, err)
+			}
+			logger.Debug("created directory %s", fp)
 		}
-		logger.Debug("created directory %s", fp)
+
+		// Create the @types/agentuity declaration file
+		if !typesExists {
+			err := os.WriteFile(fn, []byte(declaration), 0644)
+			if err != nil {
+				return fmt.Errorf("cannot create file: %s. %w", fn, err)
+			}
+			logger.Debug("created declaration file at %s", fn)
+		}
+
+		// Create the SDK file_types.d.ts
+		if !fileExists {
+			err := os.WriteFile(mfp, []byte(declaration), 0644)
+			if err != nil {
+				return fmt.Errorf("cannot create file: %s. %w", mfp, err)
+			}
+			logger.Debug("created declaration file at %s", mfp)
+		}
 	}
-	err := os.WriteFile(fn, []byte(declaration), 0644)
-	if err != nil {
-		return fmt.Errorf("cannot create file: %s. %w", fn, err)
+
+	// Patch the SDK's main index.d.ts to import file_types if it exists and doesn't already import it
+	sdkIndexPath := filepath.Join(dir, "node_modules", "@agentuity", "sdk", "dist", "index.d.ts")
+	if sys.Exists(sdkIndexPath) {
+		content, err := os.ReadFile(sdkIndexPath)
+		if err == nil {
+			contentStr := string(content)
+			// Only add the import if it's not already there
+			if !strings.Contains(contentStr, "import './file_types'") && !strings.Contains(contentStr, "import \"./file_types\"") {
+				// Find where to insert the import (after the existing exports)
+				lines := strings.Split(contentStr, "\n")
+				var newLines []string
+				inserted := false
+				for _, line := range lines {
+					newLines = append(newLines, line)
+					// Insert after the last export statement, before other imports
+					if !inserted && strings.HasPrefix(strings.TrimSpace(line), "export ") &&
+						(strings.Contains(line, "from './") || strings.Contains(line, "from \"./")) {
+						newLines = append(newLines, "import './file_types';")
+						inserted = true
+					}
+				}
+				// If we didn't insert it yet, add it after the exports
+				if !inserted && len(newLines) > 0 {
+					// Find the position after existing exports
+					for i, line := range newLines {
+						if strings.HasPrefix(strings.TrimSpace(line), "export ") {
+							continue
+						}
+						// Insert before the first non-export line
+						newContent := append(newLines[:i], append([]string{"import './file_types';"}, newLines[i:]...)...)
+						contentStr = strings.Join(newContent, "\n")
+						inserted = true
+						break
+					}
+				}
+				if inserted {
+					contentStr = strings.Join(newLines, "\n")
+				}
+
+				err = os.WriteFile(sdkIndexPath, []byte(contentStr), 0644)
+				if err != nil {
+					logger.Debug("failed to patch SDK index.d.ts: %v", err)
+				} else {
+					logger.Debug("patched SDK index.d.ts to include file_types import")
+				}
+			}
+		}
 	}
-	logger.Debug("created declaration file at %s", mfp)
-	err = os.WriteFile(mfp, []byte(declaration), 0644)
-	if err != nil {
-		return fmt.Errorf("cannot create file: %s. %w", fn, err)
-	}
-	logger.Debug("created declaration file at %s", fn)
+
 	return nil
 }
 
