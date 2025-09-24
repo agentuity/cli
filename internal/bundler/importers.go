@@ -249,13 +249,14 @@ func possiblyCreateDeclarationFile(logger logger.Logger, dir string) error {
 			contentStr := string(content)
 			// Only add the import if it's not already there
 			if !strings.Contains(contentStr, "import './file_types'") && !strings.Contains(contentStr, "import \"./file_types\"") {
-				// Find where to insert the import (after the existing exports)
+				// Find where to insert the import (after the first relative export)
 				lines := strings.Split(contentStr, "\n")
 				var newLines []string
 				inserted := false
+				
 				for _, line := range lines {
 					newLines = append(newLines, line)
-					// Insert after the last export statement, before other imports
+					// Insert after the first export with relative import
 					if !inserted && strings.HasPrefix(strings.TrimSpace(line), "export ") &&
 						(strings.Contains(line, "from './") || strings.Contains(line, "from \"./")) {
 						newLines = append(newLines, "import './file_types';")
@@ -276,10 +277,15 @@ func possiblyCreateDeclarationFile(logger logger.Logger, dir string) error {
 						break
 					}
 				}
-				if inserted {
+				// Update contentStr with the modified lines if we inserted something in the first loop
+				if inserted && contentStr == string(content) {
+					contentStr = strings.Join(newLines, "\n")
+				} else if !inserted && len(newLines) > 0 {
+					// If we still haven't inserted and there are only exports, append at the end
+					newLines = append(newLines, "import './file_types';")
 					contentStr = strings.Join(newLines, "\n")
 				}
-
+				
 				err = os.WriteFile(sdkIndexPath, []byte(contentStr), 0644)
 				if err != nil {
 					logger.Debug("failed to patch SDK index.d.ts: %v", err)
