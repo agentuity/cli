@@ -116,7 +116,7 @@ func createFileImporter(logger logger.Logger) api.Plugin {
 					return api.OnLoadResult{}, err
 				}
 				base64Data := base64.StdEncoding.EncodeToString(data)
-				js := "export default new Uint8Array(atob(" + cstr.JSONStringify(base64Data) + ").split('').map(c => c.charCodeAt(0)));"
+				js := "export default new Uint8Array(Buffer.from(" + cstr.JSONStringify(base64Data) + ", \"base64\"));"
 				logger.Debug("bundling binary file from %s", args.Path)
 				return api.OnLoadResult{Contents: &js, Loader: api.LoaderJS}, nil
 			})
