@@ -15,20 +15,23 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func makePath(args api.OnResolveArgs) string {
+	p := args.Path
+	if !filepath.IsAbs(p) {
+		p = filepath.Join(args.ResolveDir, p)
+	} else {
+		p = filepath.Clean(p)
+	}
+	return p
+}
+
 func createYAMLImporter(logger logger.Logger) api.Plugin {
 	return api.Plugin{
 		Name: "yaml",
 		Setup: func(build api.PluginBuild) {
 			filter := "\\.ya?ml$"
 			build.OnResolve(api.OnResolveOptions{Filter: filter, Namespace: "file"}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
-				p := args.Path
-				abs, err := filepath.Abs(p)
-				if err != nil {
-					return api.OnResolveResult{}, err
-				}
-				if abs != p {
-					p = filepath.Join(args.ResolveDir, p)
-				}
+				p := makePath(args)
 				if strings.Contains(p, "node_modules/") {
 					return api.OnResolveResult{}, nil
 				}
@@ -62,14 +65,7 @@ func createJSONImporter(logger logger.Logger) api.Plugin {
 		Setup: func(build api.PluginBuild) {
 			filter := "\\.json$"
 			build.OnResolve(api.OnResolveOptions{Filter: filter, Namespace: "file"}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
-				p := args.Path
-				abs, err := filepath.Abs(p)
-				if err != nil {
-					return api.OnResolveResult{}, err
-				}
-				if abs != p {
-					p = filepath.Join(args.ResolveDir, p)
-				}
+				p := makePath(args)
 				if strings.Contains(p, "node_modules/") {
 					return api.OnResolveResult{}, nil
 				}
@@ -103,14 +99,7 @@ func createFileImporter(logger logger.Logger) api.Plugin {
 		Setup: func(build api.PluginBuild) {
 			filter := "\\.(gif|png|jpg|jpeg|svg|webp)$"
 			build.OnResolve(api.OnResolveOptions{Filter: filter, Namespace: "file"}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
-				p := args.Path
-				abs, err := filepath.Abs(p)
-				if err != nil {
-					return api.OnResolveResult{}, err
-				}
-				if abs != p {
-					p = filepath.Join(args.ResolveDir, p)
-				}
+				p := makePath(args)
 				if strings.Contains(p, "node_modules/") {
 					return api.OnResolveResult{}, nil
 				}
@@ -139,14 +128,7 @@ func createTextImporter(logger logger.Logger) api.Plugin {
 		Setup: func(build api.PluginBuild) {
 			filter := "\\.(txt)$"
 			build.OnResolve(api.OnResolveOptions{Filter: filter, Namespace: "file"}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
-				p := args.Path
-				abs, err := filepath.Abs(p)
-				if err != nil {
-					return api.OnResolveResult{}, err
-				}
-				if abs != p {
-					p = filepath.Join(args.ResolveDir, p)
-				}
+				p := makePath(args)
 				if strings.Contains(p, "node_modules/") {
 					return api.OnResolveResult{}, nil
 				}
