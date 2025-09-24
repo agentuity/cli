@@ -1,0 +1,242 @@
+package bundler
+
+import (
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/agentuity/go-common/logger"
+	cstr "github.com/agentuity/go-common/string"
+	"github.com/agentuity/go-common/sys"
+	"github.com/evanw/esbuild/pkg/api"
+	"gopkg.in/yaml.v3"
+)
+
+func createYAMLImporter(logger logger.Logger) api.Plugin {
+	return api.Plugin{
+		Name: "yaml",
+		Setup: func(build api.PluginBuild) {
+			filter := "\\.ya?ml$"
+			build.OnResolve(api.OnResolveOptions{Filter: filter, Namespace: "file"}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
+				p := args.Path
+				abs, err := filepath.Abs(p)
+				if err != nil {
+					return api.OnResolveResult{}, err
+				}
+				if abs != p {
+					p = filepath.Join(args.ResolveDir, p)
+				}
+				if strings.Contains(p, "node_modules/") {
+					return api.OnResolveResult{}, nil
+				}
+				return api.OnResolveResult{Path: p, Namespace: "yaml"}, nil
+			})
+
+			build.OnLoad(api.OnLoadOptions{Filter: filter, Namespace: "yaml"}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
+				of, err := os.Open(args.Path)
+				if err != nil {
+					return api.OnLoadResult{}, err
+				}
+				defer of.Close()
+				kv := make(map[string]any)
+				err = yaml.NewDecoder(of).Decode(&kv)
+				if err != nil {
+					return api.OnLoadResult{}, err
+				}
+				js := "module.exports = " + cstr.JSONStringify(kv)
+				logger.Debug("bundling yaml file from %s", args.Path)
+				return api.OnLoadResult{Contents: &js, Loader: api.LoaderJS}, nil
+			})
+
+		},
+	}
+
+}
+
+func createJSONImporter(logger logger.Logger) api.Plugin {
+	return api.Plugin{
+		Name: "json",
+		Setup: func(build api.PluginBuild) {
+			filter := "\\.json$"
+			build.OnResolve(api.OnResolveOptions{Filter: filter, Namespace: "file"}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
+				p := args.Path
+				abs, err := filepath.Abs(p)
+				if err != nil {
+					return api.OnResolveResult{}, err
+				}
+				if abs != p {
+					p = filepath.Join(args.ResolveDir, p)
+				}
+				if strings.Contains(p, "node_modules/") {
+					return api.OnResolveResult{}, nil
+				}
+				return api.OnResolveResult{Path: p, Namespace: "json"}, nil
+			})
+
+			build.OnLoad(api.OnLoadOptions{Filter: filter, Namespace: "json"}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
+				of, err := os.Open(args.Path)
+				if err != nil {
+					return api.OnLoadResult{}, err
+				}
+				defer of.Close()
+				kv := make(map[string]any)
+				err = json.NewDecoder(of).Decode(&kv)
+				if err != nil {
+					return api.OnLoadResult{}, err
+				}
+				js := "module.exports = " + cstr.JSONStringify(kv)
+				logger.Debug("bundling json file from %s", args.Path)
+				return api.OnLoadResult{Contents: &js, Loader: api.LoaderJS}, nil
+			})
+
+		},
+	}
+
+}
+
+func createFileImporter(logger logger.Logger) api.Plugin {
+	return api.Plugin{
+		Name: "file",
+		Setup: func(build api.PluginBuild) {
+			filter := "\\.(gif|png|jpg|jpeg|svg|webp)$"
+			build.OnResolve(api.OnResolveOptions{Filter: filter, Namespace: "file"}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
+				p := args.Path
+				abs, err := filepath.Abs(p)
+				if err != nil {
+					return api.OnResolveResult{}, err
+				}
+				if abs != p {
+					p = filepath.Join(args.ResolveDir, p)
+				}
+				if strings.Contains(p, "node_modules/") {
+					return api.OnResolveResult{}, nil
+				}
+				return api.OnResolveResult{Path: p, Namespace: "file"}, nil
+			})
+
+			build.OnLoad(api.OnLoadOptions{Filter: filter, Namespace: "file"}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
+				data, err := os.ReadFile(args.Path)
+				if err != nil {
+					return api.OnLoadResult{}, err
+				}
+				base64Data := base64.StdEncoding.EncodeToString(data)
+				js := "module.exports = Buffer.from('" + base64Data + "', 'base64');"
+				logger.Debug("bundling binary file from %s", args.Path)
+				return api.OnLoadResult{Contents: &js, Loader: api.LoaderJS}, nil
+			})
+
+		},
+	}
+
+}
+
+func createTextImporter(logger logger.Logger) api.Plugin {
+	return api.Plugin{
+		Name: "text",
+		Setup: func(build api.PluginBuild) {
+			filter := "\\.(txt)$"
+			build.OnResolve(api.OnResolveOptions{Filter: filter, Namespace: "text"}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
+				p := args.Path
+				abs, err := filepath.Abs(p)
+				if err != nil {
+					return api.OnResolveResult{}, err
+				}
+				if abs != p {
+					p = filepath.Join(args.ResolveDir, p)
+				}
+				if strings.Contains(p, "node_modules/") {
+					return api.OnResolveResult{}, nil
+				}
+				return api.OnResolveResult{Path: p, Namespace: "text"}, nil
+			})
+
+			build.OnLoad(api.OnLoadOptions{Filter: filter, Namespace: "text"}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
+				data, err := os.ReadFile(args.Path)
+				if err != nil {
+					return api.OnLoadResult{}, err
+				}
+				js := "module.exports = " + cstr.JSONStringify(data)
+				logger.Debug("bundling text file from %s", args.Path)
+				return api.OnLoadResult{Contents: &js, Loader: api.LoaderJS}, nil
+			})
+
+		},
+	}
+
+}
+
+func possiblyCreateDeclarationFile(logger logger.Logger, dir string) error {
+	fp := filepath.Join(dir, "node_modules", "@types", "agentuity")
+	fn := filepath.Join(fp, "index.d.ts")
+	if sys.Exists(fn) {
+		logger.Debug("declaration file already exists at %s", fn)
+		return nil
+	}
+	if !sys.Exists(fp) {
+		if err := os.MkdirAll(fp, 0755); err != nil {
+			return fmt.Errorf("cannot create directory: %s. %w", fp, err)
+		}
+		logger.Debug("created directory %s", fp)
+	}
+	err := os.WriteFile(fn, []byte(declaration), 0644)
+	if err != nil {
+		return fmt.Errorf("cannot create file: %s. %w", fn, err)
+	}
+	logger.Debug("created declaration file at %s", fn)
+	return nil
+}
+
+var declaration = `
+declare module '*.yml' {
+  const value: any;
+  export default value;
+}
+
+declare module '*.yaml' {
+  const value: any;
+  export default value;
+}
+
+declare module '*.json' {
+  const value: any;
+  export default value;
+}
+
+declare module '*.png' {
+  const value: any;
+  export default value;
+}
+
+declare module '*.gif' {
+  const value: any;
+  export default value;
+}
+
+declare module '*.jpg' {
+  const value: any;
+  export default value;
+}
+
+declare module '*.jpeg' {
+  const value: any;
+  export default value;
+}
+
+declare module '*.svg' {
+  const value: any;
+  export default value;
+}
+
+declare module '*.webp' {
+  const value: any;
+  export default value;
+}
+
+declare module '*.txt' {
+  const value: any;
+  export default value;
+}
+`

@@ -280,6 +280,10 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		return err
 	}
 
+	if err := possiblyCreateDeclarationFile(ctx.Logger, dir); err != nil {
+		return err
+	}
+
 	if err := runTypecheck(ctx, dir); err != nil {
 		return err
 	}
@@ -334,6 +338,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 
 	ctx.Logger.Debug("starting build")
 	started := time.Now()
+
 	result := api.Build(api.BuildOptions{
 		EntryPoints:    entryPoints,
 		Bundle:         true,
@@ -347,11 +352,17 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		Engines: []api.Engine{
 			{Name: api.EngineNode, Version: "22"},
 		},
-		External:      []string{"bun"},
+		External:      []string{"bun", "fsevents"},
 		AbsWorkingDir: dir,
 		TreeShaking:   api.TreeShakingTrue,
 		Drop:          api.DropDebugger,
-		Plugins:       []api.Plugin{createPlugin(ctx.Logger, dir, shimSourceMap)},
+		Plugins: []api.Plugin{
+			createPlugin(ctx.Logger, dir, shimSourceMap),
+			createYAMLImporter(ctx.Logger),
+			createJSONImporter(ctx.Logger),
+			createTextImporter(ctx.Logger),
+			createFileImporter(ctx.Logger),
+		},
 		Define:        defines,
 		LegalComments: api.LegalCommentsNone,
 		Banner: map[string]string{
