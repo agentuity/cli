@@ -21,6 +21,7 @@ import (
 	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/sys"
 	"github.com/agentuity/go-common/tui"
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/evanw/esbuild/pkg/api"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -263,31 +264,24 @@ func isAgentInWorkspace(logger logger.Logger, agentDir string, workspace *Worksp
 	return false
 }
 
-// matchesWorkspacePattern checks if a path matches a workspace pattern
+// matchesWorkspacePattern checks if a path matches a workspace pattern using robust glob matching
+// Supports npm-style patterns including "**" for recursive matching and proper cross-platform paths
 func matchesWorkspacePattern(path, pattern string) bool {
-	// Handle exact match first
-	if path == pattern {
-		return true
+	// Normalize paths to use forward slashes for cross-platform compatibility
+	normalizedPath := filepath.ToSlash(path)
+	normalizedPattern := filepath.ToSlash(pattern)
+
+	// Handle negation patterns (e.g., "!excluded")
+	if strings.HasPrefix(normalizedPattern, "!") {
+		// This is a negation pattern - check if the path matches the pattern without "!"
+		innerPattern := strings.TrimPrefix(normalizedPattern, "!")
+		matched, err := doublestar.PathMatch(innerPattern, normalizedPath)
+		// For negation patterns, we return the inverse of the match
+		return err == nil && !matched
 	}
 
-	// Handle glob patterns like "packages/*" - should match direct children only
-	if strings.HasSuffix(pattern, "/*") {
-		dirPattern := strings.TrimSuffix(pattern, "/*")
-
-		// Check if path starts with the directory pattern
-		if !strings.HasPrefix(path, dirPattern+"/") {
-			return false
-		}
-
-		// Get the relative part after the directory
-		relPart := strings.TrimPrefix(path, dirPattern+"/")
-
-		// Should not contain additional slashes (direct child only)
-		return !strings.Contains(relPart, "/")
-	}
-
-	// Handle other glob patterns using filepath.Match
-	matched, err := filepath.Match(pattern, path)
+	// Use doublestar for robust glob matching that supports "**" and proper npm-style patterns
+	matched, err := doublestar.PathMatch(normalizedPattern, normalizedPath)
 	return err == nil && matched
 }
 
