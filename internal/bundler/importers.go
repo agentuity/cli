@@ -130,7 +130,7 @@ func createTextImporter(logger logger.Logger) api.Plugin {
 	return api.Plugin{
 		Name: "text",
 		Setup: func(build api.PluginBuild) {
-			filter := "\\.(txt)$"
+			filter := "\\.(txt|md|csv|xml|sql)$"
 			build.OnResolve(api.OnResolveOptions{Filter: filter, Namespace: "file"}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
 				p := makePath(args)
 				if isNodeModulesPath(p) {
@@ -222,6 +222,26 @@ declare module '*.webp' {
 }
 
 declare module '*.txt' {
+  const value: string;
+  export default value;
+}
+
+declare module '*.md' {
+  const value: string;
+  export default value;
+}
+
+declare module '*.csv' {
+  const value: string;
+  export default value;
+}
+
+declare module '*.xml' {
+  const value: string;
+  export default value;
+}
+
+declare module '*.sql' {
   const value: string;
   export default value;
 }
