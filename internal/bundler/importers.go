@@ -177,7 +177,7 @@ func possiblyCreateDeclarationFile(logger logger.Logger, dir string) error {
 		return fmt.Errorf("cannot create file: %s. %w", fn, err)
 	}
 	logger.Debug("created declaration file at %s", mfp)
-	err = os.WriteFile(fn, []byte(mfp), 0644)
+	err = os.WriteFile(mfp, []byte(declaration), 0644)
 	if err != nil {
 		return fmt.Errorf("cannot create file: %s. %w", fn, err)
 	}
