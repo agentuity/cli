@@ -35,10 +35,9 @@ var providerRegions = map[string][]tui.Option{
 	},
 	"aws": {
 		{ID: "us-east-1", Text: tui.PadRight("US East (N. Virginia)", 15, " ") + tui.Muted("us-east-1")},
-		{ID: "us-west-2", Text: tui.PadRight("US West (Oregon)", 15, " ") + tui.Muted("us-west-2")},
+		{ID: "us-east-2", Text: tui.PadRight("US East (Ohio)", 15, " ") + tui.Muted("us-east-2")},
 		{ID: "us-west-1", Text: tui.PadRight("US West (N. California)", 15, " ") + tui.Muted("us-west-1")},
-		{ID: "eu-west-1", Text: tui.PadRight("Europe (Ireland)", 15, " ") + tui.Muted("eu-west-1")},
-		{ID: "ap-southeast-1", Text: tui.PadRight("Asia Pacific (Singapore)", 15, " ") + tui.Muted("ap-southeast-1")},
+		{ID: "us-west-2", Text: tui.PadRight("US West (Oregon)", 15, " ") + tui.Muted("us-west-2")},
 	},
 	"azure": {
 		{ID: "eastus", Text: tui.PadRight("East US", 15, " ") + tui.Muted("eastus")},
@@ -253,9 +252,6 @@ Examples:
 			}
 		}
 
-		if err := infrastructure.Setup(ctx, logger, &infrastructure.Cluster{ID: "1234", Token: "", Provider: provider, Name: name, Type: size, Region: region}, format); err != nil {
-			logger.Fatal("%s", err)
-		}
 		// os.Exit(0)
 
 		var cluster *infrastructure.Cluster
@@ -271,6 +267,10 @@ Examples:
 			})
 			if err != nil {
 				errsystem.New(errsystem.ErrCreateProject, err, errsystem.WithContextMessage("Failed to create cluster")).ShowErrorAndExit()
+			}
+
+			if err := infrastructure.Setup(ctx, logger, &infrastructure.Cluster{ID: cluster.ID, Token: "", Provider: provider, Name: name, Type: size, Region: region}, format); err != nil {
+				logger.Fatal("%s", err)
 			}
 		})
 

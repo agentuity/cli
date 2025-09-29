@@ -12,6 +12,7 @@ import (
 	"github.com/agentuity/cli/internal/infrastructure"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
+	"github.com/agentuity/go-common/logger"
 	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/cobra"
 )
@@ -284,7 +285,7 @@ var machineCreateCmd = &cobra.Command{
 	Use:     "create [cluster_id] [provider] [region]",
 	GroupID: "info",
 	Short:   "Create a new machine for a cluster",
-	Args:    cobra.ExactArgs(3),
+	Args:    cobra.MaximumNArgs(3),
 	Aliases: []string{"new"},
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -293,9 +294,23 @@ var machineCreateCmd = &cobra.Command{
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 
-		clusterID := args[0]
-		provider := args[1]
-		region := args[2]
+		var clusterID, provider, region string
+
+		// If all arguments provided, use them directly
+		if len(args) == 3 {
+			clusterID = args[0]
+			provider = args[1]
+			region = args[2]
+		} else if tui.HasTTY {
+			// Interactive mode - prompt for missing values
+			cluster := promptForClusterSelection(ctx, logger, apiUrl, apikey)
+			provider = cluster.Provider
+			region = promptForRegionSelection(ctx, logger, provider)
+			clusterID = cluster.ID
+		} else {
+			// Non-interactive mode - require all arguments
+			errsystem.New(errsystem.ErrMissingRequiredArgument, fmt.Errorf("cluster_id, provider, and region are required in non-interactive mode"), errsystem.WithContextMessage("Missing required arguments")).ShowErrorAndExit()
+		}
 
 		orgId := promptForClusterOrganization(ctx, logger, cmd, apiUrl, apikey)
 
@@ -332,4 +347,44 @@ func init() {
 
 	// Flags for machine status command
 	machineStatusCmd.Flags().String("format", "table", "Output format (table, json)")
+}
+
+// promptForClusterSelection prompts the user to select a cluster from available clusters
+func promptForClusterSelection(ctx context.Context, logger logger.Logger, apiUrl, apikey string) infrastructure.Cluster {
+	clusters, err := infrastructure.ListClusters(ctx, logger, apiUrl, apikey)
+	if err != nil {
+		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list clusters")).ShowErrorAndExit()
+	}
+
+	if len(clusters) == 0 {
+		errsystem.New(errsystem.ErrApiRequest, fmt.Errorf("no clusters found"), errsystem.WithUserMessage("No clusters found. Please create a cluster first using 'agentuity cluster create'")).ShowErrorAndExit()
+	}
+
+	if len(clusters) == 1 {
+		cluster := clusters[0]
+		fmt.Printf("Using cluster: %s (%s)\n", cluster.Name, cluster.ID)
+		return cluster
+	}
+
+	var opts []tui.Option
+	for _, cluster := range clusters {
+		displayText := fmt.Sprintf("%s (%s) - %s %s", cluster.Name, cluster.ID, cluster.Provider, cluster.Region)
+		opts = append(opts, tui.Option{ID: cluster.ID, Text: displayText})
+	}
+
+	id := tui.Select(logger, "Select a cluster to create a machine in:", "Choose the cluster where you want to deploy the new machine", opts)
+	for _, cluster := range clusters {
+		if cluster.ID == id {
+			return cluster
+		}
+	}
+	return infrastructure.Cluster{}
+}
+
+// promptForRegionSelection prompts the user to select a region
+func promptForRegionSelection(ctx context.Context, logger logger.Logger, provider string) string {
+	// Get regions for the provider (reuse the same logic from cluster.go)
+	fmt.Println("Provider:", provider)
+	opts := getRegionsForProvider(provider)
+	return tui.Select(logger, "Which region should we use?", "The region to deploy the machine", opts)
 }

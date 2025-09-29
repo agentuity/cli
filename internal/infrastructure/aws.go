@@ -19,13 +19,103 @@ var _ ClusterSetup = (*awsSetup)(nil)
 func (s *awsSetup) Setup(ctx context.Context, logger logger.Logger, cluster *Cluster, format string) error {
 	var canExecuteAWS bool
 	var region string
-	var skipFailedDetection bool
 	pubKey, privateKey, err := generateKey()
 	if err != nil {
 		return err
 	}
 
 	// Check if AWS CLI is available and authenticated
+	canExecuteAWS, region, err = s.canExecute(ctx, logger)
+	if err != nil {
+		return err
+	}
+
+	// Generate unique names for AWS resources
+	roleName := "agentuity-cluster-" + cluster.ID
+	policyName := "agentuity-cluster-policy-" + cluster.ID
+	secretName := "agentuity-private-key-" + cluster.ID
+
+	envs := map[string]any{
+		"AWS_REGION":             region,
+		"AWS_ROLE_NAME":          roleName,
+		"AWS_POLICY_NAME":        policyName,
+		"AWS_SECRET_NAME":        secretName,
+		"ENCRYPTION_PUBLIC_KEY":  pubKey,
+		"ENCRYPTION_PRIVATE_KEY": privateKey,
+		"CLUSTER_TOKEN":          cluster.Token,
+		"CLUSTER_ID":             cluster.ID,
+		"CLUSTER_NAME":           cluster.Name,
+		"CLUSTER_TYPE":           cluster.Type,
+		"CLUSTER_REGION":         cluster.Region,
+	}
+
+	steps := make([]ExecutionSpec, 0)
+
+	if err := json.Unmarshal([]byte(getAWSClusterSpecification(envs)), &steps); err != nil {
+		return fmt.Errorf("error unmarshalling json: %w", err)
+	}
+
+	executionContext := ExecutionContext{
+		Context:     ctx,
+		Logger:      logger,
+		Runnable:    canExecuteAWS,
+		Environment: envs,
+	}
+
+	for _, step := range steps {
+		if err := step.Run(executionContext); err != nil {
+			return fmt.Errorf("failed at step '%s': %w", step.Title, err)
+		}
+	}
+
+	tui.ShowSuccess("AWS infrastructure setup completed successfully!")
+	return nil
+}
+
+func (s *awsSetup) CreateMachine(ctx context.Context, logger logger.Logger, region string, token string, clusterID string) error {
+	// Need: {AWS_REGION} {AWS_ROLE_NAME} {CLUSTER_TOKEN} {AWS_INSTANCE_NAME} {CLUSTER_ID}
+
+	roleName := "agentuity-cluster-" + clusterID
+	instanceName := generateNodeName("agentuity-node")
+
+	envs := map[string]any{
+		"AWS_REGION":        region,
+		"AWS_ROLE_NAME":     roleName,
+		"CLUSTER_TOKEN":     token,
+		"AWS_INSTANCE_NAME": instanceName,
+		"CLUSTER_ID":        clusterID,
+	}
+	var steps []ExecutionSpec
+	if err := json.Unmarshal([]byte(getAWSMachineSpecification(envs)), &steps); err != nil {
+		return fmt.Errorf("error unmarshalling json: %w", err)
+	}
+
+	canExecuteAWS, _, err := s.canExecute(ctx, logger)
+	if err != nil {
+		return err
+	}
+
+	executionContext := ExecutionContext{
+		Context:     ctx,
+		Logger:      logger,
+		Runnable:    canExecuteAWS,
+		Environment: envs,
+	}
+
+	for _, step := range steps {
+		if err := step.Run(executionContext); err != nil {
+			return fmt.Errorf("failed at step '%s': %w", step.Title, err)
+		}
+	}
+	return nil
+}
+
+func (s *awsSetup) canExecute(ctx context.Context, logger logger.Logger) (bool, string, error) {
+
+	var canExecuteAWS bool
+	var region string
+	var skipFailedDetection bool
+	var err error
 	_, err = exec.LookPath("aws")
 	if err == nil {
 		_, err := runCommand(ctx, logger, "Checking AWS authentication...", "aws", "sts", "get-caller-identity")
@@ -60,48 +150,7 @@ func (s *awsSetup) Setup(ctx context.Context, logger logger.Logger, cluster *Clu
 		}
 	}
 
-	// Generate unique names for AWS resources
-	roleName := "agentuity-cluster-" + cluster.ID
-	policyName := "agentuity-cluster-policy-" + cluster.ID
-	secretName := "agentuity-private-key-" + cluster.ID
-	instanceName := generateNodeName("agentuity-node")
-
-	envs := map[string]any{
-		"AWS_REGION":             region,
-		"AWS_ROLE_NAME":          roleName,
-		"AWS_POLICY_NAME":        policyName,
-		"AWS_SECRET_NAME":        secretName,
-		"AWS_INSTANCE_NAME":      instanceName,
-		"ENCRYPTION_PUBLIC_KEY":  pubKey,
-		"ENCRYPTION_PRIVATE_KEY": privateKey,
-		"CLUSTER_TOKEN":          cluster.Token,
-		"CLUSTER_ID":             cluster.ID,
-		"CLUSTER_NAME":           cluster.Name,
-		"CLUSTER_TYPE":           cluster.Type,
-		"CLUSTER_REGION":         cluster.Region,
-	}
-
-	steps := make([]ExecutionSpec, 0)
-
-	if err := json.Unmarshal([]byte(getAWSSpecification(envs)), &steps); err != nil {
-		return fmt.Errorf("error unmarshalling json: %w", err)
-	}
-
-	executionContext := ExecutionContext{
-		Context:     ctx,
-		Logger:      logger,
-		Runnable:    canExecuteAWS,
-		Environment: envs,
-	}
-
-	for _, step := range steps {
-		if err := step.Run(executionContext); err != nil {
-			return fmt.Errorf("failed at step '%s': %w", step.Title, err)
-		}
-	}
-
-	tui.ShowSuccess("AWS infrastructure setup completed successfully!")
-	return nil
+	return canExecuteAWS, region, nil
 }
 
 // Bash script functions removed - back to using ExecutionSpec array approach
@@ -110,7 +159,24 @@ func init() {
 	register("aws", &awsSetup{})
 }
 
-var awsSpecification = `[
+var awsMachineSpecification = `[
+  {
+    "title": "Create the Cluster Node",
+    "description": "Create a new cluster node instance and launch it.",
+    "execute": {
+      "message": "Creating node...",
+      "command": "sh",
+      "arguments": [
+        "-c",
+        "AMI_ID=$(aws ec2 describe-images --owners 084828583931 --filters 'Name=name,Values=hadron-*' 'Name=state,Values=available' --region {AWS_REGION} --query 'Images | sort_by(@, &CreationDate) | [-1].ImageId' --output text) && if [ \"$AMI_ID\" = \"\" ] || [ \"$AMI_ID\" = \"None\" ]; then SOURCE_AMI=$(aws ec2 describe-images --owners 084828583931 --filters 'Name=name,Values=hadron-*' 'Name=state,Values=available' --region us-west-1 --query 'Images | sort_by(@, &CreationDate) | [-1].ImageId' --output text) && AMI_ID=$(aws ec2 copy-image --source-image-id $SOURCE_AMI --source-region us-west-1 --region {AWS_REGION} --name \"hadron-copied-$(date +%s)\" --query 'ImageId' --output text) && aws ec2 wait image-available --image-ids $AMI_ID --region {AWS_REGION} && aws ec2 modify-image-attribute --image-id $AMI_ID --launch-permission 'Add=[{Group=all}]' --region {AWS_REGION}; fi && SUBNET_ID=$(aws ec2 describe-vpcs --filters Name=isDefault,Values=true --region {AWS_REGION} --query 'Vpcs[0].VpcId' --output text | xargs -I {} aws ec2 describe-subnets --filters Name=vpc-id,Values={} Name=default-for-az,Values=true --region {AWS_REGION} --query 'Subnets[0].SubnetId' --output text) && SG_ID=$(aws ec2 describe-security-groups --filters Name=group-name,Values={AWS_ROLE_NAME}-sg --region {AWS_REGION} --query 'SecurityGroups[0].GroupId' --output text) && aws ec2 run-instances --image-id $AMI_ID --count 1 --instance-type t3.medium --security-group-ids $SG_ID --subnet-id $SUBNET_ID --iam-instance-profile Name={AWS_ROLE_NAME} --user-data '{CLUSTER_TOKEN}' --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value={AWS_INSTANCE_NAME}},{Key=AgentuityCluster,Value={CLUSTER_ID}}]' --region {AWS_REGION}"
+      ],
+      "validate": "{AWS_INSTANCE_NAME}",
+      "success": "Node created"
+    }
+  }
+]`
+
+var awsClusterSpecification = `[
   {
     "title": "Create IAM Role for Agentuity Cluster",
     "description": "This IAM role will be used to control access to AWS resources for your Agentuity Cluster.",
@@ -364,47 +430,22 @@ var awsSpecification = `[
       ],
       "validate": "22"
     }
-  },
-  {
-    "title": "Get Latest Amazon Linux AMI",
-    "description": "Find the latest Amazon Linux 2023 AMI for the region.",
-    "execute": {
-      "message": "Finding latest AMI...",
-      "command": "aws",
-      "arguments": [
-        "ec2",
-        "describe-images",
-        "--owners",
-        "amazon",
-        "--filters",
-        "Name=name,Values=al2023-ami-*-x86_64",
-        "Name=state,Values=available",
-        "--query",
-        "Images | sort_by(@, &CreationDate) | [-1].ImageId",
-        "--output",
-        "text"
-      ],
-      "success": "Found latest AMI"
-    }
-  },
-  {
-    "title": "Create the Cluster Node",
-    "description": "Create a new cluster node instance and launch it.",
-    "execute": {
-      "message": "Creating node...",
-      "command": "sh",
-      "arguments": [
-        "-c",
-        "AMI_ID=$(aws ec2 describe-images --owners amazon --filters 'Name=name,Values=al2023-ami-*-x86_64' 'Name=state,Values=available' --query 'Images | sort_by(@, &CreationDate) | [-1].ImageId' --output text) && SUBNET_ID=$(aws ec2 describe-vpcs --filters Name=isDefault,Values=true --query 'Vpcs[0].VpcId' --output text | xargs -I {} aws ec2 describe-subnets --filters Name=vpc-id,Values={} Name=default-for-az,Values=true --query 'Subnets[0].SubnetId' --output text) && SG_ID=$(aws ec2 describe-security-groups --filters Name=group-name,Values={AWS_ROLE_NAME}-sg --query 'SecurityGroups[0].GroupId' --output text) && aws ec2 run-instances --image-id $AMI_ID --count 1 --instance-type t3.medium --security-group-ids $SG_ID --subnet-id $SUBNET_ID --iam-instance-profile Name={AWS_ROLE_NAME} --user-data '{CLUSTER_TOKEN}' --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value={AWS_INSTANCE_NAME}},{Key=AgentuityCluster,Value={CLUSTER_ID}}]'"
-      ],
-      "validate": "{AWS_INSTANCE_NAME}",
-      "success": "Node created"
-    }
   }
 ]`
 
-func getAWSSpecification(envs map[string]any) string {
-	spec := awsSpecification
+func getAWSClusterSpecification(envs map[string]any) string {
+	spec := awsClusterSpecification
+
+	// Replace variables in the JSON string
+	for key, val := range envs {
+		spec = strings.ReplaceAll(spec, "{"+key+"}", fmt.Sprint(val))
+	}
+
+	return spec
+}
+
+func getAWSMachineSpecification(envs map[string]any) string {
+	spec := awsMachineSpecification
 
 	// Replace variables in the JSON string
 	for key, val := range envs {

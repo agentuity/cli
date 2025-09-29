@@ -202,5 +202,12 @@ func CreateMachine(ctx context.Context, logger logger.Logger, baseURL string, to
 		return nil, fmt.Errorf("machine creation failed: %s", resp.Message)
 	}
 
+	if setup, ok := setups[provider]; ok {
+		if err := setup.CreateMachine(ctx, logger, region, resp.Data.Token, clusterID); err != nil {
+			client.Do("DELETE", "/cli/machine", map[string]string{"id": resp.Data.ID}, &resp)
+			return nil, fmt.Errorf("error creating machine: %w", err)
+		}
+	}
+
 	return &resp.Data, nil
 }
