@@ -40,7 +40,7 @@ Examples:
 		projectContext := project.EnsureProject(ctx, cmd)
 
 		// Check for prompts evals feature flag
-		if IsPromptsEvalsEnabled() {
+		if CheckFeatureFlag(cmd, FeaturePromptsEvals, "enable-prompts-evals") {
 			projectContext.Logger.Info("Prompts evaluations feature is enabled")
 		}
 
