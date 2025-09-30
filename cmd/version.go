@@ -34,6 +34,11 @@ Examples:
 			fmt.Println("Version: " + Version)
 			fmt.Println("Commit: " + Commit)
 			fmt.Println("Date: " + Date)
+
+			// Example of using feature flags
+			if IsPromptsEvalsEnabled() {
+				fmt.Println("Prompts Evals: Enabled")
+			}
 		} else {
 			fmt.Println(Version)
 		}
