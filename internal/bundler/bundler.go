@@ -421,6 +421,11 @@ func getJSInstallCommand(ctx BundleContext, projectDir, runtime string, isWorksp
 
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
 
+	// Generate prompts if prompts.yaml exists (before dependency installation)
+	if err := ProcessPrompts(ctx, dir); err != nil {
+		return fmt.Errorf("failed to process prompts: %w", err)
+	}
+
 	// Determine where to install dependencies (workspace root or agent directory)
 	installDir := findWorkspaceInstallDir(ctx.Logger, dir)
 	isWorkspace := installDir != dir // We're using workspace root if installDir differs from agent dir
