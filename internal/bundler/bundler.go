@@ -38,15 +38,16 @@ type AgentConfig struct {
 }
 
 type BundleContext struct {
-	Context    context.Context
-	Logger     logger.Logger
-	Project    *project.Project
-	ProjectDir string
-	Production bool
-	Install    bool
-	CI         bool
-	DevMode    bool
-	Writer     io.Writer
+	Context        context.Context
+	Logger         logger.Logger
+	Project        *project.Project
+	ProjectDir     string
+	Production     bool
+	Install        bool
+	CI             bool
+	DevMode        bool
+	Writer         io.Writer
+	PromptsEvalsFF bool
 }
 
 func dirSize(path string) (int64, error) {
@@ -422,8 +423,11 @@ func getJSInstallCommand(ctx BundleContext, projectDir, runtime string, isWorksp
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
 
 	// Generate prompts if prompts.yaml exists (before dependency installation)
-	if err := ProcessPrompts(ctx, dir); err != nil {
-		return fmt.Errorf("failed to process prompts: %w", err)
+
+	if ctx.PromptsEvalsFF {
+		if err := ProcessPrompts(ctx, dir); err != nil {
+			return fmt.Errorf("failed to process prompts: %w", err)
+		}
 	}
 
 	// Determine where to install dependencies (workspace root or agent directory)
