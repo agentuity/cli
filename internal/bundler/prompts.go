@@ -181,18 +181,30 @@ func GenerateTypeScriptTypes(prompts []Prompt) string {
 			promptVariablesInterface = fmt.Sprintf("{ %s }", strings.Join(varTypes, ", "))
 		}
 
+		// Build the type with conditional fields
+		var typeFields []string
+		typeFields = append(typeFields, fmt.Sprintf(`    slug: "%s"`, prompt.Slug))
+		typeFields = append(typeFields, fmt.Sprintf(`    name: "%s"`, prompt.Name))
+		typeFields = append(typeFields, fmt.Sprintf(`    description: "%s"`, prompt.Description))
+		typeFields = append(typeFields, `    evals: string[]`)
+
+		// Add system field only if it exists
+		if prompt.System != "" {
+			typeFields = append(typeFields, fmt.Sprintf(`    system: {
+      compile(variables?: %s): string;
+    }`, systemVariablesInterface))
+		}
+
+		// Add prompt field only if it exists
+		if prompt.Prompt != "" {
+			typeFields = append(typeFields, fmt.Sprintf(`    prompt: {
+      compile(variables?: %s): string;
+    }`, promptVariablesInterface))
+		}
+
 		promptType := fmt.Sprintf(`  %s: {
-    slug: "%s";
-    name: "%s";
-    description: "%s";
-    evals: string[];
-    system: {
-      compile(variables?: %s): string;
-    };
-    prompt: {
-      compile(variables?: %s): string;
-    };
-  }`, methodName, prompt.Slug, prompt.Name, prompt.Description, systemVariablesInterface, promptVariablesInterface)
+%s
+  }`, methodName, strings.Join(typeFields, ";\n"))
 
 		promptTypes = append(promptTypes, promptType)
 	}
@@ -242,9 +254,12 @@ func GenerateTypeScript(prompts []Prompt) string {
 			promptVariablesInterface = fmt.Sprintf("{ %s }", strings.Join(varTypes, ", "))
 		}
 
+		_ = systemVariablesInterface // suppress unused warning
+		_ = promptVariablesInterface // suppress unused warning
+
 		// Generate function signatures - always make variables optional
-		systemFunctionSignature := fmt.Sprintf("(variables: %s = {})", systemVariablesInterface)
-		promptFunctionSignature := fmt.Sprintf("(variables: %s = {})", promptVariablesInterface)
+		systemFunctionSignature := "(variables = {})"
+		promptFunctionSignature := "(variables = {})"
 
 		// Generate evals array
 		evalsStr := "[]"
@@ -256,38 +271,40 @@ func GenerateTypeScript(prompts []Prompt) string {
 			evalsStr = fmt.Sprintf("[%s]", strings.Join(evalQuoted, ", "))
 		}
 
-		// Build the method - always include both system and prompt fields
+		// Build the method with conditional fields
+		var fields []string
+		fields = append(fields, fmt.Sprintf(`    slug: "%s"`, prompt.Slug))
+		fields = append(fields, fmt.Sprintf(`    name: "%s"`, prompt.Name))
+		fields = append(fields, fmt.Sprintf(`    description: "%s"`, prompt.Description))
+		fields = append(fields, fmt.Sprintf(`    evals: %s`, evalsStr))
+
+		// Add system field only if it exists
+		if prompt.System != "" {
+			fields = append(fields, fmt.Sprintf(`    system: {
+      compile%s {
+        const template = "%s";
+        return template.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
+          return (variables as any)[varName] || match;
+        });
+      }
+    }`, systemFunctionSignature, escapedSystem))
+		}
+
+		// Add prompt field only if it exists
+		if prompt.Prompt != "" {
+			fields = append(fields, fmt.Sprintf(`    prompt: {
+      compile%s {
+        const template = "%s";
+        return template.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
+          return (variables as any)[varName] || match;
+        });
+      }
+    }`, promptFunctionSignature, escapedPrompt))
+		}
+
 		method := fmt.Sprintf(`  %s: {
-    slug: "%s",
-    name: "%s",
-    description: "%s",
-    evals: %s,
-    system: {
-      compile%s {
-        const template = "%s";
-        return template.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
-          return (variables as any)[varName] || match;
-        });
-      }
-    },
-    prompt: {
-      compile%s {
-        const template = "%s";
-        return template.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
-          return (variables as any)[varName] || match;
-        });
-      }
-    }
-  }`,
-			methodName,
-			prompt.Slug,
-			prompt.Name,
-			prompt.Description,
-			evalsStr,
-			systemFunctionSignature,
-			escapedSystem,
-			promptFunctionSignature,
-			escapedPrompt)
+%s
+  }`, methodName, strings.Join(fields, ",\n"))
 
 		methods = append(methods, method)
 	}
@@ -340,9 +357,12 @@ func GenerateJavaScript(prompts []Prompt) string {
 			promptVariablesInterface = fmt.Sprintf("{ %s }", strings.Join(varTypes, ", "))
 		}
 
+		_ = systemVariablesInterface // suppress unused warning
+		_ = promptVariablesInterface // suppress unused warning
+
 		// Generate function signatures - always make variables optional
-		systemFunctionSignature := fmt.Sprintf("(variables: %s = {})", systemVariablesInterface)
-		promptFunctionSignature := fmt.Sprintf("(variables: %s = {})", promptVariablesInterface)
+		systemFunctionSignature := "(variables = {})"
+		promptFunctionSignature := "(variables = {})"
 
 		// Generate evals array
 		evalsStr := "[]"
@@ -354,38 +374,40 @@ func GenerateJavaScript(prompts []Prompt) string {
 			evalsStr = fmt.Sprintf("[%s]", strings.Join(evalQuoted, ", "))
 		}
 
-		// Build the method - always include both system and prompt fields
+		// Build the method with conditional fields
+		var fields []string
+		fields = append(fields, fmt.Sprintf(`    slug: "%s"`, prompt.Slug))
+		fields = append(fields, fmt.Sprintf(`    name: "%s"`, prompt.Name))
+		fields = append(fields, fmt.Sprintf(`    description: "%s"`, prompt.Description))
+		fields = append(fields, fmt.Sprintf(`    evals: %s`, evalsStr))
+
+		// Add system field only if it exists
+		if prompt.System != "" {
+			fields = append(fields, fmt.Sprintf(`    system: {
+      compile%s {
+        const template = "%s";
+        return template.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
+          return variables[varName] || match;
+        });
+      }
+    }`, systemFunctionSignature, escapedSystem))
+		}
+
+		// Add prompt field only if it exists
+		if prompt.Prompt != "" {
+			fields = append(fields, fmt.Sprintf(`    prompt: {
+      compile%s {
+        const template = "%s";
+        return template.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
+          return variables[varName] || match;
+        });
+      }
+    }`, promptFunctionSignature, escapedPrompt))
+		}
+
 		method := fmt.Sprintf(`  %s: {
-    slug: "%s",
-    name: "%s",
-    description: "%s",
-    evals: %s,
-    system: {
-      compile%s {
-        const template = "%s";
-        return template.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
-          return variables[varName] || match;
-        });
-      }
-    },
-    prompt: {
-      compile%s {
-        const template = "%s";
-        return template.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
-          return variables[varName] || match;
-        });
-      }
-    }
-  }`,
-			methodName,
-			prompt.Slug,
-			prompt.Name,
-			prompt.Description,
-			evalsStr,
-			systemFunctionSignature,
-			escapedSystem,
-			promptFunctionSignature,
-			escapedPrompt)
+%s
+  }`, methodName, strings.Join(fields, ",\n"))
 
 		methods = append(methods, method)
 	}
