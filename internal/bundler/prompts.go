@@ -157,16 +157,28 @@ func GenerateTypeScriptTypes(prompts []Prompt) string {
 
 	for _, prompt := range prompts {
 		methodName := ToCamelCase(prompt.Slug)
-		variables := GetAllVariables(prompt)
 
-		// Generate variable interface
-		variablesInterface := "{}"
-		if len(variables) > 0 {
-			varTypes := make([]string, len(variables))
-			for i, v := range variables {
+		// Get variables separately for system and prompt
+		systemVariables := ExtractVariables(prompt.System)
+		promptVariables := ExtractVariables(prompt.Prompt)
+
+		// Generate variable interfaces for each
+		systemVariablesInterface := "{}"
+		if len(systemVariables) > 0 {
+			varTypes := make([]string, len(systemVariables))
+			for i, v := range systemVariables {
 				varTypes[i] = fmt.Sprintf("%s: string", v)
 			}
-			variablesInterface = fmt.Sprintf("{ %s }", strings.Join(varTypes, ", "))
+			systemVariablesInterface = fmt.Sprintf("{ %s }", strings.Join(varTypes, ", "))
+		}
+
+		promptVariablesInterface := "{}"
+		if len(promptVariables) > 0 {
+			varTypes := make([]string, len(promptVariables))
+			for i, v := range promptVariables {
+				varTypes[i] = fmt.Sprintf("%s: string", v)
+			}
+			promptVariablesInterface = fmt.Sprintf("{ %s }", strings.Join(varTypes, ", "))
 		}
 
 		promptType := fmt.Sprintf(`  %s: {
@@ -180,7 +192,7 @@ func GenerateTypeScriptTypes(prompts []Prompt) string {
     prompt: {
       compile(variables?: %s): string;
     };
-  }`, methodName, prompt.Slug, prompt.Name, prompt.Description, variablesInterface, variablesInterface)
+  }`, methodName, prompt.Slug, prompt.Name, prompt.Description, systemVariablesInterface, promptVariablesInterface)
 
 		promptTypes = append(promptTypes, promptType)
 	}
@@ -207,21 +219,32 @@ func GenerateTypeScript(prompts []Prompt) string {
 			escapedSystem = EscapeTemplateString(prompt.System)
 		}
 
-		// Get all variables from both system and prompt
-		variables := GetAllVariables(prompt)
+		// Get variables separately for system and prompt
+		systemVariables := ExtractVariables(prompt.System)
+		promptVariables := ExtractVariables(prompt.Prompt)
 
-		// Generate variable interface
-		variablesInterface := "{}"
-		if len(variables) > 0 {
-			varTypes := make([]string, len(variables))
-			for i, v := range variables {
+		// Generate variable interfaces for each
+		systemVariablesInterface := "{}"
+		if len(systemVariables) > 0 {
+			varTypes := make([]string, len(systemVariables))
+			for i, v := range systemVariables {
 				varTypes[i] = fmt.Sprintf("%s: string", v)
 			}
-			variablesInterface = fmt.Sprintf("{ %s }", strings.Join(varTypes, ", "))
+			systemVariablesInterface = fmt.Sprintf("{ %s }", strings.Join(varTypes, ", "))
 		}
 
-		// Generate function signature - always make variables optional
-		functionSignature := fmt.Sprintf("(variables: %s = {})", variablesInterface)
+		promptVariablesInterface := "{}"
+		if len(promptVariables) > 0 {
+			varTypes := make([]string, len(promptVariables))
+			for i, v := range promptVariables {
+				varTypes[i] = fmt.Sprintf("%s: string", v)
+			}
+			promptVariablesInterface = fmt.Sprintf("{ %s }", strings.Join(varTypes, ", "))
+		}
+
+		// Generate function signatures - always make variables optional
+		systemFunctionSignature := fmt.Sprintf("(variables: %s = {})", systemVariablesInterface)
+		promptFunctionSignature := fmt.Sprintf("(variables: %s = {})", promptVariablesInterface)
 
 		// Generate evals array
 		evalsStr := "[]"
@@ -261,9 +284,9 @@ func GenerateTypeScript(prompts []Prompt) string {
 			prompt.Name,
 			prompt.Description,
 			evalsStr,
-			functionSignature,
+			systemFunctionSignature,
 			escapedSystem,
-			functionSignature,
+			promptFunctionSignature,
 			escapedPrompt)
 
 		methods = append(methods, method)
@@ -294,6 +317,33 @@ func GenerateJavaScript(prompts []Prompt) string {
 			escapedSystem = EscapeTemplateString(prompt.System)
 		}
 
+		// Get variables separately for system and prompt
+		systemVariables := ExtractVariables(prompt.System)
+		promptVariables := ExtractVariables(prompt.Prompt)
+
+		// Generate variable interfaces for each
+		systemVariablesInterface := "{}"
+		if len(systemVariables) > 0 {
+			varTypes := make([]string, len(systemVariables))
+			for i, v := range systemVariables {
+				varTypes[i] = fmt.Sprintf("%s: string", v)
+			}
+			systemVariablesInterface = fmt.Sprintf("{ %s }", strings.Join(varTypes, ", "))
+		}
+
+		promptVariablesInterface := "{}"
+		if len(promptVariables) > 0 {
+			varTypes := make([]string, len(promptVariables))
+			for i, v := range promptVariables {
+				varTypes[i] = fmt.Sprintf("%s: string", v)
+			}
+			promptVariablesInterface = fmt.Sprintf("{ %s }", strings.Join(varTypes, ", "))
+		}
+
+		// Generate function signatures - always make variables optional
+		systemFunctionSignature := fmt.Sprintf("(variables: %s = {})", systemVariablesInterface)
+		promptFunctionSignature := fmt.Sprintf("(variables: %s = {})", promptVariablesInterface)
+
 		// Generate evals array
 		evalsStr := "[]"
 		if len(prompt.Evals) > 0 {
@@ -311,7 +361,7 @@ func GenerateJavaScript(prompts []Prompt) string {
     description: "%s",
     evals: %s,
     system: {
-      compile(variables = {}) {
+      compile%s {
         const template = "%s";
         return template.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
           return variables[varName] || match;
@@ -319,7 +369,7 @@ func GenerateJavaScript(prompts []Prompt) string {
       }
     },
     prompt: {
-      compile(variables = {}) {
+      compile%s {
         const template = "%s";
         return template.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
           return variables[varName] || match;
@@ -332,7 +382,9 @@ func GenerateJavaScript(prompts []Prompt) string {
 			prompt.Name,
 			prompt.Description,
 			evalsStr,
+			systemFunctionSignature,
 			escapedSystem,
+			promptFunctionSignature,
 			escapedPrompt)
 
 		methods = append(methods, method)
