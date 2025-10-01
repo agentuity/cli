@@ -234,114 +234,6 @@ export type PromptName = any;
 `, strings.Join(promptTypes, ";\n"))
 }
 
-// GenerateTypeScript generates TypeScript code with split system/prompt compile functions
-func GenerateTypeScript(prompts []Prompt) string {
-	var methods []string
-
-	for _, prompt := range prompts {
-		methodName := ToCamelCase(prompt.Slug)
-		escapedPrompt := EscapeTemplateString(prompt.Prompt)
-		escapedSystem := ""
-		if prompt.System != "" {
-			escapedSystem = EscapeTemplateString(prompt.System)
-		}
-
-		// Get variables separately for system and prompt
-		systemVariables := ExtractVariables(prompt.System)
-		promptVariables := ExtractVariables(prompt.Prompt)
-
-		// Generate variable interfaces for each
-		systemVariablesInterface := "{}"
-		if len(systemVariables) > 0 {
-			varTypes := make([]string, len(systemVariables))
-			for i, v := range systemVariables {
-				varTypes[i] = fmt.Sprintf("%s: string", v)
-			}
-			systemVariablesInterface = fmt.Sprintf("{ %s }", strings.Join(varTypes, ", "))
-		}
-
-		promptVariablesInterface := "{}"
-		if len(promptVariables) > 0 {
-			varTypes := make([]string, len(promptVariables))
-			for i, v := range promptVariables {
-				varTypes[i] = fmt.Sprintf("%s: string", v)
-			}
-			promptVariablesInterface = fmt.Sprintf("{ %s }", strings.Join(varTypes, ", "))
-		}
-
-		_ = systemVariablesInterface // suppress unused warning
-		_ = promptVariablesInterface // suppress unused warning
-
-		// Generate function signatures - always make variables optional
-		systemFunctionSignature := "(variables = {})"
-		promptFunctionSignature := "(variables = {})"
-
-		// Build the method with conditional fields
-		var fields []string
-		fields = append(fields, fmt.Sprintf(`    slug: "%s"`, prompt.Slug))
-
-		// Add system field only if it exists
-		if prompt.System != "" {
-			fields = append(fields, fmt.Sprintf(`    system: {
-      compile%s {
-        const template = "%s";
-        return template.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
-          return (variables as any)[varName] || match;
-        });
-      }
-    }`, systemFunctionSignature, escapedSystem))
-		}
-
-		// Add prompt field only if it exists
-		if prompt.Prompt != "" {
-			fields = append(fields, fmt.Sprintf(`    prompt: {
-      compile%s {
-        const template = "%s";
-        return template.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
-          return (variables as any)[varName] || match;
-        });
-      }
-    }`, promptFunctionSignature, escapedPrompt))
-		}
-
-		// Generate JSDoc comment
-		jsdoc := fmt.Sprintf(`  /**
-   * @name %s
-   * @description %s`, prompt.Name, prompt.Description)
-
-		if prompt.System != "" {
-			jsdoc += fmt.Sprintf(`
-   * @system %s`, strings.ReplaceAll(prompt.System, "\n", "\n   * "))
-		}
-
-		if prompt.Prompt != "" {
-			jsdoc += fmt.Sprintf(`
-   * @prompt %s`, strings.ReplaceAll(prompt.Prompt, "\n", "\n   * "))
-		}
-
-		jsdoc += "\n   */"
-
-		method := fmt.Sprintf(`%s
-  %s: {
-%s
-  }`, jsdoc, methodName, strings.Join(fields, ",\n"))
-
-		methods = append(methods, method)
-	}
-
-	return fmt.Sprintf(`export const prompts = {
-%s
-};
-
-// Export function that SDK will use
-// Note: All compile functions return string (never undefined/null)
-// This ensures no optional chaining is needed in agent code
-export function createPromptsAPI() {
-  return prompts;
-}
-`, strings.Join(methods, ",\n"))
-}
-
 // GenerateJavaScript generates JavaScript version (for runtime)
 func GenerateJavaScript(prompts []Prompt) string {
 	var methods []string
@@ -353,32 +245,6 @@ func GenerateJavaScript(prompts []Prompt) string {
 		if prompt.System != "" {
 			escapedSystem = EscapeTemplateString(prompt.System)
 		}
-
-		// Get variables separately for system and prompt
-		systemVariables := ExtractVariables(prompt.System)
-		promptVariables := ExtractVariables(prompt.Prompt)
-
-		// Generate variable interfaces for each
-		systemVariablesInterface := "{}"
-		if len(systemVariables) > 0 {
-			varTypes := make([]string, len(systemVariables))
-			for i, v := range systemVariables {
-				varTypes[i] = fmt.Sprintf("%s: string", v)
-			}
-			systemVariablesInterface = fmt.Sprintf("{ %s }", strings.Join(varTypes, ", "))
-		}
-
-		promptVariablesInterface := "{}"
-		if len(promptVariables) > 0 {
-			varTypes := make([]string, len(promptVariables))
-			for i, v := range promptVariables {
-				varTypes[i] = fmt.Sprintf("%s: string", v)
-			}
-			promptVariablesInterface = fmt.Sprintf("{ %s }", strings.Join(varTypes, ", "))
-		}
-
-		_ = systemVariablesInterface // suppress unused warning
-		_ = promptVariablesInterface // suppress unused warning
 
 		// Generate function signatures - always make variables optional
 		systemFunctionSignature := "(variables = {})"
@@ -456,14 +322,19 @@ func FindSDKGeneratedDir(ctx BundleContext, projectDir string) (string, error) {
 		sdkPath := filepath.Join(root, "node_modules", "@agentuity", "sdk", "dist", "apis", "prompt", "generated")
 		if _, err := os.Stat(filepath.Join(root, "node_modules", "@agentuity", "sdk")); err == nil {
 			// SDK exists, ensure generated directory exists
-			if err := os.MkdirAll(sdkPath, 0755); err == nil {
+			if err := os.MkdirAll(sdkPath, 0755); err != nil {
+				ctx.Logger.Debug("failed to create directory %s: %v", sdkPath, err)
+				// Try next location
+			} else {
 				return sdkPath, nil
 			}
 		}
 		// Fallback to src directory (development)
 		sdkPath = filepath.Join(root, "node_modules", "@agentuity", "sdk", "src", "apis", "prompt", "generated")
 		if _, err := os.Stat(filepath.Join(root, "node_modules", "@agentuity", "sdk", "src", "apis", "prompt")); err == nil {
-			if err := os.MkdirAll(sdkPath, 0755); err == nil {
+			if err := os.MkdirAll(sdkPath, 0755); err != nil {
+				ctx.Logger.Debug("failed to create directory %s: %v", sdkPath, err)
+			} else {
 				return sdkPath, nil
 			}
 		}

@@ -88,7 +88,7 @@ os.WriteFile(path, content, 0644) // Without checking if path exists
 ### ✅ Do This Instead
 ```go
 // Generate dynamic content from YAML/data
-content := GenerateTypeScript(prompts)
+content := GenerateTypeScriptTypes(prompts)
 
 // Generate to installed SDK
 sdkPath := filepath.Join(root, "node_modules", "@agentuity", "sdk", "dist", "generated")
