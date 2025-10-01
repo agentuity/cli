@@ -32,6 +32,10 @@ import { interpolateTemplate } from '@agentuity/sdk';
 
 %s
 
+/**
+ * Collection of all available prompts with JSDoc documentation
+ * Each prompt includes original system and prompt templates for reference
+ */
 export const prompts = {
 %s
 };`, strings.Join(objects, "\n\n"), cg.generatePromptExports())
@@ -89,10 +93,7 @@ func (cg *CodeGenerator) generatePromptObject(prompt Prompt) string {
 	}
 	promptParamStr := strings.Join(promptParams, ", ")
 
-	// Generate docstring with original templates
-	docstring := cg.generateDocstring(prompt)
-
-	return fmt.Sprintf(`%sconst %s = {
+	return fmt.Sprintf(`const %s = {
     slug: %q,
     system: {
         compile: (%s) => {
@@ -104,7 +105,7 @@ func (cg *CodeGenerator) generatePromptObject(prompt Prompt) string {
             return %s
         }
     }
-};`, docstring, strcase.ToLowerCamel(prompt.Slug), prompt.Slug, systemParamStr, cg.generateTemplateValue(prompt.System, systemVariables), promptParamStr, cg.generateTemplateValue(prompt.Prompt, promptVariables))
+};`, strcase.ToLowerCamel(prompt.Slug), prompt.Slug, systemParamStr, cg.generateTemplateValue(prompt.System, systemVariables), promptParamStr, cg.generateTemplateValue(prompt.Prompt, promptVariables))
 }
 
 // generateTemplateValue generates the value for a template (either compile function or direct interpolateTemplate call)
@@ -134,7 +135,6 @@ func (cg *CodeGenerator) generatePromptType(prompt Prompt) string {
 		systemParams = append(systemParams, fmt.Sprintf("variables?: { %s }", cg.generateVariableTypesFromObjects(systemVariables)))
 	}
 	systemParamStr := strings.Join(systemParams, ", ")
-	systemCompileType := fmt.Sprintf("(%s) => string", systemParamStr)
 
 	// Get variables from prompt template
 	promptVariables := cg.getPromptVariableObjects(prompt)
@@ -145,15 +145,18 @@ func (cg *CodeGenerator) generatePromptType(prompt Prompt) string {
 	promptParamStr := strings.Join(promptParams, ", ")
 	promptCompileType := fmt.Sprintf("(%s) => string", promptParamStr)
 
-	// Generate docstring for TypeScript
-	docstring := cg.generateDocstring(prompt)
+	// Generate separate system type with docstring
+	systemTypeName := fmt.Sprintf("%sSystem", strcase.ToCamel(prompt.Slug))
+	systemTypeWithDocstring := cg.generateSystemTypeWithDocstring(prompt, systemTypeName, systemParamStr)
 
-	return fmt.Sprintf(`%sexport type %s = {
-    slug: string;
-    system: { compile: %s };
-    prompt: { compile: %s };
+	return fmt.Sprintf(`%s
+
+export type %s = {
+  slug: string;
+  system: %s;
+  prompt: { compile: %s };
 };`,
-		docstring, strcase.ToCamel(prompt.Slug), systemCompileType, promptCompileType)
+		systemTypeWithDocstring, strcase.ToCamel(prompt.Slug), systemTypeName, promptCompileType)
 }
 
 // generatePromptInterface generates a TypeScript interface for a prompt
@@ -227,17 +230,25 @@ func (cg *CodeGenerator) generateDocstring(prompt Prompt) string {
 	if prompt.System != "" {
 		docLines = append(docLines, " *")
 		docLines = append(docLines, " * @system")
-		// Escape the template for JSDoc
+		// Escape the template for JSDoc and add proper line breaks
 		escapedSystem := strings.ReplaceAll(prompt.System, "*/", "* /")
-		docLines = append(docLines, fmt.Sprintf(" * %s", escapedSystem))
+		// Split by newlines and add proper JSDoc formatting
+		systemLines := strings.Split(escapedSystem, "\n")
+		for _, line := range systemLines {
+			docLines = append(docLines, fmt.Sprintf(" * %s", line))
+		}
 	}
 
 	if prompt.Prompt != "" {
 		docLines = append(docLines, " *")
 		docLines = append(docLines, " * @prompt")
-		// Escape the template for JSDoc
+		// Escape the template for JSDoc and add proper line breaks
 		escapedPrompt := strings.ReplaceAll(prompt.Prompt, "*/", "* /")
-		docLines = append(docLines, fmt.Sprintf(" * %s", escapedPrompt))
+		// Split by newlines and add proper JSDoc formatting
+		promptLines := strings.Split(escapedPrompt, "\n")
+		for _, line := range promptLines {
+			docLines = append(docLines, fmt.Sprintf(" * %s", line))
+		}
 	}
 
 	docLines = append(docLines, " */")
@@ -250,6 +261,9 @@ func (cg *CodeGenerator) generateDocstring(prompt Prompt) string {
 func (cg *CodeGenerator) generatePromptExports() string {
 	var exports []string
 	for _, prompt := range cg.prompts {
+		// Generate JSDoc comment for each prompt property
+		jsdocComment := cg.generatePromptPropertyJSDoc(prompt)
+		exports = append(exports, jsdocComment)
 		exports = append(exports, fmt.Sprintf("    %s,", strcase.ToLowerCamel(prompt.Slug)))
 	}
 	return strings.Join(exports, "\n")
@@ -259,9 +273,99 @@ func (cg *CodeGenerator) generatePromptExports() string {
 func (cg *CodeGenerator) generatePromptTypeExports() string {
 	var exports []string
 	for _, prompt := range cg.prompts {
-		exports = append(exports, fmt.Sprintf("    %s: %s,", strcase.ToLowerCamel(prompt.Slug), strcase.ToCamel(prompt.Slug)))
+		// Generate JSDoc comment for each prompt property
+		jsdocComment := cg.generatePromptPropertyJSDoc(prompt)
+		exports = append(exports, jsdocComment)
+		exports = append(exports, fmt.Sprintf("  %s: %s;", strcase.ToLowerCamel(prompt.Slug), strcase.ToCamel(prompt.Slug)))
 	}
 	return strings.Join(exports, "\n")
+}
+
+// generatePromptPropertyJSDoc generates JSDoc comments for prompt properties in PromptsCollection
+func (cg *CodeGenerator) generatePromptPropertyJSDoc(prompt Prompt) string {
+	var docLines []string
+
+	// Create JSDoc comment with name, description, and templates
+	docLines = append(docLines, "  /**")
+
+	// Add name and description
+	if prompt.Name != "" && prompt.Description != "" {
+		docLines = append(docLines, fmt.Sprintf("   * %s - %s", prompt.Name, prompt.Description))
+	} else if prompt.Name != "" {
+		docLines = append(docLines, fmt.Sprintf("   * %s", prompt.Name))
+	} else if prompt.Description != "" {
+		docLines = append(docLines, fmt.Sprintf("   * %s", prompt.Description))
+	} else {
+		// Fallback to slug-based name
+		docLines = append(docLines, fmt.Sprintf("   * %s", strcase.ToCamel(prompt.Slug)))
+	}
+
+	// Add original templates
+	if prompt.System != "" {
+		docLines = append(docLines, "   *")
+		docLines = append(docLines, "   * @system")
+		// Escape the template for JSDoc and add proper line breaks
+		escapedSystem := strings.ReplaceAll(prompt.System, "*/", "* /")
+		// Split by newlines and add proper JSDoc formatting
+		systemLines := strings.Split(escapedSystem, "\n")
+		for _, line := range systemLines {
+			docLines = append(docLines, fmt.Sprintf("   * %s", line))
+		}
+	}
+
+	if prompt.Prompt != "" {
+		docLines = append(docLines, "   *")
+		docLines = append(docLines, "   * @prompt")
+		// Escape the template for JSDoc and add proper line breaks
+		escapedPrompt := strings.ReplaceAll(prompt.Prompt, "*/", "* /")
+		// Split by newlines and add proper JSDoc formatting
+		promptLines := strings.Split(escapedPrompt, "\n")
+		for _, line := range promptLines {
+			docLines = append(docLines, fmt.Sprintf("   * %s", line))
+		}
+	}
+
+	docLines = append(docLines, "   */")
+
+	return strings.Join(docLines, "\n")
+}
+
+// generatePromptTypeJSDoc generates JSDoc comments for individual prompt types
+func (cg *CodeGenerator) generatePromptTypeJSDoc(prompt Prompt) string {
+	var docLines []string
+
+	// Create JSDoc comment with name, description, and prompt template only
+	docLines = append(docLines, "/**")
+
+	// Add name and description
+	if prompt.Name != "" && prompt.Description != "" {
+		docLines = append(docLines, fmt.Sprintf(" * %s - %s", prompt.Name, prompt.Description))
+	} else if prompt.Name != "" {
+		docLines = append(docLines, fmt.Sprintf(" * %s", prompt.Name))
+	} else if prompt.Description != "" {
+		docLines = append(docLines, fmt.Sprintf(" * %s", prompt.Description))
+	} else {
+		// Fallback to slug-based name
+		docLines = append(docLines, fmt.Sprintf(" * %s", strcase.ToCamel(prompt.Slug)))
+	}
+
+	// Add only the prompt template
+	if prompt.Prompt != "" {
+		docLines = append(docLines, " *")
+		docLines = append(docLines, " * @prompt")
+		// Escape the template for JSDoc and add proper line breaks
+		escapedPrompt := strings.ReplaceAll(prompt.Prompt, "*/", "* /")
+		// Split by newlines and add proper JSDoc formatting
+		promptLines := strings.Split(escapedPrompt, "\n")
+		for _, line := range promptLines {
+			docLines = append(docLines, fmt.Sprintf(" * %s", line))
+		}
+	}
+
+	docLines = append(docLines, " */")
+	docLines = append(docLines, "")
+
+	return strings.Join(docLines, "\n")
 }
 
 // getSystemVariables gets variables from the system template only
@@ -306,4 +410,39 @@ func (cg *CodeGenerator) getPromptVariableObjects(prompt Prompt) []Variable {
 	}
 
 	return promptTemplate.Variables
+}
+
+// generateSystemTypeWithDocstring generates a separate system type with docstring
+func (cg *CodeGenerator) generateSystemTypeWithDocstring(prompt Prompt, typeName, systemParamStr string) string {
+	if prompt.System == "" {
+		return fmt.Sprintf(`export type %s = { compile: (%s) => string };`,
+			typeName, systemParamStr)
+	}
+
+	// Generate JSDoc comment for the system type
+	docstring := cg.generateSystemDocstring(prompt)
+
+	return fmt.Sprintf(`/**
+%s
+ */
+export type %s = { compile: (%s) => string };`,
+		docstring, typeName, systemParamStr)
+}
+
+// generateSystemDocstring generates the docstring content for the system template
+func (cg *CodeGenerator) generateSystemDocstring(prompt Prompt) string {
+	if prompt.System == "" {
+		return ""
+	}
+
+	// Escape the template for docstring and add proper line breaks
+	escapedSystem := strings.ReplaceAll(prompt.System, "*/", "* /")
+	// Split by newlines and add proper docstring formatting
+	systemLines := strings.Split(escapedSystem, "\n")
+	var docLines []string
+	for _, line := range systemLines {
+		docLines = append(docLines, fmt.Sprintf("  * %s", line))
+	}
+
+	return strings.Join(docLines, "\n")
 }
