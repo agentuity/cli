@@ -157,7 +157,7 @@ func GenerateTypeScriptTypes(prompts []Prompt) string {
 
 	for _, prompt := range prompts {
 		methodName := ToCamelCase(prompt.Slug)
-		
+
 		// Get variables separately for system and prompt
 		systemVariables := ExtractVariables(prompt.System)
 		promptVariables := ExtractVariables(prompt.Prompt)
