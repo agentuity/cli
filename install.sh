@@ -381,19 +381,23 @@ install_completions() {
             "$INSTALL_PATH/agentuity" completion bash > "$BASH_COMPLETION_DIR/agentuity"
             ohai "Bash completion installed to $BASH_COMPLETION_DIR/agentuity"
           else
-            warn "No write permission to $BASH_COMPLETION_DIR. Skipping bash completion installation."
+            ohai "No write permission to $BASH_COMPLETION_DIR. Skipping bash completion installation."
           fi
         fi
         
-        if [ -d "/usr/local/share/zsh/site-functions" ]; then
+        # Check if zsh is installed before attempting to install zsh completion
+        if command -v zsh >/dev/null 2>&1 && [ -d "/usr/local/share/zsh/site-functions" ]; then
           ZSH_COMPLETION_DIR="/usr/local/share/zsh/site-functions"
           if [ -w "$ZSH_COMPLETION_DIR" ]; then
             ohai "Generating zsh completion script..."
             "$INSTALL_PATH/agentuity" completion zsh > "$ZSH_COMPLETION_DIR/_agentuity"
             ohai "Zsh completion installed to $ZSH_COMPLETION_DIR/_agentuity"
           else
-            warn "No write permission to $ZSH_COMPLETION_DIR. Skipping zsh completion installation."
+            ohai "No write permission to $ZSH_COMPLETION_DIR. Skipping zsh completion installation."
           fi
+        elif ! command -v zsh >/dev/null 2>&1; then
+          # Only skip silently if zsh is not installed (avoid unnecessary warnings)
+          debug "Zsh not found, skipping zsh completion installation"
         fi
       fi
 
@@ -405,35 +409,45 @@ install_completions() {
             "$INSTALL_PATH/agentuity" completion bash > "$BASH_COMPLETION_DIR/agentuity"
             ohai "Bash completion installed to $BASH_COMPLETION_DIR/agentuity"
           else
-            warn "No write permission to $BASH_COMPLETION_DIR. Skipping bash completion installation."
+            ohai "No write permission to $BASH_COMPLETION_DIR. Skipping bash completion installation."
             ohai "You can manually install bash completion with:"
             echo "  $INSTALL_PATH/agentuity completion bash > ~/.bash_completion"
           fi
         fi
         
-        if [ -d "/usr/share/zsh/vendor-completions" ]; then
+        # Check if zsh is installed before attempting to install zsh completion
+        if command -v zsh >/dev/null 2>&1 && [ -d "/usr/share/zsh/vendor-completions" ]; then
           ZSH_COMPLETION_DIR="/usr/share/zsh/vendor-completions"
           if [ -w "$ZSH_COMPLETION_DIR" ]; then
             ohai "Generating zsh completion script..."
             "$INSTALL_PATH/agentuity" completion zsh > "$ZSH_COMPLETION_DIR/_agentuity"
             ohai "Zsh completion installed to $ZSH_COMPLETION_DIR/_agentuity"
           else
-            warn "No write permission to $ZSH_COMPLETION_DIR. Skipping zsh completion installation."
+            ohai "No write permission to $ZSH_COMPLETION_DIR. Skipping zsh completion installation."
             ohai "You can manually install zsh completion with:"
             echo "  mkdir -p ~/.zsh/completion"
             echo "  $INSTALL_PATH/agentuity completion zsh > ~/.zsh/completion/_agentuity"
             echo "  echo 'fpath=(~/.zsh/completion \$fpath)' >> ~/.zshrc"
             echo "  echo 'autoload -U compinit && compinit' >> ~/.zshrc"
           fi
+        elif ! command -v zsh >/dev/null 2>&1; then
+          # Only skip silently if zsh is not installed (avoid unnecessary warnings)
+          debug "Zsh not found, skipping zsh completion installation"
         fi
       fi
   fi
 }
 
 success() {
-  ohai "Installation complete! Run 'agentuity --help' to get started."
-  ohai "For more information, visit: $(url "https://agentuity.dev")"
-  
+  ohai "Installation complete!"
+  printf "%sNext steps:%s\n" "$tty_bold" "$tty_reset"
+  printf "  1. %sagentuity auth signup%s (or %sagentuity login%s if you already have an account)\n" "$tty_cyan" "$tty_reset" "$tty_cyan" "$tty_reset"
+  printf "  2. %sagentuity create%s to scaffold your first Agent project\n" "$tty_cyan" "$tty_reset"
+  printf "  3. %sagentuity dev%s to test locally, then %sagentuity deploy%s\n" "$tty_cyan" "$tty_reset" "$tty_cyan" "$tty_reset"
+  printf "  4. Explore the docs, see samples, and more: %s\n" "$(url "https://agentuity.dev/")"
+  printf "\n"
+  ohai "Need help? Run 'agentuity --help' anytime."
+
   if ! command -v agentuity >/dev/null 2>&1; then
     printf "${tty_blue}==>${tty_bold} ${tty_magenta}To apply PATH changes, restart your terminal or run:${tty_reset} source ~/.$(basename $SHELL 2>/dev/null)rc\n"
   fi

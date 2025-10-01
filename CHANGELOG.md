@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.167] - 2025-09-24
+
+### Added
+- [AGENT-684] Check if zsh is installed before adding autocomplete in the CLI ([#450](https://github.com/agentuity/cli/pull/450))
+- [AGENT-628] Unit tests ([#441](https://github.com/agentuity/cli/pull/441))
+- feat: automatically add AGENTUITY_SDK_KEY and AGENTUITY_PROJECT_KEY to .env file when running dev command ([#442](https://github.com/agentuity/cli/pull/442))
+
+### Changed
+- Dont sort releases by commit msg ([#447](https://github.com/agentuity/cli/pull/447))
+- [AGENT-628] prevent local development env files from syncing to production ([#440](https://github.com/agentuity/cli/pull/440))
+
+### Fixed
+- Fix npm workspaces ([#451](https://github.com/agentuity/cli/pull/451))
+- Fix 'Press any key to continue' to accept any key, not just Enter ([#445](https://github.com/agentuity/cli/pull/445))
+
+## [v0.0.166] - 2025-08-28
+
+### Added
+- Adds support for pnpm as a bundler ([#438](https://github.com/agentuity/cli/pull/438))
+
+### Fixed
+- bump go-common to get light mode color fixes
+
 ## [v0.0.165] - 2025-08-18
 
 ### Changed
@@ -830,6 +853,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.167]: https://github.com/agentuity/cli/compare/v0.0.166...v0.0.167
+[v0.0.166]: https://github.com/agentuity/cli/compare/v0.0.165...v0.0.166
 [v0.0.165]: https://github.com/agentuity/cli/compare/v0.0.164...v0.0.165
 [v0.0.164]: https://github.com/agentuity/cli/compare/v0.0.163...v0.0.164
 [v0.0.163]: https://github.com/agentuity/cli/compare/v0.0.162...v0.0.163

@@ -242,6 +242,9 @@ func init() {
 	viper.SetDefault("overrides.api_url", "https://api.agentuity.com")
 	viper.SetDefault("overrides.transport_url", "https://agentuity.ai")
 
+	// Setup feature flags
+	SetupFeatureFlags(rootCmd)
+
 	cobra.OnInitialize(initConfig)
 }
 
