@@ -219,28 +219,3 @@ func ParsePrompt(prompt Prompt) ParsedPrompt {
 		Prompt: promptParsed,
 	}
 }
-
-// GetAllVariables extracts all variables from both system and prompt fields
-func GetAllVariables(prompt Prompt) []string {
-	allVars := make(map[string]bool)
-
-	// Extract from prompt field
-	for _, v := range ParseTemplateVariables(prompt.Prompt) {
-		allVars[v] = true
-	}
-
-	// Extract from system field if present
-	if prompt.System != "" {
-		for _, v := range ParseTemplateVariables(prompt.System) {
-			allVars[v] = true
-		}
-	}
-
-	// Convert to slice
-	variables := make([]string, 0, len(allVars))
-	for v := range allVars {
-		variables = append(variables, v)
-	}
-
-	return variables
-}

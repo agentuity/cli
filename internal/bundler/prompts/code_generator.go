@@ -73,17 +73,26 @@ func (cg *CodeGenerator) GenerateTypeScriptInterfaces() string {
 
 // generatePromptObject generates a single prompt object with system and prompt properties
 func (cg *CodeGenerator) generatePromptObject(prompt Prompt) string {
-	// Get all variables from both system and prompt templates
-	allVariables := cg.getAllVariables(prompt)
-
-	var params []string
-	if len(allVariables) > 0 {
-		params = append(params, "variables")
+	// Get variables from system template
+	systemVariables := cg.getSystemVariables(prompt)
+	var systemParams []string
+	if len(systemVariables) > 0 {
+		systemParams = append(systemParams, "variables")
 	}
+	systemParamStr := strings.Join(systemParams, ", ")
 
-	paramStr := strings.Join(params, ", ")
+	// Get variables from prompt template
+	promptVariables := cg.getPromptVariables(prompt)
+	var promptParams []string
+	if len(promptVariables) > 0 {
+		promptParams = append(promptParams, "variables")
+	}
+	promptParamStr := strings.Join(promptParams, ", ")
 
-	return fmt.Sprintf(`const %s = {
+	// Generate docstring with original templates
+	docstring := cg.generateDocstring(prompt)
+
+	return fmt.Sprintf(`%sconst %s = {
     slug: %q,
     system: {
         compile: (%s) => {
@@ -95,7 +104,7 @@ func (cg *CodeGenerator) generatePromptObject(prompt Prompt) string {
             return %s
         }
     }
-};`, strcase.ToLowerCamel(prompt.Slug), prompt.Slug, paramStr, cg.generateTemplateValue(prompt.System, allVariables), paramStr, cg.generateTemplateValue(prompt.Prompt, allVariables))
+};`, docstring, strcase.ToLowerCamel(prompt.Slug), prompt.Slug, systemParamStr, cg.generateTemplateValue(prompt.System, systemVariables), promptParamStr, cg.generateTemplateValue(prompt.Prompt, promptVariables))
 }
 
 // generateTemplateValue generates the value for a template (either compile function or direct interpolateTemplate call)
@@ -118,44 +127,60 @@ func (cg *CodeGenerator) generateSystemCompile(template string, allVariables []s
 
 // generatePromptType generates a TypeScript type for a prompt object
 func (cg *CodeGenerator) generatePromptType(prompt Prompt) string {
-	// Get all variables from both system and prompt templates
-	allVariables := cg.getAllVariables(prompt)
-
-	var params []string
-	if len(allVariables) > 0 {
-		params = append(params, fmt.Sprintf("variables?: { %s }", cg.generateVariableTypes(allVariables)))
+	// Get variables from system template
+	systemVariables := cg.getSystemVariableObjects(prompt)
+	var systemParams []string
+	if len(systemVariables) > 0 {
+		systemParams = append(systemParams, fmt.Sprintf("variables?: { %s }", cg.generateVariableTypesFromObjects(systemVariables)))
 	}
+	systemParamStr := strings.Join(systemParams, ", ")
+	systemCompileType := fmt.Sprintf("(%s) => string", systemParamStr)
 
-	paramStr := strings.Join(params, ", ")
+	// Get variables from prompt template
+	promptVariables := cg.getPromptVariableObjects(prompt)
+	var promptParams []string
+	if len(promptVariables) > 0 {
+		promptParams = append(promptParams, fmt.Sprintf("variables?: { %s }", cg.generateVariableTypesFromObjects(promptVariables)))
+	}
+	promptParamStr := strings.Join(promptParams, ", ")
+	promptCompileType := fmt.Sprintf("(%s) => string", promptParamStr)
 
-	compileType := fmt.Sprintf("(%s) => string", paramStr)
+	// Generate docstring for TypeScript
+	docstring := cg.generateDocstring(prompt)
 
-	return fmt.Sprintf(`export type %s = {
+	return fmt.Sprintf(`%sexport type %s = {
     slug: string;
     system: { compile: %s };
     prompt: { compile: %s };
 };`,
-		strcase.ToCamel(prompt.Slug), compileType, compileType)
+		docstring, strcase.ToCamel(prompt.Slug), systemCompileType, promptCompileType)
 }
 
 // generatePromptInterface generates a TypeScript interface for a prompt
 func (cg *CodeGenerator) generatePromptInterface(prompt Prompt) string {
-	// Get all variables from both system and prompt templates
-	allVariables := cg.getAllVariables(prompt)
-
-	var params []string
-	if len(allVariables) > 0 {
-		params = append(params, fmt.Sprintf("variables?: { %s }", cg.generateVariableTypes(allVariables)))
+	// Get variables from system template
+	systemVariables := cg.getSystemVariableObjects(prompt)
+	var systemParams []string
+	if len(systemVariables) > 0 {
+		systemParams = append(systemParams, fmt.Sprintf("variables?: { %s }", cg.generateVariableTypesFromObjects(systemVariables)))
 	}
+	systemParamStr := strings.Join(systemParams, ", ")
+	systemCompileType := fmt.Sprintf("(%s) => string", systemParamStr)
 
-	paramStr := strings.Join(params, ", ")
-	compileType := fmt.Sprintf("(%s) => string", paramStr)
+	// Get variables from prompt template
+	promptVariables := cg.getPromptVariableObjects(prompt)
+	var promptParams []string
+	if len(promptVariables) > 0 {
+		promptParams = append(promptParams, fmt.Sprintf("variables?: { %s }", cg.generateVariableTypesFromObjects(promptVariables)))
+	}
+	promptParamStr := strings.Join(promptParams, ", ")
+	promptCompileType := fmt.Sprintf("(%s) => string", promptParamStr)
 
 	return fmt.Sprintf(`export interface %s {
     slug: string;
     system: { compile: %s };
     prompt: { compile: %s };
-}`, strcase.ToCamel(prompt.Slug), compileType, compileType)
+}`, strcase.ToCamel(prompt.Slug), systemCompileType, promptCompileType)
 }
 
 // generateVariableTypes generates TypeScript types for variables
@@ -165,6 +190,60 @@ func (cg *CodeGenerator) generateVariableTypes(variables []string) string {
 		types = append(types, fmt.Sprintf("%s: string", variable))
 	}
 	return strings.Join(types, "; ")
+}
+
+// generateVariableTypesFromObjects generates TypeScript types for variables with default values
+func (cg *CodeGenerator) generateVariableTypesFromObjects(variables []Variable) string {
+	var types []string
+	for _, variable := range variables {
+		if variable.IsRequired {
+			// Required variables are always string
+			types = append(types, fmt.Sprintf("%s: string", variable.Name))
+		} else if variable.HasDefault {
+			// Optional variables with defaults: string | "defaultValue"
+			types = append(types, fmt.Sprintf("%s?: string | %q", variable.Name, variable.DefaultValue))
+		} else {
+			// Optional variables without defaults: string (but parameter is optional)
+			types = append(types, fmt.Sprintf("%s?: string", variable.Name))
+		}
+	}
+	return strings.Join(types, "; ")
+}
+
+// generateDocstring generates a JSDoc-style docstring for a prompt
+func (cg *CodeGenerator) generateDocstring(prompt Prompt) string {
+	var docLines []string
+	docLines = append(docLines, "/**")
+
+	// Add name and description if available
+	if prompt.Name != "" {
+		docLines = append(docLines, fmt.Sprintf(" * %s", prompt.Name))
+	}
+	if prompt.Description != "" {
+		docLines = append(docLines, fmt.Sprintf(" * %s", prompt.Description))
+	}
+
+	// Add original templates
+	if prompt.System != "" {
+		docLines = append(docLines, " *")
+		docLines = append(docLines, " * @system")
+		// Escape the template for JSDoc
+		escapedSystem := strings.ReplaceAll(prompt.System, "*/", "* /")
+		docLines = append(docLines, fmt.Sprintf(" * %s", escapedSystem))
+	}
+
+	if prompt.Prompt != "" {
+		docLines = append(docLines, " *")
+		docLines = append(docLines, " * @prompt")
+		// Escape the template for JSDoc
+		escapedPrompt := strings.ReplaceAll(prompt.Prompt, "*/", "* /")
+		docLines = append(docLines, fmt.Sprintf(" * %s", escapedPrompt))
+	}
+
+	docLines = append(docLines, " */")
+	docLines = append(docLines, "")
+
+	return strings.Join(docLines, "\n")
 }
 
 // generatePromptExports generates the exports object for JavaScript
@@ -185,37 +264,46 @@ func (cg *CodeGenerator) generatePromptTypeExports() string {
 	return strings.Join(exports, "\n")
 }
 
-// getAllVariables gets all unique variables from both system and prompt templates
-func (cg *CodeGenerator) getAllVariables(prompt Prompt) []string {
-	allVars := make(map[string]bool)
-
+// getSystemVariables gets variables from the system template only
+func (cg *CodeGenerator) getSystemVariables(prompt Prompt) []string {
 	// Parse system template if not already parsed
 	systemTemplate := prompt.SystemTemplate
 	if len(systemTemplate.Variables) == 0 && prompt.System != "" {
 		systemTemplate = ParseTemplate(prompt.System)
 	}
 
+	return systemTemplate.VariableNames()
+}
+
+// getPromptVariables gets variables from the prompt template only
+func (cg *CodeGenerator) getPromptVariables(prompt Prompt) []string {
 	// Parse prompt template if not already parsed
 	promptTemplate := prompt.PromptTemplate
 	if len(promptTemplate.Variables) == 0 && prompt.Prompt != "" {
 		promptTemplate = ParseTemplate(prompt.Prompt)
 	}
 
-	// Add variables from system template
-	for _, variable := range systemTemplate.VariableNames() {
-		allVars[variable] = true
+	return promptTemplate.VariableNames()
+}
+
+// getSystemVariableObjects gets variable objects from the system template only
+func (cg *CodeGenerator) getSystemVariableObjects(prompt Prompt) []Variable {
+	// Parse system template if not already parsed
+	systemTemplate := prompt.SystemTemplate
+	if len(systemTemplate.Variables) == 0 && prompt.System != "" {
+		systemTemplate = ParseTemplate(prompt.System)
 	}
 
-	// Add variables from prompt template
-	for _, variable := range promptTemplate.VariableNames() {
-		allVars[variable] = true
+	return systemTemplate.Variables
+}
+
+// getPromptVariableObjects gets variable objects from the prompt template only
+func (cg *CodeGenerator) getPromptVariableObjects(prompt Prompt) []Variable {
+	// Parse prompt template if not already parsed
+	promptTemplate := prompt.PromptTemplate
+	if len(promptTemplate.Variables) == 0 && prompt.Prompt != "" {
+		promptTemplate = ParseTemplate(prompt.Prompt)
 	}
 
-	// Convert map to slice
-	var variables []string
-	for variable := range allVars {
-		variables = append(variables, variable)
-	}
-
-	return variables
+	return promptTemplate.Variables
 }
