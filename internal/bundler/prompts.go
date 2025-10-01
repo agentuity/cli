@@ -184,8 +184,6 @@ func GenerateTypeScriptTypes(prompts []Prompt) string {
 		// Build the type with conditional fields
 		var typeFields []string
 		typeFields = append(typeFields, fmt.Sprintf(`    slug: "%s"`, prompt.Slug))
-		typeFields = append(typeFields, fmt.Sprintf(`    name: "%s"`, prompt.Name))
-		typeFields = append(typeFields, fmt.Sprintf(`    description: "%s"`, prompt.Description))
 
 		// Add system field only if it exists
 		if prompt.System != "" {
@@ -281,8 +279,6 @@ func GenerateTypeScript(prompts []Prompt) string {
 		// Build the method with conditional fields
 		var fields []string
 		fields = append(fields, fmt.Sprintf(`    slug: "%s"`, prompt.Slug))
-		fields = append(fields, fmt.Sprintf(`    name: "%s"`, prompt.Name))
-		fields = append(fields, fmt.Sprintf(`    description: "%s"`, prompt.Description))
 
 		// Add system field only if it exists
 		if prompt.System != "" {
@@ -391,8 +387,6 @@ func GenerateJavaScript(prompts []Prompt) string {
 		// Build the method with conditional fields
 		var fields []string
 		fields = append(fields, fmt.Sprintf(`    slug: "%s"`, prompt.Slug))
-		fields = append(fields, fmt.Sprintf(`    name: "%s"`, prompt.Name))
-		fields = append(fields, fmt.Sprintf(`    description: "%s"`, prompt.Description))
 
 		// Add system field only if it exists
 		if prompt.System != "" {
