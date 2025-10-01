@@ -50,8 +50,12 @@ func ParsePromptsYAML(filePath string) ([]Prompt, error) {
 
 	// Validate prompts
 	for i, prompt := range promptsData.Prompts {
-		if prompt.Name == "" || prompt.Slug == "" || prompt.Prompt == "" {
-			return nil, fmt.Errorf("invalid prompt at index %d: missing required fields (name, slug, prompt)", i)
+		if prompt.Name == "" || prompt.Slug == "" {
+			return nil, fmt.Errorf("invalid prompt at index %d: missing required fields (name, slug)", i)
+		}
+		// At least one of system or prompt must be present
+		if prompt.System == "" && prompt.Prompt == "" {
+			return nil, fmt.Errorf("invalid prompt at index %d: must have at least one of system or prompt", i)
 		}
 	}
 
@@ -171,10 +175,10 @@ func GenerateTypeScriptTypes(prompts []Prompt) string {
     description: "%s";
     evals: string[];
     system: {
-      compile(variables: %s): string;
+      compile(variables?: %s): string;
     };
     prompt: {
-      compile(variables: %s): string;
+      compile(variables?: %s): string;
     };
   }`, methodName, prompt.Slug, prompt.Name, prompt.Description, variablesInterface, variablesInterface)
 
@@ -216,11 +220,8 @@ func GenerateTypeScript(prompts []Prompt) string {
 			variablesInterface = fmt.Sprintf("{ %s }", strings.Join(varTypes, ", "))
 		}
 
-		// Generate function signature
-		functionSignature := fmt.Sprintf("(variables: %s)", variablesInterface)
-		if len(variables) == 0 {
-			functionSignature = "(variables: {} = {})"
-		}
+		// Generate function signature - always make variables optional
+		functionSignature := fmt.Sprintf("(variables: %s = {})", variablesInterface)
 
 		// Generate evals array
 		evalsStr := "[]"
@@ -232,7 +233,7 @@ func GenerateTypeScript(prompts []Prompt) string {
 			evalsStr = fmt.Sprintf("[%s]", strings.Join(evalQuoted, ", "))
 		}
 
-		// Build the method
+		// Build the method - always include both system and prompt fields
 		method := fmt.Sprintf(`  %s: {
     slug: "%s",
     name: "%s",
@@ -303,6 +304,7 @@ func GenerateJavaScript(prompts []Prompt) string {
 			evalsStr = fmt.Sprintf("[%s]", strings.Join(evalQuoted, ", "))
 		}
 
+		// Build the method - always include both system and prompt fields
 		method := fmt.Sprintf(`  %s: {
     slug: "%s",
     name: "%s",

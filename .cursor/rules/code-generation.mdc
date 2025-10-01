@@ -1,0 +1,102 @@
+---
+description: Code Generation Development Rules for CLI
+globs: internal/bundler/*.go, cmd/*.go
+alwaysApply: true
+---
+
+# Code Generation Development Rules
+
+> **⚠️ IMPORTANT**: These rules work in conjunction with the SDK rules. When updating these CLI rules, also update `sdk-js/.cursor/rules/code-generation.mdc` to keep them in sync.
+
+## Core Principles
+
+### Never Modify Generated Content in Source Files
+- ❌ NEVER edit files in `sdk-js/src/` that contain generated content
+- ❌ NEVER hardcode generated content like `copyWriter` prompts in source files
+- ✅ ALWAYS generate content into `node_modules/@agentuity/sdk/dist/` or `src/` directories
+- ✅ Use dynamic loading patterns for generated content
+
+### Code Generation Workflow
+1. **Modify CLI generation logic** (e.g., `internal/bundler/prompts.go`)
+2. **Update SDK to handle generated content dynamically** (e.g., `src/apis/prompt/index.ts`)
+3. **Build and test the full pipeline**: CLI generation → SDK loading → Agent usage
+
+### Optional Field Handling
+- ✅ Generated code should NEVER require optional chaining (`?.`)
+- ✅ Always generate both `system` and `prompt` fields, even if empty
+- ✅ Empty fields should return empty strings, not undefined
+- ❌ Never generate partial objects that require optional chaining
+
+## CLI-Specific Rules
+
+### Generation Target Locations
+```go
+// ✅ Correct: Generate into installed SDK
+sdkPath := filepath.Join(root, "node_modules", "@agentuity", "sdk", "dist", "generated")
+
+// ❌ Wrong: Generate into source SDK
+sdkPath := filepath.Join(root, "src", "generated")
+```
+
+### Path Resolution Priority
+1. Try `dist/` directory first (production)
+2. Fallback to `src/` directory (development)
+3. Always check if SDK exists before generating
+
+### File Generation Pattern
+```go
+func FindSDKGeneratedDir(ctx BundleContext, projectDir string) (string, error) {
+    possibleRoots := []string{
+        findWorkspaceInstallDir(ctx.Logger, projectDir),
+        projectDir,
+    }
+
+    for _, root := range possibleRoots {
+        // Try dist directory first (production)
+        sdkPath := filepath.Join(root, "node_modules", "@agentuity", "sdk", "dist", "generated")
+        if _, err := os.Stat(filepath.Join(root, "node_modules", "@agentuity", "sdk")); err == nil {
+            if err := os.MkdirAll(sdkPath, 0755); err == nil {
+                return sdkPath, nil
+            }
+        }
+        // Fallback to src directory (development)
+        sdkPath = filepath.Join(root, "node_modules", "@agentuity", "sdk", "src", "generated")
+        if _, err := os.Stat(filepath.Join(root, "node_modules", "@agentuity", "sdk", "src")); err == nil {
+            if err := os.MkdirAll(sdkPath, 0755); err == nil {
+                return sdkPath, nil
+            }
+        }
+    }
+    return "", fmt.Errorf("could not find @agentuity/sdk in node_modules")
+}
+```
+
+## Common Pitfalls to Avoid
+
+### ❌ Don't Do This
+```go
+// Hardcoding generated content in source files
+const prompts = `export const prompts = { copyWriter: { ... } };`
+
+// Generating to source SDK files
+sdkPath := filepath.Join(root, "src", "generated")
+
+// Not checking if SDK exists
+os.WriteFile(path, content, 0644) // Without checking if path exists
+```
+
+### ✅ Do This Instead
+```go
+// Generate dynamic content from YAML/data
+content := GenerateTypeScript(prompts)
+
+// Generate to installed SDK
+sdkPath := filepath.Join(root, "node_modules", "@agentuity", "sdk", "dist", "generated")
+
+// Check and create directories
+if err := os.MkdirAll(sdkPath, 0755); err != nil {
+    return fmt.Errorf("failed to create directory: %w", err)
+}
+```
+
+Remember: The CLI's job is to generate content into the installed SDK, not modify source files.
