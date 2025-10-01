@@ -38,6 +38,12 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		projectContext := project.EnsureProject(ctx, cmd)
+
+		// Check for prompts evals feature flag
+		if CheckFeatureFlag(cmd, FeaturePromptsEvals, "enable-prompts-evals") {
+			projectContext.Logger.Info("Prompts evaluations feature is enabled")
+		}
+
 		production, _ := cmd.Flags().GetBool("production")
 		install, _ := cmd.Flags().GetBool("install")
 		deploy, _ := cmd.Flags().GetBool("deploy")
