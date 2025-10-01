@@ -186,7 +186,6 @@ func GenerateTypeScriptTypes(prompts []Prompt) string {
 		typeFields = append(typeFields, fmt.Sprintf(`    slug: "%s"`, prompt.Slug))
 		typeFields = append(typeFields, fmt.Sprintf(`    name: "%s"`, prompt.Name))
 		typeFields = append(typeFields, fmt.Sprintf(`    description: "%s"`, prompt.Description))
-		typeFields = append(typeFields, `    evals: string[]`)
 
 		// Add system field only if it exists
 		if prompt.System != "" {
@@ -202,9 +201,27 @@ func GenerateTypeScriptTypes(prompts []Prompt) string {
     }`, promptVariablesInterface))
 		}
 
-		promptType := fmt.Sprintf(`  %s: {
+		// Generate JSDoc comment
+		jsdoc := fmt.Sprintf(`  /**
+   * @name %s
+   * @description %s`, prompt.Name, prompt.Description)
+
+		if prompt.System != "" {
+			jsdoc += fmt.Sprintf(`
+   * @system %s`, strings.ReplaceAll(prompt.System, "\n", "\n   * "))
+		}
+
+		if prompt.Prompt != "" {
+			jsdoc += fmt.Sprintf(`
+   * @prompt %s`, strings.ReplaceAll(prompt.Prompt, "\n", "\n   * "))
+		}
+
+		jsdoc += "\n   */"
+
+		promptType := fmt.Sprintf(`%s
+  %s: {
 %s
-  }`, methodName, strings.Join(typeFields, ";\n"))
+  }`, jsdoc, methodName, strings.Join(typeFields, ";\n"))
 
 		promptTypes = append(promptTypes, promptType)
 	}
@@ -261,22 +278,11 @@ func GenerateTypeScript(prompts []Prompt) string {
 		systemFunctionSignature := "(variables = {})"
 		promptFunctionSignature := "(variables = {})"
 
-		// Generate evals array
-		evalsStr := "[]"
-		if len(prompt.Evals) > 0 {
-			evalQuoted := make([]string, len(prompt.Evals))
-			for i, eval := range prompt.Evals {
-				evalQuoted[i] = fmt.Sprintf("'%s'", eval)
-			}
-			evalsStr = fmt.Sprintf("[%s]", strings.Join(evalQuoted, ", "))
-		}
-
 		// Build the method with conditional fields
 		var fields []string
 		fields = append(fields, fmt.Sprintf(`    slug: "%s"`, prompt.Slug))
 		fields = append(fields, fmt.Sprintf(`    name: "%s"`, prompt.Name))
 		fields = append(fields, fmt.Sprintf(`    description: "%s"`, prompt.Description))
-		fields = append(fields, fmt.Sprintf(`    evals: %s`, evalsStr))
 
 		// Add system field only if it exists
 		if prompt.System != "" {
@@ -302,9 +308,27 @@ func GenerateTypeScript(prompts []Prompt) string {
     }`, promptFunctionSignature, escapedPrompt))
 		}
 
-		method := fmt.Sprintf(`  %s: {
+		// Generate JSDoc comment
+		jsdoc := fmt.Sprintf(`  /**
+   * @name %s
+   * @description %s`, prompt.Name, prompt.Description)
+
+		if prompt.System != "" {
+			jsdoc += fmt.Sprintf(`
+   * @system %s`, strings.ReplaceAll(prompt.System, "\n", "\n   * "))
+		}
+
+		if prompt.Prompt != "" {
+			jsdoc += fmt.Sprintf(`
+   * @prompt %s`, strings.ReplaceAll(prompt.Prompt, "\n", "\n   * "))
+		}
+
+		jsdoc += "\n   */"
+
+		method := fmt.Sprintf(`%s
+  %s: {
 %s
-  }`, methodName, strings.Join(fields, ",\n"))
+  }`, jsdoc, methodName, strings.Join(fields, ",\n"))
 
 		methods = append(methods, method)
 	}
@@ -364,22 +388,11 @@ func GenerateJavaScript(prompts []Prompt) string {
 		systemFunctionSignature := "(variables = {})"
 		promptFunctionSignature := "(variables = {})"
 
-		// Generate evals array
-		evalsStr := "[]"
-		if len(prompt.Evals) > 0 {
-			evalQuoted := make([]string, len(prompt.Evals))
-			for i, eval := range prompt.Evals {
-				evalQuoted[i] = fmt.Sprintf("'%s'", eval)
-			}
-			evalsStr = fmt.Sprintf("[%s]", strings.Join(evalQuoted, ", "))
-		}
-
 		// Build the method with conditional fields
 		var fields []string
 		fields = append(fields, fmt.Sprintf(`    slug: "%s"`, prompt.Slug))
 		fields = append(fields, fmt.Sprintf(`    name: "%s"`, prompt.Name))
 		fields = append(fields, fmt.Sprintf(`    description: "%s"`, prompt.Description))
-		fields = append(fields, fmt.Sprintf(`    evals: %s`, evalsStr))
 
 		// Add system field only if it exists
 		if prompt.System != "" {
@@ -405,9 +418,27 @@ func GenerateJavaScript(prompts []Prompt) string {
     }`, promptFunctionSignature, escapedPrompt))
 		}
 
-		method := fmt.Sprintf(`  %s: {
+		// Generate JSDoc comment
+		jsdoc := fmt.Sprintf(`  /**
+   * @name %s
+   * @description %s`, prompt.Name, prompt.Description)
+
+		if prompt.System != "" {
+			jsdoc += fmt.Sprintf(`
+   * @system %s`, strings.ReplaceAll(prompt.System, "\n", "\n   * "))
+		}
+
+		if prompt.Prompt != "" {
+			jsdoc += fmt.Sprintf(`
+   * @prompt %s`, strings.ReplaceAll(prompt.Prompt, "\n", "\n   * "))
+		}
+
+		jsdoc += "\n   */"
+
+		method := fmt.Sprintf(`%s
+  %s: {
 %s
-  }`, methodName, strings.Join(fields, ",\n"))
+  }`, jsdoc, methodName, strings.Join(fields, ",\n"))
 
 		methods = append(methods, method)
 	}
