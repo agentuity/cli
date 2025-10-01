@@ -2,15 +2,16 @@ package infrastructure
 
 import (
 	"context"
-	"crypto/ed25519"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"log"
 	"time"
 
-	ccrypto "github.com/agentuity/go-common/crypto"
 	"github.com/agentuity/go-common/logger"
 	cstr "github.com/agentuity/go-common/string"
 )
@@ -40,33 +41,25 @@ func generateNodeName(prefix string) string {
 }
 
 func generateKey() (string, string, error) {
-	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return "", "", err
 	}
-	// pubKey, err := privateKeyToPEM(privateKey)
-	// if err != nil {
-	// 	return "", "", err
-	// }
-	pkcs8BytesPK, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	pkeyDER, err := x509.MarshalECPrivateKey(privateKey)
 	if err != nil {
 		return "", "", err
 	}
-	pkcs8BytesPub, err := ccrypto.ExtractEd25519PublicKeyAsPEM(privateKey)
+	pkeyPem := pem.EncodeToMemory(&pem.Block{
+		Type:  "EC PRIVATE KEY",
+		Bytes: pkeyDER,
+	})
+	pubDer, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 	if err != nil {
 		return "", "", err
 	}
-	return string(pkcs8BytesPub), base64.StdEncoding.EncodeToString(pkcs8BytesPK), nil
+	pubPem := pem.EncodeToMemory(&pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: pubDer,
+	})
+	return base64.StdEncoding.EncodeToString(pubPem), base64.StdEncoding.EncodeToString(pkeyPem), nil
 }
-
-// func privateKeyToPEM(pk ed25519.PrivateKey) ([]byte, error) {
-// 	der, err := x509.MarshalPKCS8PrivateKey(pk) // PKCS#8
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	block := &pem.Block{
-// 		Type:  "PRIVATE KEY", // RFC 8410 uses unencrypted PKCS#8 with this type
-// 		Bytes: der,
-// 	}
-// 	return pem.EncodeToMemory(block), nil
-// }
