@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added feature flag to the CLI config ([#456](https://github.com/agentuity/cli/pull/456))
 
 
+## [v0.0.168] - 2025-09-24
+
+### Added
+- Add support for importing: yaml, json, txt, png, gif, jpg, svg, webp, md, csv, pdf, sql, xml ([#452](https://github.com/agentuity/cli/pull/452))
+- Onboard nudges on next steps. Changed shell completion failure from warn to ohai so it doesn't look like installation failed. ([#454](https://github.com/agentuity/cli/pull/454))
+
+
 ## [v0.0.167] - 2025-09-24
 
 ### Added
@@ -867,6 +874,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.0.165]: https://github.com/agentuity/cli/compare/v0.0.164...v0.0.165
 [v0.0.164]: https://github.com/agentuity/cli/compare/v0.0.163...v0.0.164
 [v0.0.163]: https://github.com/agentuity/cli/compare/v0.0.162...v0.0.163
+[v0.0.168]: https://github.com/agentuity/cli/compare/v0.0.167...v0.0.168
+
 [v0.0.162]: https://github.com/agentuity/cli/compare/v0.0.161...v0.0.162
 [v0.0.161]: https://github.com/agentuity/cli/compare/v0.0.160...v0.0.161
 [v0.0.160]: https://github.com/agentuity/cli/compare/v0.0.159...v0.0.160
