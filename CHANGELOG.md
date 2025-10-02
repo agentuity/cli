@@ -868,14 +868,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks for new agent creation
 
 [v0.0.169]: https://github.com/agentuity/cli/compare/v0.0.168...v0.0.169
+[v0.0.168]: https://github.com/agentuity/cli/compare/v0.0.167...v0.0.168
 
 [v0.0.167]: https://github.com/agentuity/cli/compare/v0.0.166...v0.0.167
 [v0.0.166]: https://github.com/agentuity/cli/compare/v0.0.165...v0.0.166
 [v0.0.165]: https://github.com/agentuity/cli/compare/v0.0.164...v0.0.165
 [v0.0.164]: https://github.com/agentuity/cli/compare/v0.0.163...v0.0.164
 [v0.0.163]: https://github.com/agentuity/cli/compare/v0.0.162...v0.0.163
-[v0.0.168]: https://github.com/agentuity/cli/compare/v0.0.167...v0.0.168
-
 [v0.0.162]: https://github.com/agentuity/cli/compare/v0.0.161...v0.0.162
 [v0.0.161]: https://github.com/agentuity/cli/compare/v0.0.160...v0.0.161
 [v0.0.160]: https://github.com/agentuity/cli/compare/v0.0.159...v0.0.160
