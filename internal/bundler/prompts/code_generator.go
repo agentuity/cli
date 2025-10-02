@@ -143,20 +143,31 @@ func (cg *CodeGenerator) generatePromptType(prompt Prompt) string {
 		promptParams = append(promptParams, fmt.Sprintf("variables?: { %s }", cg.generateVariableTypesFromObjects(promptVariables)))
 	}
 	promptParamStr := strings.Join(promptParams, ", ")
-	promptCompileType := fmt.Sprintf("(%s) => string", promptParamStr)
 
-	// Generate separate system type with docstring
+	// Generate separate system and prompt types with docstrings
 	systemTypeName := fmt.Sprintf("%sSystem", strcase.ToCamel(prompt.Slug))
-	systemTypeWithDocstring := cg.generateSystemTypeWithDocstring(prompt, systemTypeName, systemParamStr)
+	promptTypeName := fmt.Sprintf("%sPrompt", strcase.ToCamel(prompt.Slug))
+	mainTypeName := strcase.ToCamel(prompt.Slug)
+
+	systemTypeWithDocstring := cg.generateTypeWithDocstring(prompt.System, systemTypeName, systemParamStr, mainTypeName)
+	promptTypeWithDocstring := cg.generateTypeWithDocstring(prompt.Prompt, promptTypeName, promptParamStr, mainTypeName)
 
 	return fmt.Sprintf(`%s
 
+%s
+
 export type %s = {
   slug: string;
+  /**
+%s
+   */
   system: %s;
-  prompt: { compile: %s };
+  /**
+%s
+   */
+  prompt: %s;
 };`,
-		systemTypeWithDocstring, strcase.ToCamel(prompt.Slug), systemTypeName, promptCompileType)
+		systemTypeWithDocstring, promptTypeWithDocstring, mainTypeName, cg.generateTemplateDocstring(prompt.System), systemTypeName, cg.generateTemplateDocstring(prompt.Prompt), promptTypeName)
 }
 
 // generatePromptInterface generates a TypeScript interface for a prompt
@@ -412,37 +423,111 @@ func (cg *CodeGenerator) getPromptVariableObjects(prompt Prompt) []Variable {
 	return promptTemplate.Variables
 }
 
-// generateSystemTypeWithDocstring generates a separate system type with docstring
-func (cg *CodeGenerator) generateSystemTypeWithDocstring(prompt Prompt, typeName, systemParamStr string) string {
-	if prompt.System == "" {
+// generateTypeWithDocstring generates a separate type with docstring
+func (cg *CodeGenerator) generateTypeWithDocstring(template, typeName, paramStr, mainTypeName string) string {
+	if template == "" {
 		return fmt.Sprintf(`export type %s = { compile: (%s) => string };`,
-			typeName, systemParamStr)
+			typeName, paramStr)
 	}
 
-	// Generate JSDoc comment for the system type
-	docstring := cg.generateSystemDocstring(prompt)
+	// Generate JSDoc comment for the type with @memberof
+	docstring := cg.generateTemplateDocstring(template)
 
 	return fmt.Sprintf(`/**
 %s
+ * @memberof %s
+ * @type {object}
  */
 export type %s = { compile: (%s) => string };`,
-		docstring, typeName, systemParamStr)
+		docstring, mainTypeName, typeName, paramStr)
 }
 
-// generateSystemDocstring generates the docstring content for the system template
-func (cg *CodeGenerator) generateSystemDocstring(prompt Prompt) string {
-	if prompt.System == "" {
+// generateTemplateDocstring generates the docstring content for any template
+func (cg *CodeGenerator) generateTemplateDocstring(template string) string {
+	if template == "" {
 		return ""
 	}
 
 	// Escape the template for docstring and add proper line breaks
-	escapedSystem := strings.ReplaceAll(prompt.System, "*/", "* /")
+	escapedTemplate := strings.ReplaceAll(template, "*/", "* /")
 	// Split by newlines and add proper docstring formatting
-	systemLines := strings.Split(escapedSystem, "\n")
+	templateLines := strings.Split(escapedTemplate, "\n")
 	var docLines []string
-	for _, line := range systemLines {
-		docLines = append(docLines, fmt.Sprintf("  * %s", line))
+	for _, line := range templateLines {
+		// Add line breaks at natural break points (sentences, periods, etc.)
+		formattedLine := cg.addNaturalLineBreaks(line)
+		docLines = append(docLines, fmt.Sprintf("  * %s", formattedLine))
 	}
 
 	return strings.Join(docLines, "\n")
+}
+
+// addNaturalLineBreaks adds line breaks at natural break points
+func (cg *CodeGenerator) addNaturalLineBreaks(line string) string {
+	// If line is short enough, return as is
+	if len(line) <= 60 {
+		return line
+	}
+
+	// Look for natural break points: periods, commas, or spaces
+	// Split at periods followed by space
+	parts := strings.Split(line, ". ")
+	if len(parts) > 1 {
+		var result []string
+		for i, part := range parts {
+			if i > 0 {
+				part = part + "."
+			}
+			if len(part) > 60 {
+				// Further split long parts at commas
+				commaParts := strings.Split(part, ", ")
+				if len(commaParts) > 1 {
+					for j, commaPart := range commaParts {
+						if j > 0 {
+							commaPart = commaPart + ","
+						}
+						result = append(result, commaPart)
+					}
+				} else {
+					result = append(result, part)
+				}
+			} else {
+				result = append(result, part)
+			}
+		}
+		// Use HTML line breaks instead of newlines
+		return strings.Join(result, ".<br/>  * ")
+	}
+
+	return line
+}
+
+// wrapLine wraps a long line at the specified width
+func (cg *CodeGenerator) wrapLine(line string, width int) []string {
+	if len(line) <= width {
+		return []string{line}
+	}
+
+	var wrapped []string
+	words := strings.Fields(line)
+	var currentLine strings.Builder
+
+	for _, word := range words {
+		// If adding this word would exceed the width, start a new line
+		if currentLine.Len() > 0 && currentLine.Len()+len(word)+1 > width {
+			wrapped = append(wrapped, currentLine.String())
+			currentLine.Reset()
+		}
+
+		if currentLine.Len() > 0 {
+			currentLine.WriteString(" ")
+		}
+		currentLine.WriteString(word)
+	}
+
+	if currentLine.Len() > 0 {
+		wrapped = append(wrapped, currentLine.String())
+	}
+
+	return wrapped
 }
