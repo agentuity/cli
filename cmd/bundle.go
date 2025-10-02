@@ -40,9 +40,7 @@ Examples:
 		projectContext := project.EnsureProject(ctx, cmd)
 
 		// Check for prompts evals feature flag
-		if CheckFeatureFlag(cmd, FeaturePromptsEvals, "enable-prompts-evals") {
-			projectContext.Logger.Info("Prompts evaluations feature is enabled")
-		}
+		promptsEvalsFF := CheckFeatureFlag(cmd, FeaturePromptsEvals, "enable-prompts-evals")
 
 		production, _ := cmd.Flags().GetBool("production")
 		install, _ := cmd.Flags().GetBool("install")
@@ -52,14 +50,15 @@ Examples:
 		description, _ := cmd.Flags().GetString("description")
 
 		if err := bundler.Bundle(bundler.BundleContext{
-			Context:    ctx,
-			Logger:     projectContext.Logger,
-			Project:    projectContext.Project,
-			ProjectDir: projectContext.Dir,
-			Production: production,
-			Install:    install,
-			CI:         ci,
-			Writer:     os.Stderr,
+			Context:        ctx,
+			Logger:         projectContext.Logger,
+			Project:        projectContext.Project,
+			ProjectDir:     projectContext.Dir,
+			Production:     production,
+			PromptsEvalsFF: promptsEvalsFF,
+			Install:        install,
+			CI:             ci,
+			Writer:         os.Stderr,
 		}); err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to bundle project")).ShowErrorAndExit()
 		}

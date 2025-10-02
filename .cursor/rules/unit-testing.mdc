@@ -1,0 +1,106 @@
+---
+description: Unit Testing Rules for CLI
+globs: *_test.go
+alwaysApply: true
+---
+
+# Unit Testing Rules
+
+## Use Testify for All Tests
+- ✅ ALWAYS use `github.com/stretchr/testify/assert` and `github.com/stretchr/testify/require` for testing
+- ✅ Use `assert.Equal()`, `assert.True()`, `assert.False()`, `assert.NoError()`, `assert.Error()` for assertions
+- ✅ Use `require.NoError()`, `require.True()`, `require.False()` for fatal assertions that should stop test execution
+- ✅ Use table-driven tests with `t.Run()` for multiple test cases
+
+## Test Structure Pattern
+```go
+func TestFunctionName(t *testing.T) {
+    tests := []struct {
+        name     string
+        input    string
+        expected string
+    }{
+        {"test case 1", "input1", "expected1"},
+        {"test case 2", "input2", "expected2"},
+    }
+
+    for _, test := range tests {
+        t.Run(test.name, func(t *testing.T) {
+            result := FunctionName(test.input)
+            assert.Equal(t, test.expected, result)
+        })
+    }
+}
+```
+
+## Reference Examples
+- See `internal/util/strings_test.go` for basic assertion patterns
+- See `internal/util/api_test.go` for complex test scenarios with `require` and `assert`
+- See `internal/bundler/bundler_test.go` for table-driven test patterns
+
+## Common Testify Patterns
+
+### Basic Assertions
+```go
+import (
+    "testing"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+)
+
+func TestBasicAssertions(t *testing.T) {
+    // Equality
+    assert.Equal(t, expected, actual)
+    assert.NotEqual(t, expected, actual)
+    
+    // Boolean checks
+    assert.True(t, condition)
+    assert.False(t, condition)
+    
+    // Error handling
+    assert.NoError(t, err)
+    assert.Error(t, err)
+    
+    // Fatal assertions (stop test on failure)
+    require.NoError(t, err)
+    require.True(t, condition)
+}
+```
+
+### Table-Driven Tests
+```go
+func TestMultipleCases(t *testing.T) {
+    tests := []struct {
+        name     string
+        input    string
+        expected string
+    }{
+        {"empty string", "", ""},
+        {"simple case", "input", "output"},
+        {"special chars", "input@#$", "output___"},
+    }
+
+    for _, test := range tests {
+        t.Run(test.name, func(t *testing.T) {
+            result := ProcessInput(test.input)
+            assert.Equal(t, test.expected, result)
+        })
+    }
+}
+```
+
+### Error Testing
+```go
+func TestErrorHandling(t *testing.T) {
+    t.Run("should return error for invalid input", func(t *testing.T) {
+        err := ProcessInvalidInput("invalid")
+        require.Error(t, err)
+        assert.Contains(t, err.Error(), "invalid input")
+    })
+    
+    t.Run("should not return error for valid input", func(t *testing.T) {
+        err := ProcessValidInput("valid")
+        assert.NoError(t, err)
+    })
+}
+```

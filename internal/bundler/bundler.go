@@ -2,10 +2,8 @@ package bundler
 
 import (
 	"archive/zip"
-	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
 	"os"
 	"os/exec"
@@ -14,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agentuity/cli/internal/bundler/prompts"
 	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
@@ -35,18 +34,6 @@ type AgentConfig struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
 	Filename string `json:"filename"`
-}
-
-type BundleContext struct {
-	Context    context.Context
-	Logger     logger.Logger
-	Project    *project.Project
-	ProjectDir string
-	Production bool
-	Install    bool
-	CI         bool
-	DevMode    bool
-	Writer     io.Writer
 }
 
 func dirSize(path string) (int64, error) {
@@ -420,6 +407,14 @@ func getJSInstallCommand(ctx BundleContext, projectDir, runtime string, isWorksp
 }
 
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
+
+	// Generate prompts if prompts.yaml exists (before dependency installation)
+
+	if ctx.PromptsEvalsFF {
+		if err := prompts.ProcessPrompts(ctx.Logger, dir); err != nil {
+			return fmt.Errorf("failed to process prompts: %w", err)
+		}
+	}
 
 	// Determine where to install dependencies (workspace root or agent directory)
 	installDir := findWorkspaceInstallDir(ctx.Logger, dir)
