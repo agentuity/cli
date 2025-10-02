@@ -8,6 +8,10 @@ lint:
 	@go vet ./...
 	@go mod tidy
 
+lint:
+	@$(MAKE) fmt
+	@go mod tidy
+
 generate:
 	@echo "Running go generate..."
 	@go generate ./...

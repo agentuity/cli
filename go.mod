@@ -18,12 +18,17 @@ require (
 	github.com/iancoleman/strcase v0.3.0
 	github.com/marcozac/go-jsonc v0.1.1
 	github.com/mattn/go-isatty v0.0.20
+	github.com/mattn/go-shellwords v1.0.12
+	github.com/muesli/reflow v0.3.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
+	github.com/sergeymakinen/go-quote v1.1.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.11.1
 	github.com/zijiren233/yaml-comment v0.2.2
+	golang.design/x/clipboard v0.7.1
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
+	golang.org/x/term v0.34.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/apimachinery v0.32.1
 )
@@ -125,10 +130,12 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/crypto v0.41.0 // indirect
+	golang.org/x/exp/shiny v0.0.0-20250606033433-dcc06ee1d476 // indirect
+	golang.org/x/image v0.28.0 // indirect
+	golang.org/x/mobile v0.0.0-20250606033058-a2a15c67f36f // indirect
 	golang.org/x/net v0.43.0
 	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.35.0
-	golang.org/x/term v0.34.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250825161204-c5933d9347a5 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250825161204-c5933d9347a5 // indirect
