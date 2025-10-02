@@ -350,6 +350,13 @@ func (cg *CodeGenerator) generatePromptTypeExports() string {
 
 		exports = append(exports, fmt.Sprintf("  [%q]: {\n    slug: string;\n    system: %s;\n    prompt: %s;\n  };", prompt.Slug, systemSignature, promptSignature))
 	}
+
+	// Add compile method signature
+	exports = append(exports, "  compile: <T extends keyof PromptsCollection>(\n    name: T,\n    variables?: {\n      system?: Parameters<PromptsCollection[T]['system']>[0];\n      prompt?: Parameters<PromptsCollection[T]['prompt']>[0];\n    }\n  ) => { system: string; prompt: string };")
+
+	// Add getPrompt method signature
+	exports = append(exports, "  getPrompt: <T extends keyof PromptsCollection>(\n    name: T\n  ) => {\n    system: PromptsCollection[T]['system'];\n    prompt: PromptsCollection[T]['prompt'];\n  };")
+
 	return strings.Join(exports, "\n")
 }
 
