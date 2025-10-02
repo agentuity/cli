@@ -229,12 +229,16 @@ func (cg *CodeGenerator) generateDocstring(prompt Prompt) string {
 	var docLines []string
 	docLines = append(docLines, "/**")
 
-	// Add name and description if available
+	// Add name and description with separate tags
 	if prompt.Name != "" {
-		docLines = append(docLines, fmt.Sprintf(" * %s", prompt.Name))
+		docLines = append(docLines, fmt.Sprintf(" * @name %s", prompt.Name))
+	} else {
+		// Fallback to slug-based name
+		docLines = append(docLines, fmt.Sprintf(" * @name %s", strcase.ToCamel(prompt.Slug)))
 	}
+
 	if prompt.Description != "" {
-		docLines = append(docLines, fmt.Sprintf(" * %s", prompt.Description))
+		docLines = append(docLines, fmt.Sprintf(" * @description %s", prompt.Description))
 	}
 
 	// Add original templates
@@ -299,16 +303,16 @@ func (cg *CodeGenerator) generatePromptPropertyJSDoc(prompt Prompt) string {
 	// Create JSDoc comment with name, description, and templates
 	docLines = append(docLines, "  /**")
 
-	// Add name and description
-	if prompt.Name != "" && prompt.Description != "" {
-		docLines = append(docLines, fmt.Sprintf("   * %s - %s", prompt.Name, prompt.Description))
-	} else if prompt.Name != "" {
-		docLines = append(docLines, fmt.Sprintf("   * %s", prompt.Name))
-	} else if prompt.Description != "" {
-		docLines = append(docLines, fmt.Sprintf("   * %s", prompt.Description))
+	// Add name and description with separate tags
+	if prompt.Name != "" {
+		docLines = append(docLines, fmt.Sprintf("   * @name %s", prompt.Name))
 	} else {
 		// Fallback to slug-based name
-		docLines = append(docLines, fmt.Sprintf("   * %s", strcase.ToCamel(prompt.Slug)))
+		docLines = append(docLines, fmt.Sprintf("   * @name %s", strcase.ToCamel(prompt.Slug)))
+	}
+
+	if prompt.Description != "" {
+		docLines = append(docLines, fmt.Sprintf("   * @description %s", prompt.Description))
 	}
 
 	// Add original templates
@@ -348,16 +352,16 @@ func (cg *CodeGenerator) generatePromptTypeJSDoc(prompt Prompt) string {
 	// Create JSDoc comment with name, description, and prompt template only
 	docLines = append(docLines, "/**")
 
-	// Add name and description
-	if prompt.Name != "" && prompt.Description != "" {
-		docLines = append(docLines, fmt.Sprintf(" * %s - %s", prompt.Name, prompt.Description))
-	} else if prompt.Name != "" {
-		docLines = append(docLines, fmt.Sprintf(" * %s", prompt.Name))
-	} else if prompt.Description != "" {
-		docLines = append(docLines, fmt.Sprintf(" * %s", prompt.Description))
+	// Add name and description with separate tags
+	if prompt.Name != "" {
+		docLines = append(docLines, fmt.Sprintf(" * @name %s", prompt.Name))
 	} else {
 		// Fallback to slug-based name
-		docLines = append(docLines, fmt.Sprintf(" * %s", strcase.ToCamel(prompt.Slug)))
+		docLines = append(docLines, fmt.Sprintf(" * @name %s", strcase.ToCamel(prompt.Slug)))
+	}
+
+	if prompt.Description != "" {
+		docLines = append(docLines, fmt.Sprintf(" * @description %s", prompt.Description))
 	}
 
 	// Add only the prompt template
