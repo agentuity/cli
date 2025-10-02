@@ -140,7 +140,7 @@ func execAction(ctx context.Context, canExecute bool, instruction string, help s
 				return err
 			}
 		}
-		tui.ShowSuccess(success)
+		tui.ShowSuccess("%s", success)
 	case skip:
 		tui.ShowWarning("Skipped")
 	case manual:
