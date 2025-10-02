@@ -213,6 +213,11 @@ var gcpSpecification = `[
         "https://www.googleapis.com/auth/cloud-platform",
         "--service-account",
         "{GCP_SERVICE_ACCOUNT}",
+        "--shielded-secure-boot",
+        "--shielded-vtpm",
+        "--shielded-integrity-monitoring",
+        "--stack-type",
+        "IPV4_ONLY",
         "--metadata=user-data={CLUSTER_TOKEN}"
       ],
       "validate": "agentuity-node-cfd688",

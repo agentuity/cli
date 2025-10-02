@@ -297,7 +297,7 @@ var machineCreateCmd = &cobra.Command{
 		provider := args[1]
 		region := args[2]
 
-		orgId := promptForClusterOrganization(ctx, logger, cmd, apiUrl, apikey)
+		orgId := promptForClusterOrganization(ctx, logger, cmd, apiUrl, apikey, "What organization should we create the machine in?")
 
 		resp, err := infrastructure.CreateMachine(ctx, logger, apiUrl, apikey, clusterID, orgId, provider, region)
 		if err != nil {
