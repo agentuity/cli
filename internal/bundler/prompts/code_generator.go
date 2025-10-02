@@ -78,34 +78,36 @@ func (cg *CodeGenerator) GenerateTypeScriptInterfaces() string {
 // generatePromptObject generates a single prompt object with system and prompt properties
 func (cg *CodeGenerator) generatePromptObject(prompt Prompt) string {
 	// Get variables from system template
-	systemVariables := cg.getSystemVariables(prompt)
-	var systemParams []string
-	if len(systemVariables) > 0 {
-		systemParams = append(systemParams, "variables")
-	}
-	systemParamStr := strings.Join(systemParams, ", ")
+	systemVariables := cg.getSystemVariableObjects(prompt)
 
 	// Get variables from prompt template
-	promptVariables := cg.getPromptVariables(prompt)
-	var promptParams []string
-	if len(promptVariables) > 0 {
-		promptParams = append(promptParams, "variables")
+	promptVariables := cg.getPromptVariableObjects(prompt)
+
+	// Generate system function signature
+	var systemParamStr string
+	if len(systemVariables) == 0 {
+		systemParamStr = ""
+	} else {
+		systemParamStr = "variables = {}"
 	}
-	promptParamStr := strings.Join(promptParams, ", ")
+
+	// Generate prompt function signature
+	var promptParamStr string
+	if len(promptVariables) == 0 {
+		promptParamStr = ""
+	} else {
+		promptParamStr = "variables = {}"
+	}
 
 	return fmt.Sprintf(`const %s = {
     slug: %q,
-    system: {
-        compile: (%s) => {
-            return %s
-        }
+    system: (%s) => {
+        return %s
     },
-    prompt: {
-        compile: (%s) => {
-            return %s
-        }
+    prompt: (%s) => {
+        return %s
     }
-};`, strcase.ToLowerCamel(prompt.Slug), prompt.Slug, systemParamStr, cg.generateTemplateValue(prompt.System), promptParamStr, cg.generateTemplateValue(prompt.Prompt))
+};`, strcase.ToLowerCamel(prompt.Slug), prompt.Slug, systemParamStr, cg.generateTemplateValueWithVars(prompt.System, len(systemVariables) > 0), promptParamStr, cg.generateTemplateValueWithVars(prompt.Prompt, len(promptVariables) > 0))
 }
 
 // generateTemplateValue generates the value for a template (either compile function or direct interpolateTemplate call)
@@ -115,6 +117,19 @@ func (cg *CodeGenerator) generateTemplateValue(template string) string {
 	}
 
 	return fmt.Sprintf("interpolateTemplate(%q, variables)", template)
+}
+
+// generateTemplateValueWithVars generates the value for a template with variable awareness
+func (cg *CodeGenerator) generateTemplateValueWithVars(template string, hasVariables bool) string {
+	if template == "" {
+		return `""`
+	}
+
+	if hasVariables {
+		return fmt.Sprintf("interpolateTemplate(%q, variables)", template)
+	} else {
+		return fmt.Sprintf("interpolateTemplate(%q, {})", template)
+	}
 }
 
 // generatePromptType generates a TypeScript type for a prompt object
@@ -152,13 +167,13 @@ export type %s = {
   /**
 %s
    */
-  system: %s;
+  system: (%s) => string;
   /**
 %s
    */
-  prompt: %s;
+  prompt: (%s) => string;
 };`,
-		systemTypeWithDocstring, promptTypeWithDocstring, mainTypeName, cg.generateTemplateDocstring(prompt.System), systemTypeName, cg.generateTemplateDocstring(prompt.Prompt), promptTypeName)
+		systemTypeWithDocstring, promptTypeWithDocstring, mainTypeName, cg.generateTemplateDocstring(prompt.System), systemParamStr, cg.generateTemplateDocstring(prompt.Prompt), promptParamStr)
 }
 
 // generatePromptInterface generates a TypeScript interface for a prompt
@@ -213,6 +228,29 @@ func (cg *CodeGenerator) generateVariableTypesFromObjects(variables []Variable) 
 		}
 	}
 	return strings.Join(types, "; ")
+}
+
+// hasRequiredVariables checks if any variables in the list are required
+func (cg *CodeGenerator) hasRequiredVariables(variables []Variable) bool {
+	for _, variable := range variables {
+		if variable.IsRequired {
+			return true
+		}
+	}
+	return false
+}
+
+// allVariablesRequired checks if all variables in the list are required
+func (cg *CodeGenerator) allVariablesRequired(variables []Variable) bool {
+	if len(variables) == 0 {
+		return false
+	}
+	for _, variable := range variables {
+		if !variable.IsRequired {
+			return false
+		}
+	}
+	return true
 }
 
 // generateDocstring generates a JSDoc-style docstring for a prompt
@@ -270,7 +308,7 @@ func (cg *CodeGenerator) generatePromptExports() string {
 		// Generate JSDoc comment for each prompt property
 		jsdocComment := cg.generatePromptPropertyJSDoc(prompt)
 		exports = append(exports, jsdocComment)
-		exports = append(exports, fmt.Sprintf("    %s,", strcase.ToLowerCamel(prompt.Slug)))
+		exports = append(exports, fmt.Sprintf("    [%q]: %s,", prompt.Slug, strcase.ToLowerCamel(prompt.Slug)))
 	}
 	return strings.Join(exports, "\n")
 }
@@ -282,7 +320,35 @@ func (cg *CodeGenerator) generatePromptTypeExports() string {
 		// Generate JSDoc comment for each prompt property
 		jsdocComment := cg.generatePromptPropertyJSDoc(prompt)
 		exports = append(exports, jsdocComment)
-		exports = append(exports, fmt.Sprintf("  %s: %s;", strcase.ToLowerCamel(prompt.Slug), strcase.ToCamel(prompt.Slug)))
+		// Get variables from system template
+		systemVariables := cg.getSystemVariableObjects(prompt)
+		systemTypeStr := cg.generateVariableTypesFromObjects(systemVariables)
+
+		// Get variables from prompt template
+		promptVariables := cg.getPromptVariableObjects(prompt)
+		promptTypeStr := cg.generateVariableTypesFromObjects(promptVariables)
+
+		// Generate system function signature
+		var systemSignature string
+		if len(systemVariables) == 0 {
+			systemSignature = "() => string"
+		} else if cg.hasRequiredVariables(systemVariables) {
+			systemSignature = fmt.Sprintf("(variables: {%s}) => string", systemTypeStr)
+		} else {
+			systemSignature = fmt.Sprintf("(variables?: {%s}) => string", systemTypeStr)
+		}
+
+		// Generate prompt function signature
+		var promptSignature string
+		if len(promptVariables) == 0 {
+			promptSignature = "() => string"
+		} else if cg.hasRequiredVariables(promptVariables) {
+			promptSignature = fmt.Sprintf("(variables: {%s}) => string", promptTypeStr)
+		} else {
+			promptSignature = fmt.Sprintf("(variables?: {%s}) => string", promptTypeStr)
+		}
+
+		exports = append(exports, fmt.Sprintf("  [%q]: {\n    slug: string;\n    system: %s;\n    prompt: %s;\n  };", prompt.Slug, systemSignature, promptSignature))
 	}
 	return strings.Join(exports, "\n")
 }
@@ -421,7 +487,7 @@ func (cg *CodeGenerator) getPromptVariableObjects(prompt Prompt) []Variable {
 // generateTypeWithDocstring generates a separate type with docstring
 func (cg *CodeGenerator) generateTypeWithDocstring(template, typeName, paramStr, mainTypeName string) string {
 	if template == "" {
-		return fmt.Sprintf(`export type %s = { compile: (%s) => string };`,
+		return fmt.Sprintf(`export type %s = (%s) => string;`,
 			typeName, paramStr)
 	}
 
@@ -433,7 +499,7 @@ func (cg *CodeGenerator) generateTypeWithDocstring(template, typeName, paramStr,
  * @memberof %s
  * @type {object}
  */
-export type %s = { compile: (%s) => string };`,
+export type %s = (%s) => string;`,
 		docstring, mainTypeName, typeName, paramStr)
 }
 
