@@ -61,17 +61,17 @@ func TestCodeGenerator(t *testing.T) {
 		assert.Contains(t, types, "import { interpolateTemplate } from '@agentuity/sdk';")
 
 		// Check that it contains the prompts object
-		assert.Contains(t, types, "export const prompts: {")
+		assert.Contains(t, types, "export const prompts: PromptsCollection = {} as any;")
 
 		// Check that it contains both prompt types
 		assert.Contains(t, types, "TestPrompt1")
 		assert.Contains(t, types, "TestPrompt2")
 
-		// Check that it contains variable types (order may vary)
+		// Check that it contains variable types with proper optional/default syntax
 		assert.Contains(t, types, "variables?: {")
-		assert.Contains(t, types, "role: string")
+		assert.Contains(t, types, "role?: string | \"assistant\"")
 		assert.Contains(t, types, "domain: string")
-		assert.Contains(t, types, "task: string")
+		assert.Contains(t, types, "task?: string | \"their question\"")
 	})
 
 	t.Run("GenerateTypeScriptInterfaces", func(t *testing.T) {
@@ -81,15 +81,15 @@ func TestCodeGenerator(t *testing.T) {
 		assert.Contains(t, interfaces, "export interface TestPrompt1 {")
 		assert.Contains(t, interfaces, "export interface TestPrompt2 {")
 
-		// Check that it contains variable types (order may vary)
+		// Check that it contains variable types with proper optional/default syntax
 		assert.Contains(t, interfaces, "variables?: {")
-		assert.Contains(t, interfaces, "role: string")
+		assert.Contains(t, interfaces, "role?: string | \"assistant\"")
 		assert.Contains(t, interfaces, "domain: string")
-		assert.Contains(t, interfaces, "task: string")
+		assert.Contains(t, interfaces, "task?: string | \"their question\"")
 
-		// Check that it contains system and prompt fields
-		assert.Contains(t, interfaces, "system?: string;")
-		assert.Contains(t, interfaces, "prompt?: string;")
+		// Check that it contains system and prompt compile functions
+		assert.Contains(t, interfaces, "system: { compile:")
+		assert.Contains(t, interfaces, "prompt: { compile:")
 	})
 }
 
@@ -110,8 +110,7 @@ func TestCodeGenerator_EmptyPrompts(t *testing.T) {
 
 	t.Run("GenerateTypeScriptTypes", func(t *testing.T) {
 		types := codeGen.GenerateTypeScriptTypes()
-		assert.Contains(t, types, "export const prompts: {")
-		assert.Contains(t, types, "} = {} as any;")
+		assert.Contains(t, types, "export const prompts: PromptsCollection = {} as any;")
 	})
 
 	t.Run("GenerateTypeScriptInterfaces", func(t *testing.T) {
@@ -198,18 +197,18 @@ func TestCodeGenerator_ComplexPrompts(t *testing.T) {
 		types := codeGen.GenerateTypeScriptTypes()
 
 		// Check that it has the correct object structure for complex prompts
-		assert.Contains(t, types, "system: { compile:")
-		assert.Contains(t, types, "prompt: { compile:")
+		assert.Contains(t, types, "system: ComplexPromptSystem;")
+		assert.Contains(t, types, "prompt: ComplexPromptPrompt;")
 		assert.Contains(t, types, "slug: string;")
 
-		// Check that it includes all variables (order may vary)
+		// Check that it includes all variables with proper optional/default syntax
 		assert.Contains(t, types, "variables?: {")
-		assert.Contains(t, types, "role: string")
+		assert.Contains(t, types, "role?: string | \"helpful assistant\"")
 		assert.Contains(t, types, "domain: string")
-		assert.Contains(t, types, "experience: string")
-		assert.Contains(t, types, "task: string")
-		assert.Contains(t, types, "approach: string")
-		assert.Contains(t, types, "priority: string")
+		assert.Contains(t, types, "experience?: string | \"intermediate\"")
+		assert.Contains(t, types, "task?: string | \"their question\"")
+		assert.Contains(t, types, "approach?: string | \"detailed\"")
+		assert.Contains(t, types, "priority?: string | \"normal\"")
 	})
 }
 
@@ -227,10 +226,10 @@ func TestCodeGenerator_VariableTypes(t *testing.T) {
 	t.Run("GenerateVariableTypes", func(t *testing.T) {
 		types := codeGen.GenerateTypeScriptTypes()
 
-		// Check that it includes all variable types (order may vary)
+		// Check that it includes all variable types with proper optional/default syntax
 		assert.Contains(t, types, "variables?: {")
-		assert.Contains(t, types, "legacy: string")
-		assert.Contains(t, types, "new: string")
+		assert.Contains(t, types, "legacy?: string")
+		assert.Contains(t, types, "new?: string | \"default\"")
 		assert.Contains(t, types, "required: string")
 	})
 }
