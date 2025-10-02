@@ -108,53 +108,56 @@ func ParseTemplate(template string) Template {
 	seen := make(map[string]bool)
 
 	for _, match := range matches {
-		if len(match) > 1 {
-			var varName string
-			var isRequired bool
-			var hasDefault bool
-			var defaultValue string
-			var originalSyntax string
+		// Ensure we have at least 4 elements: full match + 3 capture groups
+		if len(match) < 4 {
+			continue // Skip malformed matches
+		}
 
-			// Handle {{variable}} syntax (match[1])
-			if match[1] != "" {
-				varName = strings.TrimSpace(match[1])
-				isRequired = false // {{variable}} is always optional
-				hasDefault = false // {{variable}} has no default
-				originalSyntax = "{{" + varName + "}}"
-			} else if match[2] != "" {
-				// Handle {variable:default} syntax (match[2])
-				originalSyntax = match[0] // Full match including braces
-				varName = strings.TrimSpace(match[2])
-				isRequired = strings.HasPrefix(varName, "!")
-				hasDefault = match[3] != "" // Has default if match[3] is not empty
-				defaultValue = match[3]
+		var varName string
+		var isRequired bool
+		var hasDefault bool
+		var defaultValue string
+		var originalSyntax string
 
-				// Clean up the variable name
-				if isRequired {
-					varName = varName[1:] // Remove ! prefix
+		// Handle {{variable}} syntax (match[1])
+		if match[1] != "" {
+			varName = strings.TrimSpace(match[1])
+			isRequired = false // {{variable}} is always optional
+			hasDefault = false // {{variable}} has no default
+			originalSyntax = "{{" + varName + "}}"
+		} else if match[2] != "" {
+			// Handle {variable:default} syntax (match[2])
+			originalSyntax = match[0] // Full match including braces
+			varName = strings.TrimSpace(match[2])
+			isRequired = strings.HasPrefix(varName, "!")
+			hasDefault = match[3] != "" // Has default if match[3] is not empty
+			defaultValue = match[3]
+
+			// Clean up the variable name
+			if isRequired && len(varName) > 1 {
+				varName = varName[1:] // Remove ! prefix
+			}
+			if hasDefault {
+				// Remove :default suffix
+				if idx := strings.Index(varName, ":"); idx != -1 {
+					varName = varName[:idx]
 				}
-				if hasDefault {
-					// Remove :default suffix
-					if idx := strings.Index(varName, ":"); idx != -1 {
-						varName = varName[:idx]
-					}
-					// Handle :- syntax for required variables with defaults
-					if strings.HasPrefix(defaultValue, "-") {
-						defaultValue = defaultValue[1:] // Remove leading dash
-					}
+				// Handle :- syntax for required variables with defaults
+				if len(defaultValue) > 0 && strings.HasPrefix(defaultValue, "-") {
+					defaultValue = defaultValue[1:] // Remove leading dash
 				}
 			}
+		}
 
-			if varName != "" && !seen[varName] {
-				seen[varName] = true
-				variables = append(variables, Variable{
-					Name:           varName,
-					IsRequired:     isRequired,
-					HasDefault:     hasDefault,
-					DefaultValue:   defaultValue,
-					OriginalSyntax: originalSyntax,
-				})
-			}
+		if varName != "" && !seen[varName] {
+			seen[varName] = true
+			variables = append(variables, Variable{
+				Name:           varName,
+				IsRequired:     isRequired,
+				HasDefault:     hasDefault,
+				DefaultValue:   defaultValue,
+				OriginalSyntax: originalSyntax,
+			})
 		}
 	}
 

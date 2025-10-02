@@ -105,25 +105,16 @@ func (cg *CodeGenerator) generatePromptObject(prompt Prompt) string {
             return %s
         }
     }
-};`, strcase.ToLowerCamel(prompt.Slug), prompt.Slug, systemParamStr, cg.generateTemplateValue(prompt.System, systemVariables), promptParamStr, cg.generateTemplateValue(prompt.Prompt, promptVariables))
+};`, strcase.ToLowerCamel(prompt.Slug), prompt.Slug, systemParamStr, cg.generateTemplateValue(prompt.System), promptParamStr, cg.generateTemplateValue(prompt.Prompt))
 }
 
 // generateTemplateValue generates the value for a template (either compile function or direct interpolateTemplate call)
-func (cg *CodeGenerator) generateTemplateValue(template string, allVariables []string) string {
+func (cg *CodeGenerator) generateTemplateValue(template string) string {
 	if template == "" {
-		return "interpolateTemplate('', variables)"
+		return `""`
 	}
 
 	return fmt.Sprintf("interpolateTemplate(%q, variables)", template)
-}
-
-// generateSystemCompile generates the system compile function body
-func (cg *CodeGenerator) generateSystemCompile(template string, allVariables []string) string {
-	if template == "" {
-		return "interpolateTemplate('', variables);"
-	}
-
-	return fmt.Sprintf("interpolateTemplate(%q, variables);", template)
 }
 
 // generatePromptType generates a TypeScript type for a prompt object
