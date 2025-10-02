@@ -447,28 +447,6 @@ func (cg *CodeGenerator) generatePromptTypeJSDoc(prompt Prompt) string {
 	return strings.Join(docLines, "\n")
 }
 
-// getSystemVariables gets variables from the system template only
-func (cg *CodeGenerator) getSystemVariables(prompt Prompt) []string {
-	// Parse system template if not already parsed
-	systemTemplate := prompt.SystemTemplate
-	if len(systemTemplate.Variables) == 0 && prompt.System != "" {
-		systemTemplate = ParseTemplate(prompt.System)
-	}
-
-	return systemTemplate.VariableNames()
-}
-
-// getPromptVariables gets variables from the prompt template only
-func (cg *CodeGenerator) getPromptVariables(prompt Prompt) []string {
-	// Parse prompt template if not already parsed
-	promptTemplate := prompt.PromptTemplate
-	if len(promptTemplate.Variables) == 0 && prompt.Prompt != "" {
-		promptTemplate = ParseTemplate(prompt.Prompt)
-	}
-
-	return promptTemplate.VariableNames()
-}
-
 // getSystemVariableObjects gets variable objects from the system template only
 func (cg *CodeGenerator) getSystemVariableObjects(prompt Prompt) []Variable {
 	// Parse system template if not already parsed
