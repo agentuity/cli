@@ -205,20 +205,3 @@ func ParseTemplateVariables(template string) []string {
 
 	return variables
 }
-
-// ParsedPrompt represents a parsed prompt with system and prompt template information
-type ParsedPrompt struct {
-	System Template `json:"system"`
-	Prompt Template `json:"prompt"`
-}
-
-// ParsePrompt parses both system and prompt templates and returns structured information
-func ParsePrompt(prompt Prompt) ParsedPrompt {
-	systemParsed := ParseTemplate(prompt.System)
-	promptParsed := ParseTemplate(prompt.Prompt)
-
-	return ParsedPrompt{
-		System: systemParsed,
-		Prompt: promptParsed,
-	}
-}
