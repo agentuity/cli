@@ -13,19 +13,19 @@ import (
 // Mock logger for testing
 type mockLogger struct{}
 
-func (m *mockLogger) Trace(format string, args ...interface{}) {}
-func (m *mockLogger) Debug(format string, args ...interface{}) {}
-func (m *mockLogger) Info(format string, args ...interface{})  {}
-func (m *mockLogger) Warn(format string, args ...interface{})  {}
-func (m *mockLogger) Error(format string, args ...interface{}) {}
-func (m *mockLogger) Fatal(format string, args ...interface{}) {}
-func (m *mockLogger) IsTraceEnabled() bool                     { return false }
-func (m *mockLogger) IsDebugEnabled() bool                     { return false }
-func (m *mockLogger) IsInfoEnabled() bool                      { return false }
-func (m *mockLogger) IsWarnEnabled() bool                      { return false }
-func (m *mockLogger) IsErrorEnabled() bool                     { return false }
-func (m *mockLogger) IsFatalEnabled() bool                     { return false }
-func (m *mockLogger) WithField(key string, value interface{}) logger.Logger { return m }
+func (m *mockLogger) Trace(format string, args ...interface{})               {}
+func (m *mockLogger) Debug(format string, args ...interface{})               {}
+func (m *mockLogger) Info(format string, args ...interface{})                {}
+func (m *mockLogger) Warn(format string, args ...interface{})                {}
+func (m *mockLogger) Error(format string, args ...interface{})               {}
+func (m *mockLogger) Fatal(format string, args ...interface{})               {}
+func (m *mockLogger) IsTraceEnabled() bool                                   { return false }
+func (m *mockLogger) IsDebugEnabled() bool                                   { return false }
+func (m *mockLogger) IsInfoEnabled() bool                                    { return false }
+func (m *mockLogger) IsWarnEnabled() bool                                    { return false }
+func (m *mockLogger) IsErrorEnabled() bool                                   { return false }
+func (m *mockLogger) IsFatalEnabled() bool                                   { return false }
+func (m *mockLogger) WithField(key string, value interface{}) logger.Logger  { return m }
 func (m *mockLogger) WithFields(fields map[string]interface{}) logger.Logger { return m }
 func (m *mockLogger) WithError(err error) logger.Logger                      { return m }
 func (m *mockLogger) Stack(logger logger.Logger) logger.Logger               { return m }
@@ -117,18 +117,16 @@ import './file_types';`,
 				t.Fatalf("failed to create SDK dir: %v", err)
 			}
 
-			// Write test content to index.d.ts  
+			// Write test content to index.d.ts
 			indexPath := filepath.Join(sdkDir, "index.d.ts")
 			err = os.WriteFile(indexPath, []byte(tt.inputContent), 0644)
 			if err != nil {
 				t.Fatalf("failed to write test file: %v", err)
 			}
-			
 
-			
 			// Also need to create the file_types.d.ts file that the patching logic expects to exist
 			// This triggers the SDK patching logic
-			fileTypesPath := filepath.Join(sdkDir, "file_types.d.ts") 
+			fileTypesPath := filepath.Join(sdkDir, "file_types.d.ts")
 			err = os.WriteFile(fileTypesPath, []byte("// placeholder"), 0644)
 			if err != nil {
 				t.Fatalf("failed to write file_types.d.ts: %v", err)
@@ -148,8 +146,6 @@ import './file_types';`,
 			if err != nil {
 				t.Fatalf("failed to read result file: %v", err)
 			}
-			
-
 
 			resultStr := string(result)
 			if resultStr != tt.expectedOutput {
@@ -170,40 +166,40 @@ import './file_types';`,
 
 func TestNeedsDeclarationUpdate(t *testing.T) {
 	tests := []struct {
-		name           string
-		fileContent    string
-		expectedHash   string
-		shouldUpdate   bool
+		name         string
+		fileContent  string
+		expectedHash string
+		shouldUpdate bool
 	}{
 		{
-			name:           "file doesn't exist",
-			fileContent:    "",
-			expectedHash:   "abc123",
-			shouldUpdate:   true,
+			name:         "file doesn't exist",
+			fileContent:  "",
+			expectedHash: "abc123",
+			shouldUpdate: true,
 		},
 		{
-			name:           "file has matching hash",
-			fileContent:    "// agentuity-types-hash:abc123\ndeclare module '*.yml' {}",
-			expectedHash:   "abc123",
-			shouldUpdate:   false,
+			name:         "file has matching hash",
+			fileContent:  "// agentuity-types-hash:abc123\ndeclare module '*.yml' {}",
+			expectedHash: "abc123",
+			shouldUpdate: false,
 		},
 		{
-			name:           "file has different hash",
-			fileContent:    "// agentuity-types-hash:def456\ndeclare module '*.yml' {}",
-			expectedHash:   "abc123",
-			shouldUpdate:   true,
+			name:         "file has different hash",
+			fileContent:  "// agentuity-types-hash:def456\ndeclare module '*.yml' {}",
+			expectedHash: "abc123",
+			shouldUpdate: true,
 		},
 		{
-			name:           "file has no hash",
-			fileContent:    "declare module '*.yml' {}",
-			expectedHash:   "abc123",
-			shouldUpdate:   true,
+			name:         "file has no hash",
+			fileContent:  "declare module '*.yml' {}",
+			expectedHash: "abc123",
+			shouldUpdate: true,
 		},
 		{
-			name:           "empty file",
-			fileContent:    "",
-			expectedHash:   "abc123",
-			shouldUpdate:   true,
+			name:         "empty file",
+			fileContent:  "",
+			expectedHash: "abc123",
+			shouldUpdate: true,
 		},
 	}
 
