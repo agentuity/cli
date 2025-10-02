@@ -1,0 +1,95 @@
+# Prompt JSDoc Docstrings
+
+## Goal
+Add JSDoc-style docstrings to generated prompt objects that provide better IDE support and make the generated code self-documenting.
+
+## Requirements
+
+### 1. JSDoc Format for PromptsCollection
+Generate JSDoc comments on the `PromptsCollection` type properties with the following structure:
+```typescript
+export type PromptsCollection = {
+  /**
+   * [Prompt Name] - [Prompt Description]
+   *
+   * @prompt
+   * [Original prompt template with variables]
+   */
+  promptName: PromptName;
+};
+```
+
+### 2. Content Inclusion
+- **Name and Description**: Include both from YAML in format "Name - Description"
+- **@prompt**: Include only the original prompt template (not system template)
+- **Template Preservation**: Show original templates exactly as written in YAML
+
+### 3. Template Preservation
+- Show original templates exactly as written in YAML
+- Preserve variable syntax: `{variable:default}`, `{!variable}`, `{{variable}}`
+- Maintain line breaks and formatting
+- Escape JSDoc comment characters (`*/` → `* /`)
+
+### 4. IDE Integration
+- Docstrings should be visible in IDE hover tooltips when accessing `prompts.promptName`
+- Should work with "Go to Definition" functionality
+- Provide IntelliSense documentation
+- Show original prompt template for reference
+
+## Implementation
+
+### Code Generator Updates
+1. **PromptsCollection JSDoc**: Add JSDoc comments to each property in the `PromptsCollection` type
+2. **Template Escaping**: Handle JSDoc comment characters in templates
+3. **Line Break Handling**: Split templates by newlines and add proper JSDoc formatting
+4. **Prompt-Only Focus**: Only include `@prompt` section, not `@system`
+
+### File Structure
+- **`_index.js`**: Contains actual prompt objects (no JSDoc on individual objects)
+- **`index.d.ts`**: Contains TypeScript types with JSDoc comments on `PromptsCollection` properties
+
+## Example Output
+
+```typescript
+export type PromptsCollection = {
+  /**
+   * Optional Variables with Defaults - Test optional variables that have default values
+   *
+   * @prompt
+   * Help the user with: {task:their question}
+   * Use a {tone:friendly} approach.
+   */
+  optionalWithDefaults: OptionalWithDefaults;
+  /**
+   * Required Variables Test - Test required variables that must be provided
+   *
+   * @prompt
+   * Complete this {!task} for the user.
+   * The task must be specified.
+   */
+  requiredVariables: RequiredVariables;
+};
+```
+
+## Key Decisions
+
+### Why PromptsCollection Only
+- Individual prompt objects are not directly accessible to users
+- IDE hover works on `prompts.promptName` which maps to `PromptsCollection` properties
+- Avoids redundant JSDoc comments that don't provide value
+
+### Why Prompt Template Only
+- Users primarily care about what the prompt does, not the system instructions
+- Keeps JSDoc comments focused and concise
+- System templates are implementation details
+
+### Why No Individual Type JSDoc
+- Individual prompt types are not directly used by developers
+- JSDoc on `PromptsCollection` properties provides the IDE support needed
+- Keeps generated code clean and focused
+
+## Benefits
+- **IDE Support**: Better IntelliSense and hover information on `prompts.promptName`
+- **Focused Documentation**: Shows only the prompt template that users will see
+- **Clean Code**: No redundant JSDoc comments on unused objects
+- **Self-Documenting**: Developers can understand prompts without looking at YAML
