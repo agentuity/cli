@@ -1,6 +1,6 @@
-.PHONY: build lint generate test test_install_linux test_install_alpine
+.PHONY: build lint generate test test_install test_install_linux test_install_alpine test_install_debian
 
-build: fmt generate
+build: lint generate
 	@go build -o agentuity
 
 lint:

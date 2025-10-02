@@ -253,7 +253,7 @@ func possiblyCreateDeclarationFile(logger logger.Logger, dir string) error {
 				lines := strings.Split(contentStr, "\n")
 				var newLines []string
 				inserted := false
-				
+
 				for _, line := range lines {
 					newLines = append(newLines, line)
 					// Insert after the first export with relative import
@@ -285,7 +285,7 @@ func possiblyCreateDeclarationFile(logger logger.Logger, dir string) error {
 					newLines = append(newLines, "import './file_types';")
 					contentStr = strings.Join(newLines, "\n")
 				}
-				
+
 				err = os.WriteFile(sdkIndexPath, []byte(contentStr), 0644)
 				if err != nil {
 					logger.Debug("failed to patch SDK index.d.ts: %v", err)

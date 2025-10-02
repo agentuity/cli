@@ -586,11 +586,17 @@ Examples:
 		defer os.Remove(ef.Name())
 		defer ef.Close()
 
+		// ensure at least one encryption key is provided
+		if publicKey == "" && orgSecret == "" {
+			errsystem.New(errsystem.ErrEncryptingDeploymentZipFile, fmt.Errorf("neither public key nor org secret provided"),
+				errsystem.WithContextMessage("No encryption key available")).ShowErrorAndExit()
+		}
+
 		// check to see if the organization is configured to use a public key for encryption
 		if publicKey != "" {
 			block, _ := pem.Decode([]byte(publicKey))
 			if block == nil {
-				errsystem.New(errsystem.ErrEncryptingDeploymentZipFile, err,
+				errsystem.New(errsystem.ErrEncryptingDeploymentZipFile, fmt.Errorf("failed to decode PEM formatted public key"),
 					errsystem.WithContextMessage("Error decoding the PEM formatted public key for encrypting the deployment zip file")).ShowErrorAndExit()
 			}
 			pub, err := x509.ParsePKIXPublicKey(block.Bytes)
@@ -600,7 +606,7 @@ Examples:
 			}
 			pubKey, ok := pub.(*ecdsa.PublicKey)
 			if !ok {
-				errsystem.New(errsystem.ErrEncryptingDeploymentZipFile, err,
+				errsystem.New(errsystem.ErrEncryptingDeploymentZipFile, fmt.Errorf("unexpected public key type: %T", pub),
 					errsystem.WithContextMessage("Error parsing the PEM x509 public key for encrypting the deployment zip file")).ShowErrorAndExit()
 			}
 			if _, err := crypto.EncryptFIPSKEMDEMStream(pubKey, dof, ef); err != nil {
