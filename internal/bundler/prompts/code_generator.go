@@ -22,9 +22,11 @@ func NewCodeGenerator(prompts []Prompt) *CodeGenerator {
 // GenerateJavaScript generates the main JavaScript file
 func (cg *CodeGenerator) GenerateJavaScript() string {
 	var objects []string
+	var signatures []string
 
 	for _, prompt := range cg.prompts {
 		objects = append(objects, cg.generatePromptObject(prompt))
+		signatures = append(signatures, cg.generateSignatureFunction(prompt))
 	}
 
 	return fmt.Sprintf(`// Generated prompts - do not edit manually
@@ -38,28 +40,67 @@ import { interpolateTemplate } from '@agentuity/sdk';
  */
 export const prompts = {
 %s
-};`, strings.Join(objects, "\n\n"), cg.generatePromptExports())
+};
+
+/**
+ * Generated signature functions for each prompt
+ * These provide type-safe function signatures based on prompt structure
+ */
+export const signatures = {
+%s
+};`, strings.Join(objects, "\n\n"), cg.generatePromptExports(), strings.Join(signatures, ",\n"))
 }
 
 // GenerateTypeScriptTypes generates the TypeScript definitions file
 func (cg *CodeGenerator) GenerateTypeScriptTypes() string {
 	var promptTypes []string
+	var signatureTypes []string
 
 	for _, prompt := range cg.prompts {
 		promptType := cg.generatePromptType(prompt)
 		promptTypes = append(promptTypes, promptType)
+		signatureType := cg.generateSignatureType(prompt)
+		signatureTypes = append(signatureTypes, signatureType)
 	}
 
 	return fmt.Sprintf(`// Generated prompt types - do not edit manually
-import { interpolateTemplate } from '@agentuity/sdk';
+import { interpolateTemplate, Prompt } from '@agentuity/sdk';
 
 %s
 
-export type PromptsCollection = {
+export interface GeneratedPromptsCollection {
+%s
+}
+
+export type PromptsCollection = GeneratedPromptsCollection;
+
+export type SignaturesCollection = {
 %s
 };
 
-export const prompts: PromptsCollection = {} as any;`, strings.Join(promptTypes, "\n\n"), cg.generatePromptTypeExports())
+export const prompts: PromptsCollection = {} as any;
+export const signatures: SignaturesCollection = {} as any;`, strings.Join(promptTypes, "\n\n"), cg.generatePromptTypeExports(), cg.generateSignatureTypeExports())
+}
+
+// GenerateStubsFile generates the stubs file with actual generated types
+func (cg *CodeGenerator) GenerateStubsFile() string {
+	var promptTypes []string
+	for _, prompt := range cg.prompts {
+		promptTypes = append(promptTypes, cg.generatePromptType(prompt))
+	}
+	promptCollection := cg.generatePromptTypeExports()
+
+	return fmt.Sprintf(`// Generated prompt types - do not edit manually
+import { interpolateTemplate, Prompt } from '@agentuity/sdk';
+
+%s
+
+export interface GeneratedPromptsCollection {
+%s
+}
+
+export type PromptsCollection = GeneratedPromptsCollection;
+`, strings.Join(promptTypes, "\n\n"), promptCollection)
 }
 
 // GenerateTypeScriptInterfaces generates the TypeScript interfaces file
@@ -77,35 +118,132 @@ func (cg *CodeGenerator) GenerateTypeScriptInterfaces() string {
 
 // generatePromptObject generates a single prompt object with system and prompt properties
 func (cg *CodeGenerator) generatePromptObject(prompt Prompt) string {
-	// Get variables from system template
-	systemVariables := cg.getSystemVariables(prompt)
-	var systemParams []string
-	if len(systemVariables) > 0 {
-		systemParams = append(systemParams, "variables")
-	}
-	systemParamStr := strings.Join(systemParams, ", ")
+	// Determine if prompt has system, prompt, and variables
+	hasSystem := prompt.System != ""
+	hasPrompt := prompt.Prompt != ""
+	hasSystemVars := len(cg.getSystemVariables(prompt)) > 0
+	hasPromptVars := len(cg.getPromptVariables(prompt)) > 0
+	hasVariables := hasSystemVars || hasPromptVars
 
-	// Get variables from prompt template
-	promptVariables := cg.getPromptVariables(prompt)
-	var promptParams []string
-	if len(promptVariables) > 0 {
-		promptParams = append(promptParams, "variables")
+	// Generate the prompt object with conditional fields
+	var fields []string
+	fields = append(fields, fmt.Sprintf("slug: %q", prompt.Slug))
+
+	if hasSystem {
+		fields = append(fields, cg.generateSystemField(prompt))
 	}
-	promptParamStr := strings.Join(promptParams, ", ")
+
+	if hasPrompt {
+		fields = append(fields, cg.generatePromptField(prompt))
+	}
+
+	if hasVariables {
+		fields = append(fields, cg.generateVariablesField(prompt))
+	}
 
 	return fmt.Sprintf(`const %s = {
-    slug: %q,
-    system: {
-        compile: (%s) => {
-            return %s
-        }
-    },
-    prompt: {
-        compile: (%s) => {
-            return %s
-        }
-    }
-};`, strcase.ToLowerCamel(prompt.Slug), prompt.Slug, systemParamStr, cg.generateTemplateValue(prompt.System), promptParamStr, cg.generateTemplateValue(prompt.Prompt))
+    %s
+};`, strcase.ToLowerCamel(prompt.Slug), strings.Join(fields, ",\n    "))
+}
+
+// generateSystemField generates the system field for a prompt
+func (cg *CodeGenerator) generateSystemField(prompt Prompt) string {
+	systemVars := cg.getSystemVariables(prompt)
+	if len(systemVars) > 0 {
+		return fmt.Sprintf(`system: (params) => {
+        return interpolateTemplate(%q, params.system)
+    }`, prompt.System)
+	}
+	return fmt.Sprintf(`system: (params) => {
+        return %q
+    }`, prompt.System)
+}
+
+// generatePromptField generates the prompt field for a prompt
+func (cg *CodeGenerator) generatePromptField(prompt Prompt) string {
+	promptVars := cg.getPromptVariables(prompt)
+	if len(promptVars) > 0 {
+		return fmt.Sprintf(`prompt: (params) => {
+        return interpolateTemplate(%q, params.prompt)
+    }`, prompt.Prompt)
+	}
+	return fmt.Sprintf(`prompt: (params) => {
+        return %q
+    }`, prompt.Prompt)
+}
+
+// generateVariablesField generates the variables field for a prompt
+func (cg *CodeGenerator) generateVariablesField(prompt Prompt) string {
+	var allVars []Variable
+	systemVars := cg.getSystemVariableObjects(prompt)
+	promptVars := cg.getPromptVariableObjects(prompt)
+
+	// Combine system and prompt variables
+	allVars = append(allVars, systemVars...)
+	allVars = append(allVars, promptVars...)
+
+	if len(allVars) == 0 {
+		return ""
+	}
+
+	var varDefs []string
+	for _, variable := range allVars {
+		varDefs = append(varDefs, fmt.Sprintf("%s: %q", variable.Name, "string"))
+	}
+
+	return fmt.Sprintf("variables: { %s }", strings.Join(varDefs, ", "))
+}
+
+// generateSignatureFunction generates a signature function for a prompt
+func (cg *CodeGenerator) generateSignatureFunction(prompt Prompt) string {
+	hasSystem := prompt.System != ""
+	hasPrompt := prompt.Prompt != ""
+
+	// Generate the function signature based on what the prompt has
+	var params []string
+	if hasSystem {
+		params = append(params, "system: Record<string, unknown>")
+	}
+	if hasPrompt {
+		params = append(params, "prompt: Record<string, unknown>")
+	}
+
+	paramStr := strings.Join(params, ", ")
+	if paramStr != "" {
+		paramStr = fmt.Sprintf("params: { %s }", paramStr)
+	} else {
+		paramStr = ""
+	}
+
+	// Generate the function body
+	var bodyParts []string
+	if hasSystem {
+		bodyParts = append(bodyParts, fmt.Sprintf("const systemResult = prompts['%s'].system(params)", prompt.Slug))
+	}
+	if hasPrompt {
+		bodyParts = append(bodyParts, fmt.Sprintf("const promptResult = prompts['%s'].prompt(params)", prompt.Slug))
+	}
+
+	// Combine results
+	if len(bodyParts) == 1 {
+		bodyParts = append(bodyParts, "return systemResult || promptResult")
+	} else if len(bodyParts) == 2 {
+		bodyParts = append(bodyParts, "return `${systemResult}\\n${promptResult}`")
+	} else {
+		bodyParts = append(bodyParts, "return ''")
+	}
+
+	body := strings.Join(bodyParts, ";\n    ")
+
+	if paramStr == "" {
+		return fmt.Sprintf(`%s: () => {
+    %s
+}`, prompt.Slug, body)
+	}
+
+	return fmt.Sprintf(`%s: (%s) => {
+    %s
+}`, prompt.Slug, paramStr, body)
 }
 
 // generateTemplateValue generates the value for a template (either compile function or direct interpolateTemplate call)
@@ -117,48 +255,89 @@ func (cg *CodeGenerator) generateTemplateValue(template string) string {
 	return fmt.Sprintf("interpolateTemplate(%q, variables)", template)
 }
 
-// generatePromptType generates a TypeScript type for a prompt object
+// generatePromptType generates a TypeScript type for a prompt object using generics
 func (cg *CodeGenerator) generatePromptType(prompt Prompt) string {
-	// Get variables from system template
-	systemVariables := cg.getSystemVariableObjects(prompt)
-	var systemParams []string
-	if len(systemVariables) > 0 {
-		systemParams = append(systemParams, fmt.Sprintf("variables?: { %s }", cg.generateVariableTypesFromObjects(systemVariables)))
-	}
-	systemParamStr := strings.Join(systemParams, ", ")
+	hasSystem := prompt.System != ""
+	hasPrompt := prompt.Prompt != ""
+	hasSystemVars := len(cg.getSystemVariables(prompt)) > 0
+	hasPromptVars := len(cg.getPromptVariables(prompt)) > 0
+	hasVariables := hasSystemVars || hasPromptVars
 
-	// Get variables from prompt template
-	promptVariables := cg.getPromptVariableObjects(prompt)
-	var promptParams []string
-	if len(promptVariables) > 0 {
-		promptParams = append(promptParams, fmt.Sprintf("variables?: { %s }", cg.generateVariableTypesFromObjects(promptVariables)))
+	// Generate the generic type parameters
+	var genericParams []string
+	if hasSystem {
+		genericParams = append(genericParams, "true")
+	} else {
+		genericParams = append(genericParams, "false")
 	}
-	promptParamStr := strings.Join(promptParams, ", ")
+	if hasPrompt {
+		genericParams = append(genericParams, "true")
+	} else {
+		genericParams = append(genericParams, "false")
+	}
+	if hasVariables {
+		genericParams = append(genericParams, "true")
+	} else {
+		genericParams = append(genericParams, "false")
+	}
 
-	// Generate separate system and prompt types with docstrings
-	systemTypeName := fmt.Sprintf("%sSystem", strcase.ToCamel(prompt.Slug))
-	promptTypeName := fmt.Sprintf("%sPrompt", strcase.ToCamel(prompt.Slug))
+	genericStr := strings.Join(genericParams, ", ")
 	mainTypeName := strcase.ToCamel(prompt.Slug)
 
-	systemTypeWithDocstring := cg.generateTypeWithDocstring(prompt.System, systemTypeName, systemParamStr, mainTypeName)
-	promptTypeWithDocstring := cg.generateTypeWithDocstring(prompt.Prompt, promptTypeName, promptParamStr, mainTypeName)
+	// Generate the type definition
+	var fields []string
+	fields = append(fields, "slug: string")
 
-	return fmt.Sprintf(`%s
+	if hasSystem {
+		fields = append(fields, "system: (params: { system: Record<string, unknown> }) => string")
+	}
 
-%s
+	if hasPrompt {
+		fields = append(fields, "prompt: (params: { prompt: Record<string, unknown> }) => string")
+	}
 
-export type %s = {
-  slug: string;
-  /**
-%s
-   */
-  system: %s;
-  /**
-%s
-   */
-  prompt: %s;
-};`,
-		systemTypeWithDocstring, promptTypeWithDocstring, mainTypeName, cg.generateTemplateDocstring(prompt.System), systemTypeName, cg.generateTemplateDocstring(prompt.Prompt), promptTypeName)
+	if hasVariables {
+		// Generate variable types
+		var allVars []Variable
+		allVars = append(allVars, cg.getSystemVariableObjects(prompt)...)
+		allVars = append(allVars, cg.getPromptVariableObjects(prompt)...)
+
+		var varDefs []string
+		for _, variable := range allVars {
+			varDefs = append(varDefs, fmt.Sprintf("%s: string", variable.Name))
+		}
+		fields = append(fields, fmt.Sprintf("variables: { %s }", strings.Join(varDefs, ", ")))
+	}
+
+	return fmt.Sprintf(`export type %s = Prompt<%s>;`, mainTypeName, genericStr)
+}
+
+// generateSignatureType generates a TypeScript type for a signature function
+func (cg *CodeGenerator) generateSignatureType(prompt Prompt) string {
+	hasSystem := prompt.System != ""
+	hasPrompt := prompt.Prompt != ""
+
+	// Generate the function signature based on what the prompt has
+	var params []string
+	if hasSystem {
+		params = append(params, "system: Record<string, unknown>")
+	}
+	if hasPrompt {
+		params = append(params, "prompt: Record<string, unknown>")
+	}
+
+	paramStr := strings.Join(params, ", ")
+	if paramStr != "" {
+		paramStr = fmt.Sprintf("params: { %s }", paramStr)
+	} else {
+		paramStr = ""
+	}
+
+	if paramStr == "" {
+		return fmt.Sprintf(`%s: () => string`, prompt.Slug)
+	}
+
+	return fmt.Sprintf(`%s: (%s) => string`, prompt.Slug, paramStr)
 }
 
 // generatePromptInterface generates a TypeScript interface for a prompt
@@ -270,7 +449,7 @@ func (cg *CodeGenerator) generatePromptExports() string {
 		// Generate JSDoc comment for each prompt property
 		jsdocComment := cg.generatePromptPropertyJSDoc(prompt)
 		exports = append(exports, jsdocComment)
-		exports = append(exports, fmt.Sprintf("    %s,", strcase.ToLowerCamel(prompt.Slug)))
+		exports = append(exports, fmt.Sprintf("    '%s',", prompt.Slug))
 	}
 	return strings.Join(exports, "\n")
 }
@@ -282,9 +461,38 @@ func (cg *CodeGenerator) generatePromptTypeExports() string {
 		// Generate JSDoc comment for each prompt property
 		jsdocComment := cg.generatePromptPropertyJSDoc(prompt)
 		exports = append(exports, jsdocComment)
-		exports = append(exports, fmt.Sprintf("  %s: %s;", strcase.ToLowerCamel(prompt.Slug), strcase.ToCamel(prompt.Slug)))
+		exports = append(exports, fmt.Sprintf("  '%s': %s;", prompt.Slug, strcase.ToCamel(prompt.Slug)))
 	}
 	return strings.Join(exports, "\n")
+}
+
+// generateSignatureTypeExports generates the exports object for signature types
+func (cg *CodeGenerator) generateSignatureTypeExports() string {
+	var exports []string
+	for _, prompt := range cg.prompts {
+		exports = append(exports, fmt.Sprintf("  '%s': (%s) => string", prompt.Slug, cg.generateSignatureFunctionParams(prompt)))
+	}
+	return strings.Join(exports, "\n")
+}
+
+// generateSignatureFunctionParams generates the parameter string for signature functions
+func (cg *CodeGenerator) generateSignatureFunctionParams(prompt Prompt) string {
+	hasSystem := prompt.System != ""
+	hasPrompt := prompt.Prompt != ""
+
+	var params []string
+	if hasSystem {
+		params = append(params, "system: Record<string, unknown>")
+	}
+	if hasPrompt {
+		params = append(params, "prompt: Record<string, unknown>")
+	}
+
+	if len(params) == 0 {
+		return ""
+	}
+
+	return fmt.Sprintf("params: { %s }", strings.Join(params, ", "))
 }
 
 // generatePromptPropertyJSDoc generates JSDoc comments for prompt properties in PromptsCollection
