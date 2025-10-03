@@ -100,7 +100,7 @@ func outputJSON(data interface{}) {
 	}
 }
 
-func promptForClusterOrganization(ctx context.Context, logger logger.Logger, cmd *cobra.Command, apiUrl string, token string) string {
+func promptForClusterOrganization(ctx context.Context, logger logger.Logger, cmd *cobra.Command, apiUrl string, token string, prompt string) string {
 	orgs, err := organization.ListOrganizations(ctx, logger, apiUrl, token)
 	if err != nil {
 		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list organizations")).ShowErrorAndExit()
@@ -123,7 +123,7 @@ func promptForClusterOrganization(ctx context.Context, logger logger.Logger, cmd
 			for _, org := range orgs {
 				opts = append(opts, tui.Option{ID: org.OrgId, Text: org.Name, Selected: prefOrgId == org.OrgId})
 			}
-			orgId = tui.Select(logger, "What organization should we create the cluster in?", "", opts)
+			orgId = tui.Select(logger, prompt, "", opts)
 			viper.Set("preferences.orgId", orgId)
 			viper.WriteConfig() // remember the preference
 		} else {
@@ -176,7 +176,7 @@ Examples:
 		}
 
 		// Get organization ID
-		orgId := promptForClusterOrganization(ctx, logger, cmd, apiUrl, apikey)
+		orgId := promptForClusterOrganization(ctx, logger, cmd, apiUrl, apikey, "What organization should we create the cluster in?")
 
 		provider, _ := cmd.Flags().GetString("provider")
 		size, _ := cmd.Flags().GetString("size")
@@ -252,7 +252,15 @@ Examples:
 			}
 		}
 
-		// os.Exit(0)
+		if err := infrastructure.Setup(ctx, logger, &infrastructure.Cluster{ID: "1234", Token: "", Provider: provider, Name: name, Type: size, Region: region}, format); err != nil {
+			logger.Fatal("%s", err)
+		}
+
+		ready := tui.Ask(logger, "Ready to create the cluster", true)
+		if !ready {
+			logger.Info("Cluster creation cancelled")
+			os.Exit(0)
+		}
 
 		var cluster *infrastructure.Cluster
 

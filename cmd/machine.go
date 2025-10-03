@@ -322,7 +322,7 @@ Examples:
 			errsystem.New(errsystem.ErrMissingRequiredArgument, fmt.Errorf("cluster_id, provider, and region are required in non-interactive mode"), errsystem.WithContextMessage("Missing required arguments")).ShowErrorAndExit()
 		}
 
-		orgId := promptForClusterOrganization(ctx, logger, cmd, apiUrl, apikey)
+		orgId := promptForClusterOrganization(ctx, logger, cmd, apiUrl, apikey, "What organization should we create the machine in?")
 
 		resp, err := infrastructure.CreateMachine(ctx, logger, apiUrl, apikey, clusterID, orgId, provider, region)
 		if err != nil {
