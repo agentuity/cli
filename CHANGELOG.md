@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.171] - 2025-10-03
+
+### Added
+- Multi-file YAML prompt support ([#460](https://github.com/agentuity/cli/pull/460))
+
+### Changed
+- Function signature modifications and code generation enhancements ([#460](https://github.com/agentuity/cli/pull/460))
+
+
+## [v0.0.170] - 2025-10-02
+
+### Added
+- Public key encryption for self-hosted deployments and new infra ([#429](https://github.com/agentuity/cli/pull/429))
+
+
 ## [v0.0.169] - 2025-10-02
 
 ### Added
@@ -867,6 +882,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.171]: https://github.com/agentuity/cli/compare/v0.0.170...v0.0.171
+[v0.0.170]: https://github.com/agentuity/cli/compare/v0.0.169...v0.0.170
 [v0.0.169]: https://github.com/agentuity/cli/compare/v0.0.168...v0.0.169
 [v0.0.168]: https://github.com/agentuity/cli/compare/v0.0.167...v0.0.168
 [v0.0.167]: https://github.com/agentuity/cli/compare/v0.0.166...v0.0.167
