@@ -18,6 +18,7 @@ import (
 
 type ClusterSetup interface {
 	Setup(ctx context.Context, logger logger.Logger, cluster *Cluster, format string) error
+	CreateMachine(ctx context.Context, logger logger.Logger, region string, token string, clusterID string) error
 }
 
 var setups = make(map[string]ClusterSetup)

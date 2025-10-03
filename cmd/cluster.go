@@ -24,6 +24,35 @@ import (
 // Provider types for infrastructure
 var validProviders = map[string]string{"gcp": "Google Cloud", "aws": "Amazon Web Services", "azure": "Microsoft Azure", "vmware": "VMware"}
 
+// Provider-specific regions
+var providerRegions = map[string][]tui.Option{
+	"gcp": {
+		{ID: "us-central1", Text: tui.PadRight("US Central", 15, " ") + tui.Muted("us-central1")},
+		{ID: "us-west1", Text: tui.PadRight("US West", 15, " ") + tui.Muted("us-west1")},
+		{ID: "us-east1", Text: tui.PadRight("US East", 15, " ") + tui.Muted("us-east1")},
+		{ID: "europe-west1", Text: tui.PadRight("Europe West", 15, " ") + tui.Muted("europe-west1")},
+		{ID: "asia-southeast1", Text: tui.PadRight("Asia Southeast", 15, " ") + tui.Muted("asia-southeast1")},
+	},
+	"aws": {
+		{ID: "us-east-1", Text: tui.PadRight("US East (N. Virginia)", 15, " ") + tui.Muted("us-east-1")},
+		{ID: "us-east-2", Text: tui.PadRight("US East (Ohio)", 15, " ") + tui.Muted("us-east-2")},
+		{ID: "us-west-1", Text: tui.PadRight("US West (N. California)", 15, " ") + tui.Muted("us-west-1")},
+		{ID: "us-west-2", Text: tui.PadRight("US West (Oregon)", 15, " ") + tui.Muted("us-west-2")},
+	},
+	"azure": {
+		{ID: "eastus", Text: tui.PadRight("East US", 15, " ") + tui.Muted("eastus")},
+		{ID: "westus2", Text: tui.PadRight("West US 2", 15, " ") + tui.Muted("westus2")},
+		{ID: "westeurope", Text: tui.PadRight("West Europe", 15, " ") + tui.Muted("westeurope")},
+		{ID: "southeastasia", Text: tui.PadRight("Southeast Asia", 15, " ") + tui.Muted("southeastasia")},
+		{ID: "canadacentral", Text: tui.PadRight("Canada Central", 15, " ") + tui.Muted("canadacentral")},
+	},
+	"vmware": {
+		{ID: "datacenter-1", Text: tui.PadRight("Datacenter 1", 15, " ") + tui.Muted("datacenter-1")},
+		{ID: "datacenter-2", Text: tui.PadRight("Datacenter 2", 15, " ") + tui.Muted("datacenter-2")},
+		{ID: "datacenter-3", Text: tui.PadRight("Datacenter 3", 15, " ") + tui.Muted("datacenter-3")},
+	},
+}
+
 // Size types for clusters
 var validSizes = []string{"dev", "small", "medium", "large"}
 
@@ -51,6 +80,15 @@ func validateFormat(format string) error {
 		return nil
 	}
 	return fmt.Errorf("invalid format %s, must be one of: %s", format, validFormats)
+}
+
+// getRegionsForProvider returns the available regions for a specific provider
+func getRegionsForProvider(provider string) []tui.Option {
+	if regions, ok := providerRegions[provider]; ok {
+		return regions
+	}
+	// Fallback to GCP regions if provider not found
+	return providerRegions["gcp"]
 }
 
 func outputJSON(data interface{}) {
@@ -190,12 +228,7 @@ Examples:
 			}
 
 			if region == "" {
-				// TODO: move these to use an option based on the selected provider
-				opts := []tui.Option{
-					{ID: "us-central1", Text: tui.PadRight("US Central", 15, " ") + tui.Muted("us-central1")},
-					{ID: "us-west1", Text: tui.PadRight("US West", 15, " ") + tui.Muted("us-west1")},
-					{ID: "us-east1", Text: tui.PadRight("US East", 15, " ") + tui.Muted("us-east1")},
-				}
+				opts := getRegionsForProvider(provider)
 				region = tui.Select(logger, "Which region should we use?", "The region to deploy the cluster", opts)
 			}
 
@@ -242,6 +275,10 @@ Examples:
 			})
 			if err != nil {
 				errsystem.New(errsystem.ErrCreateProject, err, errsystem.WithContextMessage("Failed to create cluster")).ShowErrorAndExit()
+			}
+
+			if err := infrastructure.Setup(ctx, logger, &infrastructure.Cluster{ID: cluster.ID, Token: "", Provider: provider, Name: name, Type: size, Region: region}, format); err != nil {
+				logger.Fatal("%s", err)
 			}
 		})
 
