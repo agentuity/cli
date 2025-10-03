@@ -38,6 +38,10 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 		projectContext := project.EnsureProject(ctx, cmd)
+
+		// Check for prompts evals feature flag
+		promptsEvalsFF := CheckFeatureFlag(cmd, FeaturePromptsEvals, "enable-prompts-evals")
+
 		production, _ := cmd.Flags().GetBool("production")
 		install, _ := cmd.Flags().GetBool("install")
 		deploy, _ := cmd.Flags().GetBool("deploy")
@@ -46,14 +50,15 @@ Examples:
 		description, _ := cmd.Flags().GetString("description")
 
 		if err := bundler.Bundle(bundler.BundleContext{
-			Context:    ctx,
-			Logger:     projectContext.Logger,
-			Project:    projectContext.Project,
-			ProjectDir: projectContext.Dir,
-			Production: production,
-			Install:    install,
-			CI:         ci,
-			Writer:     os.Stderr,
+			Context:        ctx,
+			Logger:         projectContext.Logger,
+			Project:        projectContext.Project,
+			ProjectDir:     projectContext.Dir,
+			Production:     production,
+			PromptsEvalsFF: promptsEvalsFF,
+			Install:        install,
+			CI:             ci,
+			Writer:         os.Stderr,
 		}); err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to bundle project")).ShowErrorAndExit()
 		}

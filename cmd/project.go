@@ -38,6 +38,31 @@ Use the subcommands to manage your projects.`,
 	},
 }
 
+// detectRuntime auto-detects the runtime based on lockfiles in the directory
+// If no lockfile is found, falls back to the default runtime from the template
+func detectRuntime(dir string, defaultRuntime string) string {
+	// Only auto-detect for JavaScript-based runtimes
+	if defaultRuntime != "nodejs" && defaultRuntime != "bunjs" {
+		return defaultRuntime
+	}
+
+	// Check for bun lockfiles - use bunjs runtime
+	if util.Exists(filepath.Join(dir, "bun.lockb")) ||
+		util.Exists(filepath.Join(dir, "bun.lock")) {
+		return "bunjs"
+	}
+
+	// Check for nodejs runtime
+	if util.Exists(filepath.Join(dir, "pnpm-lock.yaml")) ||
+		util.Exists(filepath.Join(dir, "package-lock.json")) ||
+		util.Exists(filepath.Join(dir, "yarn.lock")) {
+		return "nodejs"
+	}
+
+	// No lockfile found, use the template default
+	return defaultRuntime
+}
+
 func saveEnv(dir string, apikey string, projectKey string) {
 	filename := filepath.Join(dir, ".env")
 	envLines, err := env.ParseEnvFile(filename)
@@ -140,7 +165,7 @@ func initProject(ctx context.Context, logger logger.Logger, args InitProjectArgs
 		Identifier: args.Provider.Identifier,
 		Language:   args.Provider.Language,
 		Framework:  args.Provider.Framework,
-		Runtime:    args.Provider.Runtime,
+		Runtime:    detectRuntime(args.Dir, args.Provider.Runtime),
 		Ignore:     args.Provider.Bundle.Ignore,
 		AgentConfig: project.AgentBundlerConfig{
 			Dir: args.Provider.SrcDir,
