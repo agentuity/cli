@@ -29,7 +29,7 @@ func TestCodeGenerator(t *testing.T) {
 		js := codeGen.GenerateJavaScript()
 
 		// Check that it contains the import
-		assert.Contains(t, js, "import { interpolateTemplate } from '@agentuity/sdk';")
+		assert.Contains(t, js, "import { interpolateTemplate } from '../../../index.js';")
 
 		// Check that it contains the prompts object
 		assert.Contains(t, js, "export const prompts = {")
@@ -41,10 +41,9 @@ func TestCodeGenerator(t *testing.T) {
 		// Check that it contains variables parameter (no TypeScript types)
 		assert.Contains(t, js, "variables")
 
-		// Check that it contains compile functions
-		assert.Contains(t, js, "system: {")
-		assert.Contains(t, js, "prompt: {")
-		assert.Contains(t, js, "compile: (variables) => {")
+		// Check that it contains function signatures
+		assert.Contains(t, js, "system: /**")
+		assert.Contains(t, js, "prompt: /**")
 		assert.Contains(t, js, "interpolateTemplate(")
 
 		// Ensure no TypeScript syntax in JavaScript
@@ -58,7 +57,7 @@ func TestCodeGenerator(t *testing.T) {
 		types := codeGen.GenerateTypeScriptTypes()
 
 		// Check that it contains the import
-		assert.Contains(t, types, "import { interpolateTemplate } from '@agentuity/sdk';")
+		assert.Contains(t, types, "import { interpolateTemplate, Prompt } from '@agentuity/sdk';")
 
 		// Check that it contains the prompts object
 		assert.Contains(t, types, "export const prompts: PromptsCollection = {} as any;")
@@ -68,7 +67,6 @@ func TestCodeGenerator(t *testing.T) {
 		assert.Contains(t, types, "TestPrompt2")
 
 		// Check that it contains variable types with proper optional/default syntax
-		assert.Contains(t, types, "variables?: {")
 		assert.Contains(t, types, "role?: string | \"assistant\"")
 		assert.Contains(t, types, "domain: string")
 		assert.Contains(t, types, "task?: string | \"their question\"")
@@ -116,10 +114,10 @@ func TestCodeGenerator_SingleFieldPrompts(t *testing.T) {
 	t.Run("GenerateJavaScript", func(t *testing.T) {
 		js := codeGen.GenerateJavaScript()
 
-		// Check that it contains the correct compile functions
-		assert.Contains(t, js, "system: {")
-		assert.Contains(t, js, "prompt: {")
-		assert.Contains(t, js, "compile: (variables) => {")
+		// Check that it contains the correct function signatures
+		assert.Contains(t, js, "system: /**")
+		assert.Contains(t, js, "prompt: /**")
+		assert.Contains(t, js, "interpolateTemplate(")
 		assert.Contains(t, js, "slug:")
 
 		// Ensure no TypeScript syntax in JavaScript
@@ -154,14 +152,14 @@ func TestCodeGenerator_ComplexPrompts(t *testing.T) {
 		js := codeGen.GenerateJavaScript()
 
 		// Check that it handles multiline templates correctly
-		assert.Contains(t, js, "interpolateTemplate(\"You are a {role:helpful assistant} specializing in {!domain}.\\nYour experience level is {experience:intermediate}.\", variables)")
-		assert.Contains(t, js, "interpolateTemplate(\"Help the user with: {task:their question}\\nUse a {approach:detailed} approach.\\nPriority: {priority:normal}\", variables)")
+		assert.Contains(t, js, "interpolateTemplate(\"You are a {role:helpful assistant} specializing in {!domain}.\\nYour experience level is {experience:intermediate}.\", { role, domain, experience })")
+		assert.Contains(t, js, "interpolateTemplate(\"Help the user with: {task:their question}\\nUse a {approach:detailed} approach.\\nPriority: {priority:normal}\", { task, approach, priority })")
 
 		// Check that it contains the correct object structure
 		assert.Contains(t, js, "const complexPrompt = {")
-		assert.Contains(t, js, "system: {")
-		assert.Contains(t, js, "prompt: {")
-		assert.Contains(t, js, "compile: (variables) => {")
+		assert.Contains(t, js, "system: /**")
+		assert.Contains(t, js, "prompt: /**")
+		assert.Contains(t, js, "interpolateTemplate(")
 		assert.Contains(t, js, "slug:")
 
 		// Ensure no TypeScript syntax in JavaScript
@@ -175,8 +173,8 @@ func TestCodeGenerator_ComplexPrompts(t *testing.T) {
 		types := codeGen.GenerateTypeScriptTypes()
 
 		// Check that it has the correct object structure for complex prompts
-		assert.Contains(t, types, "system: ComplexPromptSystem;")
-		assert.Contains(t, types, "prompt: ComplexPromptPrompt;")
+		assert.Contains(t, types, "system: (variables:")
+		assert.Contains(t, types, "prompt: (variables?:")
 		assert.Contains(t, types, "slug: string;")
 
 		// Check that it includes all variables with proper optional/default syntax
@@ -205,7 +203,6 @@ func TestCodeGenerator_VariableTypes(t *testing.T) {
 		types := codeGen.GenerateTypeScriptTypes()
 
 		// Check that it includes all variable types with proper optional/default syntax
-		assert.Contains(t, types, "variables?: {")
 		assert.Contains(t, types, "legacy?: string")
 		assert.Contains(t, types, "new?: string | \"default\"")
 		assert.Contains(t, types, "required: string")
