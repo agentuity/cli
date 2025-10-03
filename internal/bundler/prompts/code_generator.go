@@ -69,6 +69,66 @@ export const compile = (name, ...args) => {
 };`, strings.Join(objects, "\n\n"), cg.generatePromptExports(), strings.Join(signatures, ",\n"))
 }
 
+// generateCompileFunctionSignature generates the compile function signature dynamically
+func (cg *CodeGenerator) generateCompileFunctionSignature() string {
+	var cases []string
+
+	for _, prompt := range cg.prompts {
+		hasSystem := prompt.System != ""
+		hasPrompt := prompt.Prompt != ""
+		hasSystemVars := len(cg.getSystemVariableObjects(prompt)) > 0
+		hasPromptVars := len(cg.getPromptVariableObjects(prompt)) > 0
+
+		// Check if all variables are optional
+		systemVars := cg.getSystemVariableObjects(prompt)
+		promptVars := cg.getPromptVariableObjects(prompt)
+		allSystemOptional := cg.areAllVariablesOptional(systemVars)
+		allPromptOptional := cg.areAllVariablesOptional(promptVars)
+
+		var caseStr string
+		if !hasSystemVars && !hasPromptVars {
+			// No variables at all
+			caseStr = fmt.Sprintf("T extends '%s' ? []", prompt.Slug)
+		} else if allSystemOptional && allPromptOptional {
+			// All variables are optional - make params optional
+			var params []string
+			if hasSystem && hasSystemVars {
+				systemType := cg.generateParameterInterface(systemVars, allSystemOptional)
+				params = append(params, fmt.Sprintf("system?: %s", systemType))
+			}
+			if hasPrompt && hasPromptVars {
+				promptType := cg.generateParameterInterface(promptVars, allPromptOptional)
+				params = append(params, fmt.Sprintf("prompt?: %s", promptType))
+			}
+
+			paramStr := strings.Join(params, ", ")
+			caseStr = fmt.Sprintf("T extends '%s' ? [] | [{ %s }]", prompt.Slug, paramStr)
+		} else {
+			// Has required variables
+			var params []string
+			if hasSystem && hasSystemVars {
+				systemType := cg.generateParameterInterface(systemVars, allSystemOptional)
+				params = append(params, fmt.Sprintf("system: %s", systemType))
+			}
+			if hasPrompt && hasPromptVars {
+				promptType := cg.generateParameterInterface(promptVars, allPromptOptional)
+				params = append(params, fmt.Sprintf("prompt: %s", promptType))
+			}
+
+			paramStr := strings.Join(params, ", ")
+			caseStr = fmt.Sprintf("T extends '%s' ? [{ %s }]", prompt.Slug, paramStr)
+		}
+
+		cases = append(cases, caseStr)
+	}
+
+	if len(cases) == 0 {
+		return "[]"
+	}
+
+	return strings.Join(cases, "\n      : ") + "\n      : []"
+}
+
 // GenerateTypeScriptTypes generates the TypeScript definitions file
 func (cg *CodeGenerator) GenerateTypeScriptTypes() string {
 	var promptTypes []string
@@ -90,17 +150,7 @@ export interface GeneratedPromptsCollection {
 %s
   compile: <T extends keyof GeneratedPromptsCollection>(
     name: T,
-    ...args: T extends 'simple-helper' 
-      ? [] // No parameters needed
-      : T extends keyof { [K in keyof GeneratedPromptsCollection as GeneratedPromptsCollection[K] extends { system: () => string; prompt: () => string } ? K : never]: any }
-        ? [] // No parameters needed
-        : [GeneratedPromptsCollection[T] extends { system: (variables: infer S) => string; prompt: (variables: infer P) => string } 
-            ? { system: S; prompt: P }
-            : GeneratedPromptsCollection[T] extends { system: (variables: infer S) => string }
-              ? { system: S }
-              : GeneratedPromptsCollection[T] extends { prompt: (variables: infer P) => string }
-                ? { prompt: P }
-                : never]
+    ...args: %s
   ) => string;
   getPrompt: <T extends keyof GeneratedPromptsCollection>(
     name: T
@@ -114,7 +164,7 @@ export type SignaturesCollection = {
 };
 
 export const prompts: PromptsCollection = {} as any;
-export const signatures: SignaturesCollection = {} as any;`, strings.Join(promptTypes, "\n\n"), cg.generatePromptTypeExports(), cg.generateSignatureTypeExports())
+export const signatures: SignaturesCollection = {} as any;`, strings.Join(promptTypes, "\n\n"), cg.generatePromptTypeExports(), cg.generateCompileFunctionSignature(), cg.generateSignatureTypeExports())
 }
 
 // GenerateStubsFile generates the stubs file with actual generated types
@@ -185,15 +235,26 @@ func (cg *CodeGenerator) generatePromptObject(prompt Prompt) string {
 func (cg *CodeGenerator) generateSystemField(prompt Prompt) string {
 	systemVars := cg.getSystemVariableObjects(prompt)
 	if len(systemVars) > 0 {
+		allOptional := cg.areAllVariablesOptional(systemVars)
+
 		// Generate parameter destructuring for variables
 		var paramNames []string
 		for _, variable := range systemVars {
 			paramNames = append(paramNames, variable.Name)
 		}
 		paramStr := strings.Join(paramNames, ", ")
-		return fmt.Sprintf(`system: ({ %s }) => {
+
+		if allOptional {
+			// Make parameters optional
+			return fmt.Sprintf(`system: ({ %s } = {}) => {
         return interpolateTemplate(%q, { %s })
     }`, paramStr, prompt.System, paramStr)
+		} else {
+			// Parameters are required
+			return fmt.Sprintf(`system: ({ %s }) => {
+        return interpolateTemplate(%q, { %s })
+    }`, paramStr, prompt.System, paramStr)
+		}
 	}
 	return fmt.Sprintf(`system: () => {
         return interpolateTemplate(%q, {})
@@ -204,15 +265,26 @@ func (cg *CodeGenerator) generateSystemField(prompt Prompt) string {
 func (cg *CodeGenerator) generatePromptField(prompt Prompt) string {
 	promptVars := cg.getPromptVariableObjects(prompt)
 	if len(promptVars) > 0 {
+		allOptional := cg.areAllVariablesOptional(promptVars)
+
 		// Generate parameter destructuring for variables
 		var paramNames []string
 		for _, variable := range promptVars {
 			paramNames = append(paramNames, variable.Name)
 		}
 		paramStr := strings.Join(paramNames, ", ")
-		return fmt.Sprintf(`prompt: ({ %s }) => {
+
+		if allOptional {
+			// Make parameters optional
+			return fmt.Sprintf(`prompt: ({ %s } = {}) => {
         return interpolateTemplate(%q, { %s })
     }`, paramStr, prompt.Prompt, paramStr)
+		} else {
+			// Parameters are required
+			return fmt.Sprintf(`prompt: ({ %s }) => {
+        return interpolateTemplate(%q, { %s })
+    }`, paramStr, prompt.Prompt, paramStr)
+		}
 	}
 	return fmt.Sprintf(`prompt: () => {
         return interpolateTemplate(%q, {})
@@ -248,6 +320,13 @@ func (cg *CodeGenerator) generateSignatureFunction(prompt Prompt) string {
 	hasSystemVars := len(cg.getSystemVariableObjects(prompt)) > 0
 	hasPromptVars := len(cg.getPromptVariableObjects(prompt)) > 0
 
+	// Check if all variables are optional
+	systemVars := cg.getSystemVariableObjects(prompt)
+	promptVars := cg.getPromptVariableObjects(prompt)
+	allSystemOptional := cg.areAllVariablesOptional(systemVars)
+	allPromptOptional := cg.areAllVariablesOptional(promptVars)
+	allOptional := allSystemOptional && allPromptOptional
+
 	// Generate the function signature based on what the prompt has
 	var params []string
 	if hasSystem && hasSystemVars {
@@ -259,21 +338,33 @@ func (cg *CodeGenerator) generateSignatureFunction(prompt Prompt) string {
 
 	paramStr := strings.Join(params, ", ")
 	if paramStr != "" {
-		paramStr = fmt.Sprintf("{ %s }", paramStr)
+		if allOptional {
+			paramStr = fmt.Sprintf("{ %s } = {}", paramStr)
+		} else {
+			paramStr = fmt.Sprintf("{ %s }", paramStr)
+		}
 	}
 
 	// Generate the function body
 	var bodyParts []string
 	if hasSystem {
 		if hasSystemVars {
-			bodyParts = append(bodyParts, fmt.Sprintf("const systemResult = prompts['%s'].system(system)", prompt.Slug))
+			if allSystemOptional {
+				bodyParts = append(bodyParts, fmt.Sprintf("const systemResult = prompts['%s'].system(system)", prompt.Slug))
+			} else {
+				bodyParts = append(bodyParts, fmt.Sprintf("const systemResult = prompts['%s'].system(system)", prompt.Slug))
+			}
 		} else {
 			bodyParts = append(bodyParts, fmt.Sprintf("const systemResult = prompts['%s'].system()", prompt.Slug))
 		}
 	}
 	if hasPrompt {
 		if hasPromptVars {
-			bodyParts = append(bodyParts, fmt.Sprintf("const promptResult = prompts['%s'].prompt(prompt)", prompt.Slug))
+			if allPromptOptional {
+				bodyParts = append(bodyParts, fmt.Sprintf("const promptResult = prompts['%s'].prompt(prompt)", prompt.Slug))
+			} else {
+				bodyParts = append(bodyParts, fmt.Sprintf("const promptResult = prompts['%s'].prompt(prompt)", prompt.Slug))
+			}
 		} else {
 			bodyParts = append(bodyParts, fmt.Sprintf("const promptResult = prompts['%s'].prompt()", prompt.Slug))
 		}
@@ -382,12 +473,14 @@ func (cg *CodeGenerator) generateDetailedPromptType(prompt Prompt) string {
 
 	if hasSystemVars {
 		systemVars := cg.getSystemVariableObjects(prompt)
-		systemParams = cg.generateParameterInterface(systemVars, true)
+		allSystemOptional := cg.areAllVariablesOptional(systemVars)
+		systemParams = cg.generateParameterInterface(systemVars, allSystemOptional)
 	}
 
 	if hasPromptVars {
 		promptVars := cg.getPromptVariableObjects(prompt)
-		promptParams = cg.generateParameterInterface(promptVars, true)
+		allPromptOptional := cg.areAllVariablesOptional(promptVars)
+		promptParams = cg.generateParameterInterface(promptVars, allPromptOptional)
 	}
 
 	// Generate the main prompt type
@@ -396,7 +489,13 @@ func (cg *CodeGenerator) generateDetailedPromptType(prompt Prompt) string {
 
 	if hasSystem {
 		if hasSystemVars {
-			fields = append(fields, fmt.Sprintf("system: (variables: %s) => string", systemParams))
+			systemVars := cg.getSystemVariableObjects(prompt)
+			allSystemOptional := cg.areAllVariablesOptional(systemVars)
+			if allSystemOptional {
+				fields = append(fields, fmt.Sprintf("system: (variables?: %s) => string", systemParams))
+			} else {
+				fields = append(fields, fmt.Sprintf("system: (variables: %s) => string", systemParams))
+			}
 		} else {
 			fields = append(fields, "system: () => string")
 		}
@@ -404,7 +503,13 @@ func (cg *CodeGenerator) generateDetailedPromptType(prompt Prompt) string {
 
 	if hasPrompt {
 		if hasPromptVars {
-			fields = append(fields, fmt.Sprintf("prompt: (variables: %s) => string", promptParams))
+			promptVars := cg.getPromptVariableObjects(prompt)
+			allPromptOptional := cg.areAllVariablesOptional(promptVars)
+			if allPromptOptional {
+				fields = append(fields, fmt.Sprintf("prompt: (variables?: %s) => string", promptParams))
+			} else {
+				fields = append(fields, fmt.Sprintf("prompt: (variables: %s) => string", promptParams))
+			}
 		} else {
 			fields = append(fields, "prompt: () => string")
 		}
@@ -432,6 +537,16 @@ func (cg *CodeGenerator) generateDetailedPromptType(prompt Prompt) string {
 };
 
 export type %sParams = %s;`, mainTypeName, fieldsStr, mainTypeName, compileParams)
+}
+
+// areAllVariablesOptional checks if all variables in a list are optional
+func (cg *CodeGenerator) areAllVariablesOptional(variables []Variable) bool {
+	for _, variable := range variables {
+		if variable.IsRequired {
+			return false
+		}
+	}
+	return true
 }
 
 // generateParameterInterface generates a TypeScript interface for variables
@@ -619,13 +734,21 @@ func (cg *CodeGenerator) generateSignatureTypeExports() string {
 func (cg *CodeGenerator) generateSignatureFunctionParams(prompt Prompt) string {
 	hasSystem := prompt.System != ""
 	hasPrompt := prompt.Prompt != ""
+	hasSystemVars := len(cg.getSystemVariableObjects(prompt)) > 0
+	hasPromptVars := len(cg.getPromptVariableObjects(prompt)) > 0
 
 	var params []string
-	if hasSystem {
-		params = append(params, "system: Record<string, unknown>")
+	if hasSystem && hasSystemVars {
+		systemVars := cg.getSystemVariableObjects(prompt)
+		allOptional := cg.areAllVariablesOptional(systemVars)
+		systemType := cg.generateParameterInterface(systemVars, allOptional)
+		params = append(params, fmt.Sprintf("system: %s", systemType))
 	}
-	if hasPrompt {
-		params = append(params, "prompt: Record<string, unknown>")
+	if hasPrompt && hasPromptVars {
+		promptVars := cg.getPromptVariableObjects(prompt)
+		allOptional := cg.areAllVariablesOptional(promptVars)
+		promptType := cg.generateParameterInterface(promptVars, allOptional)
+		params = append(params, fmt.Sprintf("prompt: %s", promptType))
 	}
 
 	if len(params) == 0 {
