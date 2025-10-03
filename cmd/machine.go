@@ -285,6 +285,16 @@ var machineCreateCmd = &cobra.Command{
 	Use:     "create [cluster_id] [provider] [region]",
 	GroupID: "info",
 	Short:   "Create a new machine for a cluster",
+	Long: `Create a new machine for a cluster.
+
+Arguments:
+  [cluster_id]  The cluster ID to create a machine in (optional in interactive mode)
+  [provider]    The cloud provider (optional in interactive mode)  
+  [region]      The region to deploy in (optional in interactive mode)
+
+Examples:
+  agentuity machine create
+  agentuity machine create cluster-001 aws us-east-1`,
 	Args:    cobra.MaximumNArgs(3),
 	Aliases: []string{"new"},
 	Run: func(cmd *cobra.Command, args []string) {
@@ -347,6 +357,7 @@ func init() {
 
 	// Flags for machine status command
 	machineStatusCmd.Flags().String("format", "table", "Output format (table, json)")
+
 }
 
 // promptForClusterSelection prompts the user to select a cluster from available clusters
