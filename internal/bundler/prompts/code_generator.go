@@ -22,11 +22,9 @@ func NewCodeGenerator(prompts []Prompt) *CodeGenerator {
 // GenerateJavaScript generates the main JavaScript file
 func (cg *CodeGenerator) GenerateJavaScript() string {
 	var objects []string
-	var signatures []string
 
 	for _, prompt := range cg.prompts {
 		objects = append(objects, cg.generatePromptObject(prompt))
-		signatures = append(signatures, cg.generateSignatureFunction(prompt))
 	}
 
 	return fmt.Sprintf(`// Generated prompts - do not edit manually
@@ -39,34 +37,10 @@ import { interpolateTemplate } from '../../../index.js';
  * Each prompt includes original system and prompt templates for reference
  */
 export const prompts = {
-%s,
-  compile: (name, ...args) => {
-    const signature = signatures[name];
-    if (signature) {
-      return signature(...args);
-    }
-    throw new Error('No signature function found for prompt: ' + name);
-  }
-};
-
-/**
- * Generated signature functions for each prompt
- * These provide type-safe function signatures based on prompt structure
- */
-export const signatures = {
 %s
 };
 
-/**
- * Compile function that provides type-safe compilation of prompts
- */
-export const compile = (name, ...args) => {
-  const signature = signatures[name];
-  if (signature) {
-    return signature(...args);
-  }
-  throw new Error('No signature function found for prompt: ' + name);
-};`, strings.Join(objects, "\n\n"), cg.generatePromptExports(), strings.Join(signatures, ",\n"))
+`, strings.Join(objects, "\n\n"), cg.generatePromptExports())
 }
 
 // generateCompileFunctionSignature generates the compile function signature dynamically
@@ -132,13 +106,10 @@ func (cg *CodeGenerator) generateCompileFunctionSignature() string {
 // GenerateTypeScriptTypes generates the TypeScript definitions file
 func (cg *CodeGenerator) GenerateTypeScriptTypes() string {
 	var promptTypes []string
-	var signatureTypes []string
 
 	for _, prompt := range cg.prompts {
 		promptType := cg.generateDetailedPromptType(prompt)
 		promptTypes = append(promptTypes, promptType)
-		signatureType := cg.generateSignatureType(prompt)
-		signatureTypes = append(signatureTypes, signatureType)
 	}
 
 	return fmt.Sprintf(`// Generated prompt types - do not edit manually
@@ -148,23 +119,11 @@ import { interpolateTemplate, Prompt } from '@agentuity/sdk';
 
 export interface GeneratedPromptsCollection {
 %s
-  compile: <T extends keyof GeneratedPromptsCollection>(
-    name: T,
-    ...args: %s
-  ) => string;
-  getPrompt: <T extends keyof GeneratedPromptsCollection>(
-    name: T
-  ) => GeneratedPromptsCollection[T];
 }
 
 export type PromptsCollection = GeneratedPromptsCollection;
 
-export type SignaturesCollection = {
-%s
-};
-
-export const prompts: PromptsCollection = {} as any;
-export const signatures: SignaturesCollection = {} as any;`, strings.Join(promptTypes, "\n\n"), cg.generatePromptTypeExports(), cg.generateCompileFunctionSignature(), cg.generateSignatureTypeExports())
+export const prompts: PromptsCollection = {} as any;`, strings.Join(promptTypes, "\n\n"), cg.generatePromptTypeExports())
 }
 
 // GenerateStubsFile generates the stubs file with actual generated types

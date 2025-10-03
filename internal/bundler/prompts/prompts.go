@@ -16,6 +16,8 @@ type VariableInfo struct {
 // FindPromptsYAML finds prompts.yaml in the given directory
 func FindPromptsYAML(dir string) string {
 	possiblePaths := []string{
+		filepath.Join(dir, "src", "prompts", "prompts.yaml"),
+		filepath.Join(dir, "src", "prompts", "prompts.yml"),
 		filepath.Join(dir, "src", "prompts.yaml"),
 		filepath.Join(dir, "src", "prompts.yml"),
 		filepath.Join(dir, "prompts.yaml"),
