@@ -37,6 +37,7 @@ func FindPromptsYAML(dir string) string {
 // FindAllPromptFiles finds all YAML files in the prompts directory
 func FindAllPromptFiles(dir string) []string {
 	var promptFiles []string
+	seenFiles := make(map[string]bool)
 
 	// Check for prompts directory in various locations
 	possibleDirs := []string{
@@ -44,6 +45,7 @@ func FindAllPromptFiles(dir string) []string {
 		filepath.Join(dir, "prompts"),
 	}
 
+	// Scan all possible directories
 	for _, promptDir := range possibleDirs {
 		if _, err := os.Stat(promptDir); err == nil {
 			// Found prompts directory, scan for YAML files
@@ -54,10 +56,13 @@ func FindAllPromptFiles(dir string) []string {
 
 			for _, entry := range entries {
 				if !entry.IsDir() && (strings.HasSuffix(entry.Name(), ".yaml") || strings.HasSuffix(entry.Name(), ".yml")) {
-					promptFiles = append(promptFiles, filepath.Join(promptDir, entry.Name()))
+					filePath := filepath.Join(promptDir, entry.Name())
+					if !seenFiles[filePath] {
+						promptFiles = append(promptFiles, filePath)
+						seenFiles[filePath] = true
+					}
 				}
 			}
-			break // Use the first prompts directory found
 		}
 	}
 
