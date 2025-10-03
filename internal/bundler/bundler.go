@@ -614,9 +614,11 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 	}
 
 	// if we get here, we have detected native modules that cannot be bundled and that we need to install
-	// natively into the bundle. we are going to move the package.json into the file and then automatically
-	// install the bundle in a node_modules which can then be picked up at runtime.
+	// natively into the bundle. we are going to move the package.json into the output folder and then automatically
+	// install the bundle in the node_modules which can then be picked up at runtime since this folder will be
+	// what is packaged and deployed
 	if len(nativeInstalls) > 0 {
+		// remove keys we just don't need
 		for _, key := range []string{"dependencies", "devDependencies", "externals", "scripts", "keywords", "files"} {
 			delete(pkg.Data, key)
 		}
@@ -631,6 +633,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		ctx.Logger.Trace("generated %s", outfile)
 		npmargs := []string{"install", "--no-audit", "--no-fund", "--ignore-scripts", "--no-bin-links", "--no-package-lock"}
 		if ctx.Production {
+			// in production, we need to force the native modules to be compatible with our runtime environment
 			npmargs = append(npmargs, "--platform=linux", "--arch=amd64", "--omit=dev")
 		}
 		npmargs = append(npmargs, nativeInstalls...)
