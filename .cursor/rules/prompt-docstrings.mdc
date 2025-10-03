@@ -1,33 +1,74 @@
-# Prompt JSDoc Docstrings
+# Prompt JSDoc Docstrings and Multi-File Support
+
+https://stackoverflow.com/questions/19230971/how-do-i-jsdoc-a-nested-objects-methods
 
 ## Goal
-Add JSDoc-style docstrings to generated prompt objects that provide better IDE support and make the generated code self-documenting.
+Add JSDoc-style docstrings to generated prompt functions and support scanning multiple YAML files in the prompts directory for better IDE support and organization.
 
-## Requirements
+## Features Implemented
 
-### 1. JSDoc Format for PromptsCollection
-Generate JSDoc comments on the `PromptsCollection` type properties with the following structure:
+### 1. Multi-File Support
+The CLI now scans the entire `prompts` directory and processes all YAML files:
+- **Directory Locations**: Checks `src/prompts/` and `prompts/` directories
+- **File Types**: Processes all `.yaml` and `.yml` files
+- **Combined Output**: Merges all prompts from multiple files into a single generated output
+- **Legacy Support**: Still supports single `prompts.yaml` file in various locations
+
+### 2. JSDoc Comments on Functions and Types
+Generate JSDoc comments on both JavaScript functions and TypeScript type definitions:
+
+**JavaScript Functions:**
+```javascript
+system: /**
+ * System prompt:
+ * You are a {role:senior} code reviewer specializing in {language:JavaScript}.
+ * Your experience level is {experience:expert}
+ * 
+ */
+({ role, language, experience } = {}) => {
+    return interpolateTemplate("...", { role, language, experience })
+},
+```
+
+**TypeScript Type Definitions:**
 ```typescript
-export type PromptsCollection = {
+export type Assistant = {
+  slug: string;
   /**
-   * [Prompt Name] - [Prompt Description]
-   *
-   * @prompt
-   * [Original prompt template with variables]
+   * System prompt:
+   * You are a {role:helpful assistant} specializing in {domain:programming}.  
+   * Your experience level is {experience:intermediate}
+   * 
    */
-  promptName: PromptName;
+  system: (variables?: {
+    role?: string | "helpful assistant";
+    domain?: string | "programming";
+    experience?: string | "intermediate"
+  }) => string;
+  /**
+   * User prompt:
+   * Help the user with: {task:their question}
+   * Use a {!tone} approach.
+   */
+  prompt: (variables: {
+    task?: string | "their question";
+    tone: string
+  }) => string
 };
 ```
 
-### 2. Content Inclusion
-- **Name and Description**: Include both from YAML in format "Name - Description"
-- **@prompt**: Include only the original prompt template (not system template)
+### 3. Content Inclusion
+- **System Prompts**: Include the actual system prompt content in JSDoc
+- **User Prompts**: Include the actual user prompt content in JSDoc
 - **Template Preservation**: Show original templates exactly as written in YAML
+- **Variable Syntax**: Preserve `{variable:default}`, `{!variable}`, `{{variable}}` syntax
+- **Line Wrapping**: Automatically wrap long lines at 80 characters for readability
 
-### 3. Template Preservation
+### 4. Template Preservation
 - Show original templates exactly as written in YAML
 - Preserve variable syntax: `{variable:default}`, `{!variable}`, `{{variable}}`
 - Maintain line breaks and formatting
+- Escape JSDoc special characters (`*/` becomes `*\/`)
 - Escape JSDoc comment characters (`*/` → `* /`)
 
 ### 4. IDE Integration
