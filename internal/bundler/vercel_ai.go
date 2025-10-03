@@ -31,12 +31,61 @@ func createVercelAIProviderPatch(module string, createFn string, envkey string, 
 }
 
 func init() {
-	var vercelTelemetryPatch = generateJSArgsPatch(0, `experimental_telemetry: { isEnabled: true }`)
+	// Generate PatchPortal integration patch with hashing and telemetry
+	var patchPortalPatch = `
+		console.log('🔧 generateText patch executing...');
+		const { PatchPortal } = await import('@agentuity/sdk');
+		const crypto = await import('crypto');
+		const patchPortal = await PatchPortal.getInstance();
+		console.log('✅ PatchPortal instance created');
+		
+		// Extract prompt from arguments
+		const prompt = _args[0]?.prompt || _args[0]?.messages || '';
+		const promptString = typeof prompt === 'string' ? prompt : JSON.stringify(prompt);
+		console.log('📝 Extracted prompt:', promptString.substring(0, 100) + '...');
+		
+		// Generate hash for the compiled prompt (same as processPromptMetadata uses)
+		const compiledHash = crypto.createHash('sha256').update(promptString).digest('hex');
+		console.log('🔑 Generated compiled hash:', compiledHash);
+		
+		// Print current PatchPortal state
+		patchPortal.printState();
+		
+		// Get patch data using the same key format as processPromptMetadata
+		const key = 'prompt:' + compiledHash;
+		console.log('🔍 Looking for key:', key);
+		const patchData = await patchPortal.get(key);
+		console.log('🔍 Retrieved patch data:', patchData);
+		
+		// Prepare telemetry metadata with PatchPortal data
+		const opts = {...(_args[0] ?? {}) };
+		const metadata = { 
+			promptId: opts.prompt?.id || compiledHash,
+			patchPortalData: patchData || null,
+			compiledHash: compiledHash,
+			patchPortalKey: key
+		};
+		opts.experimental_telemetry = { isEnabled: true, metadata: metadata };
+		opts.prompt = opts.prompt.toString();
+		if (opts.system) {
+			opts.system = opts.system.toString();
+		}
+		_args[0] = opts;
+		
+		if (patchData) {
+			console.log('✅ Patch data found for compiled hash:', compiledHash, patchData);
+		} else {
+			console.log('ℹ️ No patch data found for compiled hash:', compiledHash);
+		}
+	`
+
+	var vercelTelemetryPatch = generateJSArgsPatch(0, ``)
+
 	vercelAIPatches := patchModule{
 		Module: "ai",
 		Functions: map[string]patchAction{
 			"generateText": {
-				Before: vercelTelemetryPatch,
+				Before: vercelTelemetryPatch + "\n" + patchPortalPatch,
 			},
 			"streamText": {
 				Before: vercelTelemetryPatch,

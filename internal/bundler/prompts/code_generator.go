@@ -28,7 +28,8 @@ func (cg *CodeGenerator) GenerateJavaScript() string {
 	}
 
 	return fmt.Sprintf(`// Generated prompts - do not edit manually
-import { interpolateTemplate } from '../../../index.js';
+import { interpolateTemplate, processPromptMetadata } from '../../../index.js';
+import crypto from 'crypto';
 
 %s
 
@@ -113,21 +114,51 @@ func (cg *CodeGenerator) generateSystemField(prompt Prompt) string {
 		}
 		paramStr := strings.Join(paramNames, ", ")
 
+		// Generate variables object for metadata
+		varDefs := make([]string, len(systemVars))
+		for i, variable := range systemVars {
+			varDefs[i] = fmt.Sprintf("%s: %s", variable.Name, variable.Name)
+		}
+		variablesStr := strings.Join(varDefs, ", ")
+
 		if allOptional {
 			// Make parameters optional
 			return fmt.Sprintf(`system: %s({ %s } = {}) => {
-        return interpolateTemplate(%q, { %s })
-    }`, jsdoc, paramStr, prompt.System, paramStr)
+        const compiled = interpolateTemplate(%q, { %s });
+        processPromptMetadata({
+            slug: %q,
+            compiled,
+            template: %q,
+            variables: { %s }
+        });
+        return compiled;
+    }`, jsdoc, paramStr, prompt.System, paramStr, prompt.Slug, prompt.System, variablesStr)
 		} else {
 			// Parameters are required
 			return fmt.Sprintf(`system: %s({ %s }) => {
-        return interpolateTemplate(%q, { %s })
-    }`, jsdoc, paramStr, prompt.System, paramStr)
+        const compiled = interpolateTemplate(%q, { %s });
+        processPromptMetadata({
+            slug: %q,
+            compiled,
+            template: %q,
+            variables: { %s }
+        });
+        return compiled;
+    }`, jsdoc, paramStr, prompt.System, paramStr, prompt.Slug, prompt.System, variablesStr)
 		}
 	}
 	return fmt.Sprintf(`system: %s() => {
-        return interpolateTemplate(%q, {})
-    }`, jsdoc, prompt.System)
+        const compiled = interpolateTemplate(%q, {});
+        processPromptMetadata({
+            slug: %q,
+            compiled,
+            hash: %q,
+			compiledHash: crypto.createHash('sha256').update(compiled).digest('hex'),
+            template: %q,
+            variables: {}
+        });
+        return compiled;
+    }`, jsdoc, prompt.System, prompt.Slug, prompt.Slug, prompt.System)
 }
 
 // generatePromptField generates the prompt field for a prompt
@@ -147,21 +178,51 @@ func (cg *CodeGenerator) generatePromptField(prompt Prompt) string {
 		}
 		paramStr := strings.Join(paramNames, ", ")
 
+		// Generate variables object for metadata
+		varDefs := make([]string, len(promptVars))
+		for i, variable := range promptVars {
+			varDefs[i] = fmt.Sprintf("%s: %s", variable.Name, variable.Name)
+		}
+		variablesStr := strings.Join(varDefs, ", ")
+
 		if allOptional {
 			// Make parameters optional
 			return fmt.Sprintf(`prompt: %s({ %s } = {}) => {
-        return interpolateTemplate(%q, { %s })
-    }`, jsdoc, paramStr, prompt.Prompt, paramStr)
+        const compiled = interpolateTemplate(%q, { %s });
+        processPromptMetadata({
+            slug: %q,
+            compiled,
+            template: %q,
+            variables: { %s }
+        });
+        return compiled;
+    }`, jsdoc, paramStr, prompt.Prompt, paramStr, prompt.Slug, prompt.Prompt, variablesStr)
 		} else {
 			// Parameters are required
 			return fmt.Sprintf(`prompt: %s({ %s }) => {
-        return interpolateTemplate(%q, { %s })
-    }`, jsdoc, paramStr, prompt.Prompt, paramStr)
+        const compiled = interpolateTemplate(%q, { %s });
+        processPromptMetadata({
+            slug: %q,
+            compiled,
+            template: %q,
+            variables: { %s }
+        });
+        return compiled;
+    }`, jsdoc, paramStr, prompt.Prompt, paramStr, prompt.Slug, prompt.Prompt, variablesStr)
 		}
 	}
 	return fmt.Sprintf(`prompt: %s() => {
-        return interpolateTemplate(%q, {})
-    }`, jsdoc, prompt.Prompt)
+        const compiled = interpolateTemplate(%q, {});
+        processPromptMetadata({
+            slug: %q,
+            compiled,
+            hash: %q,
+			compiledHash: crypto.createHash('sha256').update(compiled).digest('hex'),
+            template: %q,
+            variables: {}
+        });
+        return compiled;
+    }`, jsdoc, prompt.Prompt, prompt.Slug, prompt.Prompt)
 }
 
 // generateVariablesField generates the variables field for a prompt
