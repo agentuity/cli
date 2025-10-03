@@ -73,24 +73,6 @@ func TestCodeGenerator(t *testing.T) {
 		assert.Contains(t, types, "domain: string")
 		assert.Contains(t, types, "task?: string | \"their question\"")
 	})
-
-	t.Run("GenerateTypeScriptInterfaces", func(t *testing.T) {
-		interfaces := codeGen.GenerateTypeScriptInterfaces()
-
-		// Check that it contains both interfaces
-		assert.Contains(t, interfaces, "export interface TestPrompt1 {")
-		assert.Contains(t, interfaces, "export interface TestPrompt2 {")
-
-		// Check that it contains variable types with proper optional/default syntax
-		assert.Contains(t, interfaces, "variables?: {")
-		assert.Contains(t, interfaces, "role?: string | \"assistant\"")
-		assert.Contains(t, interfaces, "domain: string")
-		assert.Contains(t, interfaces, "task?: string | \"their question\"")
-
-		// Check that it contains system and prompt compile functions
-		assert.Contains(t, interfaces, "system: { compile:")
-		assert.Contains(t, interfaces, "prompt: { compile:")
-	})
 }
 
 func TestCodeGenerator_EmptyPrompts(t *testing.T) {
@@ -113,10 +95,6 @@ func TestCodeGenerator_EmptyPrompts(t *testing.T) {
 		assert.Contains(t, types, "export const prompts: PromptsCollection = {} as any;")
 	})
 
-	t.Run("GenerateTypeScriptInterfaces", func(t *testing.T) {
-		interfaces := codeGen.GenerateTypeScriptInterfaces()
-		assert.Equal(t, "// Generated prompt interfaces - do not edit manually\n", interfaces)
-	})
 }
 
 func TestCodeGenerator_SingleFieldPrompts(t *testing.T) {
