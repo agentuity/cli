@@ -560,7 +560,12 @@ func (cg *CodeGenerator) generateParameterInterface(variables []Variable, isOpti
 		if variable.IsRequired {
 			fields = append(fields, fmt.Sprintf("%s: string", variable.Name))
 		} else {
-			fields = append(fields, fmt.Sprintf("%s?: string", variable.Name))
+			// Include default value as union type if it exists
+			if variable.HasDefault {
+				fields = append(fields, fmt.Sprintf("%s?: string | %q", variable.Name, variable.DefaultValue))
+			} else {
+				fields = append(fields, fmt.Sprintf("%s?: string", variable.Name))
+			}
 		}
 	}
 
