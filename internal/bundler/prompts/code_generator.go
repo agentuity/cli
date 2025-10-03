@@ -193,6 +193,10 @@ func (cg *CodeGenerator) generatePromptObject(prompt Prompt) string {
 // generateSystemField generates the system field for a prompt
 func (cg *CodeGenerator) generateSystemField(prompt Prompt) string {
 	systemVars := cg.getSystemVariableObjects(prompt)
+
+	// Generate JSDoc comment with the system prompt
+	jsdoc := cg.generateSystemJSDoc(prompt)
+
 	if len(systemVars) > 0 {
 		allOptional := cg.areAllVariablesOptional(systemVars)
 
@@ -205,24 +209,28 @@ func (cg *CodeGenerator) generateSystemField(prompt Prompt) string {
 
 		if allOptional {
 			// Make parameters optional
-			return fmt.Sprintf(`system: ({ %s } = {}) => {
+			return fmt.Sprintf(`system: %s({ %s } = {}) => {
         return interpolateTemplate(%q, { %s })
-    }`, paramStr, prompt.System, paramStr)
+    }`, jsdoc, paramStr, prompt.System, paramStr)
 		} else {
 			// Parameters are required
-			return fmt.Sprintf(`system: ({ %s }) => {
+			return fmt.Sprintf(`system: %s({ %s }) => {
         return interpolateTemplate(%q, { %s })
-    }`, paramStr, prompt.System, paramStr)
+    }`, jsdoc, paramStr, prompt.System, paramStr)
 		}
 	}
-	return fmt.Sprintf(`system: () => {
+	return fmt.Sprintf(`system: %s() => {
         return interpolateTemplate(%q, {})
-    }`, prompt.System)
+    }`, jsdoc, prompt.System)
 }
 
 // generatePromptField generates the prompt field for a prompt
 func (cg *CodeGenerator) generatePromptField(prompt Prompt) string {
 	promptVars := cg.getPromptVariableObjects(prompt)
+
+	// Generate JSDoc comment with the prompt content
+	jsdoc := cg.generatePromptJSDoc(prompt)
+
 	if len(promptVars) > 0 {
 		allOptional := cg.areAllVariablesOptional(promptVars)
 
@@ -235,19 +243,19 @@ func (cg *CodeGenerator) generatePromptField(prompt Prompt) string {
 
 		if allOptional {
 			// Make parameters optional
-			return fmt.Sprintf(`prompt: ({ %s } = {}) => {
+			return fmt.Sprintf(`prompt: %s({ %s } = {}) => {
         return interpolateTemplate(%q, { %s })
-    }`, paramStr, prompt.Prompt, paramStr)
+    }`, jsdoc, paramStr, prompt.Prompt, paramStr)
 		} else {
 			// Parameters are required
-			return fmt.Sprintf(`prompt: ({ %s }) => {
+			return fmt.Sprintf(`prompt: %s({ %s }) => {
         return interpolateTemplate(%q, { %s })
-    }`, paramStr, prompt.Prompt, paramStr)
+    }`, jsdoc, paramStr, prompt.Prompt, paramStr)
 		}
 	}
-	return fmt.Sprintf(`prompt: () => {
+	return fmt.Sprintf(`prompt: %s() => {
         return interpolateTemplate(%q, {})
-    }`, prompt.Prompt)
+    }`, jsdoc, prompt.Prompt)
 }
 
 // generateVariablesField generates the variables field for a prompt
@@ -442,35 +450,37 @@ func (cg *CodeGenerator) generateDetailedPromptType(prompt Prompt) string {
 		promptParams = cg.generateParameterInterface(promptVars, allPromptOptional)
 	}
 
-	// Generate the main prompt type
+	// Generate the main prompt type with JSDoc comments
 	var fields []string
 	fields = append(fields, "slug: string")
 
 	if hasSystem {
+		systemJSDoc := cg.generateSystemJSDocForType(prompt)
 		if hasSystemVars {
 			systemVars := cg.getSystemVariableObjects(prompt)
 			allSystemOptional := cg.areAllVariablesOptional(systemVars)
 			if allSystemOptional {
-				fields = append(fields, fmt.Sprintf("system: (variables?: %s) => string", systemParams))
+				fields = append(fields, fmt.Sprintf("%s  system: (variables?: %s) => string", systemJSDoc, systemParams))
 			} else {
-				fields = append(fields, fmt.Sprintf("system: (variables: %s) => string", systemParams))
+				fields = append(fields, fmt.Sprintf("%s  system: (variables: %s) => string", systemJSDoc, systemParams))
 			}
 		} else {
-			fields = append(fields, "system: () => string")
+			fields = append(fields, fmt.Sprintf("%s  system: () => string", systemJSDoc))
 		}
 	}
 
 	if hasPrompt {
+		promptJSDoc := cg.generatePromptJSDocForType(prompt)
 		if hasPromptVars {
 			promptVars := cg.getPromptVariableObjects(prompt)
 			allPromptOptional := cg.areAllVariablesOptional(promptVars)
 			if allPromptOptional {
-				fields = append(fields, fmt.Sprintf("prompt: (variables?: %s) => string", promptParams))
+				fields = append(fields, fmt.Sprintf("%s  prompt: (variables?: %s) => string", promptJSDoc, promptParams))
 			} else {
-				fields = append(fields, fmt.Sprintf("prompt: (variables: %s) => string", promptParams))
+				fields = append(fields, fmt.Sprintf("%s  prompt: (variables: %s) => string", promptJSDoc, promptParams))
 			}
 		} else {
-			fields = append(fields, "prompt: () => string")
+			fields = append(fields, fmt.Sprintf("%s  prompt: () => string", promptJSDoc))
 		}
 	}
 
@@ -491,11 +501,14 @@ func (cg *CodeGenerator) generateDetailedPromptType(prompt Prompt) string {
 		compileParams = "never"
 	}
 
-	return fmt.Sprintf(`export type %s = {
+	// Generate JSDoc typedef for the prompt type
+	typedefJSDoc := cg.generateTypedefJSDoc(prompt)
+
+	return fmt.Sprintf(`%sexport type %s = {
   %s
 };
 
-export type %sParams = %s;`, mainTypeName, fieldsStr, mainTypeName, compileParams)
+export type %sParams = %s;`, typedefJSDoc, mainTypeName, fieldsStr, mainTypeName, compileParams)
 }
 
 // areAllVariablesOptional checks if all variables in a list are optional
@@ -729,22 +742,33 @@ func (cg *CodeGenerator) generatePromptPropertyJSDoc(prompt Prompt) string {
 	// Create JSDoc comment with name, description, and templates
 	docLines = append(docLines, "  /**")
 
-	// Add name and description with separate tags
-	if prompt.Name != "" {
-		docLines = append(docLines, fmt.Sprintf("   * @name %s", prompt.Name))
+	// Add name and description in the main comment
+	if prompt.Name != "" && prompt.Description != "" {
+		docLines = append(docLines, fmt.Sprintf("   * %s - %s", prompt.Name, prompt.Description))
+	} else if prompt.Name != "" {
+		docLines = append(docLines, fmt.Sprintf("   * %s", prompt.Name))
+	} else if prompt.Description != "" {
+		docLines = append(docLines, fmt.Sprintf("   * %s", prompt.Description))
 	} else {
 		// Fallback to slug-based name
-		docLines = append(docLines, fmt.Sprintf("   * @name %s", strcase.ToCamel(prompt.Slug)))
+		docLines = append(docLines, fmt.Sprintf("   * %s", strcase.ToCamel(prompt.Slug)))
 	}
 
-	if prompt.Description != "" {
-		docLines = append(docLines, fmt.Sprintf("   * @description %s", prompt.Description))
+	// Add function signatures in the description
+	docLines = append(docLines, "   *")
+	docLines = append(docLines, "   * Functions:")
+
+	if prompt.System != "" {
+		docLines = append(docLines, "   * - system(): Returns the system prompt")
+	}
+	if prompt.Prompt != "" {
+		docLines = append(docLines, "   * - prompt(): Returns the user prompt")
 	}
 
 	// Add original templates
 	if prompt.System != "" {
 		docLines = append(docLines, "   *")
-		docLines = append(docLines, "   * @system")
+		docLines = append(docLines, "   * System prompt:")
 		// Escape the template for JSDoc and add proper line breaks
 		escapedSystem := strings.ReplaceAll(prompt.System, "*/", "* /")
 		// Split by newlines and add proper JSDoc formatting
@@ -756,7 +780,7 @@ func (cg *CodeGenerator) generatePromptPropertyJSDoc(prompt Prompt) string {
 
 	if prompt.Prompt != "" {
 		docLines = append(docLines, "   *")
-		docLines = append(docLines, "   * @prompt")
+		docLines = append(docLines, "   * User prompt:")
 		// Escape the template for JSDoc and add proper line breaks
 		escapedPrompt := strings.ReplaceAll(prompt.Prompt, "*/", "* /")
 		// Split by newlines and add proper JSDoc formatting
@@ -960,4 +984,185 @@ func (cg *CodeGenerator) wrapLine(line string, width int) []string {
 	}
 
 	return wrapped
+}
+
+// generateSystemJSDoc generates JSDoc comment for the system function
+func (cg *CodeGenerator) generateSystemJSDoc(prompt Prompt) string {
+	if prompt.System == "" {
+		return ""
+	}
+
+	// Escape the system prompt for JSDoc
+	escapedSystem := strings.ReplaceAll(prompt.System, "*/", "*\\/")
+
+	// Clean up the system prompt for single line display but keep variable placeholders
+	cleanSystem := strings.ReplaceAll(escapedSystem, "\n", " ")
+	cleanSystem = strings.TrimSpace(cleanSystem)
+
+	// Get system variables for parameter documentation
+	systemVars := cg.getSystemVariableObjects(prompt)
+	allOptional := cg.areAllVariablesOptional(systemVars)
+
+	// Build JSDoc
+	var jsdoc strings.Builder
+	jsdoc.WriteString("/**\n")
+	jsdoc.WriteString(fmt.Sprintf(" * System prompt: %s\n", cleanSystem))
+
+	// Add parameter documentation
+	if len(systemVars) > 0 {
+		jsdoc.WriteString(" * @param {Object} variables - System prompt variables\n")
+		for _, variable := range systemVars {
+			if allOptional {
+				jsdoc.WriteString(fmt.Sprintf(" * @param {string} [variables.%s] - System prompt variable\n", variable.Name))
+			} else {
+				jsdoc.WriteString(fmt.Sprintf(" * @param {string} variables.%s - System prompt variable\n", variable.Name))
+			}
+		}
+	}
+
+	jsdoc.WriteString(" * @returns {string} The compiled system prompt\n")
+	jsdoc.WriteString(" */\n    ")
+
+	return jsdoc.String()
+}
+
+// generatePromptJSDoc generates JSDoc comment for the prompt function
+func (cg *CodeGenerator) generatePromptJSDoc(prompt Prompt) string {
+	if prompt.Prompt == "" {
+		return ""
+	}
+
+	// Escape the prompt for JSDoc
+	escapedPrompt := strings.ReplaceAll(prompt.Prompt, "*/", "*\\/")
+
+	// Clean up the prompt for single line display
+	cleanPrompt := strings.ReplaceAll(escapedPrompt, "\n", " ")
+	cleanPrompt = strings.TrimSpace(cleanPrompt)
+
+	// Get prompt variables for parameter documentation
+	promptVars := cg.getPromptVariableObjects(prompt)
+	allOptional := cg.areAllVariablesOptional(promptVars)
+
+	// Build JSDoc
+	var jsdoc strings.Builder
+	jsdoc.WriteString("/**\n")
+	jsdoc.WriteString(fmt.Sprintf(" * User prompt: %s\n", cleanPrompt))
+
+	// Add parameter documentation
+	if len(promptVars) > 0 {
+		jsdoc.WriteString(" * @param {Object} variables - User prompt variables\n")
+		for _, variable := range promptVars {
+			if allOptional {
+				jsdoc.WriteString(fmt.Sprintf(" * @param {string} [variables.%s] - User prompt variable\n", variable.Name))
+			} else {
+				jsdoc.WriteString(fmt.Sprintf(" * @param {string} variables.%s - User prompt variable\n", variable.Name))
+			}
+		}
+	}
+
+	jsdoc.WriteString(" * @returns {string} The compiled user prompt\n")
+	jsdoc.WriteString(" */\n    ")
+
+	return jsdoc.String()
+}
+
+// generateSystemJSDocForType generates JSDoc comment for the system function in TypeScript types
+func (cg *CodeGenerator) generateSystemJSDocForType(prompt Prompt) string {
+	if prompt.System == "" {
+		return ""
+	}
+
+	// Escape the system prompt for JSDoc
+	escapedSystem := strings.ReplaceAll(prompt.System, "*/", "*\\/")
+
+	// Clean up the system prompt for single line display but keep variable placeholders
+	cleanSystem := strings.ReplaceAll(escapedSystem, "\n", " ")
+	cleanSystem = strings.TrimSpace(cleanSystem)
+
+	// Convert slug to the destructured variable name pattern
+	variableName := strcase.ToLowerCamel(prompt.Slug) + "System"
+
+	// Build JSDoc with actual prompt content and variable name
+	var jsdoc strings.Builder
+	jsdoc.WriteString("/**\n")
+	jsdoc.WriteString(fmt.Sprintf(" * %s - System prompt: %s\n", variableName, cleanSystem))
+	jsdoc.WriteString(" * @param variables - System prompt variables\n")
+	jsdoc.WriteString(" * @returns The compiled system prompt string\n")
+	jsdoc.WriteString(" */\n")
+
+	return jsdoc.String()
+}
+
+// generatePromptJSDocForType generates JSDoc comment for the prompt function in TypeScript types
+func (cg *CodeGenerator) generatePromptJSDocForType(prompt Prompt) string {
+	if prompt.Prompt == "" {
+		return ""
+	}
+
+	// Escape the prompt for JSDoc
+	escapedPrompt := strings.ReplaceAll(prompt.Prompt, "*/", "*\\/")
+
+	// Clean up the prompt for single line display but keep variable placeholders
+	cleanPrompt := strings.ReplaceAll(escapedPrompt, "\n", " ")
+	cleanPrompt = strings.TrimSpace(cleanPrompt)
+
+	// Convert slug to the destructured variable name pattern
+	variableName := strcase.ToLowerCamel(prompt.Slug) + "Prompt"
+
+	// Build JSDoc with actual prompt content and variable name
+	var jsdoc strings.Builder
+	jsdoc.WriteString("/**\n")
+	jsdoc.WriteString(fmt.Sprintf(" * %s - User prompt: %s\n", variableName, cleanPrompt))
+	jsdoc.WriteString(" * @param variables - User prompt variables\n")
+	jsdoc.WriteString(" * @returns The compiled user prompt string\n")
+	jsdoc.WriteString(" */\n")
+
+	return jsdoc.String()
+}
+
+// generateTypedefJSDoc generates JSDoc typedef for the prompt type
+func (cg *CodeGenerator) generateTypedefJSDoc(prompt Prompt) string {
+	var jsdoc strings.Builder
+	jsdoc.WriteString("/**\n")
+	jsdoc.WriteString(" * ")
+	jsdoc.WriteString(prompt.Name)
+	jsdoc.WriteString(" - ")
+	jsdoc.WriteString(prompt.Description)
+	jsdoc.WriteString("\n * @typedef {Object} ")
+	jsdoc.WriteString(strcase.ToCamel(prompt.Slug))
+	jsdoc.WriteString("\n * @property {string} slug - The prompt slug\n")
+
+	if prompt.System != "" {
+		jsdoc.WriteString(" * @property {Function} system - System prompt function\n")
+		// Add system prompt content
+		escapedSystem := strings.ReplaceAll(prompt.System, "*/", "*\\/")
+		lines := strings.Split(escapedSystem, "\n")
+		for _, line := range lines {
+			wrapped := cg.wrapLine(line, 80)
+			for _, wrappedLine := range wrapped {
+				jsdoc.WriteString(" *   System: ")
+				jsdoc.WriteString(wrappedLine)
+				jsdoc.WriteString("\n")
+			}
+		}
+	}
+
+	if prompt.Prompt != "" {
+		jsdoc.WriteString(" * @property {Function} prompt - User prompt function\n")
+		// Add user prompt content
+		escapedPrompt := strings.ReplaceAll(prompt.Prompt, "*/", "*\\/")
+		lines := strings.Split(escapedPrompt, "\n")
+		for _, line := range lines {
+			wrapped := cg.wrapLine(line, 80)
+			for _, wrappedLine := range wrapped {
+				jsdoc.WriteString(" *   Prompt: ")
+				jsdoc.WriteString(wrappedLine)
+				jsdoc.WriteString("\n")
+			}
+		}
+	}
+
+	jsdoc.WriteString(" */\n")
+
+	return jsdoc.String()
 }

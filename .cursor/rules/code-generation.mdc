@@ -21,6 +21,18 @@ alwaysApply: true
 2. **Update SDK to handle generated content dynamically** (e.g., `src/apis/prompt/index.ts`)
 3. **Build and test the full pipeline**: CLI generation → SDK loading → Agent usage
 
+### Multi-File Support
+- **Directory Scanning**: CLI scans `src/prompts/` and `prompts/` directories for all YAML files
+- **File Processing**: Processes all `.yaml` and `.yml` files found in the prompts directory
+- **Combined Output**: Merges prompts from multiple files into a single generated output
+- **Legacy Support**: Still supports single `prompts.yaml` file in various locations
+
+### JSDoc Documentation
+- **Function Comments**: Generated `system` and `prompt` functions include JSDoc comments with actual prompt content
+- **IDE Support**: JSDoc comments provide better IDE hover tooltips and documentation
+- **Content Preservation**: Original prompt templates are preserved exactly as written in YAML
+- **Line Wrapping**: Long lines are automatically wrapped at 80 characters for readability
+
 ### Optional Field Handling
 - ✅ Generated code should NEVER require optional chaining (`?.`)
 - ✅ Always generate both `system` and `prompt` fields, even if empty
