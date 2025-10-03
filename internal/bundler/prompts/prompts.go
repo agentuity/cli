@@ -9,31 +9,6 @@ import (
 	"github.com/agentuity/go-common/logger"
 )
 
-// VariableInfo holds information about extracted variables
-type VariableInfo struct {
-	Names []string
-}
-
-// FindPromptsYAML finds prompts.yaml in the given directory (legacy support)
-func FindPromptsYAML(dir string) string {
-	possiblePaths := []string{
-		filepath.Join(dir, "src", "prompts", "prompts.yaml"),
-		filepath.Join(dir, "src", "prompts", "prompts.yml"),
-		filepath.Join(dir, "src", "prompts.yaml"),
-		filepath.Join(dir, "src", "prompts.yml"),
-		filepath.Join(dir, "prompts.yaml"),
-		filepath.Join(dir, "prompts.yml"),
-	}
-
-	for _, path := range possiblePaths {
-		if _, err := os.Stat(path); err == nil {
-			return path
-		}
-	}
-
-	return ""
-}
-
 // FindAllPromptFiles finds all YAML files in the prompts directory
 func FindAllPromptFiles(dir string) []string {
 	var promptFiles []string
