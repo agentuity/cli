@@ -57,7 +57,7 @@ func (cg *CodeGenerator) GenerateTypeScriptTypes() string {
 	var signatureTypes []string
 
 	for _, prompt := range cg.prompts {
-		promptType := cg.generatePromptType(prompt)
+		promptType := cg.generateDetailedPromptType(prompt)
 		promptTypes = append(promptTypes, promptType)
 		signatureType := cg.generateSignatureType(prompt)
 		signatureTypes = append(signatureTypes, signatureType)
@@ -70,6 +70,23 @@ import { interpolateTemplate, Prompt } from '@agentuity/sdk';
 
 export interface GeneratedPromptsCollection {
 %s
+  compile: <T extends keyof GeneratedPromptsCollection>(
+    name: T,
+    ...args: T extends 'simple-helper' 
+      ? [] // No parameters needed
+      : T extends keyof { [K in keyof GeneratedPromptsCollection as GeneratedPromptsCollection[K] extends { system: () => string; prompt: () => string } ? K : never]: any }
+        ? [] // No parameters needed
+        : [GeneratedPromptsCollection[T] extends { system: (variables: infer S) => string; prompt: (variables: infer P) => string } 
+            ? { system: S; prompt: P }
+            : GeneratedPromptsCollection[T] extends { system: (variables: infer S) => string }
+              ? { system: S }
+              : GeneratedPromptsCollection[T] extends { prompt: (variables: infer P) => string }
+                ? { prompt: P }
+                : never]
+  ) => string;
+  getPrompt: <T extends keyof GeneratedPromptsCollection>(
+    name: T
+  ) => GeneratedPromptsCollection[T];
 }
 
 export type PromptsCollection = GeneratedPromptsCollection;
@@ -310,6 +327,91 @@ func (cg *CodeGenerator) generatePromptType(prompt Prompt) string {
 	}
 
 	return fmt.Sprintf(`export type %s = Prompt<%s>;`, mainTypeName, genericStr)
+}
+
+// generateDetailedPromptType generates detailed TypeScript types with specific parameter interfaces
+func (cg *CodeGenerator) generateDetailedPromptType(prompt Prompt) string {
+	hasSystem := prompt.System != ""
+	hasPrompt := prompt.Prompt != ""
+	hasSystemVars := len(cg.getSystemVariables(prompt)) > 0
+	hasPromptVars := len(cg.getPromptVariables(prompt)) > 0
+
+	mainTypeName := strcase.ToCamel(prompt.Slug)
+
+	// Generate parameter interfaces
+	var systemParams string
+	var promptParams string
+
+	if hasSystemVars {
+		systemVars := cg.getSystemVariableObjects(prompt)
+		systemParams = cg.generateParameterInterface(systemVars, true)
+	}
+
+	if hasPromptVars {
+		promptVars := cg.getPromptVariableObjects(prompt)
+		promptParams = cg.generateParameterInterface(promptVars, true)
+	}
+
+	// Generate the main prompt type
+	var fields []string
+	fields = append(fields, "slug: string")
+
+	if hasSystem {
+		if hasSystemVars {
+			fields = append(fields, fmt.Sprintf("system: (variables: %s) => string", systemParams))
+		} else {
+			fields = append(fields, "system: () => string")
+		}
+	}
+
+	if hasPrompt {
+		if hasPromptVars {
+			fields = append(fields, fmt.Sprintf("prompt: (variables: %s) => string", promptParams))
+		} else {
+			fields = append(fields, "prompt: () => string")
+		}
+	}
+
+	fieldsStr := strings.Join(fields, ";\n  ")
+
+	// Generate parameter interface for compile function
+	var compileParams string
+	if hasSystemVars || hasPromptVars {
+		var paramFields []string
+		if hasSystemVars {
+			paramFields = append(paramFields, fmt.Sprintf("system: %s", systemParams))
+		}
+		if hasPromptVars {
+			paramFields = append(paramFields, fmt.Sprintf("prompt: %s", promptParams))
+		}
+		compileParams = fmt.Sprintf("{\n    %s\n  }", strings.Join(paramFields, ";\n    "))
+	} else {
+		compileParams = "never"
+	}
+
+	return fmt.Sprintf(`export type %s = {
+  %s
+};
+
+export type %sParams = %s;`, mainTypeName, fieldsStr, mainTypeName, compileParams)
+}
+
+// generateParameterInterface generates a TypeScript interface for variables
+func (cg *CodeGenerator) generateParameterInterface(variables []Variable, isOptional bool) string {
+	if len(variables) == 0 {
+		return "{}"
+	}
+
+	var fields []string
+	for _, variable := range variables {
+		if variable.IsRequired {
+			fields = append(fields, fmt.Sprintf("%s: string", variable.Name))
+		} else {
+			fields = append(fields, fmt.Sprintf("%s?: string", variable.Name))
+		}
+	}
+
+	return fmt.Sprintf("{\n    %s\n  }", strings.Join(fields, ";\n    "))
 }
 
 // generateSignatureType generates a TypeScript type for a signature function
@@ -604,7 +706,7 @@ func (cg *CodeGenerator) getPromptVariables(prompt Prompt) []string {
 	return promptTemplate.VariableNames()
 }
 
-// getSystemVariableObjects gets variable objects from the system template only
+// getSystemVariableObjects gets Variable objects from the system template
 func (cg *CodeGenerator) getSystemVariableObjects(prompt Prompt) []Variable {
 	// Parse system template if not already parsed
 	systemTemplate := prompt.SystemTemplate
@@ -615,7 +717,7 @@ func (cg *CodeGenerator) getSystemVariableObjects(prompt Prompt) []Variable {
 	return systemTemplate.Variables
 }
 
-// getPromptVariableObjects gets variable objects from the prompt template only
+// getPromptVariableObjects gets Variable objects from the prompt template
 func (cg *CodeGenerator) getPromptVariableObjects(prompt Prompt) []Variable {
 	// Parse prompt template if not already parsed
 	promptTemplate := prompt.PromptTemplate
