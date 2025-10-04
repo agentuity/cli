@@ -60,7 +60,7 @@ func init() {
 		// Prepare telemetry metadata with PatchPortal data
 		const opts = {...(_args[0] ?? {}) };
 		const metadata = { 
-			promptId: opts.prompt?.id || compiledHash,
+			promptId: patchData?.slug || opts.prompt?.id || compiledHash,
 			patchPortalData: patchData || null,
 			compiledHash: compiledHash,
 			patchPortalKey: key

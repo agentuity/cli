@@ -152,13 +152,11 @@ func (cg *CodeGenerator) generateSystemField(prompt Prompt) string {
         processPromptMetadata({
             slug: %q,
             compiled,
-            hash: %q,
-			compiledHash: crypto.createHash('sha256').update(compiled).digest('hex'),
             template: %q,
             variables: {}
         });
         return compiled;
-    }`, jsdoc, prompt.System, prompt.Slug, prompt.Slug, prompt.System)
+    }`, jsdoc, prompt.System, prompt.Slug, prompt.System)
 }
 
 // generatePromptField generates the prompt field for a prompt
@@ -216,8 +214,6 @@ func (cg *CodeGenerator) generatePromptField(prompt Prompt) string {
         processPromptMetadata({
             slug: %q,
             compiled,
-            hash: %q,
-			compiledHash: crypto.createHash('sha256').update(compiled).digest('hex'),
             template: %q,
             variables: {}
         });
