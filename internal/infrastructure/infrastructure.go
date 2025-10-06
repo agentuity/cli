@@ -183,14 +183,10 @@ func DeleteMachine(ctx context.Context, logger logger.Logger, baseURL string, to
 func CheckClusteringEnabled(ctx context.Context, logger logger.Logger, baseURL string, token string) (bool, error) {
 	client := util.NewAPIClient(ctx, logger, baseURL, token)
 
-	fmt.Println("Checking clustering enabled")
 	var resp Response[bool]
 	if err := client.Do("GET", "/cli/cluster/clustering-enabled", nil, &resp); err != nil {
-		fmt.Println("error", err)
 		return false, fmt.Errorf("error checking cluster clustering enabled: %w", err)
 	}
-
-	fmt.Println("resp", resp)
 
 	if !resp.Success {
 		return false, fmt.Errorf("clustering check failed: %s", resp.Message)
