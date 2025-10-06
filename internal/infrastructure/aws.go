@@ -187,32 +187,32 @@ func aws_cmdEscape(cmd string) string {
 
 func aws_configureSecurityGroupRules() string {
 	cmd := []string{
-		`SG_ID=$(aws ec2 describe-security-groups --filters Name=group-name,Values={AWS_ROLE_NAME}-sg --query 'SecurityGroups[0].GroupId' --output text)`,
-		`aws ec2 authorize-security-group-ingress --group-id $SG_ID --protocol tcp --port 22 --cidr 0.0.0.0/0 2>/dev/null || true`,
-		`aws ec2 authorize-security-group-ingress --group-id $SG_ID --protocol tcp --port 443 --cidr 0.0.0.0/0 2>/dev/null || true`,
+		`SG_ID=$(aws --region {AWS_REGION} ec2 describe-security-groups --filters Name=group-name,Values={AWS_ROLE_NAME}-sg --query 'SecurityGroups[0].GroupId' --output text)`,
+		`aws --region {AWS_REGION} ec2 authorize-security-group-ingress --group-id $SG_ID --protocol tcp --port 22 --cidr 0.0.0.0/0 2>/dev/null || true`,
+		`aws --region {AWS_REGION} ec2 authorize-security-group-ingress --group-id $SG_ID --protocol tcp --port 443 --cidr 0.0.0.0/0 2>/dev/null || true`,
 	}
 	return aws_cmdEscape(strings.Join(cmd, " && "))
 }
 
 func aws_checkConfigureSecurityGroupRules() string {
 	cmd := []string{
-		`SG_ID=$(aws ec2 describe-security-groups --filters Name=group-name,Values={AWS_ROLE_NAME}-sg --query 'SecurityGroups[0].GroupId' --output text)`,
-		`aws ec2 describe-security-group-rules --filters GroupId=$SG_ID --query 'SecurityGroupRules[?IpProtocol==\"tcp\" && FromPort==22 && ToPort==22]' --output text`,
+		`SG_ID=$(aws --region {AWS_REGION} ec2 describe-security-groups --filters Name=group-name,Values={AWS_ROLE_NAME}-sg --query 'SecurityGroups[0].GroupId' --output text)`,
+		`aws --region {AWS_REGION} ec2 describe-security-group-rules --filters GroupId=$SG_ID --query 'SecurityGroupRules[?IpProtocol==\"tcp\" && FromPort==22 && ToPort==22]' --output text`,
 	}
 	return aws_cmdEscape(strings.Join(cmd, " && "))
 }
 
 func aws_createSecurityGroup() string {
 	cmd := []string{
-		`VPC_ID=$(aws ec2 describe-vpcs --filters Name=isDefault,Values=true --query 'Vpcs[0].VpcId' --output text)`,
-		`aws ec2 create-security-group --group-name {AWS_ROLE_NAME}-sg --description 'Agentuity Cluster Security Group' --vpc-id $VPC_ID --query 'GroupId' --output text`,
+		`VPC_ID=$(aws --region {AWS_REGION} ec2 describe-vpcs --filters Name=isDefault,Values=true --query 'Vpcs[0].VpcId' --output text)`,
+		`aws --region {AWS_REGION} ec2 create-security-group --group-name {AWS_ROLE_NAME}-sg --description 'Agentuity Cluster Security Group' --vpc-id $VPC_ID --query 'GroupId' --output text`,
 	}
 	return aws_cmdEscape(strings.Join(cmd, " && "))
 }
 
 func aws_checkSecurityGroup() string {
 	cmd := []string{
-		`aws ec2 describe-security-groups --filters Name=group-name,Values={AWS_ROLE_NAME}-sg --query 'SecurityGroups[0].GroupId' --output text`,
+		`aws --region {AWS_REGION} ec2 describe-security-groups --filters Name=group-name,Values={AWS_ROLE_NAME}-sg --query 'SecurityGroups[0].GroupId' --output text`,
 	}
 	return aws_cmdEscape(strings.Join(cmd, " && "))
 }
@@ -290,7 +290,7 @@ func aws_checkRoleInInstanceProfile() string {
 func aws_createSecret() string {
 	cmd := []string{
 		`echo '{ENCRYPTION_PRIVATE_KEY}' | base64 -d | openssl ec -inform DER -outform PEM > /tmp/agentuity-key.pem`,
-		`aws secretsmanager create-secret --name '{AWS_SECRET_NAME}' --description 'Agentuity Cluster Private Key' --secret-string file:///tmp/agentuity-key.pem`,
+		`aws --region {AWS_REGION} secretsmanager create-secret --name '{AWS_SECRET_NAME}' --description 'Agentuity Cluster Private Key' --secret-string file:///tmp/agentuity-key.pem`,
 		`rm -f /tmp/agentuity-key.pem`,
 	}
 	return aws_cmdEscape(strings.Join(cmd, " && "))
@@ -305,15 +305,15 @@ func aws_checkSecret() string {
 
 func aws_getDefaultVPC() string {
 	cmd := []string{
-		`aws ec2 describe-vpcs --filters Name=isDefault,Values=true --query 'Vpcs[0].VpcId' --output text`,
+		`aws --region {AWS_REGION} ec2 describe-vpcs --filters Name=isDefault,Values=true --query 'Vpcs[0].VpcId' --output text`,
 	}
 	return aws_cmdEscape(strings.Join(cmd, " && "))
 }
 
 func aws_getDefaultSubnet() string {
 	cmd := []string{
-		`VPC_ID=$(aws ec2 describe-vpcs --filters Name=isDefault,Values=true --query 'Vpcs[0].VpcId' --output text)`,
-		`aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID Name=default-for-az,Values=true --query 'Subnets[0].SubnetId' --output text`,
+		`VPC_ID=$(aws --region {AWS_REGION} ec2 describe-vpcs --filters Name=isDefault,Values=true --query 'Vpcs[0].VpcId' --output text)`,
+		`aws --region {AWS_REGION} ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID Name=default-for-az,Values=true --query 'Subnets[0].SubnetId' --output text`,
 	}
 	return aws_cmdEscape(strings.Join(cmd, " && "))
 }
@@ -323,8 +323,7 @@ func aws_createMachine() string {
 		`AMI_ID=$(aws ec2 describe-images --owners 084828583931 --filters 'Name=name,Values=hadron-*' 'Name=state,Values=available' --region {AWS_REGION} --query 'Images | sort_by(@, &CreationDate) | [-1].ImageId' --output text)`,
 		`if [ "$AMI_ID" = "" ] || [ "$AMI_ID" = "None" ]; then SOURCE_AMI=$(aws ec2 describe-images --owners 084828583931 --filters 'Name=name,Values=hadron-*' 'Name=state,Values=available' --region us-west-1 --query 'Images | sort_by(@, &CreationDate) | [-1].ImageId' --output text)`,
 		`AMI_ID=$(aws ec2 copy-image --source-image-id $SOURCE_AMI --source-region us-west-1 --region {AWS_REGION} --name "hadron-copied-$(date +%s)" --query 'ImageId' --output text)`,
-		`aws ec2 wait image-available --image-ids $AMI_ID --region {AWS_REGION}`,
-		`aws ec2 modify-image-attribute --image-id $AMI_ID --launch-permission 'Add=[{Group=all}]' --region {AWS_REGION}; fi`,
+		`aws ec2 wait image-available --image-ids $AMI_ID --region {AWS_REGION}  fi`,
 		`SUBNET_ID=$(aws ec2 describe-vpcs --filters Name=isDefault,Values=true --region {AWS_REGION} --query 'Vpcs[0].VpcId' --output text | xargs -I {} aws ec2 describe-subnets --filters Name=vpc-id,Values={} Name=default-for-az,Values=true --region {AWS_REGION} --query 'Subnets[0].SubnetId' --output text)`,
 		`SG_ID=$(aws ec2 describe-security-groups --filters Name=group-name,Values={AWS_ROLE_NAME}-sg --region {AWS_REGION} --query 'SecurityGroups[0].GroupId' --output text)`,
 		`aws ec2 run-instances --image-id $AMI_ID --count 1 --instance-type t3.medium --security-group-ids $SG_ID --subnet-id $SUBNET_ID --iam-instance-profile Name={AWS_ROLE_NAME} --user-data '{CLUSTER_TOKEN}' --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value={AWS_INSTANCE_NAME}},{Key=AgentuityCluster,Value={CLUSTER_ID}}]' --associate-public-ip-address --region {AWS_REGION}`,
@@ -489,7 +488,6 @@ var awsClusterSpecification = `[
 
 func getAWSClusterSpecification(envs map[string]any) string {
 	spec := awsClusterSpecification
-	fmt.Println(spec)
 	// Replace variables in the JSON string
 	for key, val := range envs {
 		spec = strings.ReplaceAll(spec, "{"+key+"}", fmt.Sprint(val))

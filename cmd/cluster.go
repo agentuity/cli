@@ -255,10 +255,6 @@ Examples:
 			}
 		}
 
-		if err := infrastructure.Setup(ctx, logger, &infrastructure.Cluster{ID: "1234", Token: "", Provider: provider, Name: name, Type: size, Region: region}, format); err != nil {
-			logger.Fatal("%s", err)
-		}
-
 		ready := tui.Ask(logger, "Ready to create the cluster", true)
 		if !ready {
 			logger.Info("Cluster creation cancelled")
@@ -280,7 +276,7 @@ Examples:
 				errsystem.New(errsystem.ErrCreateProject, err, errsystem.WithContextMessage("Failed to create cluster")).ShowErrorAndExit()
 			}
 
-			if err := infrastructure.Setup(ctx, logger, &infrastructure.Cluster{ID: cluster.ID, Token: "", Provider: provider, Name: name, Type: size, Region: region}, format); err != nil {
+			if err := infrastructure.Setup(ctx, logger, cluster, format); err != nil {
 				logger.Fatal("%s", err)
 			}
 		})

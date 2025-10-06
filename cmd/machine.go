@@ -389,6 +389,14 @@ func promptForClusterSelection(ctx context.Context, logger logger.Logger, apiUrl
 		return cluster
 	}
 
+	// Sort clusters by Name then ID for deterministic display order
+	sort.Slice(clusters, func(i, j int) bool {
+		if clusters[i].Name != clusters[j].Name {
+			return clusters[i].Name < clusters[j].Name
+		}
+		return clusters[i].ID < clusters[j].ID
+	})
+
 	var opts []tui.Option
 	for _, cluster := range clusters {
 		displayText := fmt.Sprintf("%s (%s) - %s %s", cluster.Name, cluster.ID, cluster.Provider, cluster.Region)
@@ -396,12 +404,22 @@ func promptForClusterSelection(ctx context.Context, logger logger.Logger, apiUrl
 	}
 
 	id := tui.Select(logger, "Select a cluster to create a machine in:", "Choose the cluster where you want to deploy the new machine", opts)
+
+	// Handle user cancellation (empty string)
+	if id == "" {
+		errsystem.New(errsystem.ErrApiRequest, fmt.Errorf("no cluster selected"), errsystem.WithUserMessage("No cluster selected")).ShowErrorAndExit()
+	}
+
+	// Find the selected cluster
 	for _, cluster := range clusters {
 		if cluster.ID == id {
 			return cluster
 		}
 	}
-	return infrastructure.Cluster{}
+
+	// This should never happen, but handle it as an impossible path
+	errsystem.New(errsystem.ErrApiRequest, fmt.Errorf("selected cluster not found: %s", id), errsystem.WithUserMessage("Selected cluster not found")).ShowErrorAndExit()
+	return infrastructure.Cluster{} // This line will never be reached
 }
 
 // promptForRegionSelection prompts the user to select a region

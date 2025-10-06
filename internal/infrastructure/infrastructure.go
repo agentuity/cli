@@ -259,7 +259,11 @@ func CreateMachine(ctx context.Context, logger logger.Logger, baseURL string, to
 
 	if setup, ok := setups[provider]; ok {
 		if err := setup.CreateMachine(ctx, logger, region, resp.Data.Token, clusterID); err != nil {
-			client.Do("DELETE", "/cli/machine", map[string]string{"id": resp.Data.ID}, &resp)
+			// Rollback: delete the machine that was created
+			if rollbackErr := DeleteMachine(ctx, logger, baseURL, token, resp.Data.ID); rollbackErr != nil {
+				logger.Error("Failed to rollback machine creation", "machineID", resp.Data.ID, "error", rollbackErr)
+				return nil, fmt.Errorf("error creating machine: %w (rollback also failed: %v)", err, rollbackErr)
+			}
 			return nil, fmt.Errorf("error creating machine: %w", err)
 		}
 	}
