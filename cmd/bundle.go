@@ -30,7 +30,6 @@ Flags:
 Examples:
   agentuity bundle --production
   agentuity bundle --install --deploy`,
-	Args:    cobra.NoArgs,
 	Aliases: []string{"build"},
 	Hidden:  true,
 	Run: func(cmd *cobra.Command, args []string) {
