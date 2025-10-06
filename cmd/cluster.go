@@ -170,6 +170,9 @@ Examples:
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 
+		// Check if clustering is enabled for cluster operations
+		infrastructure.EnsureClusteringEnabled(ctx, logger, apiUrl, apikey)
+
 		var name string
 		if len(args) > 0 {
 			name = args[0]
@@ -310,6 +313,9 @@ Examples:
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 
+		// Check if clustering is enabled for cluster operations
+		infrastructure.EnsureClusteringEnabled(ctx, logger, apiUrl, apikey)
+
 		format, _ := cmd.Flags().GetString("format")
 		if format != "" {
 			if err := validateFormat(format); err != nil {
@@ -395,6 +401,9 @@ Examples:
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 
+		// Check if clustering is enabled for cluster operations
+		infrastructure.EnsureClusteringEnabled(ctx, logger, apiUrl, apikey)
+
 		clusterID := args[0]
 		force, _ := cmd.Flags().GetBool("force")
 
@@ -435,6 +444,9 @@ Examples:
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
+
+		// Check if clustering is enabled for cluster operations
+		infrastructure.EnsureClusteringEnabled(ctx, logger, apiUrl, apikey)
 
 		clusterID := args[0]
 		format, _ := cmd.Flags().GetString("format")

@@ -50,6 +50,9 @@ Examples:
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 
+		// Check if clustering is enabled for machine operations
+		infrastructure.EnsureMachineClusteringEnabled(ctx, logger, apiUrl, apikey)
+
 		var clusterFilter string
 		if len(args) > 0 {
 			clusterFilter = args[0]
@@ -169,6 +172,9 @@ Examples:
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 
+		// Check if clustering is enabled for machine operations
+		infrastructure.EnsureMachineClusteringEnabled(ctx, logger, apiUrl, apikey)
+
 		machineID := args[0]
 		force, _ := cmd.Flags().GetBool("force")
 
@@ -209,6 +215,9 @@ Examples:
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
+
+		// Check if clustering is enabled for machine operations
+		infrastructure.EnsureMachineClusteringEnabled(ctx, logger, apiUrl, apikey)
 
 		machineID := args[0]
 		format, _ := cmd.Flags().GetString("format")
@@ -303,6 +312,9 @@ Examples:
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
+
+		// Check if clustering is enabled for machine operations
+		infrastructure.EnsureMachineClusteringEnabled(ctx, logger, apiUrl, apikey)
 
 		var clusterID, provider, region string
 

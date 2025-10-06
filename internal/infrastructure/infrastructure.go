@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
 )
@@ -176,6 +177,64 @@ func DeleteMachine(ctx context.Context, logger logger.Logger, baseURL string, to
 	}
 
 	return nil
+}
+
+// CheckClusteringEnabled checks if clustering is enabled for the authenticated user
+func CheckClusteringEnabled(ctx context.Context, logger logger.Logger, baseURL string, token string) (bool, error) {
+	client := util.NewAPIClient(ctx, logger, baseURL, token)
+
+	fmt.Println("Checking clustering enabled")
+	var resp Response[bool]
+	if err := client.Do("GET", "/cli/cluster/clustering-enabled", nil, &resp); err != nil {
+		fmt.Println("error", err)
+		return false, fmt.Errorf("error checking cluster clustering enabled: %w", err)
+	}
+
+	fmt.Println("resp", resp)
+
+	if !resp.Success {
+		return false, fmt.Errorf("clustering check failed: %s", resp.Message)
+	}
+
+	return resp.Data, nil
+}
+
+// CheckMachineClusteringEnabled checks if clustering is enabled for machine operations
+func CheckMachineClusteringEnabled(ctx context.Context, logger logger.Logger, baseURL string, token string) (bool, error) {
+	client := util.NewAPIClient(ctx, logger, baseURL, token)
+
+	var resp Response[bool]
+	if err := client.Do("GET", "/cli/machine/clustering-enabled", nil, &resp); err != nil {
+		return false, fmt.Errorf("error checking machine clustering enabled: %w", err)
+	}
+
+	if !resp.Success {
+		return false, fmt.Errorf("clustering check failed: %s", resp.Message)
+	}
+
+	return resp.Data, nil
+}
+
+// EnsureClusteringEnabled checks if clustering is enabled for cluster operations and exits if not
+func EnsureClusteringEnabled(ctx context.Context, logger logger.Logger, baseURL string, token string) {
+	enabled, err := CheckClusteringEnabled(ctx, logger, baseURL, token)
+	if err != nil {
+		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to check clustering status")).ShowErrorAndExit()
+	}
+	if !enabled {
+		errsystem.New(errsystem.ErrApiRequest, fmt.Errorf("clustering is not enabled for your account"), errsystem.WithUserMessage("Clustering is not enabled for your account. Please contact support.")).ShowErrorAndExit()
+	}
+}
+
+// EnsureMachineClusteringEnabled checks if clustering is enabled for machine operations and exits if not
+func EnsureMachineClusteringEnabled(ctx context.Context, logger logger.Logger, baseURL string, token string) {
+	enabled, err := CheckMachineClusteringEnabled(ctx, logger, baseURL, token)
+	if err != nil {
+		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to check clustering status")).ShowErrorAndExit()
+	}
+	if !enabled {
+		errsystem.New(errsystem.ErrApiRequest, fmt.Errorf("clustering is not enabled for your account"), errsystem.WithUserMessage("Clustering is not enabled for your account. Please contact support.")).ShowErrorAndExit()
+	}
 }
 
 type CreateMachineResponse struct {
