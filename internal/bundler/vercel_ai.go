@@ -33,49 +33,58 @@ func createVercelAIProviderPatch(module string, createFn string, envkey string, 
 func init() {
 	// Generate PatchPortal integration patch with hashing and telemetry
 	var patchPortalPatch = `
-		console.log('🔧 generateText patch executing...');
 		const { PatchPortal } = await import('@agentuity/sdk');
-		const crypto = await import('crypto');
+		const { internal } = await import('@agentuity/sdk/logger/internal');
+		const crypto = await import('node:crypto');
+		internal.debug('🔧 generateText patch executing...');
 		const patchPortal = await PatchPortal.getInstance();
-		console.log('✅ PatchPortal instance created');
-		
-		// Extract prompt from arguments
-		const prompt = _args[0]?.prompt || _args[0]?.messages || '';
-		const promptString = typeof prompt === 'string' ? prompt : JSON.stringify(prompt);
-		console.log('📝 Extracted prompt:', promptString.substring(0, 100) + '...');
-		
-		// Generate hash for the compiled prompt (same as processPromptMetadata uses)
-		const compiledHash = crypto.createHash('sha256').update(promptString).digest('hex');
-		console.log('🔑 Generated compiled hash:', compiledHash);
-		
-		// Print current PatchPortal state
+		internal.debug('✅ PatchPortal instance created');
+
+		let compiledSystemHash = '';
+		let compiledPromptHash = '';
+		const metadata = [];
 		patchPortal.printState();
 		
-		// Get patch data using the same key format as processPromptMetadata
-		const key = 'prompt:' + compiledHash;
-		console.log('🔍 Looking for key:', key);
-		const patchData = await patchPortal.get(key);
-		console.log('🔍 Retrieved patch data:', patchData);
-		
-		// Prepare telemetry metadata with PatchPortal data
-		const opts = {...(_args[0] ?? {}) };
-		const metadata = { 
-			promptId: patchData?.slug || opts.prompt?.id || compiledHash,
-			patchPortalData: patchData || null,
-			compiledHash: compiledHash,
-			patchPortalKey: key
-		};
-		opts.experimental_telemetry = { isEnabled: true, metadata: metadata };
-		opts.prompt = opts.prompt.toString();
-		if (opts.system) {
-			opts.system = opts.system.toString();
+		if (_args[0]?.system) {
+			// Extract prompt from arguments
+			const systemString = _args[0]?.system;
+			internal.debug('📝 Extracted system:', systemString.substring(0, 100) + '...');
+			compiledSystemHash = crypto.createHash('sha256').update(systemString).digest('hex');
+			internal.debug('🔑 SYSTEM Generated compiled hash:', compiledSystemHash);
+
+			// Get patch data using the same key format as processPromptMetadata
+			const key = 'prompt:' + compiledPromptHash;
+			internal.debug('🔍 Looking for key:', key);
+			const patchData = await patchPortal.get(key);
+			internal.debug('🔍 Retrieved patch data:', patchData);
+			metadata.push(patchData);
 		}
-		_args[0] = opts;
+
+
+		if (_args[0]?.prompt) {
+			const prompt = _args[0]?.prompt || _args[0]?.messages || '';
+			const promptString = typeof prompt === 'string' ? prompt : JSON.stringify(prompt);
+			internal.debug('📝 Extracted prompt:', promptString.substring(0, 100) + '...');
+			// Generate hash for the compiled prompt (same as processPromptMetadata uses)
+			compiledPromptHash = crypto.createHash('sha256').update(promptString).digest('hex');
+			internal.debug('🔑 PROMPT Generated compiled hash:', compiledPromptHash);
+
+			// Get patch data using the same key format as processPromptMetadata
+			const key = 'prompt:' + compiledPromptHash;
+			internal.debug('🔍 Looking for key:', key);
+			const patchData = await patchPortal.get(key);
+			internal.debug('🔍 Retrieved patch data:', patchData);
+			metadata.push(patchData);
+		}
 		
-		if (patchData) {
-			console.log('✅ Patch data found for compiled hash:', compiledHash, patchData);
+		if (metadata) {
+			// Prepare telemetry metadata with PatchPortal data
+			const opts = {...(_args[0] ?? {}) };
+			opts.experimental_telemetry = { isEnabled: true, metadata };
+			_args[0] = opts;
+			internal.debug('✅ Patch data found for compiled hash:', compiledHash, patchData);
 		} else {
-			console.log('ℹ️ No patch data found for compiled hash:', compiledHash);
+			internal.debug('ℹ️ No patch data found for compiled hash:', compiledHash);
 		}
 	`
 

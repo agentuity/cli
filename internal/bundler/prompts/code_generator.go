@@ -29,7 +29,7 @@ func (cg *CodeGenerator) GenerateJavaScript() string {
 
 	return fmt.Sprintf(`// Generated prompts - do not edit manually
 import { interpolateTemplate, processPromptMetadata } from '../../../index.js';
-import crypto from 'crypto';
+import * as crypto from 'node:crypto';
 
 %s
 
