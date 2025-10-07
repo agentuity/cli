@@ -34,7 +34,7 @@ func init() {
 	// Generate PatchPortal integration patch with hashing and telemetry
 	var patchPortalPatch = `
 		const { PatchPortal } = await import('@agentuity/sdk');
-		const { internal } = await import('@agentuity/sdk/logger/internal');
+		const { internal } = await import('@agentuity/sdk');
 		const crypto = await import('node:crypto');
 		internal.debug('🔧 generateText patch executing...');
 		const patchPortal = await PatchPortal.getInstance();
@@ -42,7 +42,7 @@ func init() {
 
 		let compiledSystemHash = '';
 		let compiledPromptHash = '';
-		const metadata = [];
+		const agentuityPromptMetadata = [];
 		patchPortal.printState();
 		
 		if (_args[0]?.system) {
@@ -56,8 +56,12 @@ func init() {
 			const key = 'prompt:' + compiledPromptHash;
 			internal.debug('🔍 Looking for key:', key);
 			const patchData = await patchPortal.get(key);
-			internal.debug('🔍 Retrieved patch data:', patchData);
-			metadata.push(patchData);
+			if (patchData) {
+				internal.debug('🔍 Retrieved patch data:', patchData);
+				agentuityPromptMetadata.push(...patchData);
+			} else {
+				internal.debug('ℹ️ No patch data found for compiled hash:', compiledSystemHash);
+			}
 		}
 
 
@@ -73,18 +77,23 @@ func init() {
 			const key = 'prompt:' + compiledPromptHash;
 			internal.debug('🔍 Looking for key:', key);
 			const patchData = await patchPortal.get(key);
-			internal.debug('🔍 Retrieved patch data:', patchData);
-			metadata.push(patchData);
+			if (patchData) {
+				internal.debug('🔍 Retrieved patch data:', patchData);
+				agentuityPromptMetadata.push(...patchData);
+			} else {
+				internal.debug('ℹ️ No patch data found for compiled hash:', compiledPromptHash);
+			}
 		}
-		
-		if (metadata) {
+
+		if (agentuityPromptMetadata.length > 0) {
 			// Prepare telemetry metadata with PatchPortal data
 			const opts = {...(_args[0] ?? {}) };
-			opts.experimental_telemetry = { isEnabled: true, metadata };
+			const userMetadata = opts?.experimental_telemetry?.metadata || {};
+			opts.experimental_telemetry = { isEnabled: true, metadata: { ...userMetadata, 'agentuity.prompts': JSON.stringify(agentuityPromptMetadata) } };
 			_args[0] = opts;
-			internal.debug('✅ Patch data found for compiled hash:', compiledHash, patchData);
+			internal.debug('✅ Patch metadata attached:', agentuityPromptMetadata);
 		} else {
-			internal.debug('ℹ️ No patch data found for compiled hash:', compiledHash);
+			internal.debug('ℹ️ No patch data found for this invocation');
 		}
 	`
 
