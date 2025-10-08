@@ -12,6 +12,7 @@ import (
 	"github.com/agentuity/cli/internal/infrastructure"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
+	"github.com/agentuity/go-common/logger"
 	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/cobra"
 )
@@ -48,6 +49,9 @@ Examples:
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
+
+		// Check if clustering is enabled for machine operations
+		infrastructure.EnsureMachineClusteringEnabled(ctx, logger, apiUrl, apikey)
 
 		var clusterFilter string
 		if len(args) > 0 {
@@ -168,6 +172,9 @@ Examples:
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 
+		// Check if clustering is enabled for machine operations
+		infrastructure.EnsureMachineClusteringEnabled(ctx, logger, apiUrl, apikey)
+
 		machineID := args[0]
 		force, _ := cmd.Flags().GetBool("force")
 
@@ -208,6 +215,9 @@ Examples:
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
+
+		// Check if clustering is enabled for machine operations
+		infrastructure.EnsureMachineClusteringEnabled(ctx, logger, apiUrl, apikey)
 
 		machineID := args[0]
 		format, _ := cmd.Flags().GetString("format")
@@ -284,7 +294,17 @@ var machineCreateCmd = &cobra.Command{
 	Use:     "create [cluster_id] [provider] [region]",
 	GroupID: "info",
 	Short:   "Create a new machine for a cluster",
-	Args:    cobra.ExactArgs(3),
+	Long: `Create a new machine for a cluster.
+
+Arguments:
+  [cluster_id]  The cluster ID to create a machine in (optional in interactive mode)
+  [provider]    The cloud provider (optional in interactive mode)  
+  [region]      The region to deploy in (optional in interactive mode)
+
+Examples:
+  agentuity machine create
+  agentuity machine create cluster-001 aws us-east-1`,
+	Args:    cobra.MaximumNArgs(3),
 	Aliases: []string{"new"},
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -293,9 +313,26 @@ var machineCreateCmd = &cobra.Command{
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
 		apiUrl, _, _ := util.GetURLs(logger)
 
-		clusterID := args[0]
-		provider := args[1]
-		region := args[2]
+		// Check if clustering is enabled for machine operations
+		infrastructure.EnsureMachineClusteringEnabled(ctx, logger, apiUrl, apikey)
+
+		var clusterID, provider, region string
+
+		// If all arguments provided, use them directly
+		if len(args) == 3 {
+			clusterID = args[0]
+			provider = args[1]
+			region = args[2]
+		} else if tui.HasTTY {
+			// Interactive mode - prompt for missing values
+			cluster := promptForClusterSelection(ctx, logger, apiUrl, apikey)
+			provider = cluster.Provider
+			region = promptForRegionSelection(ctx, logger, provider)
+			clusterID = cluster.ID
+		} else {
+			// Non-interactive mode - require all arguments
+			errsystem.New(errsystem.ErrMissingRequiredArgument, fmt.Errorf("cluster_id, provider, and region are required in non-interactive mode"), errsystem.WithContextMessage("Missing required arguments")).ShowErrorAndExit()
+		}
 
 		orgId := promptForClusterOrganization(ctx, logger, cmd, apiUrl, apikey, "What organization should we create the machine in?")
 
@@ -332,4 +369,63 @@ func init() {
 
 	// Flags for machine status command
 	machineStatusCmd.Flags().String("format", "table", "Output format (table, json)")
+
+}
+
+// promptForClusterSelection prompts the user to select a cluster from available clusters
+func promptForClusterSelection(ctx context.Context, logger logger.Logger, apiUrl, apikey string) infrastructure.Cluster {
+	clusters, err := infrastructure.ListClusters(ctx, logger, apiUrl, apikey)
+	if err != nil {
+		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list clusters")).ShowErrorAndExit()
+	}
+
+	if len(clusters) == 0 {
+		errsystem.New(errsystem.ErrApiRequest, fmt.Errorf("no clusters found"), errsystem.WithUserMessage("No clusters found. Please create a cluster first using 'agentuity cluster create'")).ShowErrorAndExit()
+	}
+
+	if len(clusters) == 1 {
+		cluster := clusters[0]
+		fmt.Printf("Using cluster: %s (%s)\n", cluster.Name, cluster.ID)
+		return cluster
+	}
+
+	// Sort clusters by Name then ID for deterministic display order
+	sort.Slice(clusters, func(i, j int) bool {
+		if clusters[i].Name != clusters[j].Name {
+			return clusters[i].Name < clusters[j].Name
+		}
+		return clusters[i].ID < clusters[j].ID
+	})
+
+	var opts []tui.Option
+	for _, cluster := range clusters {
+		displayText := fmt.Sprintf("%s (%s) - %s %s", cluster.Name, cluster.ID, cluster.Provider, cluster.Region)
+		opts = append(opts, tui.Option{ID: cluster.ID, Text: displayText})
+	}
+
+	id := tui.Select(logger, "Select a cluster to create a machine in:", "Choose the cluster where you want to deploy the new machine", opts)
+
+	// Handle user cancellation (empty string)
+	if id == "" {
+		errsystem.New(errsystem.ErrApiRequest, fmt.Errorf("no cluster selected"), errsystem.WithUserMessage("No cluster selected")).ShowErrorAndExit()
+	}
+
+	// Find the selected cluster
+	for _, cluster := range clusters {
+		if cluster.ID == id {
+			return cluster
+		}
+	}
+
+	// This should never happen, but handle it as an impossible path
+	errsystem.New(errsystem.ErrApiRequest, fmt.Errorf("selected cluster not found: %s", id), errsystem.WithUserMessage("Selected cluster not found")).ShowErrorAndExit()
+	return infrastructure.Cluster{} // This line will never be reached
+}
+
+// promptForRegionSelection prompts the user to select a region
+func promptForRegionSelection(ctx context.Context, logger logger.Logger, provider string) string {
+	// Get regions for the provider (reuse the same logic from cluster.go)
+	fmt.Println("Provider:", provider)
+	opts := getRegionsForProvider(provider)
+	return tui.Select(logger, "Which region should we use?", "The region to deploy the machine", opts)
 }

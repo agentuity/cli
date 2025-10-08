@@ -85,6 +85,10 @@ func (s *gcpSetup) Setup(ctx context.Context, logger logger.Logger, cluster *Clu
 	return nil
 }
 
+func (s *gcpSetup) CreateMachine(ctx context.Context, logger logger.Logger, region string, token string, clusterID string) error {
+	return nil
+}
+
 func init() {
 	register("gcp", &gcpSetup{})
 }

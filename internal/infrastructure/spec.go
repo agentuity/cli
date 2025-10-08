@@ -80,10 +80,13 @@ func (s *ExecutionSpec) Run(ctx ExecutionContext) error {
 		func(_ctx context.Context) (bool, error) {
 			if s.SkipIf != nil {
 				if err := s.SkipIf.Run(ctx); err != nil {
+					// If skip_if command fails (e.g., resource doesn't exist), don't skip
+					// Only propagate validation errors, not command execution errors
 					if errors.Is(err, ErrInvalidMatch) {
 						return false, nil
 					}
-					return false, err
+					// For other errors (like AWS NoSuchEntity), treat as "don't skip"
+					return false, nil
 				}
 				return true, nil
 			}
