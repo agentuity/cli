@@ -133,7 +133,7 @@ func ProcessPrompts(logger logger.Logger, projectDir string) error {
 		return fmt.Errorf("failed to write index.d.ts: %w", err)
 	}
 
-	logger.Info("Generated prompts into SDK: %s and %s", jsPath, dtsPath)
+	logger.Debug("Generated prompts into SDK: %s and %s", jsPath, dtsPath)
 
 	return nil
 }

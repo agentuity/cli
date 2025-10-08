@@ -29,7 +29,7 @@ func TestCodeGenerator(t *testing.T) {
 		js := codeGen.GenerateJavaScript()
 
 		// Check that it contains the import
-		assert.Contains(t, js, "import { interpolateTemplate } from '../../../index.js';")
+		assert.Contains(t, js, "import { interpolateTemplate, processPromptMetadata } from '../../../index.js';")
 
 		// Check that it contains the prompts object
 		assert.Contains(t, js, "export const prompts = {")
