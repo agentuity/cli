@@ -167,22 +167,33 @@ func (c *Client) Close() error {
 	var err error
 	c.once.Do(func() {
 		c.logger.Debug("closing client")
-		if c.client != nil {
-			c.client.Close()
-		}
-		if c.server != nil {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			err = c.server.Shutdown(ctx)
-		}
-		if c.endpoint != nil {
-			c.endpoint.Close()
-		}
-		if c.stack != nil {
-			c.stack.Close()
-		}
+		err = c.cleanup()
 		c.logger.Debug("closed")
 	})
+	return err
+}
+
+// Close will close the client and all the associated services.
+func (c *Client) cleanup() error {
+	var err error
+	if c.client != nil {
+		c.client.Close()
+		c.client = nil
+	}
+	if c.server != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		err = c.server.Shutdown(ctx)
+		c.server = nil
+	}
+	if c.endpoint != nil {
+		c.endpoint.Close()
+		c.endpoint = nil
+	}
+	if c.stack != nil {
+		c.stack.Close()
+		c.stack = nil
+	}
 	return err
 }
 
@@ -557,11 +568,12 @@ func (c *Client) Start() error {
 			HealthCheckInterval:  time.Second * 30,
 			FailoverTimeout:      time.Second,
 		},
-		Capabilities:     capabilities,
-		NetworkInterface: &network,
-		Provider:         &provider,
-		IP4Address:       ipv4addr,
-		IP6Address:       ipv6Address.String(),
+		Capabilities:      capabilities,
+		NetworkInterface:  &network,
+		Provider:          &provider,
+		IP4Address:        ipv4addr,
+		IP6Address:        ipv6Address.String(),
+		SkipAutoReconnect: true,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create gravity client: %w", err)
@@ -581,6 +593,31 @@ func (c *Client) Start() error {
 	case <-provider.connected:
 		break
 	}
+
+	go func() {
+		log.Debug("waiting on provider disconnect")
+		client.Disconnected(c.context)
+		log.Debug("provider disconnected")
+		select {
+		case <-c.context.Done():
+			log.Debug("provider disconnected but context canceled")
+			c.Close()
+			return
+		default:
+			log.Debug("provider disconnected, restarting")
+			c.cleanup()
+			log.Info("reconnecting to server ... one moment")
+			select {
+			case <-c.context.Done():
+				return
+			case <-time.After(2 * time.Second):
+			}
+			if err := c.Start(); err != nil {
+				log.Fatal("failed to re-connect to the devmode server: %s", err)
+			}
+			log.Info("reconnected to devmode server")
+		}
+	}()
 
 	success = true
 

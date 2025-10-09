@@ -114,6 +114,7 @@ Examples:
 		tui.ClearScreen()
 		initScreenWithLogo()
 		tui.ShowSuccess("Welcome to Agentuity! You are now logged in")
+		showAuthNextSteps()
 	},
 }
 
@@ -225,6 +226,7 @@ Examples:
 		tui.ClearScreen()
 		initScreenWithLogo()
 		tui.ShowSuccess("Welcome to Agentuity! You are now logged in")
+		showAuthNextSteps()
 	},
 }
 

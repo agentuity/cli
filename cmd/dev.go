@@ -52,6 +52,8 @@ Examples:
 
 		noBuild, _ := cmd.Flags().GetBool("no-build")
 
+		promptsEvalsFF := CheckFeatureFlag(cmd, FeaturePromptsEvals, "enable-prompts-evals")
+
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
@@ -180,14 +182,16 @@ Examples:
 			}
 			started := time.Now()
 			var ok bool
+
 			tui.ShowSpinner("Building project ...", func() {
 				if err := bundler.Bundle(bundler.BundleContext{
-					Context:    ctx,
-					Logger:     log,
-					ProjectDir: dir,
-					Production: false,
-					DevMode:    true,
-					Writer:     os.Stdout,
+					Context:        ctx,
+					Logger:         log,
+					ProjectDir:     dir,
+					Production:     false,
+					DevMode:        true,
+					Writer:         os.Stdout,
+					PromptsEvalsFF: promptsEvalsFF,
 				}); err != nil {
 					if err == bundler.ErrBuildFailed {
 						return
