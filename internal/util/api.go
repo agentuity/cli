@@ -141,7 +141,6 @@ func (c *APIClient) Do(method, pathParam string, payload interface{}, response i
 	} else {
 		u.Path = path.Join(basePath, pathParam)
 	}
-
 	var body []byte
 	if payload != nil {
 		body, err = json.Marshal(payload)
