@@ -19,7 +19,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Public key encryption for self-hosted deployments and new infra ([#429](https://github.com/agentuity/cli/pull/429))
 
-
 ## [v0.0.169] - 2025-10-02
 
 ### Added

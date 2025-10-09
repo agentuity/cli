@@ -85,10 +85,14 @@ Examples:
 			}
 			defer of.Close()
 			for k, v := range project.Env {
-				fmt.Fprintf(of, "%s=%s\n", k, v)
+				if !envutil.IsAgentuityEnv.MatchString(k) {
+					fmt.Fprintf(of, "%s=%s\n", k, v)
+				}
 			}
 			for k, v := range project.Secrets {
-				fmt.Fprintf(of, "%s=%s\n", k, v)
+				if !envutil.IsAgentuityEnv.MatchString(k) {
+					fmt.Fprintf(of, "%s=%s\n", k, v)
+				}
 			}
 			// Add the required Agentuity SDK and project keys
 			fmt.Fprintf(of, "AGENTUITY_SDK_KEY=%s\n", apiKey)
