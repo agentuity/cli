@@ -78,7 +78,7 @@ Examples:
 
 		endpoint, err := dev.GetDevModeEndpoint(ctx, log, theproject.APIURL, apiKey, theproject.Project.ProjectId, hostname)
 		if err != nil {
-			errsystem.New(errsystem.ErrRetrieveDevmodeEndpoint, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to get generate devmode endpoint: %s", err))).ShowErrorAndExit()
+			errsystem.New(errsystem.ErrRetrieveDevmodeEndpoint, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to retrieve devmode endpoint: %s", err))).ShowErrorAndExit()
 		}
 
 		if hostname != endpoint.Hostname {
