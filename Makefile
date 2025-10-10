@@ -1,12 +1,15 @@
-.PHONY: build lint generate test test_install test_install_linux test_install_alpine test_install_debian
+.PHONY: build fmt lint test generate test_install test_install_linux test_install_alpine test_install_debian
 
 build: lint generate
 	@go build -o agentuity
 
-lint:
+fmt:
 	@go fmt ./...
 	@go vet ./...
 	@go mod tidy
+
+lint:
+	@make fmt
 
 generate:
 	@echo "Running go generate..."
@@ -25,6 +28,12 @@ test_install_debian:
 	@docker run -it --rm agentuity-test-install-debian
 
 test:
-	@go test -race ./...
+	@make fmt
+	@make lint
+	@make generate
+	@go test -v -count=1 -race ./...
+	@make test_install_linux
+	@make test_install_alpine
+	@make test_install_debian
 
 test_install: test_install_linux test_install_alpine test_install_debian

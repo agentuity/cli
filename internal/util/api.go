@@ -259,16 +259,27 @@ func TransformUrl(urlString string) string {
 	return urlString
 }
 
-func GetURLs(logger logger.Logger) (string, string, string) {
+type CLIUrls struct {
+	API       string
+	App       string
+	Transport string
+	Gravity   string
+}
+
+func GetURLs(logger logger.Logger) CLIUrls {
 	appUrl := viper.GetString("overrides.app_url")
 	apiUrl := viper.GetString("overrides.api_url")
 	transportUrl := viper.GetString("overrides.transport_url")
+	gravityUrl := viper.GetString("overrides.gravity_url")
 	if apiUrl == "https://api.agentuity.com" && appUrl != "https://app.agentuity.com" {
 		logger.Debug("switching app url to production since the api url is production")
 		appUrl = "https://app.agentuity.com"
 	} else if apiUrl == "https://api.agentuity.io" && appUrl == "https://app.agentuity.com" {
 		logger.Debug("switching app url to dev since the api url is dev")
 		appUrl = "https://app.agentuity.io"
+	}
+	if gravityUrl == "" {
+		gravityUrl = "grpc://gravity.agentuity.com"
 	}
 	if apiUrl == "https://api.agentuity.com" && transportUrl != "https://agentuity.ai" {
 		logger.Debug("switching transport url to production since the api url is production")
@@ -277,7 +288,16 @@ func GetURLs(logger logger.Logger) (string, string, string) {
 		logger.Debug("switching transport url to dev since the api url is dev")
 		transportUrl = "https://ai.agentuity.io"
 	}
-	return TransformUrl(apiUrl), TransformUrl(appUrl), TransformUrl(transportUrl)
+	if apiUrl == "https://api.agentuity.io" {
+		logger.Debug("switching gravity url to dev since the api url is dev")
+		gravityUrl = "grpc://gravity.agentuity.io:8443"
+	}
+	return CLIUrls{
+		API:       TransformUrl(apiUrl),
+		App:       TransformUrl(appUrl),
+		Transport: TransformUrl(transportUrl),
+		Gravity:   TransformUrl(gravityUrl),
+	}
 }
 
 func run(ctx context.Context, c *cobra.Command, command string, args ...string) {

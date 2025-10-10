@@ -21,7 +21,7 @@ type profile struct {
 	selected bool
 }
 
-var profileNameRegex = regexp.MustCompile(`name:\s+["]?([\w-_]+)["]?`)
+var profileNameRegex = regexp.MustCompile(`\bname:\s+["]?([\w-_]+)["]?`)
 var profileNameValidRegex = regexp.MustCompile(`^[\w-_]{3,}$`)
 
 func saveProfile(name string) {

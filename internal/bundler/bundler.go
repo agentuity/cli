@@ -14,9 +14,10 @@ import (
 
 	"github.com/agentuity/cli/internal/bundler/prompts"
 	"github.com/agentuity/cli/internal/errsystem"
-	"github.com/agentuity/cli/internal/project"
+	iproject "github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
+	"github.com/agentuity/go-common/project"
 	"github.com/agentuity/go-common/slice"
 	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/sys"
@@ -498,7 +499,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		return fmt.Errorf("failed to load %s: %w", pkgjson, err)
 	}
 
-	externals := make([]string, 0)
+	externals := make([]string, len(commonExternals))
 	copy(externals, commonExternals)
 	// check to see if we have any externals explicitly set in package.json so that the
 	// project can add additional externals automatically
@@ -769,7 +770,7 @@ func CreateDeploymentMutator(ctx BundleContext) util.ZipDirCallbackMutator {
 }
 
 func Bundle(ctx BundleContext) error {
-	theproject := project.NewProject()
+	theproject := iproject.NewProject()
 	if err := theproject.Load(ctx.ProjectDir); err != nil {
 		return fmt.Errorf("failed to load project from %s: %w", ctx.ProjectDir, err)
 	}

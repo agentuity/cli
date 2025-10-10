@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 
-	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/go-common/logger"
+	"github.com/agentuity/go-common/project"
 )
 
 // BundleContext holds the context for bundling operations
