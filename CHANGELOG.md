@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.174] - 2025-10-10
+
+### Changed
+- Updated go-common dependency to v1.0.103
+
 ## [v0.0.171] - 2025-10-03
 
 ### Added
@@ -881,6 +886,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.174]: https://github.com/agentuity/cli/compare/v0.0.173...v0.0.174
 [v0.0.171]: https://github.com/agentuity/cli/compare/v0.0.170...v0.0.171
 [v0.0.170]: https://github.com/agentuity/cli/compare/v0.0.169...v0.0.170
 [v0.0.169]: https://github.com/agentuity/cli/compare/v0.0.168...v0.0.169
