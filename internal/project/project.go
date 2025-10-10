@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/Masterminds/semver"
@@ -415,8 +416,10 @@ func LoadProject(logger logger.Logger, dir string, apiUrl string, appUrl string,
 	}
 }
 
+var isGitShaRE = regexp.MustCompile(`^[a-f0-9]{40}$`)
+
 func isVersionCheckRequired(ver string) bool {
-	if ver != "" && ver != "dev" && !strings.Contains(ver, "-next") {
+	if ver != "" && ver != "dev" && !strings.Contains(ver, "-next") && !isGitShaRE.MatchString(ver) {
 		return true
 	}
 	return false
