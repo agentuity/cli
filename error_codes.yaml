@@ -88,3 +88,24 @@ errors:
 
   - code: CLI-0028
     message: Failed to delete API key
+
+  - code: CLI-0029
+    message: Failed to process GitHub repository
+
+  - code: CLI-0030
+    message: Invalid GitHub URL format
+
+  - code: CLI-0031
+    message: GitHub repository not found or not accessible
+
+  - code: CLI-0032
+    message: Failed to download GitHub repository
+
+  - code: CLI-0033
+    message: Failed to extract GitHub repository
+
+  - code: CLI-0034
+    message: GitHub API request failed
+
+  - code: CLI-0035
+    message: Not a valid Agentuity project
