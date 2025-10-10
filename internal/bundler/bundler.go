@@ -499,7 +499,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		return fmt.Errorf("failed to load %s: %w", pkgjson, err)
 	}
 
-	externals := make([]string, 0)
+	externals := make([]string, len(commonExternals))
 	copy(externals, commonExternals)
 	// check to see if we have any externals explicitly set in package.json so that the
 	// project can add additional externals automatically
