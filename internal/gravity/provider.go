@@ -102,8 +102,16 @@ func (p *cliProvider) ProcessInPacket(payload []byte) {
 
 	switch version {
 	case 4:
+		if len(payload) < header.IPv4MinimumSize {
+			p.logger.Trace("dropping IPv4 packet: too short (%d bytes, need at least %d)", len(payload), header.IPv4MinimumSize)
+			return
+		}
 		protocol = ipv4.ProtocolNumber
 	case 6:
+		if len(payload) < header.IPv6MinimumSize {
+			p.logger.Trace("dropping IPv6 packet: too short (%d bytes, need at least %d)", len(payload), header.IPv6MinimumSize)
+			return
+		}
 		protocol = ipv6.ProtocolNumber
 	default:
 		p.logger.Trace("dropping packet: unknown IP version %d", version)

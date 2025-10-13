@@ -22,7 +22,6 @@ import (
 	"github.com/agentuity/go-common/gravity"
 	"github.com/agentuity/go-common/gravity/proto"
 	"github.com/agentuity/go-common/logger"
-	"github.com/agentuity/go-common/network"
 	cnet "github.com/agentuity/go-common/network"
 	cproject "github.com/agentuity/go-common/project"
 	cstr "github.com/agentuity/go-common/string"
@@ -210,16 +209,21 @@ func (c *Client) handleConnect(w http.ResponseWriter, r *http.Request) {
 		// Route through gravity tunnel
 		logger.Trace("CONNECT to %s via gravity tunnel", host)
 
-		ip := network.Addresses["catalyst"]
+		ip, ok := cnet.Addresses["catalyst"]
+		if !ok || ip == nil {
+			logger.Error("catalyst address not found in address map")
+			http.Error(w, "Service configuration error", http.StatusServiceUnavailable)
+			return
+		}
 
 		if strings.HasSuffix(host, ".agentuity.cloud") {
 			part := strings.Split(host, ".agentuity.cloud")[0]
-			if customip, ok := network.Addresses[part]; ok {
+			if customip, ok := cnet.Addresses[part]; ok && customip != nil {
 				ip = customip
 			}
 		} else if strings.HasSuffix(host, ".agentuity.io") {
 			part := strings.Split(host, ".agentuity.io")[0]
-			if customip, ok := network.Addresses[part]; ok {
+			if customip, ok := cnet.Addresses[part]; ok && customip != nil {
 				ip = customip
 			}
 		}

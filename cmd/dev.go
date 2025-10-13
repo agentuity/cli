@@ -127,6 +127,9 @@ Examples:
 		}
 
 		connectProxyPort, _ := cmd.Flags().GetInt("proxy-port")
+		if connectProxyPort < 0 || connectProxyPort > 65535 {
+			log.Fatal("invalid --proxy-port: %d (must be 0-65535)", connectProxyPort)
+		}
 		var connectProxyPortPtr *uint
 		if connectProxyPort > 0 {
 			port := uint(connectProxyPort)
