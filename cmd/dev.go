@@ -317,7 +317,7 @@ func init() {
 	rootCmd.AddCommand(devCmd)
 	devCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
 	devCmd.Flags().Int("port", 0, "The port to run the development server on (uses project default if not provided)")
-	devCmd.Flags().Int("proxy-port", 0, "The port to run the HTTP CONNECT proxy server on (disabled if not provided)")
+	devCmd.Flags().Int("proxy-port", 19081, "The port to run the HTTP CONNECT proxy server on (disabled if zero)")
 	devCmd.Flags().Bool("no-build", false, "Do not build the project before running it (useful for debugging)")
 	devCmd.Flags().MarkHidden("no-build")
 }
