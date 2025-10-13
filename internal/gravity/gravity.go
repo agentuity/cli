@@ -351,7 +351,7 @@ func (c *Client) startConnectProxy() error {
 		}
 	}()
 
-	logger.Info("CONNECT proxy listening on http://127.0.0.1:%d", port)
+	logger.Debug("CONNECT proxy listening on http://127.0.0.1:%d", port)
 	return nil
 }
 

@@ -131,7 +131,6 @@ Examples:
 		if connectProxyPort > 0 {
 			port := uint(connectProxyPort)
 			connectProxyPortPtr = &port
-			log.Info("starting CONNECT proxy on port: %d", port)
 		}
 
 		server, err := dev.New(dev.ServerArgs{
