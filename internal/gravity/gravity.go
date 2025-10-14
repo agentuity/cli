@@ -88,7 +88,7 @@ type Config struct {
 func New(config Config) *Client {
 	return &Client{
 		context:         config.Context,
-		logger:          config.Logger.WithPrefix("[gravity]"),
+		logger:          config.Logger,
 		version:         config.Version,
 		orgID:           config.OrgID,
 		projectID:       config.Project.Project.ProjectId,
