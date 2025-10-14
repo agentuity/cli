@@ -105,7 +105,12 @@ type ExecutionContext struct {
 func (c *ExecutionContext) Interpolate(args ...string) ([]string, error) {
 	var newargs []string
 	for _, arg := range args {
-		val, err := cstr.InterpolateString(arg, c.Environment)
+		val, err := cstr.Interpolate(arg, func(key string) (any, bool) {
+			if v, ok := c.Environment[key]; ok {
+				return v, true
+			}
+			return nil, false
+		})
 		if err != nil {
 			return nil, err
 		}

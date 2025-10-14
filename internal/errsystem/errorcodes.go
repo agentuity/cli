@@ -114,12 +114,16 @@ var (
 		Code:    "CLI-0028",
 		Message: "Failed to delete API key",
 	}
-	ErrInvalidArgumentProvided = errorType{
+	ErrRetrieveDevmodeEndpoint = errorType{
 		Code:    "CLI-0029",
 		Message: "Failed to retrieve devmode endpoint",
 	}
 	ErrMissingRequiredArgument = errorType{
 		Code:    "CLI-0030",
 		Message: "Missing required argument",
+	}
+	ErrInvalidArgumentProvided = errorType{
+		Code:    "CLI-0031",
+		Message: "Invalid argument provided",
 	}
 )

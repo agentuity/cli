@@ -168,10 +168,10 @@ Examples:
 		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
 
 		// Check if clustering is enabled for cluster operations
-		infrastructure.EnsureClusteringEnabled(ctx, logger, apiUrl, apikey)
+		infrastructure.EnsureClusteringEnabled(ctx, logger, urls.API, apikey)
 
 		var name string
 		if len(args) > 0 {
@@ -179,7 +179,7 @@ Examples:
 		}
 
 		// Get organization ID
-		orgId := promptForClusterOrganization(ctx, logger, cmd, apiUrl, apikey, "What organization should we create the cluster in?")
+		orgId := promptForClusterOrganization(ctx, logger, cmd, urls.API, apikey, "What organization should we create the cluster in?")
 
 		provider, _ := cmd.Flags().GetString("provider")
 		size, _ := cmd.Flags().GetString("size")
@@ -265,7 +265,7 @@ Examples:
 
 		tui.ShowSpinner("Creating cluster...", func() {
 			var err error
-			cluster, err = infrastructure.CreateCluster(ctx, logger, apiUrl, apikey, infrastructure.CreateClusterArgs{
+			cluster, err = infrastructure.CreateCluster(ctx, logger, urls.API, apikey, infrastructure.CreateClusterArgs{
 				Name:     name,
 				Provider: provider,
 				Type:     size,
@@ -307,10 +307,10 @@ Examples:
 		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
 
 		// Check if clustering is enabled for cluster operations
-		infrastructure.EnsureClusteringEnabled(ctx, logger, apiUrl, apikey)
+		infrastructure.EnsureClusteringEnabled(ctx, logger, urls.API, apikey)
 
 		format, _ := cmd.Flags().GetString("format")
 		if format != "" {
@@ -323,7 +323,7 @@ Examples:
 
 		tui.ShowSpinner("Fetching clusters...", func() {
 			var err error
-			clusters, err = infrastructure.ListClusters(ctx, logger, apiUrl, apikey)
+			clusters, err = infrastructure.ListClusters(ctx, logger, urls.API, apikey)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list clusters")).ShowErrorAndExit()
 			}
@@ -395,10 +395,10 @@ Examples:
 		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
 
 		// Check if clustering is enabled for cluster operations
-		infrastructure.EnsureClusteringEnabled(ctx, logger, apiUrl, apikey)
+		infrastructure.EnsureClusteringEnabled(ctx, logger, urls.API, apikey)
 
 		clusterID := args[0]
 		force, _ := cmd.Flags().GetBool("force")
@@ -411,7 +411,7 @@ Examples:
 		}
 
 		tui.ShowSpinner(fmt.Sprintf("Removing cluster %s...", clusterID), func() {
-			if err := infrastructure.DeleteCluster(ctx, logger, apiUrl, apikey, clusterID); err != nil {
+			if err := infrastructure.DeleteCluster(ctx, logger, urls.API, apikey, clusterID); err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to remove cluster")).ShowErrorAndExit()
 			}
 		})
@@ -439,10 +439,10 @@ Examples:
 		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger)
 
 		// Check if clustering is enabled for cluster operations
-		infrastructure.EnsureClusteringEnabled(ctx, logger, apiUrl, apikey)
+		infrastructure.EnsureClusteringEnabled(ctx, logger, urls.API, apikey)
 
 		clusterID := args[0]
 		format, _ := cmd.Flags().GetString("format")
@@ -457,7 +457,7 @@ Examples:
 
 		tui.ShowSpinner(fmt.Sprintf("Fetching cluster %s status...", clusterID), func() {
 			var err error
-			cluster, err = infrastructure.GetCluster(ctx, logger, apiUrl, apikey, clusterID)
+			cluster, err = infrastructure.GetCluster(ctx, logger, urls.API, apikey, clusterID)
 			if err != nil {
 				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get cluster status")).ShowErrorAndExit()
 			}

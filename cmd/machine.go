@@ -48,7 +48,7 @@ Examples:
 		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger); apiUrl := urls.API
 
 		// Check if clustering is enabled for machine operations
 		infrastructure.EnsureMachineClusteringEnabled(ctx, logger, apiUrl, apikey)
@@ -170,7 +170,7 @@ Examples:
 		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger); apiUrl := urls.API
 
 		// Check if clustering is enabled for machine operations
 		infrastructure.EnsureMachineClusteringEnabled(ctx, logger, apiUrl, apikey)
@@ -214,7 +214,7 @@ Examples:
 		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger); apiUrl := urls.API
 
 		// Check if clustering is enabled for machine operations
 		infrastructure.EnsureMachineClusteringEnabled(ctx, logger, apiUrl, apikey)
@@ -311,7 +311,7 @@ Examples:
 		defer cancel()
 		logger := env.NewLogger(cmd)
 		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
-		apiUrl, _, _ := util.GetURLs(logger)
+		urls := util.GetURLs(logger); apiUrl := urls.API
 
 		// Check if clustering is enabled for machine operations
 		infrastructure.EnsureMachineClusteringEnabled(ctx, logger, apiUrl, apikey)
@@ -334,9 +334,9 @@ Examples:
 			errsystem.New(errsystem.ErrMissingRequiredArgument, fmt.Errorf("cluster_id, provider, and region are required in non-interactive mode"), errsystem.WithContextMessage("Missing required arguments")).ShowErrorAndExit()
 		}
 
-		orgId := promptForClusterOrganization(ctx, logger, cmd, apiUrl, apikey, "What organization should we create the machine in?")
+		orgId := promptForClusterOrganization(ctx, logger, cmd, urls.API, apikey, "What organization should we create the machine in?")
 
-		resp, err := infrastructure.CreateMachine(ctx, logger, apiUrl, apikey, clusterID, orgId, provider, region)
+		resp, err := infrastructure.CreateMachine(ctx, logger, urls.API, apikey, clusterID, orgId, provider, region)
 		if err != nil {
 			logger.Fatal("error creating machine: %s", err)
 		}

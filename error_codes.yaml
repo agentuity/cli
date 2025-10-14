@@ -94,3 +94,6 @@ errors:
 
   - code: CLI-0030
     message: Missing required argument
+
+  - code: CLI-0031
+    message: Invalid argument provided
