@@ -17,6 +17,7 @@ import (
 	"github.com/agentuity/cli/internal/dev"
 	"github.com/agentuity/cli/internal/envutil"
 	"github.com/agentuity/cli/internal/errsystem"
+	"github.com/agentuity/cli/internal/eval"
 	"github.com/agentuity/cli/internal/gravity"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
@@ -27,9 +28,10 @@ import (
 )
 
 var devCmd = &cobra.Command{
-	Use:   "dev",
-	Args:  cobra.NoArgs,
-	Short: "Run the development server",
+	Use:     "dev",
+	Aliases: []string{"run"},
+	Args:    cobra.NoArgs,
+	Short:   "Run the development server",
 	Long: `Run the development server for local testing and development.
 
 This command starts a local development server that connects to the Agentuity Cloud
@@ -49,7 +51,6 @@ Examples:
 		apiUrl := urls.API
 		appUrl := urls.App
 		gravityUrl := urls.Gravity
-
 		noBuild, _ := cmd.Flags().GetBool("no-build")
 
 		promptsEvalsFF := CheckFeatureFlag(cmd, FeaturePromptsEvals, "enable-prompts-evals")
@@ -159,12 +160,63 @@ Examples:
 				if errors.Is(err, context.Canceled) {
 					return
 				}
-				log.Fatal("failed to start devmode connection: %s", err)
+				log.Error("failed to start live dev connection: %s", err)
 				return
 			}
 		}
 
 		tui.ShowSpinner("Connecting ...", waitForConnection)
+
+		// Start eval processor goroutine
+		go func() {
+			for evalInfo := range server.EvalChannel() {
+				go func(sessionID string) {
+					log.Debug("processing evals for session %s", sessionID)
+
+					// Fetch session data from API
+					sessionData, err := eval.GetSessionPrompts(ctx, log, apiUrl, apiKey, sessionID)
+					if err != nil {
+						log.Error("failed to fetch session prompts: %s", err)
+						return
+					}
+
+					// Process each span
+					for _, span := range sessionData.Spans {
+						log.Debug("running evals for span %s in session %s", span.SpanID, sessionID)
+
+						// Process each prompt in the span
+						for _, prompt := range span.Prompts {
+							log.Debug("running evals for prompt %s in session %s", prompt.Slug, sessionID)
+
+							// Run each eval specified for this prompt
+							for _, evalName := range prompt.Evals {
+								log.Debug("running eval %s for prompt %s in session %s", evalName, prompt.Slug, sessionID)
+
+								agentURL := fmt.Sprintf("http://127.0.0.1:%d", agentPort)
+								result, err := eval.RunEval(ctx, log, agentURL, evalName, span.Input, span.Output, sessionID)
+								if err != nil {
+									log.Error("failed to run eval %s: %s", evalName, err)
+									continue
+								}
+
+								// Log the eval result
+								if result.ScoreValue != nil {
+									log.Info("✓ Eval %s: %s (score: %.2f)", evalName, result.ResultType, *result.ScoreValue)
+								} else {
+									log.Info("✓ Eval %s: %s", evalName, result.ResultType)
+								}
+
+								if result.Metadata != nil {
+									if reasoning, ok := result.Metadata["reasoning"].(string); ok && reasoning != "" {
+										log.Debug("  Reasoning: %s", reasoning)
+									}
+								}
+							}
+						}
+					}
+				}(evalInfo.SessionID)
+			}
+		}()
 
 		publicUrl := server.PublicURL(appUrl)
 		consoleUrl := server.WebURL(appUrl)

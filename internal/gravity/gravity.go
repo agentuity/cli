@@ -39,6 +39,10 @@ const (
 	mtu   = 1500
 )
 
+type EvalInfo struct {
+	SessionID string
+}
+
 type Client struct {
 	context         context.Context
 	logger          logger.Logger
@@ -61,6 +65,7 @@ type Client struct {
 	stack           *stack.Stack
 	endpoint        *channel.Endpoint
 	provider        *cliProvider
+	evalChan        chan EvalInfo
 }
 
 type Config struct {
@@ -97,6 +102,7 @@ func New(config Config) *Client {
 		clientname:      config.ClientName,
 		dynamicHostname: config.DynamicHostname,
 		dynamicProject:  config.DynamicProject,
+		evalChan:        make(chan EvalInfo, 100),
 	}
 }
 
@@ -133,6 +139,11 @@ func (c *Client) OrgID() string {
 // EndpointID returns the endpoint ID of the client.
 func (c *Client) EndpointID() string {
 	return c.endpointID
+}
+
+// EvalChannel returns the channel for receiving eval info about requests.
+func (c *Client) EvalChannel() <-chan EvalInfo {
+	return c.evalChan
 }
 
 // For each TCP connection: connect to local HTTPS server and proxy bytes.
@@ -438,7 +449,15 @@ func (c *Client) Start() error {
 			tp := r.Header.Get("traceparent")
 			if tp != "" {
 				tok := strings.Split(tp, "-")
-				c.logger.Info("%s %s (sess_%s) in %s", r.Method, r.URL.Path, tok[1], time.Since(started))
+				sessionID := tok[1]
+				c.logger.Info("%s %s (sess_%s) in %s", r.Method, r.URL.Path, sessionID, time.Since(started))
+
+				// Send to eval channel (non-blocking)
+				select {
+				case c.evalChan <- EvalInfo{SessionID: sessionID}:
+				default:
+					// Channel full, skip
+				}
 			}
 		}),
 	}
