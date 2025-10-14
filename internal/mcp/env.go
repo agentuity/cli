@@ -42,9 +42,9 @@ func init() {
 			}
 			var err error
 			if args.IsSecret {
-				_, err = c.Project.SetProjectEnv(ctx, c.Logger, c.APIURL, c.APIKey, map[string]string{}, map[string]string{args.Key: args.Value})
+				_, err = project.SetProjectEnv(ctx, c.Logger, c.APIURL, c.APIKey, c.Project.ProjectId, map[string]string{}, map[string]string{args.Key: args.Value})
 			} else {
-				_, err = c.Project.SetProjectEnv(ctx, c.Logger, c.APIURL, c.APIKey, map[string]string{args.Key: args.Value}, map[string]string{})
+				_, err = project.SetProjectEnv(ctx, c.Logger, c.APIURL, c.APIKey, c.Project.ProjectId, map[string]string{args.Key: args.Value}, map[string]string{})
 			}
 			if err != nil {
 				return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(fmt.Sprintf("Error setting environment variable: %s", err))), nil
@@ -84,7 +84,7 @@ func init() {
 			if resp := ensureProject(&c); resp != nil {
 				return resp, nil
 			}
-			if err := c.Project.DeleteProjectEnv(ctx, c.Logger, c.APIURL, c.APIKey, args.Keys, args.Keys); err != nil {
+			if err := project.DeleteProjectEnv(ctx, c.Logger, c.APIURL, c.APIKey, c.Project.ProjectId, args.Keys, args.Keys); err != nil {
 				return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(fmt.Sprintf("Error deleting environment variable: %s", err))), nil
 			}
 			if err := project.RemoveEnvValues(ctx, c.Logger, c.ProjectDir, args.Keys...); err != nil {

@@ -116,7 +116,7 @@ var (
 	}
 	ErrInvalidArgumentProvided = errorType{
 		Code:    "CLI-0029",
-		Message: "Invalid argument provided",
+		Message: "Failed to retrieve devmode endpoint",
 	}
 	ErrMissingRequiredArgument = errorType{
 		Code:    "CLI-0030",

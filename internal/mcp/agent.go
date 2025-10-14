@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	"github.com/agentuity/cli/internal/agent"
-	"github.com/agentuity/cli/internal/project"
+	"github.com/agentuity/go-common/project"
 	mcp_golang "github.com/agentuity/mcp-golang/v2"
 )
 

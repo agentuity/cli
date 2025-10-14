@@ -4,31 +4,44 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/agentuity/go-common/logger"
 )
 
-// VariableInfo holds information about extracted variables
-type VariableInfo struct {
-	Names []string
-}
+// FindAllPromptFiles finds all YAML files in the prompts directory
+func FindAllPromptFiles(dir string) []string {
+	var promptFiles []string
+	seenFiles := make(map[string]bool)
 
-// FindPromptsYAML finds prompts.yaml in the given directory
-func FindPromptsYAML(dir string) string {
-	possiblePaths := []string{
-		filepath.Join(dir, "src", "prompts.yaml"),
-		filepath.Join(dir, "src", "prompts.yml"),
-		filepath.Join(dir, "prompts.yaml"),
-		filepath.Join(dir, "prompts.yml"),
+	// Check for prompts directory in various locations
+	possibleDirs := []string{
+		filepath.Join(dir, "src", "prompts"),
+		filepath.Join(dir, "prompts"),
 	}
 
-	for _, path := range possiblePaths {
-		if _, err := os.Stat(path); err == nil {
-			return path
+	// Scan all possible directories
+	for _, promptDir := range possibleDirs {
+		if _, err := os.Stat(promptDir); err == nil {
+			// Found prompts directory, scan for YAML files
+			entries, err := os.ReadDir(promptDir)
+			if err != nil {
+				continue
+			}
+
+			for _, entry := range entries {
+				if !entry.IsDir() && (strings.HasSuffix(entry.Name(), ".yaml") || strings.HasSuffix(entry.Name(), ".yml")) {
+					filePath := filepath.Join(promptDir, entry.Name())
+					if !seenFiles[filePath] {
+						promptFiles = append(promptFiles, filePath)
+						seenFiles[filePath] = true
+					}
+				}
+			}
 		}
 	}
 
-	return ""
+	return promptFiles
 }
 
 // FindSDKGeneratedDir finds the SDK's generated directory in node_modules
@@ -66,28 +79,34 @@ func FindSDKGeneratedDir(logger logger.Logger, projectDir string) (string, error
 
 // ProcessPrompts finds, parses, and generates prompt files into the SDK
 func ProcessPrompts(logger logger.Logger, projectDir string) error {
-	// Find prompts.yaml
-	promptsPath := FindPromptsYAML(projectDir)
-	if promptsPath == "" {
-		// No prompts.yaml found - this is OK, not all projects will have prompts
-		logger.Debug("No prompts.yaml found in project, skipping prompt generation")
+	// Find all prompt files
+	promptFiles := FindAllPromptFiles(projectDir)
+	if len(promptFiles) == 0 {
+		// No prompt files found - this is OK, not all projects will have prompts
+		logger.Debug("No prompt files found in project, skipping prompt generation")
 		return nil
 	}
 
-	logger.Debug("Found prompts.yaml at: %s", promptsPath)
+	logger.Debug("Found %d prompt files: %v", len(promptFiles), promptFiles)
 
-	// Read and parse prompts.yaml
-	data, err := os.ReadFile(promptsPath)
-	if err != nil {
-		return fmt.Errorf("failed to read prompts.yaml: %w", err)
+	// Parse all prompt files and combine prompts
+	var allPrompts []Prompt
+	for _, promptFile := range promptFiles {
+		data, err := os.ReadFile(promptFile)
+		if err != nil {
+			return fmt.Errorf("failed to read %s: %w", promptFile, err)
+		}
+
+		promptsList, err := ParsePromptsYAML(data)
+		if err != nil {
+			return fmt.Errorf("failed to parse %s: %w", promptFile, err)
+		}
+
+		allPrompts = append(allPrompts, promptsList...)
+		logger.Debug("Parsed %d prompts from %s", len(promptsList), promptFile)
 	}
 
-	promptsList, err := ParsePromptsYAML(data)
-	if err != nil {
-		return fmt.Errorf("failed to parse prompts: %w", err)
-	}
-
-	logger.Debug("Parsed %d prompts from YAML", len(promptsList))
+	logger.Debug("Total prompts parsed: %d", len(allPrompts))
 
 	// Find SDK generated directory
 	sdkGeneratedDir, err := FindSDKGeneratedDir(logger, projectDir)
@@ -98,7 +117,7 @@ func ProcessPrompts(logger logger.Logger, projectDir string) error {
 	logger.Debug("Found SDK generated directory: %s", sdkGeneratedDir)
 
 	// Generate code using the code generator
-	codeGen := NewCodeGenerator(promptsList)
+	codeGen := NewCodeGenerator(allPrompts)
 
 	// Generate index.js file (overwrite SDK's placeholder, following POC pattern)
 	jsContent := codeGen.GenerateJavaScript()
@@ -114,7 +133,7 @@ func ProcessPrompts(logger logger.Logger, projectDir string) error {
 		return fmt.Errorf("failed to write index.d.ts: %w", err)
 	}
 
-	logger.Info("Generated prompts into SDK: %s and %s", jsPath, dtsPath)
+	logger.Debug("Generated prompts into SDK: %s and %s", jsPath, dtsPath)
 
 	return nil
 }

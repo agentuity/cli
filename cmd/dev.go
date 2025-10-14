@@ -17,18 +17,19 @@ import (
 	"github.com/agentuity/cli/internal/dev"
 	"github.com/agentuity/cli/internal/envutil"
 	"github.com/agentuity/cli/internal/errsystem"
+	"github.com/agentuity/cli/internal/gravity"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/env"
 	"github.com/agentuity/go-common/tui"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var devCmd = &cobra.Command{
-	Use:     "dev",
-	Aliases: []string{"run"},
-	Args:    cobra.NoArgs,
-	Short:   "Run the development server",
+	Use:   "dev",
+	Args:  cobra.NoArgs,
+	Short: "Run the development server",
 	Long: `Run the development server for local testing and development.
 
 This command starts a local development server that connects to the Agentuity Cloud
@@ -44,8 +45,11 @@ Examples:
   agentuity dev --no-build`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log := env.NewLogger(cmd)
-		logLevel := env.LogLevel(cmd)
-		apiUrl, appUrl, transportUrl := util.GetURLs(log)
+		urls := util.GetURLs(log)
+		apiUrl := urls.API
+		appUrl := urls.App
+		gravityUrl := urls.Gravity
+
 		noBuild, _ := cmd.Flags().GetBool("no-build")
 
 		promptsEvalsFF := CheckFeatureFlag(cmd, FeaturePromptsEvals, "enable-prompts-evals")
@@ -53,11 +57,9 @@ Examples:
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		apiKey, userId := util.EnsureLoggedIn(ctx, log, cmd)
+		apiKey, _ := util.EnsureLoggedIn(ctx, log, cmd)
 		theproject := project.EnsureProject(ctx, cmd)
 		dir := theproject.Dir
-
-		checkForUpgrade(ctx, log, false)
 
 		if theproject.NewProject {
 			var projectId string
@@ -67,9 +69,21 @@ Examples:
 			ShowNewProjectImport(ctx, log, cmd, theproject.APIURL, apiKey, projectId, theproject.Project, dir, false)
 		}
 
-		project, err := theproject.Project.GetProject(ctx, log, theproject.APIURL, apiKey, false, true)
+		project, err := project.GetProject(ctx, log, theproject.APIURL, apiKey, theproject.Project.ProjectId, false, true)
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithUserMessage("Failed to validate project (%s). This is most likely due to the API key being invalid or the project has been deleted.\n\nYou can import this project using the following command:\n\n"+tui.Command("project import"), theproject.Project.ProjectId), errsystem.WithContextMessage(fmt.Sprintf("Failed to get project: %s", err))).ShowErrorAndExit()
+		}
+
+		hostname := viper.GetString("devmode.hostname")
+
+		endpoint, err := dev.GetDevModeEndpoint(ctx, log, theproject.APIURL, apiKey, theproject.Project.ProjectId, hostname)
+		if err != nil {
+			errsystem.New(errsystem.ErrRetrieveDevmodeEndpoint, err, errsystem.WithContextMessage(fmt.Sprintf("Failed to retrieve devmode endpoint: %s", err))).ShowErrorAndExit()
+		}
+
+		if hostname != endpoint.Hostname {
+			viper.Set("devmode.hostname", endpoint.Hostname)
+			viper.WriteConfig()
 		}
 
 		var envfile *deployer.EnvFile
@@ -85,13 +99,16 @@ Examples:
 			}
 			defer of.Close()
 			for k, v := range project.Env {
-				fmt.Fprintf(of, "%s=%s\n", k, v)
+				if !envutil.IsAgentuityEnv.MatchString(k) {
+					fmt.Fprintf(of, "%s=%s\n", k, v)
+				}
 			}
 			for k, v := range project.Secrets {
-				fmt.Fprintf(of, "%s=%s\n", k, v)
+				if !envutil.IsAgentuityEnv.MatchString(k) {
+					fmt.Fprintf(of, "%s=%s\n", k, v)
+				}
 			}
 			// Add the required Agentuity SDK and project keys
-			fmt.Fprintf(of, "AGENTUITY_SDK_KEY=%s\n", apiKey)
 			fmt.Fprintf(of, "AGENTUITY_PROJECT_KEY=%s\n", project.ProjectKey)
 			of.Close()
 			tui.ShowSuccess("Synchronized project to .env file: %s", tui.Muted(filename))
@@ -99,24 +116,35 @@ Examples:
 
 		orgId := project.OrgId
 
-		port, _ := cmd.Flags().GetInt("port")
-		port, err = dev.FindAvailablePort(theproject, port)
+		agentPort, _ := cmd.Flags().GetInt("port")
+		agentPort, err = dev.FindAvailablePort(theproject, agentPort)
+		if err != nil {
+			log.Fatal("failed to find available port: %s", err)
+		}
+		proxyPort, err := dev.FindAvailableOpenPort()
 		if err != nil {
 			log.Fatal("failed to find available port: %s", err)
 		}
 
 		server, err := dev.New(dev.ServerArgs{
-			Ctx:          ctx,
-			Logger:       log,
-			LogLevel:     logLevel,
-			APIURL:       apiUrl,
-			TransportURL: transportUrl,
-			APIKey:       apiKey,
-			OrgId:        orgId,
-			Project:      theproject,
-			Version:      Version,
-			UserId:       userId,
-			Port:         port,
+			APIURL:   apiUrl,
+			APIKey:   apiKey,
+			Hostname: endpoint.Hostname,
+			Config: &gravity.Config{
+				Context:         ctx,
+				Logger:          log,
+				Version:         Version,
+				OrgID:           orgId,
+				Project:         theproject,
+				EndpointID:      endpoint.ID,
+				URL:             gravityUrl,
+				SDKKey:          project.Secrets["AGENTUITY_SDK_KEY"],
+				ProxyPort:       uint(proxyPort),
+				AgentPort:       uint(agentPort),
+				Ephemeral:       true,
+				ClientName:      "cli/devmode",
+				DynamicHostname: true,
+			},
 		})
 		if err != nil {
 			log.Fatal("failed to create live dev connection: %s", err)
@@ -131,7 +159,7 @@ Examples:
 				if errors.Is(err, context.Canceled) {
 					return
 				}
-				log.Error("failed to start live dev connection: %s", err)
+				log.Fatal("failed to start devmode connection: %s", err)
 				return
 			}
 		}
@@ -140,11 +168,11 @@ Examples:
 
 		publicUrl := server.PublicURL(appUrl)
 		consoleUrl := server.WebURL(appUrl)
-		devModeUrl := fmt.Sprintf("http://127.0.0.1:%d", port)
+		devModeUrl := fmt.Sprintf("http://127.0.0.1:%d", agentPort)
 		infoBox := server.GenerateInfoBox(publicUrl, consoleUrl, devModeUrl)
 		fmt.Println(infoBox)
 
-		projectServerCmd, err := dev.CreateRunProjectCmd(processCtx, log, theproject, server, dir, orgId, port, os.Stdout, os.Stderr)
+		projectServerCmd, err := dev.CreateRunProjectCmd(processCtx, log, theproject, server, dir, orgId, agentPort, os.Stdout, os.Stderr)
 		if err != nil {
 			errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 		}
@@ -183,7 +211,7 @@ Examples:
 		}
 
 		runServer := func() {
-			projectServerCmd, err = dev.CreateRunProjectCmd(processCtx, log, theproject, server, dir, orgId, port, os.Stdout, os.Stderr)
+			projectServerCmd, err = dev.CreateRunProjectCmd(processCtx, log, theproject, server, dir, orgId, agentPort, os.Stdout, os.Stderr)
 			if err != nil {
 				errsystem.New(errsystem.ErrInvalidConfiguration, err, errsystem.WithContextMessage("Failed to run project")).ShowErrorAndExit()
 			}

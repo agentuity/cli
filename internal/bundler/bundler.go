@@ -14,9 +14,11 @@ import (
 
 	"github.com/agentuity/cli/internal/bundler/prompts"
 	"github.com/agentuity/cli/internal/errsystem"
-	"github.com/agentuity/cli/internal/project"
+	iproject "github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/logger"
+	"github.com/agentuity/go-common/project"
+	"github.com/agentuity/go-common/slice"
 	cstr "github.com/agentuity/go-common/string"
 	"github.com/agentuity/go-common/sys"
 	"github.com/agentuity/go-common/tui"
@@ -406,6 +408,16 @@ func getJSInstallCommand(ctx BundleContext, projectDir, runtime string, isWorksp
 	return cmd, args, nil
 }
 
+// these are common externals we need to automatically exclude from bundling since they have native modules
+var commonExternals = []string{"bun", "fsevents", "chromium-bidi", "sharp"}
+
+// common packages that need automatic externals to be added when detected
+// the key is the package in the package.json and then array is the dependencies that
+// need to automatically be bundled when detected
+var commonExternalsAutoInstalled = map[string][]string{
+	"playwright-core": {"chromium-bidi"},
+}
+
 func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *project.Project) error {
 
 	// Generate prompts if prompts.yaml exists (before dependency installation)
@@ -486,6 +498,20 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 	if err != nil {
 		return fmt.Errorf("failed to load %s: %w", pkgjson, err)
 	}
+
+	externals := make([]string, len(commonExternals))
+	copy(externals, commonExternals)
+	// check to see if we have any externals explicitly set in package.json so that the
+	// project can add additional externals automatically
+	if e, ok := pkg.Data["externals"].([]interface{}); ok {
+		for _, s := range e {
+			if val, ok := s.(string); ok {
+				if !slice.Contains(externals, val) {
+					externals = append(externals, val)
+				}
+			}
+		}
+	}
 	ctx.Logger.Debug("resolving agentuity sdk")
 	agentuitypkg, err := resolveAgentuity(ctx.Logger, installDir)
 	if err != nil {
@@ -531,7 +557,7 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		Engines: []api.Engine{
 			{Name: api.EngineNode, Version: "22"},
 		},
-		External:      []string{"bun", "fsevents"},
+		External:      externals,
 		AbsWorkingDir: dir,
 		TreeShaking:   api.TreeShakingTrue,
 		Drop:          api.DropDebugger,
@@ -564,6 +590,64 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 
 		os.Exit(2)
 		return nil // This line will never be reached due to os.Exit
+	}
+
+	nodeModulesDir := filepath.Join(dir, "node_modules")
+
+	var nativeInstalls []string
+
+	for _, val := range externals {
+		nm := filepath.Join(nodeModulesDir, val)
+		if sys.Exists(nm) {
+			nativeInstalls = append(nativeInstalls, val)
+		}
+	}
+
+	for mod, deps := range commonExternalsAutoInstalled {
+		nm := filepath.Join(nodeModulesDir, mod)
+		if sys.Exists(nm) {
+			for _, dep := range deps {
+				if !slice.Contains(nativeInstalls, dep) {
+					nativeInstalls = append(nativeInstalls, dep)
+				}
+			}
+		}
+	}
+
+	// if we get here, we have detected native modules that cannot be bundled and that we need to install
+	// natively into the bundle. we are going to move the package.json into the output folder and then automatically
+	// install the bundle in the node_modules which can then be picked up at runtime since this folder will be
+	// what is packaged and deployed
+	if len(nativeInstalls) > 0 {
+		// remove keys we just don't need
+		for _, key := range []string{"dependencies", "devDependencies", "externals", "scripts", "keywords", "files"} {
+			delete(pkg.Data, key)
+		}
+		buf, err := pkg.ToJSON()
+		if err != nil {
+			return fmt.Errorf("error serializing modified package.json: %w", err)
+		}
+		outfile := filepath.Join(outdir, "package.json")
+		if err := os.WriteFile(outfile, buf, 0644); err != nil {
+			return fmt.Errorf("error generating package.json: %w", err)
+		}
+		ctx.Logger.Trace("generated %s", outfile)
+		npmargs := []string{"install", "--no-audit", "--no-fund", "--ignore-scripts", "--no-bin-links", "--no-package-lock"}
+		if ctx.Production {
+			// in production, we need to force the native modules to be compatible with our runtime environment
+			npmargs = append(npmargs, "--platform=linux", "--arch=amd64", "--omit=dev")
+		}
+		npmargs = append(npmargs, nativeInstalls...)
+		ctx.Logger.Trace("running native install: npm %s", strings.Join(npmargs, " "))
+		// note: in this case, we're using npm which should be compatible regardless of main
+		// package manager like bun or pnpm so we can get specific arg stability in the npm install
+		c := exec.CommandContext(ctx.Context, "npm", npmargs...)
+		c.Dir = outdir
+		out, err := c.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to install native dependencies: %w. %s", err, string(out))
+		}
+		ctx.Logger.Debug("npm installed native dependencies to %s: %s", outdir, string(out))
 	}
 
 	if err := validateDiskRequest(ctx, outdir); err != nil {
@@ -686,7 +770,7 @@ func CreateDeploymentMutator(ctx BundleContext) util.ZipDirCallbackMutator {
 }
 
 func Bundle(ctx BundleContext) error {
-	theproject := project.NewProject()
+	theproject := iproject.NewProject()
 	if err := theproject.Load(ctx.ProjectDir); err != nil {
 		return fmt.Errorf("failed to load project from %s: %w", ctx.ProjectDir, err)
 	}
