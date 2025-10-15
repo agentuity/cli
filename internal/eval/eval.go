@@ -3,6 +3,7 @@ package eval
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/agentuity/cli/internal/util"
@@ -45,7 +46,7 @@ type SessionResponse struct {
 func GetSessionPrompts(ctx context.Context, logger logger.Logger, baseUrl string, token string, sessionID string) (*SessionData, error) {
 	client := util.NewAPIClient(ctx, logger, baseUrl, token)
 	// sleep for 1 second
-	time.Sleep(30 * time.Second)
+	time.Sleep(15 * time.Second)
 
 	maxAttempts := 5
 	retryDelay := 1 * time.Minute
@@ -91,6 +92,7 @@ type RunEvalRequest struct {
 	Input     string `json:"input"`
 	Output    string `json:"output"`
 	SessionID string `json:"sessionId"`
+	SpanID    string `json:"spanId"`
 }
 
 type EvalResult struct {
@@ -102,13 +104,14 @@ type EvalResult struct {
 }
 
 // RunEval executes an eval function on the agent
-func RunEval(ctx context.Context, logger logger.Logger, agentURL string, evalName string, input string, output string, sessionID string) (*EvalResult, error) {
+func RunEval(ctx context.Context, logger logger.Logger, agentURL string, evalName string, input string, output string, sessionID string, spanID string) (*EvalResult, error) {
 	client := util.NewAPIClient(ctx, logger, agentURL, "")
 
 	payload := RunEvalRequest{
 		Input:     input,
 		Output:    output,
 		SessionID: sessionID,
+		SpanID:    spanID,
 	}
 
 	var result EvalResult
@@ -117,4 +120,24 @@ func RunEval(ctx context.Context, logger logger.Logger, agentURL string, evalNam
 	}
 
 	return &result, nil
+}
+
+type Response[T any] struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Data    T      `json:"data"`
+}
+
+// CreateEval creates a new evaluation function in the project
+func CreateEval(ctx context.Context, logger logger.Logger, baseUrl string, token string, projectId string, slug string, name string, description string) (string, error) {
+	client := util.NewAPIClient(ctx, logger, baseUrl, token)
+
+	var resp Response[string]
+	if err := client.Do("POST", fmt.Sprintf("/cli/eval/%s", url.PathEscape(projectId)), map[string]any{"slug": slug, "name": name, "description": description}, &resp); err != nil {
+		return "", fmt.Errorf("error creating eval: %s", err)
+	}
+	if !resp.Success {
+		return "", fmt.Errorf("error creating eval: %s", resp.Message)
+	}
+	return resp.Data, nil
 }

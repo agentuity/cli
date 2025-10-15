@@ -193,7 +193,7 @@ Examples:
 								log.Debug("running eval %s for prompt %s in session %s", evalName, prompt.Slug, sessionID)
 
 								agentURL := fmt.Sprintf("http://127.0.0.1:%d", agentPort)
-								result, err := eval.RunEval(ctx, log, agentURL, evalName, span.Input, span.Output, sessionID)
+								result, err := eval.RunEval(ctx, log, agentURL, evalName, span.Input, span.Output, sessionID, span.SpanID)
 								if err != nil {
 									log.Error("failed to run eval %s: %s", evalName, err)
 									continue
