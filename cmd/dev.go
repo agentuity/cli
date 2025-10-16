@@ -167,6 +167,13 @@ Examples:
 
 		tui.ShowSpinner("Connecting ...", waitForConnection)
 
+		// Load eval metadata map (slug -> ID mapping)
+		evalMetadataMap, err := eval.LoadEvalMetadataMap(log, theproject.Dir)
+		if err != nil {
+			log.Warn("failed to load eval metadata map: %v", err)
+			evalMetadataMap = make(map[string]string) // Use empty map to continue
+		}
+
 		// Start eval processor goroutine
 		go func() {
 			for evalInfo := range server.EvalChannel() {
@@ -189,21 +196,30 @@ Examples:
 							log.Debug("running evals for prompt %s in session %s", prompt.Slug, sessionID)
 
 							// Run each eval specified for this prompt
-							for _, evalName := range prompt.Evals {
-								log.Debug("running eval %s for prompt %s in session %s", evalName, prompt.Slug, sessionID)
+							for _, evalSlug := range prompt.Evals {
+								// Map slug to eval ID using metadata, fallback to slug if not found
+								evalID := evalSlug
+								if mappedID, ok := evalMetadataMap[evalSlug]; ok {
+									evalID = mappedID
+									log.Debug("mapped eval slug '%s' to ID '%s'", evalSlug, evalID)
+								} else {
+									log.Debug("no mapping found for eval slug '%s', using slug as ID", evalSlug)
+								}
+
+								log.Debug("running eval %s (ID: %s) for prompt %s in session %s", evalSlug, evalID, prompt.Slug, sessionID)
 
 								agentURL := fmt.Sprintf("http://127.0.0.1:%d", agentPort)
-								result, err := eval.RunEval(ctx, log, agentURL, evalName, span.Input, span.Output, sessionID, span.SpanID)
+								result, err := eval.RunEval(ctx, log, agentURL, evalSlug, evalID, span.Input, span.Output, sessionID, span.SpanID)
 								if err != nil {
-									log.Error("failed to run eval %s: %s", evalName, err)
+									log.Error("failed to run eval %s: %s", evalSlug, err)
 									continue
 								}
 
 								// Log the eval result
 								if result.ScoreValue != nil {
-									log.Info("✓ Eval %s: %s (score: %.2f)", evalName, result.ResultType, *result.ScoreValue)
+									log.Info("✓ Eval %s: %s (score: %.2f)", evalSlug, result.ResultType, *result.ScoreValue)
 								} else {
-									log.Info("✓ Eval %s: %s", evalName, result.ResultType)
+									log.Info("✓ Eval %s: %s", evalSlug, result.ResultType)
 								}
 
 								if result.Metadata != nil {
