@@ -54,6 +54,10 @@ func (s *Server) Connect() error {
 	return s.client.Start()
 }
 
+func (s *Server) EvalChannel() <-chan gravity.EvalInfo {
+	return s.client.EvalChannel()
+}
+
 var (
 	logoColor  = lipgloss.AdaptiveColor{Light: "#11c7b9", Dark: "#00FFFF"}
 	labelColor = lipgloss.AdaptiveColor{Light: "#999999", Dark: "#FFFFFF"}

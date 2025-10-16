@@ -129,10 +129,11 @@ func (cg *CodeGenerator) generateSystemField(prompt Prompt) string {
             slug: %q,
             compiled,
             template: %q,
-            variables: { %s }
+            variables: { %s },
+            evals: %s
         });
         return compiled;
-    }`, jsdoc, paramStr, prompt.System, paramStr, prompt.Slug, prompt.System, variablesStr)
+    }`, jsdoc, paramStr, prompt.System, paramStr, prompt.Slug, prompt.System, variablesStr, cg.formatEvalsArray(prompt.Evals))
 		} else {
 			// Parameters are required
 			return fmt.Sprintf(`system: %s({ %s }) => {
@@ -141,10 +142,11 @@ func (cg *CodeGenerator) generateSystemField(prompt Prompt) string {
             slug: %q,
             compiled,
             template: %q,
-            variables: { %s }
+            variables: { %s },
+            evals: %s
         });
         return compiled;
-    }`, jsdoc, paramStr, prompt.System, paramStr, prompt.Slug, prompt.System, variablesStr)
+    }`, jsdoc, paramStr, prompt.System, paramStr, prompt.Slug, prompt.System, variablesStr, cg.formatEvalsArray(prompt.Evals))
 		}
 	}
 	return fmt.Sprintf(`system: %s() => {
@@ -153,10 +155,11 @@ func (cg *CodeGenerator) generateSystemField(prompt Prompt) string {
             slug: %q,
             compiled,
             template: %q,
-            variables: {}
+            variables: {},
+            evals: %s
         });
         return compiled;
-    }`, jsdoc, prompt.System, prompt.Slug, prompt.System)
+    }`, jsdoc, prompt.System, prompt.Slug, prompt.System, cg.formatEvalsArray(prompt.Evals))
 }
 
 // generatePromptField generates the prompt field for a prompt
@@ -191,10 +194,11 @@ func (cg *CodeGenerator) generatePromptField(prompt Prompt) string {
             slug: %q,
             compiled,
             template: %q,
-            variables: { %s }
+            variables: { %s },
+            evals: %s
         });
         return compiled;
-    }`, jsdoc, paramStr, prompt.Prompt, paramStr, prompt.Slug, prompt.Prompt, variablesStr)
+    }`, jsdoc, paramStr, prompt.Prompt, paramStr, prompt.Slug, prompt.Prompt, variablesStr, cg.formatEvalsArray(prompt.Evals))
 		} else {
 			// Parameters are required
 			return fmt.Sprintf(`prompt: %s({ %s }) => {
@@ -203,10 +207,11 @@ func (cg *CodeGenerator) generatePromptField(prompt Prompt) string {
             slug: %q,
             compiled,
             template: %q,
-            variables: { %s }
+            variables: { %s },
+            evals: %s
         });
         return compiled;
-    }`, jsdoc, paramStr, prompt.Prompt, paramStr, prompt.Slug, prompt.Prompt, variablesStr)
+    }`, jsdoc, paramStr, prompt.Prompt, paramStr, prompt.Slug, prompt.Prompt, variablesStr, cg.formatEvalsArray(prompt.Evals))
 		}
 	}
 	return fmt.Sprintf(`prompt: %s() => {
@@ -215,10 +220,11 @@ func (cg *CodeGenerator) generatePromptField(prompt Prompt) string {
             slug: %q,
             compiled,
             template: %q,
-            variables: {}
+            variables: {},
+            evals: %s
         });
         return compiled;
-    }`, jsdoc, prompt.Prompt, prompt.Slug, prompt.Prompt)
+    }`, jsdoc, prompt.Prompt, prompt.Slug, prompt.Prompt, cg.formatEvalsArray(prompt.Evals))
 }
 
 // generateVariablesField generates the variables field for a prompt
@@ -816,6 +822,19 @@ func (cg *CodeGenerator) generatePromptJSDocForType(prompt Prompt) string {
 	jsdoc.WriteString(" */\n")
 
 	return jsdoc.String()
+}
+
+// formatEvalsArray formats a Go string slice as a JavaScript array
+func (cg *CodeGenerator) formatEvalsArray(evals []string) string {
+	if len(evals) == 0 {
+		return "[]"
+	}
+
+	var quoted []string
+	for _, eval := range evals {
+		quoted = append(quoted, fmt.Sprintf("%q", eval))
+	}
+	return fmt.Sprintf("[%s]", strings.Join(quoted, ", "))
 }
 
 // generateTypedefJSDoc generates JSDoc typedef for the prompt type

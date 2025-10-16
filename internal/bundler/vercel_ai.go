@@ -36,31 +36,34 @@ func init() {
 		const { PatchPortal } = await import('@agentuity/sdk');
 		const { internal } = await import('@agentuity/sdk');
 		const crypto = await import('node:crypto');
-		internal.debug('🔧 generateText patch executing...');
+		console.log('🔧 generateText patch executing...');
 		const patchPortal = await PatchPortal.getInstance();
-		internal.debug('✅ PatchPortal instance created');
+		console.log('✅ PatchPortal instance created');
 
 		let compiledSystemHash = '';
 		let compiledPromptHash = '';
 		const agentuityPromptMetadata = [];
 		patchPortal.printState();
+
+		console.log('🎃🔥🧟')
+		console.log(_args[0])
 		
 		if (_args[0]?.system) {
 			// Extract prompt from arguments
 			const systemString = _args[0]?.system;
-			internal.debug('📝 Extracted system:', systemString.substring(0, 100) + '...');
+			console.log('📝 Extracted system:', systemString.substring(0, 100) + '...');
 			compiledSystemHash = crypto.createHash('sha256').update(systemString).digest('hex');
-			internal.debug('🔑 SYSTEM Generated compiled hash:', compiledSystemHash);
+			console.log('🔑 SYSTEM Generated compiled hash:', compiledSystemHash);
 
 			// Get patch data using the same key format as processPromptMetadata
 			const key = 'prompt:' + compiledPromptHash;
-			internal.debug('🔍 Looking for key:', key);
+			console.log('🔍 Looking for key:', key);
 			const patchData = await patchPortal.get(key);
 			if (patchData) {
-				internal.debug('🔍 Retrieved patch data:', patchData);
+				console.log('🔍 Retrieved patch data:', patchData);
 				agentuityPromptMetadata.push(...patchData);
 			} else {
-				internal.debug('ℹ️ No patch data found for compiled hash:', compiledSystemHash);
+				console.log('ℹ️ No patch data found for compiled hash:', compiledSystemHash);
 			}
 		}
 
@@ -68,20 +71,20 @@ func init() {
 		if (_args[0]?.prompt) {
 			const prompt = _args[0]?.prompt || _args[0]?.messages || '';
 			const promptString = typeof prompt === 'string' ? prompt : JSON.stringify(prompt);
-			internal.debug('📝 Extracted prompt:', promptString.substring(0, 100) + '...');
+			console.log('📝 Extracted prompt:', promptString.substring(0, 100) + '...');
 			// Generate hash for the compiled prompt (same as processPromptMetadata uses)
 			compiledPromptHash = crypto.createHash('sha256').update(promptString).digest('hex');
-			internal.debug('🔑 PROMPT Generated compiled hash:', compiledPromptHash);
+			console.log('🔑 PROMPT Generated compiled hash:', compiledPromptHash);
 
 			// Get patch data using the same key format as processPromptMetadata
 			const key = 'prompt:' + compiledPromptHash;
-			internal.debug('🔍 Looking for key:', key);
+			console.log('🔍 Looking for key:', key);
 			const patchData = await patchPortal.get(key);
 			if (patchData) {
-				internal.debug('🔍 Retrieved patch data:', patchData);
+				console.log('🔍 Retrieved patch data:', patchData);
 				agentuityPromptMetadata.push(...patchData);
 			} else {
-				internal.debug('ℹ️ No patch data found for compiled hash:', compiledPromptHash);
+				console.log('ℹ️ No patch data found for compiled hash:', compiledPromptHash);
 			}
 		}
 
@@ -91,9 +94,9 @@ func init() {
 			const userMetadata = opts?.experimental_telemetry?.metadata || {};
 			opts.experimental_telemetry = { isEnabled: true, metadata: { ...userMetadata, 'agentuity.prompts': JSON.stringify(agentuityPromptMetadata) } };
 			_args[0] = opts;
-			internal.debug('✅ Patch metadata attached:', agentuityPromptMetadata);
+			console.log('✅ Patch metadata attached:', agentuityPromptMetadata);
 		} else {
-			internal.debug('ℹ️ No patch data found for this invocation');
+			console.log('ℹ️ No patch data found for this invocation');
 		}
 	`
 
