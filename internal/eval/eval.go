@@ -96,7 +96,7 @@ type RunEvalRequest struct {
 	Output    string `json:"output"`
 	SessionID string `json:"sessionId"`
 	SpanID    string `json:"spanId"`
-	EvalID    string `json:"evalId"`
+	EvalName  string `json:"evalName"`
 }
 
 type EvalResult struct {
@@ -116,11 +116,11 @@ func RunEval(ctx context.Context, logger logger.Logger, agentURL string, evalNam
 		Output:    output,
 		SessionID: sessionID,
 		SpanID:    spanID,
-		EvalID:    evalID,
+		EvalName:  evalName,
 	}
 
 	var result EvalResult
-	if err := client.Do("POST", fmt.Sprintf("/eval/%s", evalName), payload, &result); err != nil {
+	if err := client.Do("POST", fmt.Sprintf("/_agentuity/eval/%s", evalID), payload, &result); err != nil {
 		return nil, fmt.Errorf("error running eval %s: %s", evalName, err)
 	}
 

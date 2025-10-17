@@ -14,7 +14,12 @@ type patchModule struct {
 	Module    string
 	Filename  string
 	Functions map[string]patchAction
+	Classes   map[string]patchClass
 	Body      *patchAction
+}
+
+type patchClass struct {
+	Methods map[string]patchAction
 }
 
 type patchAction struct {
@@ -169,6 +174,80 @@ func createPlugin(logger logger.Logger, dir string, shimSourceMap bool) api.Plug
 						suffix.WriteString("}\n")
 						logger.Debug("patched %s -> %s", name, fn)
 					}
+
+					// Handle class method patching
+					for className, class := range mod.Classes {
+						for methodName, method := range class.Methods {
+							logger.Debug("attempting to patch class %s method %s", className, methodName)
+
+							// Look for class definition
+							classPattern := "class " + className
+							classIndex := strings.Index(contents, classPattern)
+							if classIndex == -1 {
+								logger.Debug("class %s not found", className)
+								continue
+							}
+							logger.Debug("found class %s at index %d", className, classIndex)
+
+							// Look for method definition within the class
+							methodPattern := methodName + "("
+							methodIndex := strings.Index(contents[classIndex:], methodPattern)
+							if methodIndex == -1 {
+								logger.Debug("method %s not found in class %s", methodName, className)
+								continue
+							}
+							methodIndex += classIndex
+							logger.Debug("found method %s at index %d", methodName, methodIndex)
+
+							// Find the start of the method
+							braceIndex := strings.LastIndex(contents[:methodIndex], "{")
+							if braceIndex == -1 {
+								logger.Debug("opening brace not found for method %s", methodName)
+								continue
+							}
+
+							// Find the end of the method
+							braceCount := 0
+							endIndex := braceIndex
+							for i := braceIndex; i < len(contents); i++ {
+								if contents[i] == '{' {
+									braceCount++
+								} else if contents[i] == '}' {
+									braceCount--
+									if braceCount == 0 {
+										endIndex = i
+										break
+									}
+								}
+							}
+
+							// Extract method content
+							methodContent := contents[braceIndex+1 : endIndex]
+
+							// Create patched method
+							patchedMethod := fmt.Sprintf(`{
+								// Store original method
+								if (!%s.prototype.__agentuity_%s) {
+									%s.prototype.__agentuity_%s = %s.prototype.%s;
+								}
+								
+								// Create wrapper
+								%s.prototype.%s = function(...args) {
+									%s
+									return this.__agentuity_%s.apply(this, args);
+								};
+								
+								// Original method implementation
+								%s
+							}`, className, methodName, className, methodName, className, methodName, className, methodName, method.Before, methodName, methodContent)
+
+							// Replace the method in the content
+							contents = contents[:braceIndex] + patchedMethod + contents[endIndex+1:]
+
+							logger.Debug("patched class method %s.%s", className, methodName)
+						}
+					}
+
 					contents = contents + "\n" + suffix.String()
 					if mod.Body != nil {
 						if mod.Body.Before != "" {
