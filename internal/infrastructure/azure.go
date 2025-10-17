@@ -43,10 +43,9 @@ func (s *azureSetup) Setup(ctx context.Context, logger logger.Logger, cluster *C
 			region = "eastus" // final fallback
 		}
 	}
-
 	// Generate unique names for Azure resources
 	servicePrincipalName := "agentuity-cluster-" + cluster.ID
-	keyVaultName := "agentuity-kv-" + cluster.ID[:6] // Key Vault names have character limits
+	keyVaultName := "agentuity-kv-" + cluster.ID[len(cluster.ID)-6:]
 	secretName := "agentuity-private-key"
 	networkSecurityGroupName := "agentuity-nsg-" + cluster.ID
 
@@ -100,6 +99,7 @@ func (s *azureSetup) CreateMachine(ctx context.Context, logger logger.Logger, re
 	servicePrincipalName := "agentuity-cluster-" + clusterID
 	vmName := generateNodeName("agentuity-node")
 	networkSecurityGroupName := "agentuity-nsg-" + clusterID
+	keyVaultName := "agentuity-kv-" + clusterID[len(clusterID)-6:]
 
 	envs := map[string]any{
 		"AZURE_SUBSCRIPTION_ID":   subscriptionID,
@@ -110,6 +110,7 @@ func (s *azureSetup) CreateMachine(ctx context.Context, logger logger.Logger, re
 		"CLUSTER_TOKEN":           token,
 		"AZURE_VM_NAME":           vmName,
 		"CLUSTER_ID":              clusterID,
+		"AZURE_KEY_VAULT":         keyVaultName,
 	}
 
 	var steps []ExecutionSpec
@@ -199,23 +200,10 @@ func init() {
 // Azure command functions
 func azure_registerProviders() string {
 	cmd := []string{
-		`echo "Registering Microsoft.KeyVault..."`,
 		`az provider register --namespace Microsoft.KeyVault`,
-		`echo "Registering Microsoft.Compute..."`,
 		`az provider register --namespace Microsoft.Compute`,
-		`echo "Registering Microsoft.Network..."`,
 		`az provider register --namespace Microsoft.Network`,
-		`echo "Waiting for KeyVault registration to complete..."`,
 		`timeout 300 bash -c 'until [ "$(az provider show --namespace Microsoft.KeyVault --query registrationState -o tsv)" = "Registered" ]; do echo "Still registering..."; sleep 10; done'`,
-		`echo "Registration complete."`,
-	}
-	return azure_cmdEscape(strings.Join(cmd, " && "))
-}
-
-func azure_checkProviderRegistration() string {
-	cmd := []string{
-		`STATE=$(az provider show --namespace Microsoft.KeyVault --query "registrationState" -o tsv)`,
-		`if [ "$STATE" = "Registered" ]; then echo "Registered"; else echo "NotRegistered"; fi`,
 	}
 	return azure_cmdEscape(strings.Join(cmd, " && "))
 }
@@ -234,11 +222,17 @@ func azure_checkServicePrincipal() string {
 	return azure_cmdEscape(strings.Join(cmd, " && "))
 }
 
+func azure_assignKeyVaultRole() string {
+	cmd := []string{
+		`SP_APP_ID=$(az ad sp list --display-name {AZURE_SERVICE_PRINCIPAL} --query "[0].appId" -o tsv)`,
+		`az role assignment create --role "Key Vault Secrets User" --assignee $SP_APP_ID --scope /subscriptions/{AZURE_SUBSCRIPTION_ID}/resourceGroups/{AZURE_RESOURCE_GROUP}/providers/Microsoft.KeyVault/vaults/{AZURE_KEY_VAULT}`,
+	}
+	return azure_cmdEscape(strings.Join(cmd, " && "))
+}
+
 func azure_createKeyVault() string {
 	cmd := []string{
-		`echo "Checking if Key Vault exists..."`,
 		`if az keyvault show --name {AZURE_KEY_VAULT} >/dev/null 2>&1; then echo "Key Vault exists, checking RBAC status..."; RBAC_ENABLED=$(az keyvault show --name {AZURE_KEY_VAULT} --query "properties.enableRbacAuthorization" -o tsv); if [ "$RBAC_ENABLED" = "true" ]; then echo "RBAC is enabled, deleting and recreating Key Vault..."; az keyvault delete --name {AZURE_KEY_VAULT} --resource-group {AZURE_RESOURCE_GROUP}; az keyvault purge --name {AZURE_KEY_VAULT} --location {CLUSTER_REGION}; sleep 30; fi; fi`,
-		`echo "Creating Key Vault with access policies enabled..."`,
 		`az keyvault create --name {AZURE_KEY_VAULT} --resource-group {AZURE_RESOURCE_GROUP} --location {CLUSTER_REGION} --enable-rbac-authorization false --query "properties.vaultUri" -o tsv`,
 	}
 	return azure_cmdEscape(strings.Join(cmd, " && "))
@@ -249,23 +243,6 @@ func azure_checkKeyVault() string {
 		`VAULT_URI=$(az keyvault show --name {AZURE_KEY_VAULT} --query "properties.vaultUri" -o tsv 2>/dev/null)`,
 		`RBAC_ENABLED=$(az keyvault show --name {AZURE_KEY_VAULT} --query "properties.enableRbacAuthorization" -o tsv 2>/dev/null)`,
 		`if [ "$VAULT_URI" != "" ] && [ "$RBAC_ENABLED" = "false" ]; then echo "$VAULT_URI"; else echo ""; fi`,
-	}
-	return azure_cmdEscape(strings.Join(cmd, " && "))
-}
-
-func azure_grantKeyVaultAccess() string {
-	cmd := []string{
-		`SP_OBJECT_ID=$(az ad sp show --id $(az ad sp list --display-name {AZURE_SERVICE_PRINCIPAL} --query "[0].appId" -o tsv) --query "id" -o tsv)`,
-		`az keyvault set-policy --name {AZURE_KEY_VAULT} --object-id $SP_OBJECT_ID --secret-permissions get list`,
-	}
-	return azure_cmdEscape(strings.Join(cmd, " && "))
-}
-
-func azure_checkKeyVaultAccess() string {
-	cmd := []string{
-		`SP_OBJECT_ID=$(az ad sp show --id $(az ad sp list --display-name {AZURE_SERVICE_PRINCIPAL} --query "[0].appId" -o tsv) --query "id" -o tsv)`,
-		`POLICY_COUNT=$(az keyvault show --name {AZURE_KEY_VAULT} --query "length(properties.accessPolicies[?objectId=='$SP_OBJECT_ID'])" -o tsv)`,
-		`if [ "$POLICY_COUNT" -gt "0" ]; then echo "AccessGranted"; else echo "NoAccess"; fi`,
 	}
 	return azure_cmdEscape(strings.Join(cmd, " && "))
 }
@@ -317,33 +294,29 @@ func azure_checkSecurityGroupRules() string {
 
 func azure_validateInfrastructure() string {
 	cmd := []string{
-		`echo "Looking for NSG: {AZURE_NSG_NAME}"`,
-		`echo "In resource group: {AZURE_RESOURCE_GROUP}"`,
-		`echo "Available NSGs in resource group:"`,
 		`az network nsg list --resource-group {AZURE_RESOURCE_GROUP} --query "[].name" -o table || echo "No NSGs found or resource group doesn't exist"`,
-		`echo "Checking for cluster-related NSGs:"`,
 		`az network nsg list --resource-group {AZURE_RESOURCE_GROUP} --query "[?contains(name, 'agentuity-nsg')]" -o table || echo "No agentuity NSGs found"`,
-		`echo "Trying to get location of expected NSG..."`,
 		`az network nsg show --resource-group {AZURE_RESOURCE_GROUP} --name {AZURE_NSG_NAME} --query "location" -o tsv`,
 	}
 	return azure_cmdEscape(strings.Join(cmd, " && "))
 }
 
-func azure_getImageId() string {
+func azure_checkSSHKey() string {
 	cmd := []string{
-		`IMAGE_ID=$(az image list --resource-group HADRON-IMAGES --query "[?starts_with(name, 'hadron-')] | sort_by(@, &name) | [-1].id" -o tsv)`,
-		`if [ "$IMAGE_ID" = "" ] || [ "$IMAGE_ID" = "null" ]; then IMAGE_ID="/subscriptions/1e63abb3-1105-4060-ae3c-2067435e57b9/resourceGroups/HADRON-IMAGES/providers/Microsoft.Compute/images/hadron-20251009132735"; fi`,
-		`echo "$IMAGE_ID"`,
+		`if [ ! -f ~/.ssh/id_rsa.pub ]; then echo "SSH key not found, generating new key pair..."; ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N "" -q; echo "SSH key generated at ~/.ssh/id_rsa"; else echo "SSH key found at ~/.ssh/id_rsa.pub"; fi`,
 	}
 	return azure_cmdEscape(strings.Join(cmd, " && "))
 }
 
-func azure_createVMSimple() string {
+func azure_createVMOnly() string {
 	cmd := []string{
+		`IMAGE_ID=$(az image list --resource-group HADRON-IMAGES --query "[?starts_with(name, 'hadron-')] | sort_by(@, &tags.build_time) | [-1].id" -o tsv)`,
+		`if [ "$IMAGE_ID" = "" ] || [ "$IMAGE_ID" = "null" ]; then echo "ERROR: No hadron images found!"; exit 1; fi`,
+		`IMAGE_NAME=$(az image show --ids "$IMAGE_ID" --query "name" -o tsv)`,
 		`NSG_LOCATION=$(az network nsg show --resource-group {AZURE_RESOURCE_GROUP} --name {AZURE_NSG_NAME} --query "location" -o tsv)`,
-		`IMAGE_ID=$(az image list --resource-group HADRON-IMAGES --query "[?starts_with(name, 'hadron-')] | sort_by(@, &name) | [-1].id" -o tsv)`,
-		`if [ "$IMAGE_ID" = "" ] || [ "$IMAGE_ID" = "null" ]; then IMAGE_ID="/subscriptions/1e63abb3-1105-4060-ae3c-2067435e57b9/resourceGroups/HADRON-IMAGES/providers/Microsoft.Compute/images/hadron-20251009132735"; fi`,
-		`az vm create --resource-group {AZURE_RESOURCE_GROUP} --name {AZURE_VM_NAME} --image "$IMAGE_ID" --plan-name "9-base" --plan-product "rockylinux-x86_64" --plan-publisher "resf" --admin-username azureuser --generate-ssh-keys --size Standard_D2s_v3 --location "$NSG_LOCATION" --nsg {AZURE_NSG_NAME} --custom-data '{CLUSTER_TOKEN}' --assign-identity --role "Reader" --scope /subscriptions/{AZURE_SUBSCRIPTION_ID}/resourceGroups/{AZURE_RESOURCE_GROUP} --tags AgentuityCluster={CLUSTER_ID}`,
+		`az vm create --resource-group {AZURE_RESOURCE_GROUP} --name {AZURE_VM_NAME} --image "$IMAGE_ID" --plan-name "9-base" --plan-product "rockylinux-x86_64" --plan-publisher "resf" --admin-username rocky --ssh-key-values ~/.ssh/id_rsa.pub --authentication-type ssh --size Standard_D2s_v3 --location "$NSG_LOCATION" --nsg {AZURE_NSG_NAME} --assign-identity --role "Reader" --scope /subscriptions/{AZURE_SUBSCRIPTION_ID}/resourceGroups/{AZURE_RESOURCE_GROUP} --tags AgentuityCluster={CLUSTER_ID} --user-data={CLUSTER_TOKEN}`,
+		`VM_IDENTITY=$(az vm show --resource-group {AZURE_RESOURCE_GROUP} --name {AZURE_VM_NAME} --query "identity.principalId" -o tsv)`,
+		`az keyvault set-policy --name {AZURE_KEY_VAULT} --object-id $VM_IDENTITY --secret-permissions get list`,
 	}
 	return azure_cmdEscape(strings.Join(cmd, " && "))
 }
@@ -367,28 +340,28 @@ func azureMachineSpecification() string {
     }
   },
   {
-    "title": "Get Hadron Image",
-    "description": "Find the latest Hadron image or use the fallback image.",
+    "title": "Check SSH Key",
+    "description": "Verify SSH key exists or generate a new one for VM access.",
     "execute": {
-      "message": "Getting Hadron image...",
+      "message": "Checking SSH key...",
       "command": "sh",
       "arguments": [
-        "-c", "` + azure_getImageId() + `"
+        "-c", "` + azure_checkSSHKey() + `"
       ],
-      "success": "Image found"
+      "success": "SSH key ready"
     }
   },
   {
-    "title": "Create Virtual Machine",
-    "description": "Create and deploy the VM with cluster configuration.",
+    "title": "Deploy Virtual Machine",
+    "description": "Create the VM with selected image and cluster configuration.",
     "execute": {
-      "message": "Creating VM...",
+      "message": "Deploying VM...",
       "command": "sh",
       "arguments": [
-        "-c", "` + azure_createVMSimple() + `"
+        "-c", "` + azure_createVMOnly() + `"
       ],
       "validate": "{AZURE_VM_NAME}",
-      "success": "VM created successfully"
+      "success": "VM deployed successfully"
     }
   }
 ]`
@@ -440,20 +413,14 @@ var azureClusterSpecification = `[
     }
   },
   {
-    "title": "Grant Service Principal Access to Key Vault",
-    "description": "Grant the service principal permissions to access secrets in the Key Vault.",
-    "execute": {
-      "message": "Granting Key Vault access...",
-      "command": "sh",
-      "arguments": [ "-c", "` + azure_grantKeyVaultAccess() + `" ],
-      "success": "Key Vault access granted"
-    },
-    "skip_if": {
-      "message": "Checking Key Vault access...",
-      "command": "sh",
-      "arguments": [ "-c", "` + azure_checkKeyVaultAccess() + `" ],
-      "validate": "AccessGranted"
-    }
+  "title": "Assign Key Vault Role to Service Principal",
+  "description": "Assign the Key Vault Secrets User role to the service principal for accessing secrets.",
+  "execute": {
+  "message": "Assigning Key Vault role...",
+  "command": "sh",
+  "arguments": [ "-c", "` + azure_assignKeyVaultRole() + `" ],
+  "success": "Key Vault role assigned"
+  }
   },
   {
     "title": "Create encryption key and store in Azure Key Vault",
