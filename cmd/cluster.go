@@ -275,7 +275,7 @@ Examples:
 			if err != nil {
 				errsystem.New(errsystem.ErrCreateProject, err, errsystem.WithContextMessage("Failed to create cluster")).ShowErrorAndExit()
 			}
-
+			cluster.Region = region
 			if err := infrastructure.Setup(ctx, logger, cluster, format); err != nil {
 				logger.Fatal("%s", err)
 			}
