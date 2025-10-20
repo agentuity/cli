@@ -21,9 +21,10 @@ import (
 )
 
 var runCmd = &cobra.Command{
-	Use:   "run",
-	Args:  cobra.NoArgs,
-	Short: "Run the production server",
+	Hidden: true, // not working yet
+	Use:    "run",
+	Args:   cobra.NoArgs,
+	Short:  "Run the production server",
 	Long: `Run the production server for connecting to the Agentuity Cloud.
 
 This command starts a local production server that connects to the Agentuity Cloud
