@@ -279,7 +279,7 @@ func GetURLs(logger logger.Logger) CLIUrls {
 		appUrl = "https://app.agentuity.io"
 	}
 	if gravityUrl == "" {
-		gravityUrl = "grpc://gravity.agentuity.com"
+		gravityUrl = "grpc://devmode.agentuity.com"
 	}
 	if apiUrl == "https://api.agentuity.com" && transportUrl != "https://agentuity.ai" {
 		logger.Debug("switching transport url to production since the api url is production")
