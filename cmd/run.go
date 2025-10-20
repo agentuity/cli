@@ -172,7 +172,7 @@ func init() {
 	rootCmd.AddCommand(runCmd)
 	runCmd.Flags().StringP("dir", "d", ".", "The directory to run the server in")
 	runCmd.Flags().Int("port", 0, "The port to run the server on (uses project default if not provided)")
-	runCmd.Flags().String("gravity-url", "grpc://devmode.agentuity.com", "The URL to the devmode/gravity server")
+	runCmd.Flags().String("gravity-url", "grpc://gravity.agentuity.com", "The URL to the gravity server")
 	runCmd.Flags().String("transport-url", "https://agentuity.ai", "The URL to the transport server")
 	runCmd.Flags().MarkHidden("gravity-url")
 	runCmd.Flags().MarkHidden("transport-url")
