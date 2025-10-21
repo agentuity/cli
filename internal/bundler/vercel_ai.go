@@ -123,39 +123,23 @@ func init() {
 						}
 					}
 					
+					
+				
+					
 					// Add attributes to span configuration
-					_args[0].attributes = {
-						...originalAttributes,
-						'@agentuity/span-patch': 'active',
-						'bobby': 'testing123',
-						'@agentuity/prompts': agentuityPromptMetadata.length > 0 ? JSON.stringify(agentuityPromptMetadata) : 'no-data'
-					};
+					if (agentuityPromptMetadata.length > 0) {
+						_args[0].attributes = {
+							...originalAttributes,
+							'@agentuity/prompts': JSON.stringify(agentuityPromptMetadata)
+						};
+					}
+
 				}
 				`,
 			},
 		},
 	}
 
-	// Add patch for setAttribute to intercept response text
-	patches["@traceloop/instrumentation-openai"] = patchModule{
-		Module: "@traceloop/instrumentation-openai",
-		Functions: map[string]patchAction{
-			"setAttribute": {
-				Before: `
-				// Intercept setAttribute calls to capture response text
-				if (_args[0] && typeof _args[0] === 'string' && _args[1] !== undefined) {
-					const key = _args[0];
-					const value = _args[1];
-					
-					// Check if this is a response content attribute
-					if (key.includes('gen_ai.completions') && key.includes('.content') && typeof value === 'string' && value.trim()) {
-						console.log('🤖 AI Response:', value);
-					}
-				}
-				`,
-			},
-		},
-	}
 	patches["@vercel/ai"] = vercelAIPatches
 
 	// register all the providers that we support in our Agentuity AI Gateway

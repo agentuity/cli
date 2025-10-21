@@ -17,7 +17,6 @@ import (
 	"github.com/agentuity/cli/internal/dev"
 	"github.com/agentuity/cli/internal/envutil"
 	"github.com/agentuity/cli/internal/errsystem"
-	"github.com/agentuity/cli/internal/eval"
 	"github.com/agentuity/cli/internal/gravity"
 	"github.com/agentuity/cli/internal/project"
 	"github.com/agentuity/cli/internal/util"
@@ -166,20 +165,6 @@ Examples:
 		}
 
 		tui.ShowSpinner("Connecting ...", waitForConnection)
-
-		// Start eval processor if feature flag is enabled
-		if promptsEvalsFF {
-			// Load eval metadata map (slug -> ID mapping)
-			evalMetadataMap, err := eval.LoadEvalMetadataMap(log, theproject.Dir)
-			if err != nil {
-				log.Warn("failed to load eval metadata map: %v", err)
-				evalMetadataMap = make(map[string]string) // Use empty map to continue
-			}
-
-			// Create and start eval processor
-			evalProcessor := dev.NewEvalProcessor(log, apiUrl, apiKey, agentPort, evalMetadataMap)
-			evalProcessor.StartEvalProcessor(ctx, server.EvalChannel())
-		}
 
 		publicUrl := server.PublicURL(appUrl)
 		consoleUrl := server.WebURL(appUrl)
