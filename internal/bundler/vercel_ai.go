@@ -89,17 +89,19 @@ func init() {
 						}
 					}
 					
-					// Generate hashes synchronously
-					const crypto = require('node:crypto');
+					// Generate hashes using SDK utility
+					const { hashSync } = require('@agentuity/sdk');
 					let compiledSystemHash = '';
 					let compiledPromptHash = '';
 					
 					if (systemString) {
-						compiledSystemHash = crypto.createHash('sha256').update(systemString).digest('hex');
+						compiledSystemHash = hashSync(systemString);
+						console.log('🔑 System hash:', compiledSystemHash);
 					}
 					
 					if (promptString) {
-						compiledPromptHash = crypto.createHash('sha256').update(promptString).digest('hex');
+						compiledPromptHash = hashSync(promptString);
+						console.log('🔑 Prompt hash:', compiledPromptHash);
 					}
 					
 					// Access PatchPortal state synchronously
