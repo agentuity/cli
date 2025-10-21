@@ -289,9 +289,7 @@ func aws_checkRoleInInstanceProfile() string {
 
 func aws_createSecret() string {
 	cmd := []string{
-		`echo '{ENCRYPTION_PRIVATE_KEY}' | base64 -d | openssl ec -inform DER -outform PEM > /tmp/agentuity-key.pem`,
-		`aws --region {AWS_REGION} secretsmanager create-secret --name '{AWS_SECRET_NAME}' --description 'Agentuity Cluster Private Key' --secret-string file:///tmp/agentuity-key.pem`,
-		`rm -f /tmp/agentuity-key.pem`,
+		`aws --region {AWS_REGION} secretsmanager create-secret --name '{AWS_SECRET_NAME}' --description 'Agentuity Cluster Private Key' --secret-string {ENCRYPTION_PRIVATE_KEY}`,
 	}
 	return aws_cmdEscape(strings.Join(cmd, " && "))
 }
