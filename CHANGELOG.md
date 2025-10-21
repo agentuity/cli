@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.176] - 2025-10-14
+
+### Changed
+- Add breaking change check for 0.0.154 ([#470](https://github.com/agentuity/cli/pull/470))
+- Remove [gravity] log prefix ([#467](https://github.com/agentuity/cli/pull/467))
+
 ## [v0.0.175] - 2025-10-13
 
 ### Changed
@@ -909,6 +915,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.176]: https://github.com/agentuity/cli/compare/v0.0.175...v0.0.176
 [v0.0.175]: https://github.com/agentuity/cli/compare/v0.0.174...v0.0.175
 [v0.0.174]: https://github.com/agentuity/cli/compare/v0.0.173...v0.0.174
 [v0.0.173]: https://github.com/agentuity/cli/compare/v0.0.172...v0.0.173
