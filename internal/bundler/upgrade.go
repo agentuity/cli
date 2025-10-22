@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver"
+	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/tui"
 	"github.com/pelletier/go-toml/v2"
@@ -264,24 +265,36 @@ func checkForBreakingChanges(ctx BundleContext, language string, runtime string)
 						if err := change.Callback(ctx); err != nil {
 							return err
 						}
-						fmt.Println("Migration performed, please re-run the command")
-						os.Exit(0)
+						return errsystem.New(errsystem.ErrBreakingChangeMigrationRequired, fmt.Errorf("migration performed, please re-run the command"))
 					} else {
-						fmt.Println("Migration required")
-						os.Exit(1)
+						return errsystem.New(errsystem.ErrBreakingChangeMigrationRequired, fmt.Errorf("migration required"))
 					}
 				} else {
-					// In dev mode, just show the message and exit
-					fmt.Println(change.Message)
-					os.Exit(1)
+					// In dev mode, return specific error type
+					return errsystem.New(errsystem.ErrSdkUpdateRequired, fmt.Errorf(change.Message))
 				}
 			} else {
-				// For breaking changes without callbacks, just show message and exit
-				fmt.Println("Breaking change migration required")
-				os.Exit(1)
+				// For breaking changes without callbacks, return specific error type
+				return errsystem.New(errsystem.ErrSdkUpdateRequired, fmt.Errorf("breaking change migration required"))
 			}
 		}
 	}
 
 	return nil
+}
+
+// CheckForBreakingChangesWithBanner is a wrapper that handles breaking changes gracefully
+// Returns true if a breaking change was detected and handled, false otherwise
+func CheckForBreakingChangesWithBanner(ctx BundleContext, language string, runtime string) bool {
+	err := checkForBreakingChanges(ctx, language, runtime)
+	if err != nil {
+		// Check if this is a breaking change error that we should handle gracefully
+		if errsystem.IsBreakingChangeError(err) {
+			// Don't show the error code plane, just exit cleanly
+			os.Exit(1)
+		}
+		// For other errors, let them propagate
+		return false
+	}
+	return false
 }

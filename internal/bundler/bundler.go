@@ -467,8 +467,8 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		shimSourceMap = true
 	}
 
-	if err := checkForBreakingChanges(ctx, "javascript", theproject.Bundler.Runtime); err != nil {
-		return err
+	if CheckForBreakingChangesWithBanner(ctx, "javascript", theproject.Bundler.Runtime) {
+		return nil // Breaking change was handled gracefully
 	}
 
 	if err := possiblyCreateDeclarationFile(ctx.Logger, dir); err != nil {
@@ -724,8 +724,8 @@ func bundlePython(ctx BundleContext, dir string, outdir string, theproject *proj
 		ctx.Logger.Debug("installed dependencies: %s", strings.TrimSpace(string(out)))
 	}
 
-	if err := checkForBreakingChanges(ctx, "python", theproject.Bundler.Runtime); err != nil {
-		return err
+	if CheckForBreakingChangesWithBanner(ctx, "python", theproject.Bundler.Runtime) {
+		return nil // Breaking change was handled gracefully
 	}
 
 	config := map[string]any{

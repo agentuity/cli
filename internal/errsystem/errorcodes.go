@@ -118,4 +118,12 @@ var (
 		Code:    "CLI-0029",
 		Message: "Failed to retrieve devmode endpoint",
 	}
+	ErrBreakingChangeMigrationRequired = errorType{
+		Code:    "CLI-0030",
+		Message: "Breaking change migration required",
+	}
+	ErrSdkUpdateRequired = errorType{
+		Code:    "CLI-0031",
+		Message: "SDK update required",
+	}
 )

@@ -89,6 +89,26 @@ func WithUserId(userId string) option {
 	}
 }
 
+// IsBreakingChangeError checks if an error is a breaking change error that should be handled gracefully
+func IsBreakingChangeError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Check if it's an errSystem error with breaking change codes
+	if es, ok := err.(*errSystem); ok {
+		return es.code.Code == "CLI-0030" || es.code.Code == "CLI-0031"
+	}
+
+	// Check if it's wrapped in an errSystem
+	var es *errSystem
+	if errors.As(err, &es) && es != nil {
+		return es.code.Code == "CLI-0030" || es.code.Code == "CLI-0031"
+	}
+
+	return false
+}
+
 // WithProjectId adds the project ID to the error attributes.
 func WithProjectId(projectId string) option {
 	return func(e *errSystem) {
