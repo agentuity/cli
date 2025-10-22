@@ -239,13 +239,12 @@ type CreateMachineResponse struct {
 }
 
 // CreateMachine creates a new machine in the provisioning state
-func CreateMachine(ctx context.Context, logger logger.Logger, baseURL string, token string, clusterID string, orgID string, provider string, region string) (*CreateMachineResponse, error) {
+func CreateMachine(ctx context.Context, logger logger.Logger, baseURL string, token string, clusterID string, provider string, region string) (*CreateMachineResponse, error) {
 	client := util.NewAPIClient(ctx, logger, baseURL, token)
 
 	var resp Response[CreateMachineResponse]
 	var data = map[string]string{
 		"clusterId": clusterID,
-		"orgId":     orgID,
 		"provider":  provider,
 		"region":    region,
 	}
