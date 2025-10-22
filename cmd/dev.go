@@ -27,10 +27,9 @@ import (
 )
 
 var devCmd = &cobra.Command{
-	Use:     "dev",
-	Aliases: []string{"run"},
-	Args:    cobra.NoArgs,
-	Short:   "Run the development server",
+	Use:   "dev",
+	Args:  cobra.NoArgs,
+	Short: "Run the development server",
 	Long: `Run the development server for local testing and development.
 
 This command starts a local development server that connects to the Agentuity Cloud
