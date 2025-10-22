@@ -31,97 +31,117 @@ func createVercelAIProviderPatch(module string, createFn string, envkey string, 
 }
 
 func init() {
-	// Generate PatchPortal integration patch with hashing and telemetry
-	var patchPortalPatch = `
-		const { PatchPortal } = await import('@agentuity/sdk');
-		const { internal } = await import('@agentuity/sdk');
-		const crypto = await import('node:crypto');
-		internal.debug('🔧 generateText patch executing...');
-		const patchPortal = await PatchPortal.getInstance();
-		internal.debug('✅ PatchPortal instance created');
 
-		let compiledSystemHash = '';
-		let compiledPromptHash = '';
-		const agentuityPromptMetadata = [];
-		patchPortal.printState();
-		
-		if (_args[0]?.system) {
-			// Extract prompt from arguments
-			const systemString = _args[0]?.system;
-			internal.debug('📝 Extracted system:', systemString.substring(0, 100) + '...');
-			compiledSystemHash = crypto.createHash('sha256').update(systemString).digest('hex');
-			internal.debug('🔑 SYSTEM Generated compiled hash:', compiledSystemHash);
+	var vercelTelemetryPatch = generateJSArgsPatch(0, ` `+"")
 
-			// Get patch data using the same key format as processPromptMetadata
-			const key = 'prompt:' + compiledPromptHash;
-			internal.debug('🔍 Looking for key:', key);
-			const patchData = await patchPortal.get(key);
-			if (patchData) {
-				internal.debug('🔍 Retrieved patch data:', patchData);
-				agentuityPromptMetadata.push(...patchData);
-			} else {
-				internal.debug('ℹ️ No patch data found for compiled hash:', compiledSystemHash);
-			}
-		}
-
-
-		if (_args[0]?.prompt) {
-			const prompt = _args[0]?.prompt || _args[0]?.messages || '';
-			const promptString = typeof prompt === 'string' ? prompt : JSON.stringify(prompt);
-			internal.debug('📝 Extracted prompt:', promptString.substring(0, 100) + '...');
-			// Generate hash for the compiled prompt (same as processPromptMetadata uses)
-			compiledPromptHash = crypto.createHash('sha256').update(promptString).digest('hex');
-			internal.debug('🔑 PROMPT Generated compiled hash:', compiledPromptHash);
-
-			// Get patch data using the same key format as processPromptMetadata
-			const key = 'prompt:' + compiledPromptHash;
-			internal.debug('🔍 Looking for key:', key);
-			const patchData = await patchPortal.get(key);
-			if (patchData) {
-				internal.debug('🔍 Retrieved patch data:', patchData);
-				agentuityPromptMetadata.push(...patchData);
-			} else {
-				internal.debug('ℹ️ No patch data found for compiled hash:', compiledPromptHash);
-			}
-		}
-
-		if (agentuityPromptMetadata.length > 0) {
-			// Prepare telemetry metadata with PatchPortal data
-			const opts = {...(_args[0] ?? {}) };
-			const userMetadata = opts?.experimental_telemetry?.metadata || {};
-			opts.experimental_telemetry = { isEnabled: true, metadata: { ...userMetadata, 'agentuity.prompts': JSON.stringify(agentuityPromptMetadata) } };
-			_args[0] = opts;
-			internal.debug('✅ Patch metadata attached:', agentuityPromptMetadata);
-		} else {
-			internal.debug('ℹ️ No patch data found for this invocation');
-		}
-	`
-
-	var vercelTelemetryPatch = generateJSArgsPatch(0, ``)
+	var enableTelemetryPatch = `
+		// Enable experimental telemetry to capture response text
+		const opts = {...(_args[0] ?? {}) };
+		opts.experimental_telemetry = { isEnabled: true };
+		_args[0] = opts;
+		`
 
 	vercelAIPatches := patchModule{
 		Module: "ai",
 		Functions: map[string]patchAction{
 			"generateText": {
-				Before: vercelTelemetryPatch + "\n" + patchPortalPatch,
+				Before: vercelTelemetryPatch + enableTelemetryPatch,
 			},
 			"streamText": {
-				Before: vercelTelemetryPatch,
+				Before: vercelTelemetryPatch + enableTelemetryPatch,
 			},
 			"generateObject": {
-				Before: vercelTelemetryPatch,
+				Before: vercelTelemetryPatch + enableTelemetryPatch,
 			},
 			"streamObject": {
-				Before: vercelTelemetryPatch,
+				Before: vercelTelemetryPatch + enableTelemetryPatch,
 			},
 			"embed": {
-				Before: vercelTelemetryPatch,
+				Before: vercelTelemetryPatch + enableTelemetryPatch,
 			},
 			"embedMany": {
-				Before: vercelTelemetryPatch,
+				Before: vercelTelemetryPatch + enableTelemetryPatch,
+			},
+			"recordSpan": {
+				Before: `
+				if (_args[0]?.name && ['ai.generateText', 'ai.generateObject', 'ai.streamText', 'ai.streamObject'].includes(_args[0].name)) {
+					// Add our custom attributes to the span configuration
+					const originalAttributes = _args[0].attributes || {};
+					
+					// Extract system and prompt from the span attributes
+					let systemString = '';
+					let promptString = '';
+					
+					if (_args[0]?.attributes) {
+						// Try to extract from span attributes
+						systemString = _args[0].attributes['ai.system'] || _args[0].attributes['system'] || '';
+						promptString = _args[0].attributes['ai.prompt'] || _args[0].attributes['prompt'] || '';
+						
+						// If prompt is a JSON object, extract the individual fields
+						if (typeof promptString === 'string' && promptString.startsWith('{')) {
+							try {
+								const promptObj = JSON.parse(promptString);
+								systemString = promptObj.system || systemString;
+								promptString = promptObj.prompt || promptString;
+							} catch (e) {
+								// If parsing fails, keep the original string
+							}
+						}
+					}
+					
+					// Generate hashes using SDK utility
+					const { hashSync } = require('@agentuity/sdk');
+					let compiledSystemHash = '';
+					let compiledPromptHash = '';
+					
+					if (systemString) {
+						compiledSystemHash = hashSync(systemString);
+						
+					}
+					
+					if (promptString) {
+						compiledPromptHash = hashSync(promptString);
+					
+					}
+					
+					// Access PatchPortal state synchronously
+					const agentuityPromptMetadata = [];
+					
+					if (globalThis.__patchPortalInstance) {
+						if (systemString) {
+							const key = 'prompt:' + compiledSystemHash;
+							const patchData = globalThis.__patchPortalInstance.state[key];
+							if (patchData) {
+								agentuityPromptMetadata.push(...patchData);
+							}
+						}
+						
+						if (promptString) {
+							const key = 'prompt:' + compiledPromptHash;
+							const patchData = globalThis.__patchPortalInstance.state[key];
+							if (patchData) {
+								agentuityPromptMetadata.push(...patchData);
+							}
+						}
+					}
+					
+					
+				
+					
+					// Add attributes to span configuration
+					if (agentuityPromptMetadata.length > 0) {
+						_args[0].attributes = {
+							...originalAttributes,
+							'@agentuity/prompts': JSON.stringify(agentuityPromptMetadata)
+						};
+					}
+
+				}
+				`,
 			},
 		},
 	}
+
 	patches["@vercel/ai"] = vercelAIPatches
 
 	// register all the providers that we support in our Agentuity AI Gateway

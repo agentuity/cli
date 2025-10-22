@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/agentuity/cli/internal/bundler/prompts"
 	"github.com/agentuity/cli/internal/deployer"
 	"github.com/agentuity/cli/internal/envutil"
 	"github.com/agentuity/cli/internal/errsystem"
@@ -73,6 +74,21 @@ type startAgent struct {
 	Remove bool `json:"remove,omitempty"`
 }
 
+type PromptVariable struct {
+	Name     string `json:"name"`
+	Required bool   `json:"required,omitempty"`
+	Default  string `json:"default,omitempty"`
+}
+
+type DeployPrompt struct {
+	Slug        string           `json:"slug"`
+	Name        string           `json:"name"`
+	System      *string          `json:"system,omitempty"`
+	Prompt      *string          `json:"prompt,omitempty"`
+	Variables   []PromptVariable `json:"variables,omitempty"`
+	Description *string          `json:"description,omitempty"`
+}
+
 type startRequest struct {
 	Agents         []startAgent       `json:"agents"`
 	Resources      *Resources         `json:"resources,omitempty"`
@@ -81,6 +97,7 @@ type startRequest struct {
 	TagDescription string             `json:"description,omitempty"`
 	TagMessage     string             `json:"message,omitempty"`
 	UsePrivateKey  bool               `json:"usePrivateKey,omitempty"`
+	Prompts        []DeployPrompt     `json:"prompts,omitempty"`
 }
 
 func ShowNewProjectImport(ctx context.Context, logger logger.Logger, cmd *cobra.Command, apiUrl string, apikey string, projectId string, project *project.Project, dir string, isImport bool) {
@@ -424,6 +441,18 @@ Examples:
 		startRequest.TagDescription = description
 		startRequest.TagMessage = message
 		startRequest.UsePrivateKey = true
+
+		// Collect prompts data if prompts feature flag is enabled
+		promptsEvalsFF := CheckFeatureFlag(cmd, FeaturePromptsEvals, "enable-prompts-evals")
+		if promptsEvalsFF {
+			prompts, err := collectPromptsData(logger, dir)
+			if err != nil {
+				logger.Debug("Failed to collect prompts data: %v", err)
+			} else {
+				startRequest.Prompts = prompts
+				logger.Debug("Collected %d prompts for deployment", len(prompts))
+			}
+		}
 
 		// Start deployment
 		if err := client.Do("PUT", fmt.Sprintf("/cli/deploy/start/%s%s", theproject.ProjectId, deploymentId), startRequest, &startResponse); err != nil {
@@ -1026,6 +1055,98 @@ Examples:
 		}
 		tui.Table(headers, rows)
 	},
+}
+
+// collectPromptsData collects prompts data from the project directory
+func collectPromptsData(logger logger.Logger, dir string) ([]DeployPrompt, error) {
+	// Find all prompt files
+	promptFiles := prompts.FindAllPromptFiles(dir)
+	if len(promptFiles) == 0 {
+		logger.Debug("No prompt files found")
+		return nil, nil
+	}
+
+	logger.Debug("Found %d prompt files: %v", len(promptFiles), promptFiles)
+
+	var allPrompts []DeployPrompt
+
+	// Parse all prompt files and combine prompts
+	for _, promptFile := range promptFiles {
+		data, err := os.ReadFile(promptFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read %s: %w", promptFile, err)
+		}
+
+		promptsList, err := prompts.ParsePromptsYAML(data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse %s: %w", promptFile, err)
+		}
+
+		// Convert to DeployPrompt format
+		for _, prompt := range promptsList {
+			deployPrompt := DeployPrompt{
+				Slug:        prompt.Slug,
+				Name:        prompt.Name,
+				Description: &prompt.Description,
+			}
+
+			// Convert system prompt
+			if prompt.System != "" {
+				deployPrompt.System = &prompt.System
+			}
+
+			// Convert user prompt
+			if prompt.Prompt != "" {
+				deployPrompt.Prompt = &prompt.Prompt
+			}
+
+			// Convert variables from templates
+			var variables []PromptVariable
+			if prompt.SystemTemplate.Variables != nil {
+				for _, v := range prompt.SystemTemplate.Variables {
+					variables = append(variables, PromptVariable{
+						Name:     v.Name,
+						Required: v.IsRequired,
+						Default:  v.DefaultValue,
+					})
+				}
+			}
+			if prompt.PromptTemplate.Variables != nil {
+				for _, v := range prompt.PromptTemplate.Variables {
+					// Check if variable already exists
+					found := false
+					for i, existing := range variables {
+						if existing.Name == v.Name {
+							// Update existing variable if it's more restrictive
+							if v.IsRequired && !existing.Required {
+								variables[i].Required = true
+							}
+							if v.DefaultValue != "" && existing.Default == "" {
+								variables[i].Default = v.DefaultValue
+							}
+							found = true
+							break
+						}
+					}
+					if !found {
+						variables = append(variables, PromptVariable{
+							Name:     v.Name,
+							Required: v.IsRequired,
+							Default:  v.DefaultValue,
+						})
+					}
+				}
+			}
+
+			deployPrompt.Variables = variables
+			allPrompts = append(allPrompts, deployPrompt)
+		}
+
+		logger.Debug("Parsed %d prompts from %s", len(promptsList), promptFile)
+	}
+
+	logger.Debug("Total prompts collected: %d", len(allPrompts))
+	return allPrompts, nil
 }
 
 func init() {

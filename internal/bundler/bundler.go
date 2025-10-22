@@ -467,8 +467,8 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 		shimSourceMap = true
 	}
 
-	if err := checkForBreakingChanges(ctx, "javascript", theproject.Bundler.Runtime); err != nil {
-		return err
+	if CheckForBreakingChangesWithBanner(ctx, "javascript", theproject.Bundler.Runtime) {
+		return nil // Breaking change was handled gracefully
 	}
 
 	if err := possiblyCreateDeclarationFile(ctx.Logger, dir); err != nil {
@@ -481,6 +481,8 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 
 	var entryPoints []string
 	entryPoints = append(entryPoints, filepath.Join(dir, "index.js"))
+
+	// Add agent entry points
 	files, err := util.ListDir(filepath.Join(dir, theproject.Bundler.AgentConfig.Dir))
 	if err != nil {
 		errsystem.New(errsystem.ErrListFilesAndDirectories, err).ShowErrorAndExit()
@@ -492,6 +494,18 @@ func bundleJavascript(ctx BundleContext, dir string, outdir string, theproject *
 	}
 	if len(entryPoints) == 0 {
 		return fmt.Errorf("no index.ts files found in %s", theproject.Bundler.AgentConfig.Dir)
+	}
+
+	// Add eval entry points if evals directory exists
+	if ctx.PromptsEvalsFF {
+		evalsDir := filepath.Join(dir, "src", "evals")
+		if util.Exists(evalsDir) {
+			evalFiles, err := filepath.Glob(filepath.Join(evalsDir, "*.ts"))
+			if err == nil && len(evalFiles) > 0 {
+				ctx.Logger.Debug("found %d eval files to bundle", len(evalFiles))
+				entryPoints = append(entryPoints, evalFiles...)
+			}
+		}
 	}
 	pkgjson := filepath.Join(dir, "package.json")
 	pkg, err := util.NewOrderedMapFromFile(util.PackageJsonKeysOrder, pkgjson)
@@ -710,8 +724,8 @@ func bundlePython(ctx BundleContext, dir string, outdir string, theproject *proj
 		ctx.Logger.Debug("installed dependencies: %s", strings.TrimSpace(string(out)))
 	}
 
-	if err := checkForBreakingChanges(ctx, "python", theproject.Bundler.Runtime); err != nil {
-		return err
+	if CheckForBreakingChangesWithBanner(ctx, "python", theproject.Bundler.Runtime) {
+		return nil // Breaking change was handled gracefully
 	}
 
 	config := map[string]any{

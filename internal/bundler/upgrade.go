@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver"
+	"github.com/agentuity/cli/internal/errsystem"
 	"github.com/agentuity/cli/internal/util"
 	"github.com/agentuity/go-common/tui"
 	"github.com/pelletier/go-toml/v2"
@@ -22,6 +23,18 @@ type breakingChange struct {
 }
 
 var breakingChanges = []breakingChange{
+	{
+		Runtime: "bunjs",
+		Version: "<0.0.157",
+		Title:   "🚫 JS SDK Update Required 🚫",
+		Message: "Please run `bun update @agentuity/sdk --latest` and then re-run this command again.  There are no code changes required on your end.",
+	},
+	{
+		Runtime: "nodejs",
+		Version: "<0.0.157",
+		Title:   "🚫 JS SDK Update Required 🚫",
+		Message: "Please run `npm upgrade @agentuity/sdk` and then re-run this command again.  There are no code changes required on your end.",
+	},
 	{
 		Runtime: "bunjs",
 		Version: "<0.0.154",
@@ -240,32 +253,48 @@ func checkForBreakingChanges(ctx BundleContext, language string, runtime string)
 			return nil
 		}
 		if c.Check(currentVersion) {
+			// Always show banner if we have a TTY
+			if tui.HasTTY {
+				tui.ShowBanner(change.Title, change.Message, true)
+			}
+
 			if change.Callback != nil {
-				var proceed bool
-				if tui.HasTTY && !ctx.DevMode {
-					tui.ShowBanner(change.Title, change.Message, true)
-				} else {
-					return fmt.Errorf("migration required: %s. %s", change.Title, change.Message)
-				}
-				proceed = tui.AskForConfirm("Would you like to migrate your project now?", 'y') == 'y'
-				if proceed {
-					if err := change.Callback(ctx); err != nil {
-						return err
+				if !ctx.DevMode {
+					proceed := tui.AskForConfirm("Would you like to migrate your project now?", 'y') == 'y'
+					if proceed {
+						if err := change.Callback(ctx); err != nil {
+							return err
+						}
+						return errsystem.New(errsystem.ErrBreakingChangeMigrationRequired, fmt.Errorf("migration performed, please re-run the command"))
+					} else {
+						return errsystem.New(errsystem.ErrBreakingChangeMigrationRequired, fmt.Errorf("migration required"))
 					}
-					return fmt.Errorf("migration performed, please re-run the command")
 				} else {
-					return fmt.Errorf("migration required")
+					// In dev mode, return specific error type
+					return errsystem.New(errsystem.ErrSdkUpdateRequired, fmt.Errorf("%s", change.Message))
 				}
 			} else {
-				if tui.HasTTY && !ctx.DevMode {
-					tui.ShowBanner(change.Title, change.Message, true)
-					return fmt.Errorf("breaking change migration required")
-				} else {
-					return fmt.Errorf("%s", change.Message)
-				}
+				// For breaking changes without callbacks, return specific error type
+				return errsystem.New(errsystem.ErrSdkUpdateRequired, fmt.Errorf("breaking change migration required"))
 			}
 		}
 	}
 
 	return nil
+}
+
+// CheckForBreakingChangesWithBanner is a wrapper that handles breaking changes gracefully
+// Returns true if a breaking change was detected and handled, false otherwise
+func CheckForBreakingChangesWithBanner(ctx BundleContext, language string, runtime string) bool {
+	err := checkForBreakingChanges(ctx, language, runtime)
+	if err != nil {
+		// Check if this is a breaking change error that we should handle gracefully
+		if errsystem.IsBreakingChangeError(err) {
+			// Don't show the error code plane, just exit cleanly
+			os.Exit(1)
+		}
+		// For other errors, let them propagate
+		return false
+	}
+	return false
 }

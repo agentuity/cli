@@ -91,3 +91,9 @@ errors:
 
   - code: CLI-0029
     message: Failed to retrieve devmode endpoint
+
+  - code: CLI-0030
+    message: Breaking change migration required
+
+  - code: CLI-0031
+    message: SDK update required
