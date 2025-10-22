@@ -271,7 +271,7 @@ func checkForBreakingChanges(ctx BundleContext, language string, runtime string)
 					}
 				} else {
 					// In dev mode, return specific error type
-					return errsystem.New(errsystem.ErrSdkUpdateRequired, fmt.Errorf(change.Message))
+					return errsystem.New(errsystem.ErrSdkUpdateRequired, fmt.Errorf("%s", change.Message))
 				}
 			} else {
 				// For breaking changes without callbacks, return specific error type
