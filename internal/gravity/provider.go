@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/agentuity/go-common/gravity"
+	"github.com/agentuity/go-common/gravity/proto"
 	"github.com/agentuity/go-common/gravity/provider"
 	"github.com/agentuity/go-common/logger"
 	"gvisor.dev/gvisor/pkg/buffer"
@@ -65,7 +66,7 @@ func (p *cliProvider) Configure(config provider.Configuration) error {
 }
 
 // Provision provisions a resource for a given spec
-func (p *cliProvider) Provision(ctx context.Context, request *provider.ProvisionRequest) (*provider.Resource, error) {
+func (p *cliProvider) Provision(ctx context.Context, request *provider.ProvisionRequest) (*proto.ExistingDeployment, error) {
 	return nil, nil
 }
 
@@ -75,7 +76,7 @@ func (p *cliProvider) Deprovision(ctx context.Context, resourceID string, reason
 }
 
 // Resources returns a list of all resources regardless of state
-func (p *cliProvider) Resources() []*provider.Resource {
+func (p *cliProvider) Resources() []*proto.ExistingDeployment {
 	return nil
 }
 
