@@ -96,12 +96,12 @@ func init() {
 					
 					if (systemString) {
 						compiledSystemHash = hashSync(systemString);
-						console.log('🔑 System hash:', compiledSystemHash);
+						
 					}
 					
 					if (promptString) {
 						compiledPromptHash = hashSync(promptString);
-						console.log('🔑 Prompt hash:', compiledPromptHash);
+					
 					}
 					
 					// Access PatchPortal state synchronously

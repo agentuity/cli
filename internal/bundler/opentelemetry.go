@@ -20,10 +20,7 @@ func init() {
 							const traceId = this.spanContext().traceId;
 							const sessionId = 'sess_' + traceId;
 							const promptMetadataRaw = this.attributes['@agentuity/prompts'];
-							
-							// Use internal logger from SDK
-							const logger = globalThis.__agentuityInternalLogger || console;
-							logger.debug('[AGENTUITY] 🔍 Span attributes:', this.attributes);
+						
 							// Create eval job with output if promptMetadata exists
 							if (globalThis.__evalJobSchedulerInstance && promptMetadataRaw) {								
 								try {
@@ -32,12 +29,6 @@ func init() {
 									
 									// Count total evals across all prompt metadata
 									const totalEvals = promptMetadata.reduce((count, meta) => count + (meta.evals?.length || 0), 0);
-									logger.info('[AGENTUITY] 📦 Creating eval job with output:', {
-										spanId,
-										sessionId,
-										totalEvals,
-										outputLength: value?.length || 0
-									});
 									
 									// Create job with output included
 									const jobWithOutput = {
@@ -48,12 +39,8 @@ func init() {
 										createdAt: new Date().toISOString()
 									};								
 									globalThis.__evalJobSchedulerInstance.pendingJobs.set(spanId, jobWithOutput);
-									logger.info('[AGENTUITY] ✅ Eval job created successfully');
 								} catch (error) {
-									logger.warn('[AGENTUITY] ❌ Failed to create eval job:', error);
 								}
-							} else {
-								logger.debug('[AGENTUITY] ⏭️  Skipping eval job creation - no promptMetadata or scheduler instance');
 							}
 						}
 						`,

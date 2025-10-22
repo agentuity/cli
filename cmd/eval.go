@@ -48,7 +48,7 @@ func getEvalInfoFlow(logger logger.Logger, name string, description string) (str
 	return name, description
 }
 
-func generateEvalFile(logger logger.Logger, projectDir string, evalID string, slug string, name string, description string, isTypeScript bool) error {
+func generateEvalFile(logger logger.Logger, projectDir string, evalID string, slug string, name string, description string) error {
 	// Always generate TypeScript files for evals
 	ext := ".ts"
 
@@ -139,17 +139,20 @@ var evalCreateCmd = &cobra.Command{
 		isPython := theproject.Project.Bundler.Language == "python"
 		slug := util.SafeProjectFilename(strings.ToLower(name), isPython)
 
+		var evalID string
+		var evalErr error
+
 		action := func() {
 			// Create eval via API
-			evalID, err := eval.CreateEval(ctx, logger, apiUrl, apikey, theproject.Project.ProjectId, slug, name, description)
-			if err != nil {
-				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to create eval")).ShowErrorAndExit()
+			evalID, evalErr = eval.CreateEval(ctx, logger, apiUrl, apikey, theproject.Project.ProjectId, slug, name, description)
+			if evalErr != nil {
+				errsystem.New(errsystem.ErrApiRequest, evalErr, errsystem.WithContextMessage("Failed to create eval")).ShowErrorAndExit()
 			}
 
 			logger.Debug("Created eval with ID: %s", evalID)
 
 			// Generate eval file (always TypeScript) with the real ID from API
-			if err := generateEvalFile(logger, theproject.Dir, evalID, slug, name, description, true); err != nil {
+			if err := generateEvalFile(logger, theproject.Dir, evalID, slug, name, description); err != nil {
 				errsystem.New(errsystem.ErrOpenFile, err, errsystem.WithContextMessage("Failed to create eval file")).ShowErrorAndExit()
 			}
 		}
@@ -159,7 +162,7 @@ var evalCreateCmd = &cobra.Command{
 		format, _ := cmd.Flags().GetString("format")
 		if format == "json" {
 			result := map[string]string{
-				"id":          "eval_" + slug,
+				"id":          evalID,
 				"slug":        slug,
 				"name":        name,
 				"description": description,

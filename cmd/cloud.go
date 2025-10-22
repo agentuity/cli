@@ -76,7 +76,6 @@ type startAgent struct {
 
 type PromptVariable struct {
 	Name     string `json:"name"`
-	Type     string `json:"type,omitempty"`
 	Required bool   `json:"required,omitempty"`
 	Default  string `json:"default,omitempty"`
 }
