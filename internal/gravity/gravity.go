@@ -438,9 +438,7 @@ func (c *Client) Start() error {
 			tp := r.Header.Get("traceparent")
 			if tp != "" {
 				tok := strings.Split(tp, "-")
-				sessionID := tok[1]
-				c.logger.Info("%s %s (sess_%s) in %s", r.Method, r.URL.Path, sessionID, time.Since(started))
-
+				c.logger.Info("%s %s (sess_%s) in %s", r.Method, r.URL.Path, tok[1], time.Since(started))
 			}
 		}),
 	}
