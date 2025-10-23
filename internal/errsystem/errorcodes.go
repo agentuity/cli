@@ -118,16 +118,16 @@ var (
 		Code:    "CLI-0029",
 		Message: "Failed to retrieve devmode endpoint",
 	}
-	ErrMissingRequiredArgument = errorType{
+	ErrBreakingChangeMigrationRequired = errorType{
 		Code:    "CLI-0030",
-		Message: "Missing required argument",
-	}
-	ErrInvalidArgumentProvided = errorType{
-		Code:    "CLI-0031",
-		Message: "Invalid argument provided",
+		Message: "Breaking change migration required",
 	}
 	ErrSdkUpdateRequired = errorType{
-		Code:    "CLI-0032",
+		Code:    "CLI-0031",
 		Message: "SDK update required",
+	}
+	ErrInvalidArgumentProvided = errorType{
+		Code:    "CLI-0032",
+		Message: "Invalid argument provided",
 	}
 )

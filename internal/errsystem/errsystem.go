@@ -97,13 +97,13 @@ func IsBreakingChangeError(err error) bool {
 
 	// Check if it's an errSystem error with breaking change codes
 	if es, ok := err.(*errSystem); ok {
-		return es.code.Code == "CLI-0030" || es.code.Code == "CLI-0032"
+		return es.code.Code == "CLI-0030" || es.code.Code == "CLI-0031"
 	}
 
 	// Check if it's wrapped in an errSystem
 	var es *errSystem
 	if errors.As(err, &es) && es != nil {
-		return es.code.Code == "CLI-0030" || es.code.Code == "CLI-0032"
+		return es.code.Code == "CLI-0030" || es.code.Code == "CLI-0031"
 	}
 
 	return false

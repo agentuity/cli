@@ -93,10 +93,10 @@ errors:
     message: Failed to retrieve devmode endpoint
 
   - code: CLI-0030
-    message: Missing required argument
+    message: Breaking change migration required
 
   - code: CLI-0031
-    message: Invalid argument provided
+    message: SDK update required
 
   - code: CLI-0032
-    message: SDK update required
+    message: Invalid argument provided
