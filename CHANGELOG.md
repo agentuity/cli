@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.0.179] - 2025-10-23
+
+### Changed
+- Bump to go-common 1.0.111 ([#475](https://github.com/agentuity/cli/pull/475))
+
+### Fixed
+- Corrected the API endpoint used for creating evals ([#477](https://github.com/agentuity/cli/pull/477))
+
 ## [v0.0.176] - 2025-10-14
 
 ### Changed
@@ -915,6 +923,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added project import checks during development mode
 - Added project import checks for new agent creation
 
+[v0.0.179]: https://github.com/agentuity/cli/compare/v0.0.178...v0.0.179
+[v0.0.178]: https://github.com/agentuity/cli/compare/v0.0.177...v0.0.178
+[v0.0.177]: https://github.com/agentuity/cli/compare/v0.0.176...v0.0.177
 [v0.0.176]: https://github.com/agentuity/cli/compare/v0.0.175...v0.0.176
 [v0.0.175]: https://github.com/agentuity/cli/compare/v0.0.174...v0.0.175
 [v0.0.174]: https://github.com/agentuity/cli/compare/v0.0.173...v0.0.174
