@@ -93,7 +93,7 @@ func CreateEval(ctx context.Context, logger logger.Logger, baseUrl string, token
 	}
 
 	var resp Response[EvalData]
-	if err := client.Do("POST", "/cli/evals", payload, &resp); err != nil {
+	if err := client.Do("POST", "/cli/eval", payload, &resp); err != nil {
 		return "", fmt.Errorf("error creating eval: %s", err)
 	}
 	if !resp.Success {
