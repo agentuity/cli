@@ -130,4 +130,8 @@ var (
 		Code:    "CLI-0032",
 		Message: "Invalid argument provided",
 	}
+	ErrMissingRequiredArgument = errorType{
+		Code:    "CLI-0033",
+		Message: "Missing required argument",
+	}
 )

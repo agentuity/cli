@@ -100,3 +100,6 @@ errors:
 
   - code: CLI-0032
     message: Invalid argument provided
+
+  - code: CLI-0033
+    message: Missing required argument
