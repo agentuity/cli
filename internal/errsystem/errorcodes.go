@@ -126,4 +126,8 @@ var (
 		Code:    "CLI-0031",
 		Message: "Invalid argument provided",
 	}
+	ErrSdkUpdateRequired = errorType{
+		Code:    "CLI-0032",
+		Message: "SDK update required",
+	}
 )

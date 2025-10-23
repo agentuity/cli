@@ -1,10 +1,10 @@
 module github.com/agentuity/cli
 
-go 1.25.2
+go 1.25.3
 
 require (
 	github.com/Masterminds/semver v1.5.0
-	github.com/agentuity/go-common v1.0.104
+	github.com/agentuity/go-common v1.0.111
 	github.com/agentuity/mcp-golang/v2 v2.0.2
 	github.com/bmatcuk/doublestar/v4 v4.8.1
 	github.com/charmbracelet/bubbles v0.20.0
@@ -138,8 +138,8 @@ require (
 	go.opentelemetry.io/otel/sdk/log v0.14.0 // indirect
 	go.opentelemetry.io/otel/trace v1.38.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.7.1 // indirect
-	go.uber.org/atomic v1.9.0 // indirect
-	go.uber.org/multierr v1.9.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
+	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.41.0 // indirect
 	golang.org/x/exp/shiny v0.0.0-20250606033433-dcc06ee1d476 // indirect
 	golang.org/x/image v0.28.0 // indirect

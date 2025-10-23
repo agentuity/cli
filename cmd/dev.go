@@ -49,7 +49,6 @@ Examples:
 		apiUrl := urls.API
 		appUrl := urls.App
 		gravityUrl := urls.Gravity
-
 		noBuild, _ := cmd.Flags().GetBool("no-build")
 
 		promptsEvalsFF := CheckFeatureFlag(cmd, FeaturePromptsEvals, "enable-prompts-evals")
@@ -159,7 +158,7 @@ Examples:
 				if errors.Is(err, context.Canceled) {
 					return
 				}
-				log.Fatal("failed to start devmode connection: %s", err)
+				log.Error("failed to start live dev connection: %s", err)
 				return
 			}
 		}

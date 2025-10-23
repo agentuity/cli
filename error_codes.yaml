@@ -97,3 +97,6 @@ errors:
 
   - code: CLI-0031
     message: Invalid argument provided
+
+  - code: CLI-0032
+    message: SDK update required
