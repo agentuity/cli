@@ -1,0 +1,523 @@
+package cmd
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/signal"
+	"sort"
+	"syscall"
+
+	"github.com/agentuity/cli/internal/errsystem"
+	"github.com/agentuity/cli/internal/infrastructure"
+	"github.com/agentuity/cli/internal/organization"
+	"github.com/agentuity/cli/internal/util"
+	"github.com/agentuity/go-common/env"
+	"github.com/agentuity/go-common/logger"
+	"github.com/agentuity/go-common/slice"
+	"github.com/agentuity/go-common/tui"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+)
+
+// Provider types for infrastructure
+var validProviders = map[string]string{"gcp": "Google Cloud", "aws": "Amazon Web Services", "azure": "Microsoft Azure", "vmware": "VMware"}
+
+// Provider-specific regions
+var providerRegions = map[string][]tui.Option{
+	"gcp": {
+		{ID: "us-central1", Text: tui.PadRight("US Central", 15, " ") + tui.Muted("us-central1")},
+		{ID: "us-west1", Text: tui.PadRight("US West", 15, " ") + tui.Muted("us-west1")},
+		{ID: "us-east1", Text: tui.PadRight("US East", 15, " ") + tui.Muted("us-east1")},
+		{ID: "europe-west1", Text: tui.PadRight("Europe West", 15, " ") + tui.Muted("europe-west1")},
+		{ID: "asia-southeast1", Text: tui.PadRight("Asia Southeast", 15, " ") + tui.Muted("asia-southeast1")},
+	},
+	"aws": {
+		{ID: "us-east-1", Text: tui.PadRight("US East (N. Virginia)", 15, " ") + tui.Muted("us-east-1")},
+		{ID: "us-east-2", Text: tui.PadRight("US East (Ohio)", 15, " ") + tui.Muted("us-east-2")},
+		{ID: "us-west-1", Text: tui.PadRight("US West (N. California)", 15, " ") + tui.Muted("us-west-1")},
+		{ID: "us-west-2", Text: tui.PadRight("US West (Oregon)", 15, " ") + tui.Muted("us-west-2")},
+	},
+	"azure": {
+		{ID: "eastus", Text: tui.PadRight("East US", 15, " ") + tui.Muted("eastus")},
+		{ID: "westus2", Text: tui.PadRight("West US 2", 15, " ") + tui.Muted("westus2")},
+		{ID: "westeurope", Text: tui.PadRight("West Europe", 15, " ") + tui.Muted("westeurope")},
+		{ID: "southeastasia", Text: tui.PadRight("Southeast Asia", 15, " ") + tui.Muted("southeastasia")},
+		{ID: "canadacentral", Text: tui.PadRight("Canada Central", 15, " ") + tui.Muted("canadacentral")},
+	},
+	"vmware": {
+		{ID: "datacenter-1", Text: tui.PadRight("Datacenter 1", 15, " ") + tui.Muted("datacenter-1")},
+		{ID: "datacenter-2", Text: tui.PadRight("Datacenter 2", 15, " ") + tui.Muted("datacenter-2")},
+		{ID: "datacenter-3", Text: tui.PadRight("Datacenter 3", 15, " ") + tui.Muted("datacenter-3")},
+	},
+}
+
+// Size types for clusters
+var validSizes = []string{"dev", "small", "medium", "large"}
+
+// Output formats
+var validFormats = []string{"table", "json"}
+
+func validateProvider(provider string) error {
+	for p := range validProviders {
+		if p == provider {
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid provider %s, must be one of: %s", provider, validProviders)
+}
+
+func validateSize(size string) error {
+	if slice.Contains(validSizes, size) {
+		return nil
+	}
+	return fmt.Errorf("invalid size %s, must be one of: %s", size, validSizes)
+}
+
+func validateFormat(format string) error {
+	if slice.Contains(validFormats, format) {
+		return nil
+	}
+	return fmt.Errorf("invalid format %s, must be one of: %s", format, validFormats)
+}
+
+// getRegionsForProvider returns the available regions for a specific provider
+func getRegionsForProvider(provider string) []tui.Option {
+	if regions, ok := providerRegions[provider]; ok {
+		return regions
+	}
+	// Fallback to GCP regions if provider not found
+	return providerRegions["gcp"]
+}
+
+func outputJSON(data interface{}) {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(data); err != nil {
+		fmt.Fprintf(os.Stderr, "Error encoding JSON: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func promptForClusterOrganization(ctx context.Context, logger logger.Logger, cmd *cobra.Command, apiUrl string, token string, prompt string) string {
+	orgs, err := organization.ListOrganizations(ctx, logger, apiUrl, token)
+	if err != nil {
+		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list organizations")).ShowErrorAndExit()
+	}
+	if len(orgs) == 0 {
+		logger.Fatal("you are not a member of any organizations")
+		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithUserMessage("You are not a member of any organizations")).ShowErrorAndExit()
+	}
+	var orgId string
+	if len(orgs) == 1 {
+		orgId = orgs[0].OrgId
+	} else {
+		hasCLIFlag := cmd.Flags().Changed("org-id")
+		prefOrgId, _ := cmd.Flags().GetString("org-id")
+		if prefOrgId == "" {
+			prefOrgId = viper.GetString("preferences.orgId")
+		}
+		if tui.HasTTY && !hasCLIFlag {
+			var opts []tui.Option
+			for _, org := range orgs {
+				opts = append(opts, tui.Option{ID: org.OrgId, Text: org.Name, Selected: prefOrgId == org.OrgId})
+			}
+			orgId = tui.Select(logger, prompt, "", opts)
+			viper.Set("preferences.orgId", orgId)
+			viper.WriteConfig() // remember the preference
+		} else {
+			for _, org := range orgs {
+				if org.OrgId == prefOrgId || org.Name == prefOrgId {
+					return org.OrgId
+				}
+			}
+			logger.Fatal("no TTY and no organization preference found. re-run with --org-id")
+		}
+	}
+	return orgId
+}
+
+var clusterCmd = &cobra.Command{
+	Use:    "cluster",
+	Hidden: true,
+	Short:  "Cluster management commands",
+	Long: `Cluster management commands for creating, listing, and managing infrastructure clusters.
+
+Use the subcommands to manage your clusters.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		cmd.Help()
+	},
+}
+
+var clusterNewCmd = &cobra.Command{
+	Use:     "new [name]",
+	GroupID: "management",
+	Short:   "Create a new cluster",
+	Long: `Create a new infrastructure cluster with the specified configuration.
+
+Arguments:
+  [name]    The name of the cluster
+
+Examples:
+  agentuity cluster new production --provider gcp --size large --region us-west1
+  agentuity cluster create staging --provider aws --size medium --region us-east-1`,
+	Aliases: []string{"create"},
+	Args:    cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		logger := env.NewLogger(cmd)
+		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
+		urls := util.GetURLs(logger)
+
+		// Check if clustering is enabled for cluster operations
+		infrastructure.EnsureClusteringEnabled(ctx, logger, urls.API, apikey)
+
+		var name string
+		if len(args) > 0 {
+			name = args[0]
+		}
+
+		// Get organization ID
+		orgId := promptForClusterOrganization(ctx, logger, cmd, urls.API, apikey, "What organization should we create the cluster in?")
+
+		provider, _ := cmd.Flags().GetString("provider")
+		size, _ := cmd.Flags().GetString("size")
+		region, _ := cmd.Flags().GetString("region")
+		format, _ := cmd.Flags().GetString("format")
+
+		// Validate inputs
+		if provider != "" {
+			if err := validateProvider(provider); err != nil {
+				errsystem.New(errsystem.ErrInvalidArgumentProvided, err, errsystem.WithContextMessage("Invalid provider")).ShowErrorAndExit()
+			}
+		}
+
+		if size != "" {
+			if err := validateSize(size); err != nil {
+				errsystem.New(errsystem.ErrInvalidArgumentProvided, err, errsystem.WithContextMessage("Invalid cluster size")).ShowErrorAndExit()
+			}
+		}
+
+		if format != "" {
+			if err := validateFormat(format); err != nil {
+				errsystem.New(errsystem.ErrInvalidArgumentProvided, err, errsystem.WithContextMessage("Invalid output format")).ShowErrorAndExit()
+			}
+		}
+
+		// Interactive prompts if TTY available and values not provided
+		if tui.HasTTY {
+			if provider == "" {
+				opts := []tui.Option{}
+				var keys []string
+				for k := range validProviders {
+					keys = append(keys, k)
+				}
+				sort.Strings(keys)
+				for _, id := range keys {
+					opts = append(opts, tui.Option{ID: id, Text: validProviders[id]})
+				}
+				provider = tui.Select(logger, "Which provider should we use?", "", opts)
+			}
+
+			if size == "" {
+				opts := []tui.Option{
+					{ID: "dev", Text: tui.PadRight("Dev", 15, " ") + tui.Muted("1 x 2 CPU, 8 GB RAM, 50GB Disk")},
+					{ID: "small", Text: tui.PadRight("Small", 15, " ") + tui.Muted("1 x 4 CPU, 16 GB RAM, 100GB Disk")},
+					{ID: "medium", Text: tui.PadRight("Medium", 15, " ") + tui.Muted("2 x 8 CPU, 32 GB RAM, 500GB Disk")},
+					{ID: "large", Text: tui.PadRight("Large", 15, " ") + tui.Muted("3 x 16 CPU, 128 GB RAM, 1500GB Disk")},
+				}
+				size = tui.Select(logger, "What size cluster do you need?", "This will be used to provision the cluster", opts)
+			}
+
+			if region == "" {
+				opts := getRegionsForProvider(provider)
+				region = tui.Select(logger, "Which region should we use?", "The region to deploy the cluster", opts)
+			}
+
+			if name == "" {
+				name = tui.Input(logger, "What should we name the cluster?", "A unique name for your cluster")
+			}
+
+		} else {
+			// Non-interactive validation
+			if name == "" {
+				errsystem.New(errsystem.ErrMissingRequiredArgument, fmt.Errorf("cluster name is required"), errsystem.WithContextMessage("Missing cluster name")).ShowErrorAndExit()
+			}
+			if provider == "" {
+				errsystem.New(errsystem.ErrMissingRequiredArgument, fmt.Errorf("provider is required"), errsystem.WithContextMessage("Missing provider")).ShowErrorAndExit()
+			}
+			if size == "" {
+				errsystem.New(errsystem.ErrMissingRequiredArgument, fmt.Errorf("size is required"), errsystem.WithContextMessage("Missing cluster size")).ShowErrorAndExit()
+			}
+			if region == "" {
+				errsystem.New(errsystem.ErrMissingRequiredArgument, fmt.Errorf("region is required"), errsystem.WithContextMessage("Missing region")).ShowErrorAndExit()
+			}
+		}
+
+		ready := tui.Ask(logger, "Ready to create the cluster", true)
+		if !ready {
+			logger.Info("Cluster creation cancelled")
+			os.Exit(0)
+		}
+
+		var cluster *infrastructure.Cluster
+
+		tui.ShowSpinner("Creating cluster...", func() {
+			var err error
+			cluster, err = infrastructure.CreateCluster(ctx, logger, urls.API, apikey, infrastructure.CreateClusterArgs{
+				Name:     name,
+				Provider: provider,
+				Type:     size,
+				Region:   region,
+				OrgID:    orgId,
+			})
+			if err != nil {
+				errsystem.New(errsystem.ErrCreateProject, err, errsystem.WithContextMessage("Failed to create cluster")).ShowErrorAndExit()
+			}
+
+			if err := infrastructure.Setup(ctx, logger, cluster, format); err != nil {
+				logger.Fatal("%s", err)
+			}
+		})
+
+		if format == "json" {
+			outputJSON(cluster)
+		} else {
+			tui.ShowSuccess("Cluster %s created successfully with ID: %s", cluster.Name, cluster.ID)
+		}
+	},
+}
+
+var clusterListCmd = &cobra.Command{
+	Use:     "list",
+	GroupID: "info",
+	Short:   "List all clusters",
+	Long: `List all infrastructure clusters in your organization.
+
+This command displays all clusters, showing their IDs, names, providers, and status.
+
+Examples:
+  agentuity cluster list
+  agentuity cluster ls --format json`,
+	Aliases: []string{"ls"},
+	Args:    cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		logger := env.NewLogger(cmd)
+		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
+		urls := util.GetURLs(logger)
+
+		// Check if clustering is enabled for cluster operations
+		infrastructure.EnsureClusteringEnabled(ctx, logger, urls.API, apikey)
+
+		format, _ := cmd.Flags().GetString("format")
+		if format != "" {
+			if err := validateFormat(format); err != nil {
+				errsystem.New(errsystem.ErrInvalidArgumentProvided, err, errsystem.WithContextMessage("Invalid output format")).ShowErrorAndExit()
+			}
+		}
+
+		var clusters []infrastructure.Cluster
+
+		tui.ShowSpinner("Fetching clusters...", func() {
+			var err error
+			clusters, err = infrastructure.ListClusters(ctx, logger, urls.API, apikey)
+			if err != nil {
+				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list clusters")).ShowErrorAndExit()
+			}
+		})
+
+		if format == "json" {
+			outputJSON(clusters)
+			return
+		}
+
+		if len(clusters) == 0 {
+			fmt.Println()
+			tui.ShowWarning("no clusters found")
+			fmt.Println()
+			tui.ShowBanner("Create a new cluster", tui.Text("Use the ")+tui.Command("cluster new")+tui.Text(" command to create a new cluster"), false)
+			return
+		}
+
+		// Sort clusters by name
+		sort.Slice(clusters, func(i, j int) bool {
+			return clusters[i].Name < clusters[j].Name
+		})
+
+		headers := []string{
+			tui.Title("ID"),
+			tui.Title("Name"),
+			tui.Title("Provider"),
+			tui.Title("Size"),
+			tui.Title("Region"),
+			tui.Title("Created"),
+		}
+
+		rows := [][]string{}
+		for _, cluster := range clusters {
+			// Since backend doesn't have status or machine_count, we'll show type and created date
+			rows = append(rows, []string{
+				tui.Muted(cluster.ID),
+				tui.Bold(cluster.Name),
+				tui.Text(cluster.Provider),
+				tui.Text(cluster.Type), // backend field name
+				tui.Text(cluster.Region),
+				tui.Muted(cluster.CreatedAt[:10]), // show date only
+			})
+		}
+
+		tui.Table(headers, rows)
+
+	},
+}
+
+var clusterRemoveCmd = &cobra.Command{
+	Use:     "remove [id]",
+	GroupID: "management",
+	Short:   "Remove a cluster",
+	Long: `Remove an infrastructure cluster by ID.
+
+This command will delete the specified cluster and all its resources.
+
+Arguments:
+  [id]    The ID of the cluster to remove
+
+Examples:
+  agentuity cluster remove cluster-001
+  agentuity cluster rm cluster-001 --force`,
+	Aliases: []string{"rm", "del"},
+	Args:    cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		logger := env.NewLogger(cmd)
+		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
+		urls := util.GetURLs(logger)
+
+		// Check if clustering is enabled for cluster operations
+		infrastructure.EnsureClusteringEnabled(ctx, logger, urls.API, apikey)
+
+		clusterID := args[0]
+		force, _ := cmd.Flags().GetBool("force")
+
+		if !force {
+			if !tui.Ask(logger, fmt.Sprintf("Are you sure you want to remove cluster %s? This action cannot be undone.", clusterID), false) {
+				tui.ShowWarning("cancelled")
+				return
+			}
+		}
+
+		tui.ShowSpinner(fmt.Sprintf("Removing cluster %s...", clusterID), func() {
+			if err := infrastructure.DeleteCluster(ctx, logger, urls.API, apikey, clusterID); err != nil {
+				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to remove cluster")).ShowErrorAndExit()
+			}
+		})
+
+		tui.ShowSuccess("Cluster %s removed successfully", clusterID)
+
+	},
+}
+
+var clusterStatusCmd = &cobra.Command{
+	Use:     "status [id]",
+	GroupID: "info",
+	Short:   "Get cluster status",
+	Long: `Get the detailed status of a specific cluster.
+
+Arguments:
+  [id]    The ID of the cluster
+
+Examples:
+  agentuity cluster status cluster-001
+  agentuity cluster status cluster-001 --format json`,
+	Args: cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+		logger := env.NewLogger(cmd)
+		apikey, _ := util.EnsureLoggedIn(ctx, logger, cmd)
+		urls := util.GetURLs(logger)
+
+		// Check if clustering is enabled for cluster operations
+		infrastructure.EnsureClusteringEnabled(ctx, logger, urls.API, apikey)
+
+		clusterID := args[0]
+		format, _ := cmd.Flags().GetString("format")
+
+		if format != "" {
+			if err := validateFormat(format); err != nil {
+				errsystem.New(errsystem.ErrInvalidArgumentProvided, err, errsystem.WithContextMessage("Invalid output format")).ShowErrorAndExit()
+			}
+		}
+
+		var cluster *infrastructure.Cluster
+
+		tui.ShowSpinner(fmt.Sprintf("Fetching cluster %s status...", clusterID), func() {
+			var err error
+			cluster, err = infrastructure.GetCluster(ctx, logger, urls.API, apikey, clusterID)
+			if err != nil {
+				errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to get cluster status")).ShowErrorAndExit()
+			}
+		})
+
+		if format == "json" {
+			outputJSON(cluster)
+			return
+		}
+
+		fmt.Printf("Cluster ID: %s\n", tui.Bold(cluster.ID))
+		fmt.Printf("Name: %s\n", cluster.Name)
+		fmt.Printf("Provider: %s\n", cluster.Provider)
+		fmt.Printf("Size: %s\n", cluster.Type) // backend field is "type"
+		fmt.Printf("Region: %s\n", cluster.Region)
+		if cluster.OrgID != nil {
+			fmt.Printf("Organization ID: %s\n", *cluster.OrgID)
+		}
+		if cluster.OrgName != nil {
+			fmt.Printf("Organization: %s\n", *cluster.OrgName)
+		}
+		fmt.Printf("Created: %s\n", cluster.CreatedAt)
+		if cluster.UpdatedAt != nil {
+			fmt.Printf("Updated: %s\n", *cluster.UpdatedAt)
+		}
+
+	},
+}
+
+func init() {
+	// Add command groups for cluster operations
+	clusterCmd.AddGroup(&cobra.Group{
+		ID:    "management",
+		Title: "Cluster Management:",
+	})
+	clusterCmd.AddGroup(&cobra.Group{
+		ID:    "info",
+		Title: "Information:",
+	})
+
+	rootCmd.AddCommand(clusterCmd)
+	clusterCmd.AddCommand(clusterNewCmd)
+	clusterCmd.AddCommand(clusterListCmd)
+	clusterCmd.AddCommand(clusterRemoveCmd)
+	clusterCmd.AddCommand(clusterStatusCmd)
+
+	// Flags for cluster new command
+	clusterNewCmd.Flags().String("provider", "", "The infrastructure provider (gcp, aws, azure, vmware, other)")
+	clusterNewCmd.Flags().String("size", "", "The cluster size (dev, small, medium, large)")
+	clusterNewCmd.Flags().String("region", "", "The region to deploy the cluster")
+	clusterNewCmd.Flags().String("format", "table", "Output format (table, json)")
+	clusterNewCmd.Flags().String("org-id", "", "The organization to create the cluster in")
+
+	// Flags for cluster list command
+	clusterListCmd.Flags().String("format", "table", "Output format (table, json)")
+
+	// Flags for cluster remove command
+	clusterRemoveCmd.Flags().Bool("force", false, "Force removal without confirmation")
+
+	// Flags for cluster status command
+	clusterStatusCmd.Flags().String("format", "table", "Output format (table, json)")
+}
