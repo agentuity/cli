@@ -18,8 +18,9 @@ import (
 )
 
 var machineCmd = &cobra.Command{
-	Use:   "machine",
-	Short: "Machine management commands",
+	Use:    "machine",
+	Hidden: true,
+	Short:  "Machine management commands",
 	Long: `Machine management commands for listing and managing infrastructure machines.
 
 Use the subcommands to manage your machines.`,

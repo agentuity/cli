@@ -139,8 +139,9 @@ func promptForClusterOrganization(ctx context.Context, logger logger.Logger, cmd
 }
 
 var clusterCmd = &cobra.Command{
-	Use:   "cluster",
-	Short: "Cluster management commands",
+	Use:    "cluster",
+	Hidden: true,
+	Short:  "Cluster management commands",
 	Long: `Cluster management commands for creating, listing, and managing infrastructure clusters.
 
 Use the subcommands to manage your clusters.`,
