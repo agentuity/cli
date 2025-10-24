@@ -381,7 +381,7 @@ func promptForClusterSelection(ctx context.Context, logger logger.Logger, apiUrl
 	if err != nil {
 		errsystem.New(errsystem.ErrApiRequest, err, errsystem.WithContextMessage("Failed to list clusters")).ShowErrorAndExit()
 	}
-	fmt.Println(clusters)
+	logger.Debug("retrieved clusters", "count", len(clusters))
 
 	if len(clusters) == 0 {
 		errsystem.New(errsystem.ErrApiRequest, fmt.Errorf("no clusters found"), errsystem.WithUserMessage("No clusters found. Please create a cluster first using 'agentuity cluster create'")).ShowErrorAndExit()
@@ -429,7 +429,7 @@ func promptForClusterSelection(ctx context.Context, logger logger.Logger, apiUrl
 // promptForRegionSelection prompts the user to select a region
 func promptForRegionSelection(ctx context.Context, logger logger.Logger, provider string) string {
 	// Get regions for the provider (reuse the same logic from cluster.go)
-	fmt.Println("Provider:", provider)
+	logger.Debug("provider", provider)
 	opts := getRegionsForProvider(provider)
 	return tui.Select(logger, "Which region should we use?", "The region to deploy the machine", opts)
 }
