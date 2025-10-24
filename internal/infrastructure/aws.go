@@ -30,6 +30,11 @@ func (s *awsSetup) Setup(ctx context.Context, logger logger.Logger, cluster *Clu
 		return err
 	}
 
+	// Use the cluster's region if specified, otherwise fall back to detected region
+	if cluster.Region != "" {
+		region = cluster.Region
+	}
+
 	// Generate unique names for AWS resources
 	roleName := "agentuity-cluster-" + cluster.ID
 	policyName := "agentuity-cluster-policy-" + cluster.ID
@@ -289,7 +294,7 @@ func aws_checkRoleInInstanceProfile() string {
 
 func aws_createSecret() string {
 	cmd := []string{
-		`echo '{ENCRYPTION_PRIVATE_KEY}' | base64 -d | openssl ec -inform DER -outform PEM > /tmp/agentuity-key.pem`,
+		`echo '{ENCRYPTION_PRIVATE_KEY}' | base64 -d | openssl ec -outform PEM > /tmp/agentuity-key.pem`,
 		`aws --region {AWS_REGION} secretsmanager create-secret --name '{AWS_SECRET_NAME}' --description 'Agentuity Cluster Private Key' --secret-string file:///tmp/agentuity-key.pem`,
 		`rm -f /tmp/agentuity-key.pem`,
 	}

@@ -107,22 +107,36 @@ func quoteCmdArg(arg string) string {
 
 func execAction(ctx context.Context, canExecute bool, instruction string, help string, cmd string, args []string, runner runFunc, success string, skipFunc possibleSkipFunc) error {
 	fmt.Println(commandBorderStyle.Render(instruction + "\n\n" + tui.Muted(help)))
+
+	// Extract the actual command for display/clipboard if using sh -c wrapper
+	displayCmd := cmd
+	displayArgs := args
+	clipboardCmd := cmd + " " + strings.Join(args, " ")
+
+	if cmd == "sh" && len(args) >= 2 && args[0] == "-c" {
+		// Extract the actual command from sh -c "command" and display it directly
+		displayCmd = ""
+		displayArgs = []string{args[1]}
+		clipboardCmd = args[1]
+	}
+
 	f := wordwrap.NewWriter(78)
 	f.Newline = []rune{'\r'}
 	f.KeepNewlines = true
 	f.Breakpoints = []rune{' ', '|'}
 	f.Write([]byte(commandPromptStyle.Render("$ ")))
-	f.Write([]byte(commandBodyStyle.Render(cmd)))
-	f.Write([]byte(" "))
-	for _, arg := range args {
+	if displayCmd != "" {
+		f.Write([]byte(commandBodyStyle.Render(displayCmd)))
+		f.Write([]byte(" "))
+	}
+	for _, arg := range displayArgs {
 		f.Write([]byte(commandBodyStyle.Render(arg)))
 		f.Write([]byte(" "))
 	}
 	f.Close()
 	v := f.String()
 	v = strings.ReplaceAll(v, "\n", tui.Muted(" \\\n  "))
-	cmdbuf := []byte(cmd + " " + strings.Join(args, " "))
-	clipboard.Write(clipboard.FmtText, cmdbuf)
+	clipboard.Write(clipboard.FmtText, []byte(clipboardCmd))
 	fmt.Println(v)
 	fmt.Println()
 	switch confirmAction(canExecute) {
