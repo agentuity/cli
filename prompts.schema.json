@@ -1,0 +1,76 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "https://agentuity.com/prompts.schema.json",
+	"title": "Agentuity Prompts Schema",
+	"description": "The schema for Agentuity prompts configuration",
+	"type": "object",
+	"required": [
+		"prompts"
+	],
+	"properties": {
+		"prompts": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": [
+					"slug",
+					"name",
+					"description"
+				],
+				"anyOf": [
+					{
+						"required": [
+							"system"
+						],
+						"not": {
+							"required": [
+								"prompt"
+							]
+						}
+					},
+					{
+						"required": [
+							"prompt"
+						],
+						"not": {
+							"required": [
+								"system"
+							]
+						}
+					}
+				],
+				"properties": {
+					"slug": {
+						"type": "string",
+						"pattern": "^[a-z0-9-]+$",
+						"description": "A unique identifier for the prompt using lowercase letters, numbers, and hyphens"
+					},
+					"name": {
+						"type": "string",
+						"description": "The human-readable name of the prompt"
+					},
+					"description": {
+						"type": "string",
+						"description": "A description of what this prompt does"
+					},
+					"system": {
+						"type": "string",
+						"description": "The system message template with optional variables in {variable:default} format"
+					},
+					"prompt": {
+						"type": "string",
+						"description": "The user prompt template with optional variables in {variable:default} format"
+					},
+					"evals": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						},
+						"description": "Optional evaluation criteria for this prompt"
+					}
+				}
+			},
+			"description": "Array of prompt definitions"
+		}
+	}
+}
