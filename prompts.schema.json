@@ -21,22 +21,12 @@
 					{
 						"required": [
 							"system"
-						],
-						"not": {
-							"required": [
-								"prompt"
-							]
-						}
+						]
 					},
 					{
 						"required": [
 							"prompt"
-						],
-						"not": {
-							"required": [
-								"system"
-							]
-						}
+						]
 					}
 				],
 				"properties": {
