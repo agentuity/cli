@@ -8,7 +8,10 @@ import (
 	"github.com/agentuity/go-common/gravity/provider"
 	"github.com/agentuity/go-common/logger"
 	"gvisor.dev/gvisor/pkg/buffer"
+	"gvisor.dev/gvisor/pkg/tcpip"
+	"gvisor.dev/gvisor/pkg/tcpip/header"
 	"gvisor.dev/gvisor/pkg/tcpip/link/channel"
+	"gvisor.dev/gvisor/pkg/tcpip/network/ipv4"
 	"gvisor.dev/gvisor/pkg/tcpip/network/ipv6"
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
 )
@@ -89,9 +92,38 @@ func (p *cliProvider) ProcessInPacket(payload []byte) {
 	if p.ep == nil {
 		return
 	}
-	pkt := stack.NewPacketBuffer(stack.PacketBufferOptions{})
-	view := buffer.NewView(len(payload))
-	view.Write(payload)
-	pkt.Data().AppendView(view)
-	p.ep.InjectInbound(ipv6.ProtocolNumber, pkt)
+
+	if len(payload) < 1 {
+		return
+	}
+
+	// Detect IP version from the packet header
+	version := header.IPVersion(payload)
+	var protocol tcpip.NetworkProtocolNumber
+
+	switch version {
+	case 4:
+		if len(payload) < header.IPv4MinimumSize {
+			p.logger.Trace("dropping IPv4 packet: too short (%d bytes, need at least %d)", len(payload), header.IPv4MinimumSize)
+			return
+		}
+		protocol = ipv4.ProtocolNumber
+	case 6:
+		if len(payload) < header.IPv6MinimumSize {
+			p.logger.Trace("dropping IPv6 packet: too short (%d bytes, need at least %d)", len(payload), header.IPv6MinimumSize)
+			return
+		}
+		protocol = ipv6.ProtocolNumber
+	default:
+		p.logger.Trace("dropping packet: unknown IP version %d", version)
+		return
+	}
+
+	// Create packet buffer with proper payload and cleanup
+	pkt := stack.NewPacketBuffer(stack.PacketBufferOptions{
+		Payload: buffer.MakeWithData(append([]byte(nil), payload...)),
+	})
+	defer pkt.DecRef()
+
+	p.ep.InjectInbound(protocol, pkt)
 }

@@ -125,24 +125,35 @@ Examples:
 			log.Fatal("failed to find available port: %s", err)
 		}
 
+		connectProxyPort, _ := cmd.Flags().GetInt("proxy-port")
+		if connectProxyPort < 0 || connectProxyPort > 65535 {
+			log.Fatal("invalid --proxy-port: %d (must be 0-65535)", connectProxyPort)
+		}
+		var connectProxyPortPtr *uint
+		if connectProxyPort > 0 {
+			port := uint(connectProxyPort)
+			connectProxyPortPtr = &port
+		}
+
 		server, err := dev.New(dev.ServerArgs{
 			APIURL:   apiUrl,
 			APIKey:   apiKey,
 			Hostname: endpoint.Hostname,
 			Config: &gravity.Config{
-				Context:         ctx,
-				Logger:          log,
-				Version:         Version,
-				OrgID:           orgId,
-				Project:         theproject,
-				EndpointID:      endpoint.ID,
-				URL:             gravityUrl,
-				SDKKey:          project.Secrets["AGENTUITY_SDK_KEY"],
-				ProxyPort:       uint(proxyPort),
-				AgentPort:       uint(agentPort),
-				Ephemeral:       true,
-				ClientName:      "cli/devmode",
-				DynamicHostname: true,
+				Context:          ctx,
+				Logger:           log,
+				Version:          Version,
+				OrgID:            orgId,
+				Project:          theproject,
+				EndpointID:       endpoint.ID,
+				URL:              gravityUrl,
+				SDKKey:           project.Secrets["AGENTUITY_SDK_KEY"],
+				ProxyPort:        uint(proxyPort),
+				AgentPort:        uint(agentPort),
+				ConnectProxyPort: connectProxyPortPtr,
+				Ephemeral:        true,
+				ClientName:       "cli/devmode",
+				DynamicHostname:  true,
 			},
 		})
 		if err != nil {
@@ -307,6 +318,7 @@ func init() {
 	rootCmd.AddCommand(devCmd)
 	devCmd.Flags().StringP("dir", "d", ".", "The directory to run the development server in")
 	devCmd.Flags().Int("port", 0, "The port to run the development server on (uses project default if not provided)")
+	devCmd.Flags().Int("proxy-port", 19081, "The port to run the HTTP CONNECT proxy server on (disabled if zero)")
 	devCmd.Flags().Bool("no-build", false, "Do not build the project before running it (useful for debugging)")
 	devCmd.Flags().MarkHidden("no-build")
 }
