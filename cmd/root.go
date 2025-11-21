@@ -54,7 +54,7 @@ Docs:           %s
 Community:      %s
 Dashboard:      %s`,
 		tui.Bold("⨺ Agentuity"),
-		titleStyle.Render("Build, manage and deploy AI agents"),
+		titleStyle.Render("The full-stack platform for AI agents"),
 		Version,
 		tui.Link("https://agentuity.dev"),
 		tui.Link("https://discord.gg/agentuity"),
@@ -146,7 +146,7 @@ Dashboard:      %s`,
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "agentuity",
-	Short: "Agentuity CLI is a command-line tool for building, managing, and deploying AI agents.",
+	Short: "The full-stack platform for AI agents",
 	PreRun: func(cmd *cobra.Command, args []string) {
 		// do this after load so we can get the dynamic version
 		cmd.Long = logoBox.Render(fmt.Sprintf(`%s     %s
@@ -156,7 +156,7 @@ Docs:           %s
 Community:      %s
 Dashboard:      %s`,
 			tui.Bold("⨺ Agentuity"),
-			tui.Muted("Build, manage and deploy AI agents"),
+			tui.Muted("The full-stack platform for AI agents"),
 			Version,
 			tui.Link("https://agentuity.dev"),
 			tui.Link("https://discord.gg/agentuity"),

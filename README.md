@@ -11,7 +11,7 @@
 # Agentuity CLI
 
 
-The command line tools for the Agentuity Agent Cloud Platform.  These tools are used to build, manage, and deploy Agents to the Agentuity platform.
+The full-stack platform for AI agents.
 
 ## Installation
 
@@ -77,7 +77,7 @@ agentuity --help
 
 ## Usage
 
-The Agentuity CLI provides a comprehensive set of commands to help you build, manage, and deploy Agents. Here's an overview of the available commands:
+The Agentuity CLI provides a comprehensive set of commands to help you manage your AI agents. Here's an overview of the available commands:
 
 ### Basic Commands
 
