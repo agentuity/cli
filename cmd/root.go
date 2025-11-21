@@ -146,7 +146,7 @@ Dashboard:      %s`,
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "agentuity",
-	Short: "The full-stack platform for AI agents",
+	Short: "Agentuity CLI is a command-line tool for building, managing, and deploying AI agents.",
 	PreRun: func(cmd *cobra.Command, args []string) {
 		// do this after load so we can get the dynamic version
 		cmd.Long = logoBox.Render(fmt.Sprintf(`%s     %s
