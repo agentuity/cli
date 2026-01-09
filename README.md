@@ -10,6 +10,9 @@
 
 # Agentuity CLI
 
+> [!WARNING]
+> This repo has now been deprecated in favor of the new opensource [SDK mono repo](https://github.com/agentuity/sdk) and will be archived soon.
+
 
 The command line tools for the Agentuity Agent Cloud Platform.  These tools are used to build, manage, and deploy Agents to the Agentuity platform.
 
